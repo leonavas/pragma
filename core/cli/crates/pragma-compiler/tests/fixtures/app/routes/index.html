@@ -1,0 +1,21 @@
+<title>Início</title>
+<section class="p-4">
+  <h1 class="text-2xl font-bold">Produtos</h1>
+  <button class="btn" data-on-click="alternar" data-open="sobre">Alternar</button>
+  <c-card titulo="Destaque" destaque class="mt-4">
+    <p>Corpo do card</p>
+    <button slot="acoes" class="btn" data-on-click="alternar" data-text="state.aberto">Alternar</button>
+  </c-card>
+  <ul data-show="state.aberto">
+    <template data-for="item in state.itens" data-key="item.id">
+      <li>
+        <span data-text="item.nome">nome</span>
+        <template data-if="item.promo">
+          <c-card titulo="Promo"><b>promo</b></c-card>
+        </template>
+        <template data-else><i>normal</i></template>
+      </li>
+    </template>
+    <template data-empty><li>Nada</li></template>
+  </ul>
+</section>

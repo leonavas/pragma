@@ -1,0 +1,47 @@
+{
+  "mode": "preview",
+  "results": [
+    {
+      "name": "1. Rotas, títulos, links SPA e 404",
+      "passed": true
+    },
+    {
+      "name": "2. Histórico, deep links e filtros URL (preview)",
+      "passed": true
+    },
+    {
+      "name": "3. Counters independentes e limites",
+      "passed": true
+    },
+    {
+      "name": "4. Carrinho, estoque e derivados imediatos",
+      "passed": true
+    },
+    {
+      "name": "5. Tarefas: validação, CRUD, busca, chave e confirmação",
+      "passed": true
+    },
+    {
+      "name": "6. Persistência de tarefas, carrinho e tema",
+      "passed": true
+    },
+    {
+      "name": "7. Relógio e listeners descartados em 5 ciclos",
+      "passed": true
+    },
+    {
+      "name": "8. Esqueleto, erro simulado/real, retry, vazio e cache",
+      "passed": true
+    },
+    {
+      "name": "9. Modal: Escape, botão, fundo e foco; tabs por teclado",
+      "passed": true
+    },
+    {
+      "name": "10. Artefatos estáticos, responsividade e ausência de erros JS",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "fetches": 13
+}

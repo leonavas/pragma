@@ -1,0 +1,16 @@
+[package]
+name = "pragma-jslint"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+pragma-diag.workspace = true
+oxc_allocator = "0.159"
+oxc_ast = "0.159"
+oxc_ast_visit = "0.159"
+oxc_codegen = { version = "0.159", default-features = false }
+oxc_minifier = "0.159"
+oxc_parser = "0.159"
+oxc_span = "0.159"
+oxc_syntax = "0.159"

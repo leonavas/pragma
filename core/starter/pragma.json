@@ -1,0 +1,4 @@
+{
+  "name": "app",
+  "budgets": { "initialJsKb": 15, "routeJsKb": 10, "cssKb": 15 }
+}

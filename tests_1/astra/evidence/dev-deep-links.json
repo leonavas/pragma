@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "mode": "dev",
+  "checked": [
+    "deep link e refresh /tarefas?filtro=concluidas",
+    "deep link e refresh /loja/cafe",
+    "voltar/avançar categoria da loja"
+  ]
+}

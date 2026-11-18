@@ -1,0 +1,25 @@
+{
+  "assets": [
+    {
+      "file": "dist/assets/app.css",
+      "bytes": 12497,
+      "gzip": 3747
+    },
+    {
+      "file": "dist/assets/app.js",
+      "bytes": 23666,
+      "gzip": 8188
+    }
+  ],
+  "jsGzip": 8188,
+  "firstVisitJsGzip": 8188,
+  "cssGzip": 3747,
+  "lines": {
+    "js": 769,
+    "svelte": 0,
+    "css": 156,
+    "html": 16
+  },
+  "runtimeLines": 111,
+  "appJsExcludingRuntime": 658
+}

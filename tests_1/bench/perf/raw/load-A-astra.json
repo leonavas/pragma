@@ -1,0 +1,626 @@
+{
+ "measure": "load",
+ "profile": "A",
+ "app": "astra",
+ "runs": 10,
+ "chromium": "159.0.8154.6",
+ "at": "2026-11-18T19:56:47.049Z",
+ "data": {
+  "/": [
+   {
+    "fcp": 140,
+    "lcp": 140,
+    "lcpEl": "H1.",
+    "dcl": 116.5,
+    "load": 116.59999999403954,
+    "ttfb": 6.799999997019768,
+    "longTasks": 1,
+    "longTaskMs": 81,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 103,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 104,
+    "lcp": 104,
+    "lcpEl": "H1.",
+    "dcl": 87.20000000298023,
+    "load": 87.3999999910593,
+    "ttfb": 4.399999991059303,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 103,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 108,
+    "lcp": 108,
+    "lcpEl": "H1.",
+    "dcl": 81.5,
+    "load": 81.79999999701977,
+    "ttfb": 4.0999999940395355,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 103,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 116,
+    "lcp": 116,
+    "lcpEl": "H1.",
+    "dcl": 91.90000000596046,
+    "load": 92.29999999701977,
+    "ttfb": 6.799999997019768,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 103,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 104,
+    "lcp": 104,
+    "lcpEl": "H1.",
+    "dcl": 87.20000000298023,
+    "load": 87.5,
+    "ttfb": 4.799999997019768,
+    "longTasks": 1,
+    "longTaskMs": 51,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 103,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 96,
+    "lcp": 96,
+    "lcpEl": "H1.",
+    "dcl": 72.19999998807907,
+    "load": 72.3999999910593,
+    "ttfb": 4.0999999940395355,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 103,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 108,
+    "lcp": 108,
+    "lcpEl": "H1.",
+    "dcl": 83.90000000596046,
+    "load": 84.09999999403954,
+    "ttfb": 3.4000000059604645,
+    "longTasks": 1,
+    "longTaskMs": 50,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 103,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 108,
+    "lcp": 108,
+    "lcpEl": "H1.",
+    "dcl": 89.30000001192093,
+    "load": 89.5,
+    "ttfb": 5.600000008940697,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 103,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 104,
+    "lcp": 104,
+    "lcpEl": "H1.",
+    "dcl": 85.1000000089407,
+    "load": 85.20000000298023,
+    "ttfb": 3,
+    "longTasks": 1,
+    "longTaskMs": 50,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 103,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 116,
+    "lcp": 116,
+    "lcpEl": "H1.",
+    "dcl": 86.20000000298023,
+    "load": 86.40000000596046,
+    "ttfb": 3.6000000089406967,
+    "longTasks": 1,
+    "longTaskMs": 55,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 103,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   }
+  ],
+  "/tarefas": [
+   {
+    "fcp": 112,
+    "lcp": 112,
+    "lcpEl": "H1.",
+    "dcl": 87.70000000298023,
+    "load": 89.5,
+    "ttfb": 3.4000000059604645,
+    "longTasks": 1,
+    "longTaskMs": 51,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 92,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/tarefas",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 96,
+    "lcp": 96,
+    "lcpEl": "H1.",
+    "dcl": 73.40000000596046,
+    "load": 75.70000000298023,
+    "ttfb": 4.5999999940395355,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 92,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/tarefas",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 88,
+    "lcp": 88,
+    "lcpEl": "H1.",
+    "dcl": 69.70000000298023,
+    "load": 70.79999999701977,
+    "ttfb": 6.9000000059604645,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 92,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/tarefas",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 128,
+    "lcp": 128,
+    "lcpEl": "H1.",
+    "dcl": 87.90000000596046,
+    "load": 89.79999999701977,
+    "ttfb": 4.0999999940395355,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 92,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/tarefas",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 100,
+    "lcp": 100,
+    "lcpEl": "H1.",
+    "dcl": 78.80000001192093,
+    "load": 81.30000001192093,
+    "ttfb": 7.200000002980232,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 92,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/tarefas",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 112,
+    "lcp": 112,
+    "lcpEl": "H1.",
+    "dcl": 87.29999999701977,
+    "load": 88.5,
+    "ttfb": 7.700000002980232,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 92,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/tarefas",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 128,
+    "lcp": 128,
+    "lcpEl": "H1.",
+    "dcl": 95.20000000298023,
+    "load": 97.29999999701977,
+    "ttfb": 5.399999991059303,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 92,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/tarefas",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 96,
+    "lcp": 96,
+    "lcpEl": "H1.",
+    "dcl": 73.09999999403954,
+    "load": 74.5,
+    "ttfb": 4.700000002980232,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 92,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/tarefas",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 128,
+    "lcp": 128,
+    "lcpEl": "H1.",
+    "dcl": 93.5,
+    "load": 96.19999998807907,
+    "ttfb": 5.5999999940395355,
+    "longTasks": 1,
+    "longTaskMs": 55,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 92,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/tarefas",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   },
+   {
+    "fcp": 120,
+    "lcp": 120,
+    "lcpEl": "H1.",
+    "dcl": 89.3999999910593,
+    "load": 92.29999999701977,
+    "ttfb": 3.3999999910593033,
+    "longTasks": 1,
+    "longTaskMs": 51,
+    "tbt": 0,
+    "decodedBytes": 36671,
+    "domNodes": 92,
+    "requests": 3,
+    "bytes": 37031,
+    "urls": [
+     "/tarefas",
+     "/assets/app.css",
+     "/assets/app.js"
+    ]
+   }
+  ],
+  "/loja": [
+   {
+    "fcp": 88,
+    "lcp": 88,
+    "lcpEl": "P.muted",
+    "dcl": 66.29999999701977,
+    "load": 68.09999999403954,
+    "ttfb": 4,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 37646,
+    "domNodes": 212,
+    "requests": 4,
+    "bytes": 38130,
+    "urls": [
+     "/loja",
+     "/assets/app.css",
+     "/assets/app.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 132,
+    "lcp": 132,
+    "lcpEl": "P.muted",
+    "dcl": 104.79999999701977,
+    "load": 107.29999999701977,
+    "ttfb": 5.0999999940395355,
+    "longTasks": 1,
+    "longTaskMs": 55,
+    "tbt": 0,
+    "decodedBytes": 37646,
+    "domNodes": 212,
+    "requests": 4,
+    "bytes": 38130,
+    "urls": [
+     "/loja",
+     "/assets/app.css",
+     "/assets/app.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 112,
+    "lcp": 112,
+    "lcpEl": "P.muted",
+    "dcl": 82.59999999403954,
+    "load": 86,
+    "ttfb": 3.7999999970197678,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 37646,
+    "domNodes": 212,
+    "requests": 4,
+    "bytes": 38130,
+    "urls": [
+     "/loja",
+     "/assets/app.css",
+     "/assets/app.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 96,
+    "lcp": 96,
+    "lcpEl": "P.muted",
+    "dcl": 76.40000000596046,
+    "load": 78.90000000596046,
+    "ttfb": 3.4000000059604645,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 37646,
+    "domNodes": 212,
+    "requests": 4,
+    "bytes": 38130,
+    "urls": [
+     "/loja",
+     "/assets/app.css",
+     "/assets/app.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 104,
+    "lcp": 104,
+    "lcpEl": "P.muted",
+    "dcl": 82.40000000596046,
+    "load": 84.20000000298023,
+    "ttfb": 4.200000002980232,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 37646,
+    "domNodes": 212,
+    "requests": 4,
+    "bytes": 38130,
+    "urls": [
+     "/loja",
+     "/assets/app.css",
+     "/assets/app.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 120,
+    "lcp": 120,
+    "lcpEl": "P.muted",
+    "dcl": 87,
+    "load": 89.5,
+    "ttfb": 4.600000008940697,
+    "longTasks": 1,
+    "longTaskMs": 51,
+    "tbt": 0,
+    "decodedBytes": 37646,
+    "domNodes": 212,
+    "requests": 4,
+    "bytes": 38130,
+    "urls": [
+     "/loja",
+     "/assets/app.css",
+     "/assets/app.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 120,
+    "lcp": 120,
+    "lcpEl": "P.muted",
+    "dcl": 96.70000000298023,
+    "load": 97.79999999701977,
+    "ttfb": 6.299999997019768,
+    "longTasks": 1,
+    "longTaskMs": 57,
+    "tbt": 0,
+    "decodedBytes": 37646,
+    "domNodes": 212,
+    "requests": 4,
+    "bytes": 38130,
+    "urls": [
+     "/loja",
+     "/assets/app.css",
+     "/assets/app.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 116,
+    "lcp": 116,
+    "lcpEl": "P.muted",
+    "dcl": 79.70000000298023,
+    "load": 81.29999999701977,
+    "ttfb": 3.9000000059604645,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 37646,
+    "domNodes": 212,
+    "requests": 4,
+    "bytes": 38130,
+    "urls": [
+     "/loja",
+     "/assets/app.css",
+     "/assets/app.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 112,
+    "lcp": 112,
+    "lcpEl": "P.muted",
+    "dcl": 81.30000001192093,
+    "load": 83.40000000596046,
+    "ttfb": 6,
+    "longTasks": 1,
+    "longTaskMs": 50,
+    "tbt": 0,
+    "decodedBytes": 37646,
+    "domNodes": 212,
+    "requests": 4,
+    "bytes": 38130,
+    "urls": [
+     "/loja",
+     "/assets/app.css",
+     "/assets/app.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 116,
+    "lcp": 116,
+    "lcpEl": "P.muted",
+    "dcl": 80.5,
+    "load": 82.79999999701977,
+    "ttfb": 3.5,
+    "longTasks": 1,
+    "longTaskMs": 51,
+    "tbt": 0,
+    "decodedBytes": 37646,
+    "domNodes": 212,
+    "requests": 4,
+    "bytes": 38130,
+    "urls": [
+     "/loja",
+     "/assets/app.css",
+     "/assets/app.js",
+     "/produtos.json"
+    ]
+   }
+  ]
+ }
+}

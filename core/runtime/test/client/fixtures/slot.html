@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Slot</title>
+  <script>self.__pragmaDev=true</script>
+  <script type="application/json" id="pragma-route">{"pattern":"/slot","page":"/assets/slot.js","components":{"caixa":"/assets/caixa.js","contador":"/assets/contador.js"},"stores":{"conta":"/assets/conta.js"},"loader":false,"ssr":false}</script>
+  <script type="module" src="/core/boot.js"></script>
+</head>
+<body>
+  <header><nav><a id="nav-a" href="/a">A</a> <a id="nav-slot" href="/slot">Slot</a></nav> <span id="qtd" data-text="shared.conta.total"></span></header>
+  <main data-page>
+    <section data-c="caixa" data-inicial="5" data-on-click="caixa">
+      <h2 id="caixa-titulo" data-text="state.titulo"></h2>
+      <button id="caixa-mais" data-on-click="mais">+</button>
+      <output id="caixa-n" data-text="state.n"></output>
+      <div class="corpo">
+        <button id="pagina-btn" data-slot="1" data-on-click="pagina">página</button>
+        <p id="pagina-titulo" data-slot="1" data-text="state.titulo"></p>
+        <input id="pagina-campo" data-slot="1" data-model="state.campo">
+        <template data-slot="1" data-if="state.mostrar" data-tid="s1"><b id="pagina-if" data-text="state.titulo"></b></template>
+        <div data-c="contador">
+          <button class="mais" data-on-click="mais">+</button><span class="cont" data-text="state.n"></span>
+          <button id="fundo-btn" data-slot="2" data-on-click="pagina">fundo</button>
+          <button id="meio-btn" data-slot="1" data-on-click="mais">meio</button>
+        </div>
+      </div>
+    </section>
+    <ul>
+      <template data-for="item in state.itens" data-key="item.id" data-tid="s2"><li>
+        <div data-c="caixa" data-inicial="1" data-attr-data-max="item.max">
+          <output class="n" data-text="state.n"></output><span class="max" data-text="state.max"></span>
+          <button class="item-btn" data-slot="1" data-on-click="escolher" data-text="item.nome"></button>
+        </div>
+      </li></template>
+    </ul>
+    <span id="campo" data-text="state.campo"></span>
+    <span id="escolhido" data-text="state.escolhido"></span>
+    <span id="dobro" data-text="state.dobro"></span>
+    <a id="link-slot" href="/slot">aqui</a>
+    <a id="link-filtro" href="/slot?f=1">filtro</a>
+    <input id="chk" type="checkbox" data-attr-checked="state.marcado">
+    <template data-if="state.editando" data-tid="s3"><input id="edit" autofocus></template>
+  </main>
+</body>
+</html>

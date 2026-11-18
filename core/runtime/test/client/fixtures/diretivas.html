@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Diretivas</title>
+  <style>#alto{height:3000px}</style>
+  <script>self.__pragmaDev=true</script>
+  <link rel="modulepreload" href="/assets/diretivas.js">
+  <script type="application/json" id="pragma-route">{"pattern":"/diretivas","page":"/assets/diretivas.js","components":{"contador":"/assets/contador.js"},"stores":{"carrinho":"/assets/carrinho.js"},"loader":false,"ssr":false}</script>
+  <script type="module" src="/core/boot.js"></script>
+</head>
+<body>
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qtd" data-text="shared.carrinho.itens.length"></span></header>
+  <main data-page>
+    <h1 id="nome" data-text="state.nome"></h1>
+    <a id="link" data-attr-href="state.link" data-attr-aria-disabled="state.desabilitado" data-attr-title="state.titulo" data-attr-data-x="state.ativo">link</a>
+    <p id="cls" class="base" data-class-ativo="state.ativo" data-class-inativo="!state.ativo">classe</p>
+    <p id="show" data-show="state.ativo">show</p>
+    <p id="hide" data-show="!state.ativo">hide</p>
+    <template data-if="state.mostrar" data-tid="t1"><p id="sim">sim</p></template>
+    <template data-else><p id="nao">não</p></template>
+    <ul id="lista">
+      <template data-for="item in state.itens" data-key="item.id" data-tid="t2"><li>
+        <span class="n" data-text="item.nome"></span>
+        <template data-if="item.ok" data-tid="t3"><b class="ok">ok</b></template>
+        <template data-for="tag in item.tags" data-key="tag.t" data-tid="t4"><i class="tag" data-text="tag.t"></i></template>
+        <template data-empty><i class="sem">sem tags</i></template>
+        <div data-c="contador"><button class="mais" data-on-click="mais">+</button><span class="cont" data-text="state.n"></span><span class="dono" data-text="item.nome"></span></div>
+        <button class="rm" data-on-click="remover">x</button>
+      </li></template>
+      <template data-empty><li id="vazio">vazio</li></template>
+    </ul>
+    <div data-with-p="state.pessoa"><span id="w" data-text="p.nome"></span></div>
+    <input id="m-text" data-model="state.nome">
+    <input id="m-check" type="checkbox" data-model="state.aceito">
+    <input id="m-num" type="number" data-model="state.qtd">
+    <select id="m-sel" data-model="state.cor"><template data-for="c in state.cores" data-key="c" data-tid="t5"><option data-attr-value="c" data-text="c"></option></template></select>
+    <input id="r-p" type="radio" name="tam" value="p" data-model="state.tamanho">
+    <input id="r-g" type="radio" name="tam" value="g" data-model="state.tamanho">
+    <span id="eco-qtd" data-text="state.qtd"></span>
+    <span id="eco-aceito" data-text="state.aceito"></span>
+    <span id="eco-tam" data-text="state.tamanho"></span>
+    <span id="eco-cor" data-text="state.cor"></span>
+    <button id="alternar" data-on-click="alternar">alternar</button>
+    <button id="salvar" data-on-click="salvar">salvar</button>
+    <button id="falhar" data-on-click="falhar">falhar</button>
+    <span id="salvando" data-show="state.salvando">salvando</span>
+    <template data-if="state.resposta" data-tid="t6"><span id="resposta" data-text="state.resposta.input.nome"></span></template>
+    <p id="erro" data-text="state.erro"></p>
+    <button id="comprar" data-on-click="comprar">comprar</button>
+    <span id="tick" data-text="state.tick"></span>
+    <form data-on-submit="enviar"><button id="enviar">enviar</button></form>
+    <span id="enviado" data-text="state.enviado"></span>
+  </main>
+</body>
+</html>

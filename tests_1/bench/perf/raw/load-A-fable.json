@@ -1,0 +1,627 @@
+{
+ "measure": "load",
+ "profile": "A",
+ "app": "fable",
+ "runs": 10,
+ "chromium": "159.0.8154.6",
+ "at": "2026-11-18T19:57:36.584Z",
+ "data": {
+  "/": [
+   {
+    "fcp": 192,
+    "lcp": 192,
+    "lcpEl": "P.",
+    "dcl": 118.30000001192093,
+    "load": 156.6000000089407,
+    "ttfb": 8.100000008940697,
+    "longTasks": 1,
+    "longTaskMs": 65,
+    "tbt": 0,
+    "decodedBytes": 30094,
+    "domNodes": 95,
+    "requests": 4,
+    "bytes": 30938,
+    "urls": [
+     "/",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js",
+     "/favicon.ico"
+    ]
+   },
+   {
+    "fcp": 116,
+    "lcp": 116,
+    "lcpEl": "P.",
+    "dcl": 90.79999999701977,
+    "load": 94,
+    "ttfb": 4.4000000059604645,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 95,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 100,
+    "lcp": 100,
+    "lcpEl": "P.",
+    "dcl": 68.79999999701977,
+    "load": 72.79999999701977,
+    "ttfb": 5.799999997019768,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 95,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 112,
+    "lcp": 112,
+    "lcpEl": "P.",
+    "dcl": 80.29999999701977,
+    "load": 84.70000000298023,
+    "ttfb": 4,
+    "longTasks": 1,
+    "longTaskMs": 53,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 95,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 92,
+    "lcp": 92,
+    "lcpEl": "P.",
+    "dcl": 67.90000000596046,
+    "load": 71.70000000298023,
+    "ttfb": 2,
+    "longTasks": 1,
+    "longTaskMs": 52,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 95,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 108,
+    "lcp": 108,
+    "lcpEl": "P.",
+    "dcl": 75.20000000298023,
+    "load": 79,
+    "ttfb": 3.7999999970197678,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 95,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 116,
+    "lcp": 116,
+    "lcpEl": "P.",
+    "dcl": 69.30000001192093,
+    "load": 74.40000000596046,
+    "ttfb": 3,
+    "longTasks": 1,
+    "longTaskMs": 51,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 95,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 108,
+    "lcp": 108,
+    "lcpEl": "P.",
+    "dcl": 70.70000000298023,
+    "load": 73.5,
+    "ttfb": 3.800000011920929,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 95,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 100,
+    "lcp": 100,
+    "lcpEl": "P.",
+    "dcl": 72.29999999701977,
+    "load": 76,
+    "ttfb": 4,
+    "longTasks": 1,
+    "longTaskMs": 51,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 95,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 100,
+    "lcp": 100,
+    "lcpEl": "P.",
+    "dcl": 67.20000000298023,
+    "load": 71.5,
+    "ttfb": 4.100000008940697,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 95,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   }
+  ],
+  "/tarefas": [
+   {
+    "fcp": 108,
+    "lcp": 108,
+    "lcpEl": "H1.",
+    "dcl": 70.29999999701977,
+    "load": 81.3999999910593,
+    "ttfb": 3.5,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 81,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/tarefas",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 100,
+    "lcp": 100,
+    "lcpEl": "H1.",
+    "dcl": 71.40000000596046,
+    "load": 82,
+    "ttfb": 3.5999999940395355,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 81,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/tarefas",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 108,
+    "lcp": 108,
+    "lcpEl": "H1.",
+    "dcl": 70.59999999403954,
+    "load": 82.29999999701977,
+    "ttfb": 2.5999999940395355,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 81,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/tarefas",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 100,
+    "lcp": 100,
+    "lcpEl": "H1.",
+    "dcl": 66,
+    "load": 78.90000000596046,
+    "ttfb": 3.7000000029802322,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 81,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/tarefas",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 104,
+    "lcp": 104,
+    "lcpEl": "H1.",
+    "dcl": 67,
+    "load": 79.79999999701977,
+    "ttfb": 2.8999999910593033,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 81,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/tarefas",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 96,
+    "lcp": 96,
+    "lcpEl": "H1.",
+    "dcl": 65.79999999701977,
+    "load": 79.20000000298023,
+    "ttfb": 3.4000000059604645,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 81,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/tarefas",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 88,
+    "lcp": 88,
+    "lcpEl": "H1.",
+    "dcl": 62.29999999701977,
+    "load": 74.09999999403954,
+    "ttfb": 3.9000000059604645,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 81,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/tarefas",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 100,
+    "lcp": 100,
+    "lcpEl": "H1.",
+    "dcl": 62.20000000298023,
+    "load": 74.59999999403954,
+    "ttfb": 3.5,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 81,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/tarefas",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 104,
+    "lcp": 104,
+    "lcpEl": "H1.",
+    "dcl": 66.30000001192093,
+    "load": 75.80000001192093,
+    "ttfb": 3.300000011920929,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 81,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/tarefas",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   },
+   {
+    "fcp": 92,
+    "lcp": 92,
+    "lcpEl": "H1.",
+    "dcl": 58.20000000298023,
+    "load": 68.70000000298023,
+    "ttfb": 2.2000000029802322,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 30079,
+    "domNodes": 81,
+    "requests": 3,
+    "bytes": 30734,
+    "urls": [
+     "/tarefas",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js"
+    ]
+   }
+  ],
+  "/loja": [
+   {
+    "fcp": 96,
+    "lcp": 500,
+    "lcpEl": "H3.product-name",
+    "dcl": 63.8999999910593,
+    "load": 80.19999998807907,
+    "ttfb": 4.299999997019768,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 31054,
+    "domNodes": 184,
+    "requests": 4,
+    "bytes": 31909,
+    "urls": [
+     "/loja",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 96,
+    "lcp": 504,
+    "lcpEl": "H3.product-name",
+    "dcl": 61.79999999701977,
+    "load": 74.70000000298023,
+    "ttfb": 2.7999999970197678,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 31054,
+    "domNodes": 184,
+    "requests": 4,
+    "bytes": 31909,
+    "urls": [
+     "/loja",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 100,
+    "lcp": 488,
+    "lcpEl": "H3.product-name",
+    "dcl": 62.19999998807907,
+    "load": 74.09999999403954,
+    "ttfb": 3.199999988079071,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 31054,
+    "domNodes": 184,
+    "requests": 4,
+    "bytes": 31909,
+    "urls": [
+     "/loja",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 104,
+    "lcp": 496,
+    "lcpEl": "H3.product-name",
+    "dcl": 66.40000000596046,
+    "load": 78.59999999403954,
+    "ttfb": 3.7999999970197678,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 31054,
+    "domNodes": 184,
+    "requests": 4,
+    "bytes": 31909,
+    "urls": [
+     "/loja",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 104,
+    "lcp": 488,
+    "lcpEl": "H3.product-name",
+    "dcl": 63.5,
+    "load": 76.5,
+    "ttfb": 3.0999999940395355,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 31054,
+    "domNodes": 184,
+    "requests": 4,
+    "bytes": 31909,
+    "urls": [
+     "/loja",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 88,
+    "lcp": 496,
+    "lcpEl": "H3.product-name",
+    "dcl": 60.79999999701977,
+    "load": 71.70000000298023,
+    "ttfb": 3.5999999940395355,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 31054,
+    "domNodes": 184,
+    "requests": 4,
+    "bytes": 31909,
+    "urls": [
+     "/loja",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 92,
+    "lcp": 500,
+    "lcpEl": "H3.product-name",
+    "dcl": 66.20000000298023,
+    "load": 77.79999999701977,
+    "ttfb": 6.4000000059604645,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 31054,
+    "domNodes": 184,
+    "requests": 4,
+    "bytes": 31909,
+    "urls": [
+     "/loja",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 96,
+    "lcp": 500,
+    "lcpEl": "H3.product-name",
+    "dcl": 66,
+    "load": 76.30000001192093,
+    "ttfb": 4.100000008940697,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 31054,
+    "domNodes": 184,
+    "requests": 4,
+    "bytes": 31909,
+    "urls": [
+     "/loja",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 104,
+    "lcp": 508,
+    "lcpEl": "H3.product-name",
+    "dcl": 67.70000000298023,
+    "load": 79.8999999910593,
+    "ttfb": 3.3999999910593033,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "tbt": 0,
+    "decodedBytes": 31054,
+    "domNodes": 184,
+    "requests": 4,
+    "bytes": 31909,
+    "urls": [
+     "/loja",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js",
+     "/produtos.json"
+    ]
+   },
+   {
+    "fcp": 116,
+    "lcp": 500,
+    "lcpEl": "H3.product-name",
+    "dcl": 69.79999999701977,
+    "load": 85.1000000089407,
+    "ttfb": 3.2999999970197678,
+    "longTasks": 1,
+    "longTaskMs": 54,
+    "tbt": 0,
+    "decodedBytes": 31054,
+    "domNodes": 184,
+    "requests": 4,
+    "bytes": 31909,
+    "urls": [
+     "/loja",
+     "/assets/app-6VBXMAM3.css",
+     "/assets/app-4ANYNGKT.js",
+     "/produtos.json"
+    ]
+   }
+  ]
+ }
+}

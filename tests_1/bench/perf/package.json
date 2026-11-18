@@ -1,0 +1,12 @@
+{
+  "name": "mercadinho-perf-bench",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "node bench.mjs"
+  },
+  "devDependencies": {
+    "lighthouse": "^13.6.0",
+    "playwright": "^1.65.1"
+  }
+}

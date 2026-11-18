@@ -1,0 +1,4 @@
+{
+  "name": "mercadinho",
+  "budgets": { "initialJsKb": 15, "routeJsKb": 5, "cssKb": 10 }
+}

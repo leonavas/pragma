@@ -1,0 +1,9 @@
+<div class="inline-flex">
+  <button type="button" class="btn" data-attr-data-open="props.id" data-attr-popovertarget="props.id">
+    <span data-text="props.rotulo"></span>
+    <svg class="size-4 text-muted" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
+  </button>
+  <div popover data-attr-id="props.id" class="min-w-48 rounded-xl border border-line bg-surface p-1 text-sm text-ink shadow-lg">
+    <slot></slot>
+  </div>
+</div>

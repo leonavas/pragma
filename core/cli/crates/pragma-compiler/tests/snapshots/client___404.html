@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Não encontrado</title>
+<meta name="description" content="Loja de teste">
+<link rel="icon" href="/img/icon.svg">
+<link rel="stylesheet" href="/assets/app.css">
+<script>self.__pragmaDev=true</script>
+<link rel="modulepreload" href="/assets/lib/components/contador/contador.js">
+<link rel="modulepreload" href="/assets/lib/state/carrinho.js">
+<link rel="modulepreload" href="/assets/core/router.js">
+<link rel="modulepreload" href="/assets/core/log.js">
+<link rel="modulepreload" href="/assets/core/state.js">
+<script type="application/json" id="pragma-route">{"components":{"contador":"/assets/lib/components/contador/contador.js"},"loader":false,"page":null,"pattern":"*","ssr":false,"stores":{"carrinho":"/assets/lib/state/carrinho.js"}}</script>
+<script type="module" src="/assets/core/boot.js"></script>
+<script type="module" src="/_pragma/dev.js"></script>
+</head>
+<body>
+<header class="flex items-center gap-4 p-4">
+  <a href="/">Início</a>
+  <button data-c="contador" class="btn" data-on-click="somar"><span data-text="state.n">0</span></button>
+  <span data-text="shared.carrinho.total">0</span>
+</header>
+<main data-page>
+<h1 class="text-2xl">Página não encontrada</h1>
+</main>
+<footer class="text-sm text-neutral-500" data-text="query.ref"></footer>
+</body>
+</html>

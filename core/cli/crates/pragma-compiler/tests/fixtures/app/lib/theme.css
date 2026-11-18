@@ -1,0 +1,4 @@
+@layer components {
+  .btn { padding: 0.5rem 1rem; border-radius: var(--radius-md); }
+  .tag, .ativo { font-size: .75rem; }
+}

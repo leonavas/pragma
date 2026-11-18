@@ -1,0 +1,59 @@
+[
+  {
+    "html": "/index.html",
+    "loader": false,
+    "modules": [
+      "/assets/routes/index.js",
+      "/assets/lib/components/card/card.js",
+      "/assets/lib/components/contador/contador.js",
+      "/assets/lib/state/carrinho.js",
+      "/assets/core/router.js",
+      "/assets/core/log.js",
+      "/assets/utils/fmt.js",
+      "/assets/core/state.js"
+    ],
+    "pattern": "/",
+    "ssr": false
+  },
+  {
+    "html": "/blog/[slug].html",
+    "loader": true,
+    "modules": [
+      "/assets/routes/blog/[slug].js",
+      "/assets/lib/components/contador/contador.js",
+      "/assets/lib/state/carrinho.js",
+      "/assets/core/router.js",
+      "/assets/core/log.js",
+      "/assets/core/state.js"
+    ],
+    "pattern": "/blog/:slug",
+    "ssr": true
+  },
+  {
+    "html": "/loja/index.html",
+    "loader": false,
+    "modules": [
+      "/assets/lib/components/contador/contador.js",
+      "/assets/lib/state/carrinho.js",
+      "/assets/core/router.js",
+      "/assets/core/log.js",
+      "/assets/core/state.js"
+    ],
+    "pattern": "/loja",
+    "ssr": false
+  },
+  {
+    "html": "/loja/[id].html",
+    "loader": true,
+    "modules": [
+      "/assets/routes/loja/[id].js",
+      "/assets/lib/components/contador/contador.js",
+      "/assets/lib/state/carrinho.js",
+      "/assets/core/router.js",
+      "/assets/core/log.js",
+      "/assets/core/state.js"
+    ],
+    "pattern": "/loja/:id",
+    "ssr": false
+  }
+]

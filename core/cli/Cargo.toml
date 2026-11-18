@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = ["crates/*", "xtask"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+pragma-diag = { path = "crates/pragma-diag" }
+pragma-css = { path = "crates/pragma-css" }
+pragma-jslint = { path = "crates/pragma-jslint" }
+pragma-compiler = { path = "crates/pragma-compiler" }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

@@ -1,0 +1,25 @@
+<title>Produto · Mercadinho</title>
+
+<div class="flex flex-col gap-6">
+  <a href="/loja" class="text-sm text-muted hover:text-ink">← Voltar para a loja</a>
+  <template data-if="data.produto">
+    <article class="card flex max-w-xl flex-col gap-4">
+      <p class="text-sm text-muted" data-text="data.produto.categoriaNome"></p>
+      <h1 class="text-3xl font-semibold tracking-tight" data-text="data.produto.nome"></h1>
+      <p class="text-2xl font-semibold tabular-nums" data-text="data.produto.precoBRL"></p>
+      <p class="text-sm text-muted"><span data-text="data.produto.estoque"></span> em estoque</p>
+      <c-comprar data-attr-data-id="data.produto.id" data-attr-data-nome="data.produto.nome" data-attr-data-preco="data.produto.preco" data-attr-data-estoque="data.produto.estoque"></c-comprar>
+      <div class="flex items-center gap-3 border-t border-line pt-4 text-sm">
+        <button type="button" class="btn" data-on-click="curtir" data-attr-disabled="state.enviando">Gostei</button>
+        <span><span class="tabular-nums" data-text="data.produto.curtidas"></span> curtida(s)</span>
+        <span class="text-danger-600" role="status" data-text="state.erro"></span>
+      </div>
+    </article>
+  </template>
+  <template data-else>
+    <section class="flex flex-col gap-2">
+      <h1 class="text-3xl font-semibold tracking-tight">Produto não encontrado</h1>
+      <p class="text-muted">Confira o endereço ou volte para a loja.</p>
+    </section>
+  </template>
+</div>

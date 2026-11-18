@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>overlay</title>
+  <style>
+    *, ::backdrop { margin: 0; padding: 0; box-sizing: border-box; border: 0 solid; }
+    html[data-scroll-lock] { overflow: hidden; }
+    html[data-scroll-lock=gutter] { scrollbar-gutter: stable; }
+    [hidden] { display: none !important; }
+    dialog::backdrop { background: rgb(0 0 0 / 0.4); }
+    .dialog { width: min(100% - 2rem, 28rem); margin: auto; padding: 1.5rem; }
+    .alto { height: 3000px; }
+  </style>
+  <script type="module">
+    import { initOverlays, open, close, confirm, closeAll, handlePopState } from '/core/overlay.js'
+    const erros = []
+    initOverlays({ log: { error: (msg, attrs) => erros.push([msg, attrs]) } })
+    self.navegacoes = 0
+    addEventListener('popstate', e => handlePopState(e) || self.navegacoes++)
+    document.addEventListener('click', async e => {
+      if (e.target.id == 'item-js') self.r = await confirm('apagar')
+    })
+    self.t = { open, close, confirm, closeAll, erros }
+  </script>
+</head>
+<body>
+  <header>
+    <button id="abre-sobre" data-open="sobre">Sobre</button>
+    <button id="abre-apagar" data-open="apagar">Apagar</button>
+    <div class="inline-flex" data-c="dropdown">
+      <button type="button" class="btn" id="abre-mais" data-open="mais" popovertarget="mais">
+        <span>Mais</span>
+      </button>
+      <div popover id="mais">
+        <a href="#ajuda">Ajuda</a>
+        <button id="item-copiar" data-close value="copiar">Copiar</button>
+        <button id="item-apagar" data-open="apagar">Apagar…</button>
+        <button id="item-js">Apagar via confirm()…</button>
+      </div>
+    </div>
+    <button id="fora">Fora</button>
+  </header>
+  <main data-page class="alto">
+    <dialog class="dialog" id="sobre" aria-label="Sobre o app" data-c="modal">
+      <header>
+        <h2>Sobre o app</h2>
+        <button type="button" id="x-sobre" data-close aria-label="Fechar">×</button>
+      </header>
+      <div>
+        <p>Conteúdo.</p>
+        <button id="abre-detalhes" data-open="detalhes">Detalhes</button>
+      </div>
+      <footer><button id="ok-sobre" data-close value="ok">Fechar</button></footer>
+    </dialog>
+
+    <dialog class="dialog" id="detalhes" aria-label="Detalhes" data-c="modal">
+      <header><h2>Detalhes</h2></header>
+      <div><p>Segundo nível.</p></div>
+      <footer><button id="ok-detalhes" data-close value="ok">Fechar</button></footer>
+    </dialog>
+
+    <dialog class="dialog" role="alertdialog" id="apagar" aria-label="Apagar projeto?" data-c="alert">
+      <h2>Apagar projeto?</h2>
+      <div><p>Essa ação não pode ser desfeita.</p></div>
+      <footer>
+        <button id="cancela-apagar" data-close value="cancel">Cancelar</button>
+        <button id="confirma-apagar" data-close value="ok">Apagar</button>
+      </footer>
+    </dialog>
+  </main>
+</body>
+</html>

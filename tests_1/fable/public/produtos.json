@@ -1,0 +1,11 @@
+[
+  { "id": "cafe", "nome": "Café torrado 500 g", "categoria": "mercearia", "preco": 32.9, "estoque": 12 },
+  { "id": "arroz", "nome": "Arroz integral 1 kg", "categoria": "mercearia", "preco": 9.5, "estoque": 30 },
+  { "id": "azeite", "nome": "Azeite extravirgem 500 ml", "categoria": "mercearia", "preco": 44.0, "estoque": 5 },
+  { "id": "sabao", "nome": "Sabão de coco 5 un", "categoria": "limpeza", "preco": 12.3, "estoque": 20 },
+  { "id": "detergente", "nome": "Detergente neutro 500 ml", "categoria": "limpeza", "preco": 3.2, "estoque": 0 },
+  { "id": "esponja", "nome": "Esponja dupla face 4 un", "categoria": "limpeza", "preco": 6.8, "estoque": 15 },
+  { "id": "maca", "nome": "Maçã gala 1 kg", "categoria": "hortifruti", "preco": 11.9, "estoque": 8 },
+  { "id": "banana", "nome": "Banana prata 1 kg", "categoria": "hortifruti", "preco": 7.4, "estoque": 25 },
+  { "id": "alface", "nome": "Alface crespa", "categoria": "hortifruti", "preco": 4.5, "estoque": 3 }
+]

@@ -1,0 +1,21 @@
+// Lista o JS/CSS baixado na primeira visita a / e tira screenshots (rodar como e2e/aceite.mjs).
+import { chromium } from 'playwright';
+const b = await chromium.launch(); const ctx = await b.newContext({ viewport: { width: 1200, height: 900 } });
+const p = await ctx.newPage();
+const js = new Set(), css = new Set();
+p.on('response', (r) => { const u = new URL(r.url()); if (u.pathname.endsWith('.js')) js.add(u.pathname); if (u.pathname.endsWith('.css')) css.add(u.pathname); });
+await p.goto('http://localhost:5171/', { waitUntil: 'networkidle' });
+console.log('JS:' + [...js].join(' ')); console.log('CSS:' + [...css].join(' '));
+await p.screenshot({ path: 'painel-claro.png', fullPage: true });
+await p.getByRole('button', { name: 'Tema escuro' }).click();
+await p.screenshot({ path: 'painel-escuro.png', fullPage: true });
+await p.getByRole('link', { name: 'Loja', exact: true }).click();
+await p.locator('.produto').first().waitFor();
+await p.locator('.produto', { hasText: 'Café' }).getByRole('button', { name: 'Adicionar' }).click();
+await p.screenshot({ path: 'loja-escuro.png', fullPage: true });
+await p.getByRole('button', { name: 'Tema escuro' }).count();
+await p.evaluate(() => (document.documentElement.dataset.theme = 'light'));
+await p.getByRole('link', { name: 'Tarefas', exact: true }).click();
+await p.locator('.todo-list').waitFor();
+await p.screenshot({ path: 'tarefas-claro.png', fullPage: true });
+await b.close();

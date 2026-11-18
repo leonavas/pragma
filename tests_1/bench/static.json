@@ -1,0 +1,1122 @@
+{
+ "gerado_em": "2026-11-18",
+ "metodo": {
+  "build": "npm run build numa cópia em /tmp, 1 aquecimento + 5 medições intercaladas entre apps, cada uma sob flock /tmp/pragma-bench.lock; inclui ~0,1-0,2 s de overhead do npm",
+  "dev": "npm run dev numa cópia, saídas/caches de dev apagados antes de cada execução (sveltekit: .svelte-kit e node_modules/.vite; astra: dist; fable: .dev); tempo do spawn até o primeiro HTTP 200 em / (curl a cada ~10 ms); portas 5181-5183; 5 vezes, sob flock",
+  "npm_ci": "npm ci --no-audit --no-fund, 1 vez, depois de um npm ci de aquecimento (cache quente), sob flock",
+  "compressao": "gzip -9 e brotli -q 11 (CLIs), por arquivo; totais somam os arquivos",
+  "primeira_visita": "análise estática: index.html (script/link/modulepreload/import()) + imports estáticos recursivos; no SvelteKit também o nó de layout (0) e o da rota / (2) com suas dependências __vite__mapDeps (JS+CSS). Não inclui produtos.json (só carregado em /loja).",
+  "linhas": "\"código\" = linhas não vazias e que não são só comentário (//, /* */, <!-- -->; <script>/<style> em .svelte/.html tratados pela linguagem respectiva)"
+ },
+ "sveltekit": {
+  "agente": {
+   "handle": "app-sveltekit",
+   "tempo": "21 min 45 s",
+   "segundos": 1305,
+   "chamadas_ferramenta": 37,
+   "por_tipo": {
+    "bash": 33,
+    "tool Read": 3,
+    "edit": 1
+   },
+   "mensagens_assistente": 8
+  },
+  "codigo": {
+   "app": {
+    "by_ext": {
+     ".html": {
+      "files": 1,
+      "lines": 22,
+      "code": 20
+     },
+     ".svelte": {
+      "files": 22,
+      "lines": 1196,
+      "code": 1078
+     },
+     ".ts": {
+      "files": 8,
+      "lines": 215,
+      "code": 165
+     },
+     ".css": {
+      "files": 1,
+      "lines": 259,
+      "code": 247
+     }
+    },
+    "total": {
+     "files": 32,
+     "lines": 1692,
+     "code": 1510
+    },
+    "files": [
+     {
+      "file": "src/app.html",
+      "lines": 22,
+      "code": 20
+     },
+     {
+      "file": "src/lib/components/AppHeader.svelte",
+      "lines": 48,
+      "code": 46
+     },
+     {
+      "file": "src/lib/components/CartBadge.svelte",
+      "lines": 33,
+      "code": 31
+     },
+     {
+      "file": "src/lib/components/CartSummary.svelte",
+      "lines": 87,
+      "code": 85
+     },
+     {
+      "file": "src/lib/components/Clock.svelte",
+      "lines": 33,
+      "code": 28
+     },
+     {
+      "file": "src/lib/components/Counter.svelte",
+      "lines": 67,
+      "code": 62
+     },
+     {
+      "file": "src/lib/components/FilterBar.svelte",
+      "lines": 38,
+      "code": 32
+     },
+     {
+      "file": "src/lib/components/Modal.svelte",
+      "lines": 86,
+      "code": 72
+     },
+     {
+      "file": "src/lib/components/NavLink.svelte",
+      "lines": 36,
+      "code": 31
+     },
+     {
+      "file": "src/lib/components/ProductCard.svelte",
+      "lines": 83,
+      "code": 78
+     },
+     {
+      "file": "src/lib/components/ProductGrid.svelte",
+      "lines": 84,
+      "code": 77
+     },
+     {
+      "file": "src/lib/components/SearchInput.svelte",
+      "lines": 11,
+      "code": 9
+     },
+     {
+      "file": "src/lib/components/StatCard.svelte",
+      "lines": 40,
+      "code": 37
+     },
+     {
+      "file": "src/lib/components/Tabs.svelte",
+      "lines": 80,
+      "code": 72
+     },
+     {
+      "file": "src/lib/components/ThemeToggle.svelte",
+      "lines": 13,
+      "code": 10
+     },
+     {
+      "file": "src/lib/components/TodoForm.svelte",
+      "lines": 56,
+      "code": 51
+     },
+     {
+      "file": "src/lib/components/TodoList.svelte",
+      "lines": 131,
+      "code": 119
+     },
+     {
+      "file": "src/lib/format.ts",
+      "lines": 3,
+      "code": 2
+     },
+     {
+      "file": "src/lib/state/carrinho.svelte.ts",
+      "lines": 47,
+      "code": 36
+     },
+     {
+      "file": "src/lib/state/catalogo.svelte.ts",
+      "lines": 52,
+      "code": 44
+     },
+     {
+      "file": "src/lib/state/persist.svelte.ts",
+      "lines": 21,
+      "code": 15
+     },
+     {
+      "file": "src/lib/state/theme.svelte.ts",
+      "lines": 15,
+      "code": 9
+     },
+     {
+      "file": "src/lib/state/todos.svelte.ts",
+      "lines": 59,
+      "code": 46
+     },
+     {
+      "file": "src/lib/url.ts",
+      "lines": 16,
+      "code": 12
+     },
+     {
+      "file": "src/routes/+error.svelte",
+      "lines": 17,
+      "code": 14
+     },
+     {
+      "file": "src/routes/+layout.svelte",
+      "lines": 13,
+      "code": 11
+     },
+     {
+      "file": "src/routes/+layout.ts",
+      "lines": 2,
+      "code": 1
+     },
+     {
+      "file": "src/routes/+page.svelte",
+      "lines": 89,
+      "code": 81
+     },
+     {
+      "file": "src/routes/loja/+page.svelte",
+      "lines": 31,
+      "code": 25
+     },
+     {
+      "file": "src/routes/loja/[id]/+page.svelte",
+      "lines": 45,
+      "code": 39
+     },
+     {
+      "file": "src/routes/tarefas/+page.svelte",
+      "lines": 75,
+      "code": 68
+     },
+     {
+      "file": "src/styles/app.css",
+      "lines": 259,
+      "code": 247
+     }
+    ],
+    "bytes": 44893
+   },
+   "runtime": {
+    "by_ext": {},
+    "total": {
+     "files": 0,
+     "lines": 0,
+     "code": 0
+    },
+    "files": [],
+    "bytes": 0
+   },
+   "tooling": {
+    "by_ext": {},
+    "total": {
+     "files": 0,
+     "lines": 0,
+     "code": 0
+    },
+    "files": [],
+    "bytes": 0
+   }
+  },
+  "excluidos": [
+   "src/styles/preflight.css",
+   "src/styles/preflight.LICENSE",
+   "src/app.d.ts (boilerplate de tipos do template)",
+   "svelte.config.js",
+   "vite.config.ts",
+   "tsconfig.json",
+   ".npmrc",
+   ".vscode/",
+   "e2e/aceite.mjs",
+   "e2e/medir.mjs",
+   "static/*",
+   "build/",
+   ".svelte-kit/"
+  ],
+  "console_no_app": 0,
+  "console_runtime": 0,
+  "console_tooling": 0,
+  "bundle": {
+   "files": {
+    "/index.html": {
+     "raw": 1875,
+     "gzip": 825,
+     "brotli": 659
+    },
+    "/_app/immutable/nodes/5.BdxFJ5qb.js": {
+     "raw": 5359,
+     "gzip": 2410,
+     "brotli": 2105
+    },
+    "/_app/immutable/nodes/4.CL370rx_.js": {
+     "raw": 1825,
+     "gzip": 1004,
+     "brotli": 876
+    },
+    "/_app/immutable/nodes/3.CtRAaVVl.js": {
+     "raw": 2967,
+     "gzip": 1478,
+     "brotli": 1293
+    },
+    "/_app/immutable/nodes/2.Ck4VXCmp.js": {
+     "raw": 5148,
+     "gzip": 2370,
+     "brotli": 2116
+    },
+    "/_app/immutable/nodes/1.CAGJG9n8.js": {
+     "raw": 712,
+     "gzip": 495,
+     "brotli": 425
+    },
+    "/_app/immutable/nodes/0.Bsy5n1dw.js": {
+     "raw": 1867,
+     "gzip": 931,
+     "brotli": 812
+    },
+    "/_app/immutable/entry/start.Cv45uePc.js": {
+     "raw": 60,
+     "gzip": 95,
+     "brotli": 65
+    },
+    "/_app/immutable/entry/app.Dlf73n1Z.js": {
+     "raw": 5254,
+     "gzip": 2356,
+     "brotli": 2068
+    },
+    "/_app/immutable/chunks/xihTtKlq.js": {
+     "raw": 65,
+     "gzip": 91,
+     "brotli": 70
+    },
+    "/_app/immutable/chunks/bH1TpTz6.js": {
+     "raw": 2884,
+     "gzip": 1448,
+     "brotli": 1279
+    },
+    "/_app/immutable/chunks/WbpY05qh.js": {
+     "raw": 963,
+     "gzip": 485,
+     "brotli": 431
+    },
+    "/_app/immutable/chunks/DkSoK_Ua.js": {
+     "raw": 46645,
+     "gzip": 17698,
+     "brotli": 16087
+    },
+    "/_app/immutable/chunks/DDFFAbdB.js": {
+     "raw": 1287,
+     "gzip": 739,
+     "brotli": 635
+    },
+    "/_app/immutable/chunks/DBQEbcSe.js": {
+     "raw": 239,
+     "gzip": 202,
+     "brotli": 175
+    },
+    "/_app/immutable/chunks/D6rj5LTu.js": {
+     "raw": 1177,
+     "gzip": 670,
+     "brotli": 588
+    },
+    "/_app/immutable/chunks/C-J4ZThy.js": {
+     "raw": 4414,
+     "gzip": 2009,
+     "brotli": 1789
+    },
+    "/_app/immutable/chunks/Bjy-W4x2.js": {
+     "raw": 1365,
+     "gzip": 666,
+     "brotli": 499
+    },
+    "/_app/immutable/chunks/BcZrWdMs.js": {
+     "raw": 26755,
+     "gzip": 10265,
+     "brotli": 9308
+    },
+    "/_app/immutable/chunks/BNnSyLbg.js": {
+     "raw": 294,
+     "gzip": 179,
+     "brotli": 139
+    },
+    "/_app/immutable/assets/todos.IG_BZB4n.css": {
+     "raw": 972,
+     "gzip": 438,
+     "brotli": 359
+    },
+    "/_app/immutable/assets/format.BpuQej35.css": {
+     "raw": 341,
+     "gzip": 244,
+     "brotli": 182
+    },
+    "/_app/immutable/assets/SearchInput.VS6OUTNU.css": {
+     "raw": 236,
+     "gzip": 194,
+     "brotli": 127
+    },
+    "/_app/immutable/assets/ProductCard.DnD9qt8M.css": {
+     "raw": 1635,
+     "gzip": 586,
+     "brotli": 461
+    },
+    "/_app/immutable/assets/5.ClQuSy6Q.css": {
+     "raw": 1006,
+     "gzip": 428,
+     "brotli": 335
+    },
+    "/_app/immutable/assets/3.DhcxsyOZ.css": {
+     "raw": 504,
+     "gzip": 280,
+     "brotli": 210
+    },
+    "/_app/immutable/assets/2.Cdy0xb6S.css": {
+     "raw": 618,
+     "gzip": 334,
+     "brotli": 259
+    },
+    "/_app/immutable/assets/0.0SexZWbg.css": {
+     "raw": 9084,
+     "gzip": 2896,
+     "brotli": 2485
+    }
+   },
+   "js": {
+    "files": 19,
+    "raw": 109280,
+    "gzip": 45591,
+    "brotli": 40760
+   },
+   "css": {
+    "files": 8,
+    "raw": 14396,
+    "gzip": 5400,
+    "brotli": 4418
+   },
+   "html": {
+    "files": 1,
+    "raw": 1875,
+    "gzip": 825,
+    "brotli": 659
+   },
+   "first_visit": {
+    "files": [
+     "/_app/immutable/assets/0.0SexZWbg.css",
+     "/_app/immutable/assets/2.Cdy0xb6S.css",
+     "/_app/immutable/assets/format.BpuQej35.css",
+     "/_app/immutable/assets/todos.IG_BZB4n.css",
+     "/_app/immutable/chunks/BNnSyLbg.js",
+     "/_app/immutable/chunks/BcZrWdMs.js",
+     "/_app/immutable/chunks/D6rj5LTu.js",
+     "/_app/immutable/chunks/DBQEbcSe.js",
+     "/_app/immutable/chunks/DkSoK_Ua.js",
+     "/_app/immutable/chunks/WbpY05qh.js",
+     "/_app/immutable/chunks/bH1TpTz6.js",
+     "/_app/immutable/chunks/xihTtKlq.js",
+     "/_app/immutable/entry/app.Dlf73n1Z.js",
+     "/_app/immutable/entry/start.Cv45uePc.js",
+     "/_app/immutable/nodes/0.Bsy5n1dw.js",
+     "/_app/immutable/nodes/2.Ck4VXCmp.js",
+     "/index.html"
+    ],
+    "raw": 104241,
+    "gzip": 41527,
+    "brotli": 37082,
+    ".js": {
+     "files": 12,
+     "raw": 91351,
+     "gzip": 36790,
+     "brotli": 33138
+    },
+    ".css": {
+     "files": 4,
+     "raw": 11015,
+     "gzip": 3912,
+     "brotli": 3285
+    }
+   },
+   "all_output_files": 31
+  },
+  "dependencias": {
+   "devDependencies": {
+    "@sveltejs/adapter-static": "3.0.11",
+    "@sveltejs/kit": "2.70.4",
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "svelte": "5.58.0",
+    "svelte-check": "4.7.8",
+    "typescript": "6.0.3",
+    "vite": "8.3.8"
+   },
+   "dependencies": {},
+   "installed_packages": 58,
+   "node_modules_bytes": 73756433,
+   "node_modules_du_h": "75M"
+  },
+  "ferramenta": {
+   "build_ms": [
+    6007,
+    5830,
+    6226,
+    5586,
+    6121
+   ],
+   "build_mediana_ms": 6007,
+   "dev_cold_ms": [
+    2730,
+    2464,
+    2597,
+    2431,
+    2865
+   ],
+   "dev_cold_mediana_ms": 2597,
+   "npm_ci_ms": 3815
+  },
+  "checks": [
+   {
+    "cmd": "npm run check (svelte-kit sync && svelte-check)",
+    "pass": true,
+    "detail": "0 erros, 0 avisos",
+    "ms": 5712
+   }
+  ]
+ },
+ "astra": {
+  "agente": {
+   "handle": "astra-signals",
+   "tempo": "15 min 38 s",
+   "segundos": 938,
+   "chamadas_ferramenta": 56,
+   "por_tipo": {
+    "bash": 51,
+    "tool view_image": 5
+   },
+   "mensagens_assistente": 11
+  },
+  "codigo": {
+   "app": {
+    "by_ext": {
+     ".html": {
+      "files": 1,
+      "lines": 16,
+      "code": 16
+     },
+     ".js": {
+      "files": 8,
+      "lines": 658,
+      "code": 656
+     },
+     ".css": {
+      "files": 1,
+      "lines": 156,
+      "code": 156
+     }
+    },
+    "total": {
+     "files": 10,
+     "lines": 830,
+     "code": 828
+    },
+    "files": [
+     {
+      "file": "index.html",
+      "lines": 16,
+      "code": 16
+     },
+     {
+      "file": "src/app.js",
+      "lines": 48,
+      "code": 48
+     },
+     {
+      "file": "src/components/common.js",
+      "lines": 225,
+      "code": 224
+     },
+     {
+      "file": "src/components/shop.js",
+      "lines": 99,
+      "code": 99
+     },
+     {
+      "file": "src/components/todos.js",
+      "lines": 89,
+      "code": 89
+     },
+     {
+      "file": "src/pages/dashboard.js",
+      "lines": 36,
+      "code": 36
+     },
+     {
+      "file": "src/pages/shop.js",
+      "lines": 36,
+      "code": 35
+     },
+     {
+      "file": "src/pages/tasks.js",
+      "lines": 41,
+      "code": 41
+     },
+     {
+      "file": "src/state.js",
+      "lines": 84,
+      "code": 84
+     },
+     {
+      "file": "src/styles.css",
+      "lines": 156,
+      "code": 156
+     }
+    ],
+    "bytes": 45635
+   },
+   "runtime": {
+    "by_ext": {
+     ".js": {
+      "files": 4,
+      "lines": 111,
+      "code": 109
+     }
+    },
+    "total": {
+     "files": 4,
+     "lines": 111,
+     "code": 109
+    },
+    "files": [
+     {
+      "file": "src/lib/component.js",
+      "lines": 27,
+      "code": 26
+     },
+     {
+      "file": "src/lib/list.js",
+      "lines": 33,
+      "code": 32
+     },
+     {
+      "file": "src/lib/router.js",
+      "lines": 25,
+      "code": 25
+     },
+     {
+      "file": "src/lib/store.js",
+      "lines": 26,
+      "code": 26
+     }
+    ],
+    "bytes": 3816
+   },
+   "tooling": {
+    "by_ext": {
+     ".js": {
+      "files": 1,
+      "lines": 22,
+      "code": 22
+     }
+    },
+    "total": {
+     "files": 1,
+     "lines": 22,
+     "code": 22
+    },
+    "files": [
+     {
+      "file": "scripts/build.mjs",
+      "lines": 22,
+      "code": 22
+     }
+    ],
+    "bytes": 1001
+   }
+  },
+  "excluidos": [
+   "src/preflight.css",
+   "public/*",
+   "scripts/acceptance.mjs",
+   "scripts/deep-links.mjs",
+   "scripts/measure.mjs",
+   "evidence/",
+   "dist/"
+  ],
+  "console_no_app": 0,
+  "console_runtime": 0,
+  "console_tooling": 0,
+  "bundle": {
+   "files": {
+    "/index.html": {
+     "raw": 508,
+     "gzip": 326,
+     "brotli": 230
+    },
+    "/assets/app.js": {
+     "raw": 23666,
+     "gzip": 8188,
+     "brotli": 7377
+    },
+    "/assets/app.css": {
+     "raw": 12497,
+     "gzip": 3747,
+     "brotli": 3256
+    }
+   },
+   "js": {
+    "files": 1,
+    "raw": 23666,
+    "gzip": 8188,
+    "brotli": 7377
+   },
+   "css": {
+    "files": 1,
+    "raw": 12497,
+    "gzip": 3747,
+    "brotli": 3256
+   },
+   "html": {
+    "files": 1,
+    "raw": 508,
+    "gzip": 326,
+    "brotli": 230
+   },
+   "first_visit": {
+    "files": [
+     "/assets/app.css",
+     "/assets/app.js",
+     "/index.html"
+    ],
+    "raw": 36671,
+    "gzip": 12261,
+    "brotli": 10863,
+    ".js": {
+     "files": 1,
+     "raw": 23666,
+     "gzip": 8188,
+     "brotli": 7377
+    },
+    ".css": {
+     "files": 1,
+     "raw": 12497,
+     "gzip": 3747,
+     "brotli": 3256
+    }
+   },
+   "all_output_files": 5
+  },
+  "dependencias": {
+   "devDependencies": {
+    "esbuild": "0.27.7"
+   },
+   "dependencies": {},
+   "installed_packages": 2,
+   "node_modules_bytes": 11267300,
+   "node_modules_du_h": "11M"
+  },
+  "ferramenta": {
+   "build_ms": [
+    339,
+    365,
+    309,
+    369,
+    289
+   ],
+   "build_mediana_ms": 339,
+   "dev_cold_ms": [
+    379,
+    417,
+    406,
+    384,
+    341
+   ],
+   "dev_cold_mediana_ms": 384,
+   "npm_ci_ms": 961
+  },
+  "checks": [
+   {
+    "cmd": "(nenhum check/teste estático no package.json; scripts/acceptance.mjs é e2e com Playwright, fora do escopo)",
+    "pass": null
+   },
+   {
+    "cmd": "node --check em src/ e scripts/ (16 arquivos, check neutro aplicado por mim)",
+    "pass": true
+   }
+  ]
+ },
+ "fable": {
+  "agente": {
+   "handle": "fable-signals",
+   "tempo": "22 min 47 s",
+   "segundos": 1367,
+   "chamadas_ferramenta": 33,
+   "por_tipo": {
+    "bash": 25,
+    "edit": 3,
+    "tool Read": 5
+   },
+   "mensagens_assistente": 6
+  },
+  "codigo": {
+   "app": {
+    "by_ext": {
+     ".html": {
+      "files": 1,
+      "lines": 20,
+      "code": 19
+     },
+     ".js": {
+      "files": 25,
+      "lines": 834,
+      "code": 724
+     },
+     ".css": {
+      "files": 1,
+      "lines": 534,
+      "code": 452
+     }
+    },
+    "total": {
+     "files": 27,
+     "lines": 1388,
+     "code": 1195
+    },
+    "files": [
+     {
+      "file": "index.html",
+      "lines": 20,
+      "code": 19
+     },
+     {
+      "file": "src/components/app-header.js",
+      "lines": 35,
+      "code": 31
+     },
+     {
+      "file": "src/components/cart-summary.js",
+      "lines": 34,
+      "code": 32
+     },
+     {
+      "file": "src/components/clock.js",
+      "lines": 10,
+      "code": 9
+     },
+     {
+      "file": "src/components/counter.js",
+      "lines": 21,
+      "code": 19
+     },
+     {
+      "file": "src/components/filter-bar.js",
+      "lines": 18,
+      "code": 14
+     },
+     {
+      "file": "src/components/modal.js",
+      "lines": 38,
+      "code": 34
+     },
+     {
+      "file": "src/components/product-card.js",
+      "lines": 26,
+      "code": 24
+     },
+     {
+      "file": "src/components/product-grid.js",
+      "lines": 37,
+      "code": 34
+     },
+     {
+      "file": "src/components/search-input.js",
+      "lines": 12,
+      "code": 10
+     },
+     {
+      "file": "src/components/stat-card.js",
+      "lines": 13,
+      "code": 11
+     },
+     {
+      "file": "src/components/tabs.js",
+      "lines": 50,
+      "code": 43
+     },
+     {
+      "file": "src/components/theme-toggle.js",
+      "lines": 11,
+      "code": 10
+     },
+     {
+      "file": "src/components/todo-form.js",
+      "lines": 40,
+      "code": 39
+     },
+     {
+      "file": "src/components/todo-list.js",
+      "lines": 65,
+      "code": 57
+     },
+     {
+      "file": "src/format.js",
+      "lines": 15,
+      "code": 10
+     },
+     {
+      "file": "src/main.js",
+      "lines": 19,
+      "code": 16
+     },
+     {
+      "file": "src/pages/loja.js",
+      "lines": 61,
+      "code": 57
+     },
+     {
+      "file": "src/pages/nao-encontrada.js",
+      "lines": 8,
+      "code": 7
+     },
+     {
+      "file": "src/pages/painel.js",
+      "lines": 71,
+      "code": 70
+     },
+     {
+      "file": "src/pages/tarefas.js",
+      "lines": 73,
+      "code": 71
+     },
+     {
+      "file": "src/state/cart.js",
+      "lines": 43,
+      "code": 29
+     },
+     {
+      "file": "src/state/persisted.js",
+      "lines": 21,
+      "code": 17
+     },
+     {
+      "file": "src/state/products.js",
+      "lines": 38,
+      "code": 26
+     },
+     {
+      "file": "src/state/theme.js",
+      "lines": 20,
+      "code": 14
+     },
+     {
+      "file": "src/state/todos.js",
+      "lines": 55,
+      "code": 40
+     },
+     {
+      "file": "src/styles/app.css",
+      "lines": 534,
+      "code": 452
+     }
+    ],
+    "bytes": 41766
+   },
+   "runtime": {
+    "by_ext": {
+     ".js": {
+      "files": 4,
+      "lines": 448,
+      "code": 323
+     }
+    },
+    "total": {
+     "files": 4,
+     "lines": 448,
+     "code": 323
+    },
+    "files": [
+     {
+      "file": "src/lib/component.js",
+      "lines": 34,
+      "code": 22
+     },
+     {
+      "file": "src/lib/dom.js",
+      "lines": 106,
+      "code": 75
+     },
+     {
+      "file": "src/lib/reactive.js",
+      "lines": 239,
+      "code": 176
+     },
+     {
+      "file": "src/lib/router.js",
+      "lines": 69,
+      "code": 50
+     }
+    ],
+    "bytes": 13975
+   },
+   "tooling": {
+    "by_ext": {
+     ".js": {
+      "files": 3,
+      "lines": 126,
+      "code": 107
+     }
+    },
+    "total": {
+     "files": 3,
+     "lines": 126,
+     "code": 107
+    },
+    "files": [
+     {
+      "file": "scripts/build.js",
+      "lines": 57,
+      "code": 48
+     },
+     {
+      "file": "scripts/check.js",
+      "lines": 41,
+      "code": 34
+     },
+     {
+      "file": "scripts/preview.js",
+      "lines": 28,
+      "code": 25
+     }
+    ],
+    "bytes": 5249
+   }
+  },
+  "excluidos": [
+   "src/styles/preflight.css",
+   "src/styles/preflight.LICENSE",
+   "public/*",
+   "test/reactive.test.js",
+   "dist/"
+  ],
+  "console_no_app": 0,
+  "console_runtime": 0,
+  "console_tooling": 3,
+  "bundle": {
+   "files": {
+    "/index.html": {
+     "raw": 681,
+     "gzip": 432,
+     "brotli": 294
+    },
+    "/assets/app-4ANYNGKT.js": {
+     "raw": 18811,
+     "gzip": 7152,
+     "brotli": 6486
+    },
+    "/assets/app-6VBXMAM3.css": {
+     "raw": 10587,
+     "gzip": 3265,
+     "brotli": 2802
+    }
+   },
+   "js": {
+    "files": 1,
+    "raw": 18811,
+    "gzip": 7152,
+    "brotli": 6486
+   },
+   "css": {
+    "files": 1,
+    "raw": 10587,
+    "gzip": 3265,
+    "brotli": 2802
+   },
+   "html": {
+    "files": 1,
+    "raw": 681,
+    "gzip": 432,
+    "brotli": 294
+   },
+   "first_visit": {
+    "files": [
+     "/assets/app-4ANYNGKT.js",
+     "/assets/app-6VBXMAM3.css",
+     "/index.html"
+    ],
+    "raw": 30079,
+    "gzip": 10849,
+    "brotli": 9582,
+    ".js": {
+     "files": 1,
+     "raw": 18811,
+     "gzip": 7152,
+     "brotli": 6486
+    },
+    ".css": {
+     "files": 1,
+     "raw": 10587,
+     "gzip": 3265,
+     "brotli": 2802
+    }
+   },
+   "all_output_files": 4
+  },
+  "dependencias": {
+   "devDependencies": {
+    "esbuild": "0.25.12"
+   },
+   "dependencies": {},
+   "installed_packages": 2,
+   "node_modules_bytes": 10496999,
+   "node_modules_du_h": "11M"
+  },
+  "ferramenta": {
+   "build_ms": [
+    320,
+    332,
+    307,
+    369,
+    383
+   ],
+   "build_mediana_ms": 332,
+   "dev_cold_ms": [
+    366,
+    402,
+    406,
+    351,
+    440
+   ],
+   "dev_cold_mediana_ms": 402,
+   "npm_ci_ms": 1146
+  },
+  "checks": [
+   {
+    "cmd": "npm test (node --test)",
+    "pass": true,
+    "detail": "22/22 testes",
+    "ms": 473
+   },
+   {
+    "cmd": "npm run check (lint do dialeto, scripts/check.js)",
+    "pass": true,
+    "detail": "nenhum problema",
+    "ms": 237
+   },
+   {
+    "cmd": "node --check em src/ e scripts/ (32 arquivos, check neutro aplicado por mim)",
+    "pass": true
+   }
+  ]
+ }
+}

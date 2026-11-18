@@ -1,0 +1,9 @@
+<article class="card flex h-full flex-col gap-3">
+  <div class="flex items-start justify-between gap-2">
+    <h2 class="font-semibold leading-snug"><a class="hover:underline" data-attr-href="produto.url" data-text="produto.nome"></a></h2>
+    <span class="rounded-full bg-danger-100 px-2 py-0.5 text-xs font-medium text-danger-700" data-show="produto.esgotado">Esgotado</span>
+  </div>
+  <p class="text-sm text-muted" data-text="produto.categoriaNome"></p>
+  <p class="text-lg font-semibold tabular-nums" data-text="produto.precoBRL"></p>
+  <c-comprar class="mt-auto" data-attr-data-id="produto.id" data-attr-data-nome="produto.nome" data-attr-data-preco="produto.preco" data-attr-data-estoque="produto.estoque"></c-comprar>
+</article>

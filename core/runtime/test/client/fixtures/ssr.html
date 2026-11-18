@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SSR</title>
+  <style>#alto{height:3000px}</style>
+  <script>self.__pragmaDev=true</script>
+  <link rel="modulepreload" href="/assets/ssr.js">
+  <script type="application/json" id="pragma-route">{"pattern":"/ssr","page":"/assets/ssr.js","components":{},"stores":{"carrinho":"/assets/carrinho.js"},"loader":true,"ssr":true}</script>
+  <script type="module" src="/core/boot.js"></script>
+</head>
+<body>
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qtd" data-text="shared.carrinho.itens.length"></span></header>
+  <main data-page>
+    <h1 id="t" data-text="data.titulo">Olá SSR</h1>
+    <ul id="l"><template data-for="x in data.itens" data-key="x.id" data-tid="s1"><li data-text="x.nome"></li></template><li data-of="s1" data-key="1" data-text="x.nome">um</li><li data-of="s1" data-key="2" data-text="x.nome">dois</li><template data-empty><li>nada</li></template></ul>
+    <template data-if="data.destaque" data-tid="s2"><p id="d">destaque</p></template><p data-of="s2" id="d">destaque</p><template data-else><p id="sem">sem destaque</p></template>
+    <template data-if="!data.destaque" data-tid="s4"><p id="nd">sem</p></template><template data-else><p id="cd">com</p></template><p data-of="s4" id="cd">com</p>
+    <span id="c" data-text="state.n"></span>
+    <button id="mais" data-on-click="mais">+</button>
+    <template data-if="state.aberto" data-tid="s3"><p id="aberto">aberto</p></template>
+  </main>
+  <script type="application/json" id="pragma-data">{"data":{"titulo":"Olá SSR","itens":[{"id":1,"nome":"um"},{"id":2,"nome":"dois"}],"destaque":true}}</script>
+  <script>
+    self.__antes = [...document.querySelectorAll('main *')]
+    self.__mut = []
+    new MutationObserver(rs => self.__mut.push(...rs.map(r => r.type + ':' + (r.target.id || r.target.localName))))
+      .observe(document.querySelector('main'), { subtree: true, childList: true, characterData: true, attributes: true })
+  </script>
+</body>
+</html>

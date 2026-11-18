@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="pt-BR">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="icon" href="data:," />
+		<!-- Ordem das camadas declarada antes de qualquer CSS (inclusive o CSS por rota dos componentes) -->
+		<style>@layer reset, tokens, base, layout, components, utilities;</style>
+		<script>
+			// Aplica o tema salvo antes do primeiro paint, em qualquer rota.
+			try {
+				var t = localStorage.getItem('mercadinho:tema');
+				document.documentElement.dataset.theme =
+					t === 'dark' || t === 'light' ? t : matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+			} catch (e) {}
+		</script>
+		%sveltekit.head%
+	</head>
+	<body data-sveltekit-preload-data="hover">
+		<div style="display: contents">%sveltekit.body%</div>
+	</body>
+</html>

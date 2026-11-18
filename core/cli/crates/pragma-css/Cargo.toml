@@ -1,0 +1,8 @@
+[package]
+name = "pragma-css"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lightningcss = { version = "1.0.0-alpha.72", default-features = false }

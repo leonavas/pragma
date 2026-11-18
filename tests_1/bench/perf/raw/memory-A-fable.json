@@ -1,0 +1,350 @@
+{
+ "measure": "memory",
+ "profile": "A",
+ "app": "fable",
+ "runs": 10,
+ "chromium": "159.0.8154.6",
+ "at": "2026-11-18T20:15:40.686Z",
+ "data": [
+  {
+   "initial": {
+    "heapUsed": 903248,
+    "heapTotal": 1835008,
+    "nodes": 177,
+    "listeners": 17,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after1": {
+    "heapUsed": 2440828,
+    "heapTotal": 3022848,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after10": {
+    "heapUsed": 2629316,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after30": {
+    "heapUsed": 2704076,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   }
+  },
+  {
+   "initial": {
+    "heapUsed": 903248,
+    "heapTotal": 1835008,
+    "nodes": 177,
+    "listeners": 17,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after1": {
+    "heapUsed": 2440824,
+    "heapTotal": 3022848,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after10": {
+    "heapUsed": 2629292,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after30": {
+    "heapUsed": 2704108,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   }
+  },
+  {
+   "initial": {
+    "heapUsed": 903248,
+    "heapTotal": 1835008,
+    "nodes": 177,
+    "listeners": 17,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after1": {
+    "heapUsed": 2440824,
+    "heapTotal": 3022848,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after10": {
+    "heapUsed": 2629292,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after30": {
+    "heapUsed": 2704108,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   }
+  },
+  {
+   "initial": {
+    "heapUsed": 903248,
+    "heapTotal": 1835008,
+    "nodes": 177,
+    "listeners": 17,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after1": {
+    "heapUsed": 2440824,
+    "heapTotal": 3022848,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after10": {
+    "heapUsed": 2629292,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after30": {
+    "heapUsed": 2704108,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   }
+  },
+  {
+   "initial": {
+    "heapUsed": 903248,
+    "heapTotal": 1835008,
+    "nodes": 177,
+    "listeners": 17,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after1": {
+    "heapUsed": 2440832,
+    "heapTotal": 3022848,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after10": {
+    "heapUsed": 2629300,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after30": {
+    "heapUsed": 2704116,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   }
+  },
+  {
+   "initial": {
+    "heapUsed": 903248,
+    "heapTotal": 1835008,
+    "nodes": 177,
+    "listeners": 17,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after1": {
+    "heapUsed": 2440828,
+    "heapTotal": 3022848,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after10": {
+    "heapUsed": 2629296,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after30": {
+    "heapUsed": 2704112,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   }
+  },
+  {
+   "initial": {
+    "heapUsed": 903248,
+    "heapTotal": 1835008,
+    "nodes": 177,
+    "listeners": 17,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after1": {
+    "heapUsed": 2440824,
+    "heapTotal": 3022848,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after10": {
+    "heapUsed": 2629292,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after30": {
+    "heapUsed": 2704108,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   }
+  },
+  {
+   "initial": {
+    "heapUsed": 903248,
+    "heapTotal": 1835008,
+    "nodes": 177,
+    "listeners": 17,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after1": {
+    "heapUsed": 2440832,
+    "heapTotal": 3022848,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after10": {
+    "heapUsed": 2629300,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after30": {
+    "heapUsed": 2704116,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   }
+  },
+  {
+   "initial": {
+    "heapUsed": 903248,
+    "heapTotal": 1835008,
+    "nodes": 177,
+    "listeners": 17,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after1": {
+    "heapUsed": 2440832,
+    "heapTotal": 3022848,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after10": {
+    "heapUsed": 2629300,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after30": {
+    "heapUsed": 2704116,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   }
+  },
+  {
+   "initial": {
+    "heapUsed": 903248,
+    "heapTotal": 1835008,
+    "nodes": 177,
+    "listeners": 17,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after1": {
+    "heapUsed": 2440824,
+    "heapTotal": 3022848,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after10": {
+    "heapUsed": 2629292,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   },
+   "after30": {
+    "heapUsed": 2704108,
+    "heapTotal": 3284992,
+    "nodes": 183,
+    "listeners": 43,
+    "documents": 1,
+    "docElements": 95
+   }
+  }
+ ]
+}
