@@ -11,8 +11,9 @@ list: anything else is an error.
 | `.<class>="[!]v"` | element | toggles the class |
 | `:show="[!]v"` | element | `hidden` when falsy |
 | `:model="$v"` | input, select, textarea | two-way binding; `$` or `shared` only |
-| `@<event>="fn"` | element | calls the owner's function `fn` |
-| `@<event>="fn(a, b)"` | element | calls `fn` with arguments: paths (`task`, `$x`, `data.x`), `'text'`, numbers, `true`/`false`/`null`, `event` |
+| `@<event>="fn"` | element | calls the owner's function `fn(event)` (`@input="search"` with `function search(event)`) |
+| `@<event>="fn(a, b)"` | element | calls `fn` with only these arguments: paths (`task`, `$x`, `data.x`), `'text'`, numbers, `true`/`false`/`null`, `event` (the DOM event), `el` (the element with the `@`) |
+| `@<event>="shared.cart.add(item)"` | element | calls a store function (same arguments) |
 | `@open="id"` / `@close` | button | opens/closes an overlay (overlays.md) |
 
 ## Text: `{path}`
@@ -107,7 +108,9 @@ Compute every derived value (total, label, filter, flag) in a function of the sc
 
 - Each `<if>`, `<else-if>`, `<else>`, `<for>`, `<empty>` contains exactly 1 root element, not another block. Put other directives on that element, not on the block tag.
 - Strict HTML: close every non-void tag. No `<html>`, `<body>`, `<template>`; one `<script>` and one `<style>` per file (state.md, css.md).
-- `@submit` calls `preventDefault()`. Pass the `<for>` item as an argument: `@click="remove(task)"`; `event` is the DOM event (`@input="search(event)"`).
+- `@submit` calls `preventDefault()`. Pass the `<for>` item as an argument: `@click="remove(task)"`. Without parentheses the function gets the event (`@input="search"`); with them it gets only what you list (`@click="reset()"` gets nothing). Use `el`, not `event.currentTarget`, for the element with the `@` (events are delegated).
+- No `$` in events (`@click="increase"`, not `@click="$increase"`): `$` marks values. `:attr` takes a bare path (`:disabled="$atMinimum"`); to build text write `title="Count {$count}"` without the colon.
+- Block tags take one path, no operators: `<if $hasTasks>` with `const hasTasks = () => tasks.length > 0` in the script.
 - For `aria-*` states (`aria-pressed`, `aria-expanded`), return the strings `'true'`/`'false'`: boolean `false` removes the attribute.
 - `:show` hides an element that stays in the DOM; `<if>` creates/removes it. An element with `autofocus` inside a newly inserted block gets focus.
 - In dev, a path that does not exist throws (except under `query`).

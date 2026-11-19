@@ -40,38 +40,18 @@
   }
 </script>
 
-<div>
-  <ul class="relative-time-list">
+<div class="grid w-full max-w-md gap-4 font-mono text-xs">
+  <ul class="divide-y divide-line border-y border-line tabular-nums">
     <for release in $releases key=release.version>
-      <li class="relative-time-row">
-        <span class="relative-time-version">{release.version}</span>
-        <span class="relative-time-date">{release.date}</span>
-        <span class="relative-time-ago">{release.ago}</span>
+      <li class="flex gap-3 py-2.5">
+        <span class="w-16 text-ink">{release.version}</span>
+        <span class="text-faint">{release.date}</span>
+        <span class="ml-auto text-accent">{release.ago}</span>
       </li>
     </for>
   </ul>
-  <div class="relative-time-footer">
+  <div class="flex flex-wrap items-center gap-x-4 gap-y-3">
     <button type="button" class="btn btn-small" @click="loadRelativeTimes" :disabled="$busy">{$buttonText}</button>
-    <p class="relative-time-status" role="status">{$status}</p>
+    <p class="text-faint" role="status">{$status}</p>
   </div>
 </div>
-
-<style>
-  [data-c="relative-time"] { display: grid; gap: 1rem; width: min(100%, 26rem); }
-  [data-c="relative-time"] .relative-time-list { border-top: 1px solid var(--color-line); }
-  [data-c="relative-time"] .relative-time-row {
-    display: grid;
-    grid-template-columns: 4.5rem 6.5rem 1fr;
-    gap: 0.75rem;
-    padding: 0.625rem 0;
-    border-bottom: 1px solid var(--color-line);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    font-variant-numeric: tabular-nums;
-  }
-  [data-c="relative-time"] .relative-time-version { color: var(--color-ink); }
-  [data-c="relative-time"] .relative-time-date { color: var(--color-faint); }
-  [data-c="relative-time"] .relative-time-ago { color: var(--color-accent); text-align: right; }
-  [data-c="relative-time"] .relative-time-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; }
-  [data-c="relative-time"] .relative-time-status { color: var(--color-faint); font-family: var(--font-mono); font-size: 0.75rem; }
-</style>

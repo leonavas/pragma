@@ -1,13 +1,69 @@
+<script>
+  const files = [
+    { name: 'router.js', size: 4120 },
+    { name: 'overlay.js', size: 2860 },
+    { name: 'state.js', size: 1310 },
+    { name: 'boot.js', size: 690 },
+  ]
+
+  let key = 'name'
+  let descending = false
+
+  const menuLabel = () => 'Sort: ' + key + (descending ? ', desc' : ', asc')
+
+  function sorted() {
+    const rows = files
+      .map(file => ({ ...file, label: (file.size / 1000).toFixed(1) + ' kB' }))
+      .sort((left, right) => (key === 'size' ? left.size - right.size : left.name.localeCompare(right.name)))
+    return descending ? rows.reverse() : rows
+  }
+
+  function sortBy(nextKey) {
+    key = nextKey
+  }
+
+  function reverse() {
+    descending = !descending
+  }
+</script>
+
 <div>
   <c-dropdown id="sort-menu" :label="$menuLabel">
-    <button type="button" @close @click="sortBy" value="name">By name</button>
-    <button type="button" @close @click="sortBy" value="size">By size</button>
+    <button type="button" @close @click="sortBy('name')">By name</button>
+    <button type="button" @close @click="sortBy('size')">By size</button>
     <hr>
     <button type="button" @close @click="reverse">Reverse order</button>
   </c-dropdown>
   <ol class="sort-list">
     <for file in $sorted key=file.name>
-      <li class="sort-row"><span :text="file.name"></span><span class="sort-size" :text="file.label"></span></li>
+      <li class="sort-row"><span>{file.name}</span><span class="sort-size">{file.label}</span></li>
     </for>
   </ol>
 </div>
+
+<style>
+  [data-c="sort-menu"] {
+    display: grid;
+    justify-items: start;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 20rem;
+  }
+  .sort-list {
+    width: 100%;
+    border-top: 1px solid var(--color-line);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  .sort-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0.25rem;
+    border-bottom: 1px solid var(--color-line);
+    color: var(--color-ink);
+  }
+  .sort-size {
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+  }
+</style>

@@ -1,53 +1,25 @@
-<script>
-  export let set = ''
-  export let label = ''
-
-  const rowSets = {
-    highlighter: [
-      { name: "import hljs from 'highlight.js'", note: 'index entry: all 193 languages', raw: 926.7, gzip: 303.4 },
-      { name: '@lezer/highlight + javascript, html, css', note: 'pure ESM, rejected: the JS grammar alone is 29.6 kB', raw: 161.5, gzip: 60.9 },
-      { name: 'highlight.js/lib/core + xml, javascript, css', note: 'used on this site: on the server for every showcase, in the browser only via import() on the SEO page', raw: 40.8, gzip: 14.8, shipped: true },
-    ],
-    packages: [
-      { name: 'es-toolkit', note: 'groupBy + debounce, ESM', raw: 0.67, gzip: 0.43, shipped: true },
-      { name: 'valibot', note: 'object, pipe, string, email, safeParse, ESM', raw: 3.4, gzip: 1.35, shipped: true },
-      { name: '@date-fns/tz', note: 'TZDate, ESM', raw: 4.9, gzip: 1.75 },
-      { name: 'dayjs', note: 'core + relativeTime, CommonJS: ships whole', raw: 8.75, gzip: 3.69 },
-      { name: 'lodash', note: 'groupBy + sumBy, CommonJS: ships whole', raw: 22.0, gzip: 6.49 },
-      { name: 'date-fns', note: 'format, ESM (format pulls the locale code)', raw: 25.0, gzip: 6.69 },
-      { name: 'fuse.js', note: 'Fuse class, one export', raw: 26.5, gzip: 9.21 },
-      { name: 'chart.js', note: 'bar chart: 5 registered pieces', raw: 132.6, gzip: 45.99 },
-    ],
-  }
-
-  const kilobytes = size => (size < 10 ? size.toFixed(2) : size.toFixed(1)) + ' kB'
-
-  const rows = () => (rowSets[set] ?? []).map(row => ({ ...row, shipped: Boolean(row.shipped), rawText: kilobytes(row.raw), gzipText: kilobytes(row.gzip) }))
-  const max = () => Math.max(...rows().map(row => row.gzip))
-</script>
-
-<div>
-  <table>
+<div class="w-full min-w-0 overflow-x-auto">
+  <table class="w-full font-mono text-xs tabular-nums">
     <caption class="sr-only">{$label}</caption>
-    <thead>
+    <thead class="label border-b border-line-strong">
       <tr>
-        <th scope="col">Import</th>
-        <th scope="col" class="size-table-number size-table-raw">Raw</th>
-        <th scope="col" class="size-table-number">Gzip</th>
+        <th scope="col" class="pb-2.5 text-left font-medium">Import</th>
+        <th scope="col" class="size-raw pb-2.5 text-right font-medium">Raw</th>
+        <th scope="col" class="w-20 pb-2.5 text-right font-medium">Gzip</th>
       </tr>
     </thead>
-    <tbody>
+    <tbody class="divide-y divide-line border-b border-line">
       <for row in $rows key=row.name>
         <tr .is-shipped="row.shipped">
-          <th scope="row">
-            <span class="size-table-cell">
-              <span class="size-table-name">{row.name}</span>
-              <span class="size-table-note">{row.note}</span>
-              <meter class="size-table-bar" min="0" :max="$max" :value="row.gzip" aria-hidden="true"></meter>
+          <th scope="row" class="pr-4 text-left font-normal">
+            <span class="grid gap-1.5">
+              <span class="text-ink">{row.name}</span>
+              <span class="font-sans text-sm text-faint">{row.note}</span>
+              <meter class="size-bar" min="0" max="1" :value="row.share" aria-hidden="true"></meter>
             </span>
           </th>
-          <td class="size-table-number size-table-raw">{row.rawText}</td>
-          <td class="size-table-number size-table-gzip">{row.gzipText}</td>
+          <td class="size-raw w-20 text-right whitespace-nowrap text-muted">{row.rawText}</td>
+          <td class="size-gzip w-20 text-right whitespace-nowrap">{row.gzipText}</td>
         </tr>
       </for>
     </tbody>
@@ -55,34 +27,16 @@
 </div>
 
 <style>
-  [data-c="size-table"] { width: 100%; min-width: 0; overflow-x: auto; }
-  [data-c="size-table"] table { width: 100%; min-width: 18rem; border-collapse: collapse; font-family: var(--font-mono); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
-  [data-c="size-table"] thead th {
-    padding: 0 0 0.625rem;
-    border-bottom: 1px solid var(--color-line-strong);
-    color: var(--color-faint);
-    font-size: 0.6875rem;
-    font-weight: 500;
-    letter-spacing: 0.06em;
-    text-align: left;
-    text-transform: uppercase;
-  }
-  [data-c="size-table"] tbody :is(th, td) { padding: 0.875rem 0; vertical-align: top; }
-  [data-c="size-table"] tbody tr { border-bottom: 1px solid var(--color-line); }
-  [data-c="size-table"] .size-table-cell { display: grid; gap: 0.375rem; }
-  [data-c="size-table"] tbody th { padding-right: 1rem; font-weight: 400; text-align: left; }
-  [data-c="size-table"] .size-table-number { width: 4.75rem; color: var(--color-muted); text-align: right; white-space: nowrap; }
-  [data-c="size-table"] .size-table-gzip { color: var(--color-ink); }
-  [data-c="size-table"] .size-table-name { color: var(--color-ink); }
-  [data-c="size-table"] .size-table-note { color: var(--color-faint); font-family: var(--font-sans); font-size: 0.8125rem; }
-  [data-c="size-table"] .size-table-bar { display: block; width: 100%; height: 0.375rem; margin-top: 0.25rem; border: 0; background: var(--color-raised); appearance: none; }
-  [data-c="size-table"] .size-table-bar::-webkit-meter-bar { height: 0.375rem; border: 0; border-radius: 0; background: var(--color-raised); }
-  [data-c="size-table"] .size-table-bar::-webkit-meter-optimum-value { border-radius: 0; background: var(--color-line-strong); }
-  [data-c="size-table"] .size-table-bar::-moz-meter-bar { border-radius: 0; background: var(--color-line-strong); }
-  [data-c="size-table"] .is-shipped .size-table-bar::-webkit-meter-optimum-value { background: var(--color-accent); }
-  [data-c="size-table"] .is-shipped .size-table-bar::-moz-meter-bar { background: var(--color-accent); }
-  [data-c="size-table"] .is-shipped .size-table-gzip { color: var(--color-accent); }
+  table { min-width: 18rem; }
+  tbody :is(th, td) { padding-block: 0.875rem; vertical-align: top; }
+  .size-bar { display: block; width: 100%; height: 0.375rem; margin-top: 0.25rem; appearance: none; background: var(--color-raised); }
+  .size-bar::-webkit-meter-bar { height: 0.375rem; border: 0; border-radius: 0; background: var(--color-raised); }
+  .size-bar::-webkit-meter-optimum-value { background: var(--color-line-strong); }
+  .size-bar::-moz-meter-bar { background: var(--color-line-strong); }
+  .is-shipped .size-bar::-webkit-meter-optimum-value { background: var(--color-accent); }
+  .is-shipped .size-bar::-moz-meter-bar { background: var(--color-accent); }
+  .is-shipped .size-gzip { color: var(--color-accent); }
   @media (max-width: 40rem) {
-    [data-c="size-table"] .size-table-raw { display: none; }
+    .size-raw { display: none; }
   }
 </style>

@@ -2,10 +2,11 @@ import { readExamples } from '../_source.server.js'
 
 export const ssr = true
 
-const component = name => [`_components/${name}/${name}.html`, `_components/${name}/${name}.js`, `_components/${name}/${name}.css`]
+const component = name => [`_components/${name}/${name}.html`]
 
 export async function load() {
   const examples = await readExamples('routes/examples/syntax', {
+    interpolation: component('interpolation'),
     bindings: component('bindings'),
     classes: component('classes'),
     visibility: component('visibility'),
@@ -14,8 +15,8 @@ export async function load() {
     overlay: ['_snippets/overlay-shortcut/usage.html', '_components/overlay-shortcut/overlay-shortcut.html'],
     conditions: component('conditions'),
     lists: component('lists'),
-    badge: ['_snippets/badge/usage.html', '_components/badge/badge.html', '_components/badge/badge.css'],
-    rejected: ['_snippets/rejected/wrong.html'],
+    badge: ['_snippets/badge/usage.html', '_components/badge/badge.html'],
+    rejected: ['_snippets/rejected/wrong.html', '_snippets/rejected/ticker.js'],
   })
   return { examples }
 }

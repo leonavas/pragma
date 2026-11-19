@@ -134,6 +134,9 @@ impl<'p> Expander<'p> {
             let slots: Slots = HashMap::from([(String::new(), page_nodes.clone())]);
             let lsc = Scope { from: Path::new("routes"), props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: 0 };
             body = self.expand_nodes(&rest, &lsc);
+            if page.css.is_some() {
+                name_page_main(&mut body, &page.out_name);
+            }
         }
         merge_head(&mut head, own_head);
         (Expanded { head, body, page: page_nodes, components: self.used }, self.diags)
@@ -403,7 +406,12 @@ impl<'p> Expander<'p> {
                 && !s.props.iter().any(|x| x.eq_ignore_ascii_case(prop))
             {
                 let has = if s.props.is_empty() { "its script declares no props".to_string() } else { format!("its props: {}", s.props.join(", ")) };
-                self.err(a.pos, "html/unknown-prop", format!("<{tag}> has no prop `{prop}` ({has}); declare it with `export let {prop} = …`"));
+                let lowered: Vec<String> = s.props.iter().map(|p| p.to_ascii_lowercase()).collect();
+                let fix = match directive::did_you_mean(prop, lowered.iter().map(String::as_str)) {
+                    Some(near) => format!("did you mean `{near}`?"),
+                    None => format!("declare it with `export let {prop} = …`"),
+                };
+                self.err(a.pos, "html/unknown-prop", format!("<{tag}> has no prop `{prop}` ({has}); {fix}"));
             }
             if let Some(alias) = lname.strip_prefix("data-with-") {
                 match self.resolve(a.value.as_deref().unwrap_or(""), sc) {
@@ -531,8 +539,8 @@ impl Expander<'_> {
 
     /// `toggle(task, $q)`: path arguments resolved (`state.q`, caller paths); static props become literals.
     fn event_call(&self, v: &str, sc: &Scope) -> String {
-        let Ok((name, args)) = directive::parse_call(v) else { return v.to_string() };
-        directive::join_call(name, &args, |p| match self.resolve(p, sc) {
+        let Ok(call) = directive::parse_call(v) else { return v.to_string() };
+        directive::join_call(&call, |p| match self.resolve(p, sc) {
             Res::Path(p) => p,
             Res::Prop(None) => "null".into(),
             Res::Prop(Some(None)) => "true".into(),
@@ -553,8 +561,23 @@ impl Expander<'_> {
     }
 }
 
+/// `<main data-page="<page>">`: the scope of the page's own CSS (the router copies it on navigation).
+fn name_page_main(nodes: &mut [Node], page: &str) -> bool {
+    for n in nodes {
+        let Node::Element(e) = n else { continue };
+        if e.is("main") && let Some(a) = e.attrs.iter_mut().find(|a| a.name.eq_ignore_ascii_case("data-page")) {
+            a.value = Some(page.to_string());
+            return true;
+        }
+        if name_page_main(&mut e.children, page) {
+            return true;
+        }
+    }
+    false
+}
+
 pub fn is_head_tag(e: &Element) -> bool {
-    e.is("title") || e.is("meta") || e.is("link")
+    e.is("title") || e.is("meta") || e.is("link") || directive::is_json_ld(e)
 }
 
 /// Identity of a head tag: a page tag replaces the layout tag with the same key.
@@ -625,6 +648,8 @@ pub struct PageCtx<'a> {
     pub page_file: &'a Path,
     /// Components used with a script: `data-c` id -> (tag for messages, script).
     pub comp_scripts: HashMap<String, (&'a str, OwnerScript<'a>)>,
+    /// Every script by module path (stores included: `@click="shared.cart.add(…)"`).
+    pub scripts: &'a HashMap<PathBuf, pragma_jslint::script::ScriptInfo>,
 }
 
 #[derive(Clone)]
@@ -660,6 +685,22 @@ impl Scoped<'_> {
             let Node::Element(e) = n else { continue };
             if self.p.files[e.pos.file as usize] != self.ctx.page_file {
                 continue;
+            }
+            if directive::is_json_ld(e) {
+                let text = match e.children.first() {
+                    Some(Node::Text(t, _)) => t.as_str(),
+                    _ => "",
+                };
+                for (_, _, v) in directive::json_ld_paths(text).unwrap_or_default() {
+                    if !matches!(directive::root(v), "data" | "params" | "query") || directive::check_path(v, false).is_err() {
+                        continue;
+                    }
+                    if !self.ctx.ssr && !std::mem::replace(&mut told, true) {
+                        let f = rel_str(&self.ctx.page_file.with_extension("server.js"));
+                        self.err(e.pos, "html/head", format!("JSON-LD with {{path}} is rendered by the server so crawlers see it: add export const ssr = true to {f}"));
+                    }
+                    self.path(e.pos, v, &[], &Owner::Page, true);
+                }
             }
             for a in &e.attrs {
                 let lname = a.name.to_ascii_lowercase();
@@ -745,12 +786,15 @@ impl Scoped<'_> {
                     }
                 }
                 Dir::On(_) => {
-                    if let Ok((name, args)) = directive::parse_call(v) {
-                        self.action(a.pos, name, &owner);
-                        for arg in args {
-                            if let directive::Arg::Path(p) = arg {
-                                self.path(a.pos, p, vars, &owner, in_page);
-                            }
+                    if let Ok(call) = directive::parse_call(v) {
+                        if call.is_store() {
+                            self.path(a.pos, call.name, vars, &owner, in_page);
+                            self.store_function(a.pos, call.name);
+                        } else {
+                            self.action(a.pos, call.name, &owner);
+                        }
+                        for p in call.paths() {
+                            self.path(a.pos, p, vars, &owner, in_page);
                         }
                     }
                 }
@@ -793,10 +837,32 @@ impl Scoped<'_> {
         let Some((whose, script)) = self.owner_script(owner) else {
             return self.no_script(pos, &format!("@… calls \"{name}\""), owner);
         };
-        if !script.info.incomplete && !script.info.is_function(name) {
+        if !script.info.incomplete && !script.info.callable(name) {
             let what = if script.info.declares(name) { "is not a function" } else { "is not declared" };
-            self.err(pos, "html/unknown-name", format!("\"{name}\" {what} in {whose}: write `function {name}() {{ … }}` at its top level"));
+            let hint = match directive::did_you_mean(name, script.info.callables()) {
+                Some(m) => format!("did you mean \"{m}\"? Otherwise write"),
+                None => "write".into(),
+            };
+            self.err(pos, "html/unknown-name", format!("\"{name}\" {what} in {whose}: {hint} `function {name}() {{ … }}` (or `const {name} = …` holding a function) at its top level"));
         }
+    }
+
+    /// `@click="shared.cart.add(…)"`: `add` must be a function of the store (its own path is checked by `path`).
+    fn store_function(&mut self, pos: Pos, name: &str) {
+        let mut parts = name.split('.').skip(1);
+        let (Some(store), Some(f)) = (parts.next(), parts.next()) else { return };
+        let Some(info) = self.p.stores.get(store).and_then(|m| self.ctx.scripts.get(m)) else { return };
+        if info.incomplete || info.callable(f) {
+            return;
+        }
+        let hint = directive::did_you_mean(f, info.callables()).map(|m| format!(" Did you mean shared.{store}.{m}?")).unwrap_or_default();
+        self.err(pos, "html/unknown-name", format!("\"{f}\" is not a function of the store {store} (lib/state/{store}.js).{hint}"));
+    }
+
+    /// Every name the owner's script declares (state, props, constants, functions).
+    fn script_names(&self, owner: &Owner) -> Vec<String> {
+        let Some((_, s)) = self.owner_script(owner) else { return Vec::new() };
+        [&s.info.lets, &s.info.props, &s.info.consts, &s.info.functions].into_iter().flatten().cloned().collect()
     }
 
     /// `:model` writes: only a top-level `let`.
@@ -819,7 +885,12 @@ impl Scoped<'_> {
             return;
         }
         if !script.info.declares(name) {
-            self.err(pos, "html/unknown-name", format!("${name} is not declared in {whose}: add `let {name} = …` (state), `export let {name} = …` (prop) or `function {name}() {{ … }}`"));
+            let names = self.script_names(owner);
+            let hint = match directive::did_you_mean(name, names.iter().map(String::as_str)) {
+                Some(m) => format!("did you mean ${m}? Otherwise add"),
+                None => "add".into(),
+            };
+            self.err(pos, "html/unknown-name", format!("${name} is not declared in {whose}: {hint} `let {name} = …` (state), `export let {name} = …` (prop) or `function {name}() {{ … }}`"));
         } else if let Some((_, line, col)) = script.info.mutated_consts.iter().find(|(n, _, _)| n == name) {
             let (file, line, col) = (script.file.to_path_buf(), *line, *col);
             self.diags.push(Diagnostic::error(file, line, col, "js/const-state", format!("`{name}` is changed in place and used in HTML, but a `const` is not state: declare it with `let {name}`")));
@@ -851,7 +922,10 @@ impl Scoped<'_> {
                 Some(s) if self.p.stores.contains_key(s) => {
                     self.stores.insert(s.to_string());
                 }
-                Some(s) => self.err(pos, "html/invalid-root", format!("store \"{s}\" does not exist (create lib/state/{s}.js)")),
+                Some(s) => {
+                    let hint = directive::did_you_mean(s, self.p.stores.keys().map(String::as_str)).map(|m| format!("did you mean shared.{m}? Otherwise ")).unwrap_or_default();
+                    self.err(pos, "html/invalid-root", format!("store \"{s}\" does not exist ({hint}create lib/state/{s}.js)"));
+                }
                 None => self.err(pos, "html/invalid-path", "use shared.<store>.field"),
             },
             "params" => {
@@ -872,7 +946,23 @@ impl Scoped<'_> {
                 let name = segs.get(1).copied().unwrap_or("");
                 self.err(pos, "html/invalid-root", format!("${name} was not passed with :{name} (a text prop has no subfields)"));
             }
-            _ => self.err(pos, "html/invalid-root", format!("unknown root \"{root}\" (use $, data, shared, params, query, page or a <for> variable)")),
+            _ => {
+                let names = self.script_names(owner);
+                let msg = if names.iter().any(|n| n == root) {
+                    format!("\"{root}\" is a name of the script: in HTML write ${p} (`{{${p}}}`, `:attr=\"${p}\"`)")
+                } else {
+                    let known = vars.iter().map(String::as_str).chain(["data", "shared", "params", "query", "page"]);
+                    let hint = if let Some(m) = directive::did_you_mean(root, known) {
+                        format!("did you mean \"{m}\"? ")
+                    } else if let Some(m) = directive::did_you_mean(root, names.iter().map(String::as_str)) {
+                        format!("did you mean ${m}? ")
+                    } else {
+                        String::new()
+                    };
+                    format!("unknown root \"{root}\" ({hint}use $, data, shared, params, query, page or a <for> variable)")
+                };
+                self.err(pos, "html/invalid-root", msg)
+            }
         }
     }
 }

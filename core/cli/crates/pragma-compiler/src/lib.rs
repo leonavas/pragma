@@ -96,16 +96,23 @@ fn gzip_len(bytes: &[u8]) -> u64 {
     miniz_oxide::deflate::compress_to_vec(bytes, 6).len() as u64 + 18
 }
 
-/// Authors scope a component's CSS with `[data-c="<name>"]`; a `routes/**/_components` one gets a
+/// The three ways to write `[attr="value"]` in CSS.
+fn spellings(attr: &str, value: &str) -> Vec<String> {
+    vec![format!("[{attr}=\"{value}\"]"), format!("[{attr}='{value}']"), format!("[{attr}={value}]")]
+}
+
+/// A component's CSS applies only inside it: every selector that does not already name
+/// `[data-c="<name>"]` is scoped to it (`:global(…)` opts out). A `routes/**/_components` one gets a
 /// per-folder id (`Component::id`), so its own selector is rewritten to that id (BUG-S-11).
 fn scope_component_css(css: &str, name: &str, id: &str) -> String {
-    if name == id {
-        return css.to_string();
-    }
     let to = format!("[data-c=\"{id}\"]");
-    [format!("[data-c=\"{name}\"]"), format!("[data-c='{name}']"), format!("[data-c={name}]")]
-        .iter()
-        .fold(css.to_string(), |out, from| out.replace(from.as_str(), &to))
+    let css = if name == id { css.to_string() } else { spellings("data-c", name).iter().fold(css.to_string(), |out, from| out.replace(from.as_str(), &to)) };
+    pragma_css::scope::scope(&css, &to, &spellings("data-c", id))
+}
+
+/// A page's CSS applies only inside its `<main data-page="<page>">`.
+fn scope_page_css(css: &str, page: &str) -> String {
+    pragma_css::scope::scope(css, &format!("[data-page=\"{page}\"]"), &spellings("data-page", page))
 }
 
 fn sort_diags(mut d: Vec<Diagnostic>) -> Vec<Diagnostic> {
@@ -404,13 +411,13 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             comp_css.insert(c.dir.clone(), scope_component_css(&css, &c.name, &c.id));
         }
     }
-    // a page <style> goes into the global CSS like a component's (in @layer components)
+    // a page <style> goes into the global CSS like a component's (in @layer components), scoped to its <main>
     let mut page_css: Vec<(PathBuf, String)> = Vec::new();
-    for f in p.pages.iter().chain(p.not_found.iter()).filter_map(|pg| pg.css.as_ref()) {
+    for (f, page) in p.pages.iter().chain(p.not_found.iter()).filter_map(|pg| pg.css.as_ref().map(|f| (f, &pg.out_name))) {
         if let Some(css) = p.read(f) {
             css_comment(f, &css, &mut diags);
             validate::css_classes(&css, &mut project_classes);
-            page_css.push((f.clone(), css));
+            page_css.push((f.clone(), scope_page_css(&css, page)));
         }
     }
     let mut classes = validate::ClassCheck::new(project_classes, theme);
@@ -458,6 +465,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             params: page.pattern.split('/').filter_map(|s| s.strip_prefix(':')).map(str::to_string).collect(),
             page_script: page.module.as_ref().and_then(owner),
             page_file: &p.files[page.html as usize],
+            scripts: &scripts,
             comp_scripts: exp
                 .components
                 .values()

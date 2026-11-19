@@ -76,7 +76,7 @@ fn pragma_imports_become_services_and_other_imports_are_hoisted() {
 
 #[test]
 fn let_without_value_and_several_declarators() {
-    let s = component("let a = 1, b, c = a + 1\nexport let label, size = 2\nfunction all() { return [a, b, c, label, size] }\n");
+    let s = component("let a = 1, b, c = a + 1\nexport let label, size = 2\nfunction all() { return [a, b, c, label, size] }\nfunction bump() { c = 0 }\n");
     assert!(s.diags.is_empty(), "{:#?}", s.diags);
     has(&s.code, "$.a = 1, $.b = undefined, $.c = $.a + 1");
     has(&s.code, "$pragma.prop(\"label\", undefined), $pragma.prop(\"size\", 2)");
@@ -118,7 +118,9 @@ fn script_structure_errors() {
     for (src, want) in cases {
         let s = component(src);
         assert!(s.diags.iter().any(|d| d.rule == "js/component-script" && d.message.contains(want)), "{src}: {:#?}", s.diags);
-        assert_eq!(s.code, src, "a script with errors is not rewritten");
+        // not rewritten, except that `pragma` imports go (no second error from the module graph)
+        let expected: String = src.lines().map(|l| if l.contains("from 'pragma'") { "\n".to_string() } else { format!("{l}\n") }).collect();
+        assert_eq!(s.code, expected, "a script with errors is not rewritten");
     }
     let page = transform(Path::new("routes/x.js"), "export let id = ''\n", ScriptKind::Page);
     assert!(page.diags[0].message.contains("pages have no props"), "{:#?}", page.diags);
@@ -149,6 +151,57 @@ fn store_with_persist() {
     assert!(bad.diags[0].message.contains("\"missing\""), "{:#?}", bad.diags);
     let props = transform(Path::new("lib/state/cart.js"), "export let x = 1\n", ScriptKind::Store);
     assert_eq!(rules(&props), [(1, "js/component-script")]);
+}
+
+#[test]
+fn data_read_at_the_top_level() {
+    let page = |src: &str| transform(Path::new("routes/x.js"), src, ScriptKind::Page);
+    let s = page("import { data } from 'pragma'\nlet products = data.products\nconst total = () => data.total\nfunction like() { data.likes += 1 }\n");
+    assert_eq!(rules(&s), [(2, "js/top-level-data")]);
+    assert!(s.diags[0].message.contains("const products = () => data.products"), "{}", s.diags[0].message);
+    let ok = page("import { data, params, query } from 'pragma'\nlet id = params.id\nlet tab = query.tab\nconst rows = () => data.rows\n");
+    assert!(ok.diags.is_empty(), "{:#?}", ok.diags);
+}
+
+#[test]
+fn stale_derived_values() {
+    let s = component("export let step = 1\nlet count = 0\nlet doubled = count * 2\nconst title = 'Count ' + count\nconst big = step * 10\nlet start = step\nlet max = 10\nconst limit = max\nconst label = () => 'n ' + count\nlet seed = count\nfunction reset() { seed = 0 }\nlet names = [1].map(n => n + count)\n");
+    let got: Vec<u32> = s.diags.iter().filter(|d| d.rule == "js/stale-derived").map(|d| d.line).collect();
+    // doubled, title, big, start, limit (max is a let: state); not label (a function), seed
+    // (assigned later) nor names (reads count only inside a callback: not flagged)
+    assert_eq!(got, [3, 4, 5, 6, 8], "{:#?}", s.diags);
+    let doubled = &s.diags[0].message;
+    assert!(doubled.contains("`doubled` reads `count` once") && doubled.contains("const doubled = () => count * 2"), "{doubled}");
+}
+
+#[test]
+fn derived_function_used_without_call() {
+    let s = component("let items = []\nconst empty = () => items.length === 0\nconst total = () => items.length\nfunction tick() {}\nfunction check() {\n  if (empty) return\n  const label = `${total} items`\n  const none = !empty\n  const many = total > 1 && empty\n  setInterval(tick, 1000)\n  return [items.filter(Boolean), typeof total, empty() ? 1 : 2]\n}\n");
+    let got: Vec<(u32, String)> = s.diags.iter().map(|d| (d.line, d.message.split('`').nth(1).unwrap_or("").to_string())).collect();
+    assert!(s.diags.iter().all(|d| d.rule == "js/derived-call"), "{:#?}", s.diags);
+    assert_eq!(got, [(6, "empty".into()), (7, "total".into()), (8, "empty".into()), (9, "total".into()), (9, "empty".into())], "{:#?}", s.diags);
+    assert!(s.diags[0].message.contains("call it in JS: `empty()`"));
+}
+
+#[test]
+fn dollar_names_in_a_script() {
+    let s = component("let count = 0\nfunction add() { $count += 1 }\nfunction other() { return $unknown }\nconst $ok = 1\n");
+    let dollar: Vec<(u32, &str)> = s.diags.iter().filter(|d| d.rule == "js/dollar-in-script").map(|d| (d.line, d.message.as_str())).collect();
+    assert_eq!(dollar.len(), 2, "{:#?}", s.diags);
+    assert!(dollar[0].0 == 2 && dollar[0].1.contains("in <script> write `count`"), "{dollar:?}");
+    assert_eq!(dollar[1].0, 3);
+}
+
+#[test]
+fn several_errors_in_one_pass() {
+    let s = component("import { data } from 'pragma'\nexport let step = 1\nlet products = data.list\nlet twice = step * 2\nfunction bump() { step += 1; if (show) return }\nconst show = () => true\nvar old = 1\n");
+    let mut found: Vec<&str> = s.diags.iter().map(|d| d.rule).collect();
+    found.sort();
+    found.dedup();
+    assert_eq!(found, ["js/component-script", "js/derived-call", "js/prop-write", "js/stale-derived", "js/top-level-data"], "{:#?}", s.diags);
+    // the names stay known, so the HTML checks still run (only the old API hides them)
+    assert!(!s.info.incomplete && s.info.declares("old") && s.info.declares("products"));
+    assert!(component("export const state = () => ({})\n").info.incomplete);
 }
 
 #[test]

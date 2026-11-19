@@ -15,7 +15,7 @@ const HELP: &str = "pragma — HTML, CSS and JS without a framework
 usage:
   pragma new <dir>                              create an app in <dir> (empty or missing)
   pragma dev [--port 5180] [--host 127.0.0.1]   dev server with live reload
-  pragma build                                  build dist/ for production
+  pragma build [--allow-outdated-core]          build dist/ for production (stops if core/ is outdated)
   pragma check [--strict]                       check HTML, CSS, JS and budgets (--strict: warnings become errors)
   pragma serve [--port 3000] [--host 127.0.0.1] serve dist/ as in production
   pragma upgrade                                update core/ (runtime, docs, base.css) to this version
@@ -44,7 +44,11 @@ pub fn run(args: Vec<String>) -> i32 {
         }
         "new" => cmd_new(rest),
         "dev" => cmd_dev(rest),
-        "build" => parse(rest, &[]).and_then(|_| cmd_build()),
+        "build" => {
+            let allow = rest.iter().any(|a| a == "--allow-outdated-core");
+            let rest: Vec<String> = rest.iter().filter(|a| *a != "--allow-outdated-core").cloned().collect();
+            parse(&rest, &[]).and_then(|a| no_positional(&a)).and_then(|_| cmd_build(allow))
+        }
         "check" => {
             let strict = rest.iter().any(|a| a == "--strict");
             let rest: Vec<String> = rest.iter().filter(|a| *a != "--strict").cloned().collect();
@@ -125,11 +129,22 @@ fn cmd_dev(args: &[String]) -> Result<i32, String> {
     no_positional(&args)?;
     let port = args.port(5180)?;
     let root = app_root()?;
+    if let Some(warning) = upgrade::outdated(&root) {
+        print_diagnostics(&root, &[warning]);
+        eprintln!("{} pages may fail to render with an old core/ (e.g. SSR \"unknown op\"); run `pragma upgrade`\n", report::paint("33", "warning:"));
+    }
     Ok(runtime()?.block_on(dev::run(root, &args.host(), port)))
 }
 
-fn cmd_build() -> Result<i32, String> {
+fn cmd_build(allow_outdated_core: bool) -> Result<i32, String> {
     let root = app_root()?;
+    match upgrade::build_gate(&root, allow_outdated_core) {
+        Ok(warning) => print_diagnostics(&root, warning.as_slice()),
+        Err((error, message)) => {
+            print_diagnostics(&root, &[error]);
+            return Err(message);
+        }
+    }
     let started = Instant::now();
     let opts = pragma_compiler::BuildOptions { root: root.clone(), out_dir: root.join("dist"), mode: pragma_compiler::Mode::Prod };
     match pragma_compiler::build(&opts) {

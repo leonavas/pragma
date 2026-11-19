@@ -14,11 +14,14 @@ name/
   name.html   required: optional <script> and <style> at the top level, then 1 root element
               (not <template>, <slot> or a component)
   name.js     optional, instead of the <script>
-  name.css    optional, instead of the <style>; scope selectors with [data-c="name"]
+  name.css    optional, instead of the <style>; scoped to the component automatically
 ```
 
 The `<script>` is the component's state and behavior (state.md); `<style>` (or `name.css`) is
-its CSS, scoped with `[data-c="name"]`. Both inline and as a file = `html/duplicate-module`.
+its CSS. The build scopes every selector to the component (its root and what is inside it):
+`button { … }` never styles a button outside it. `:global(…)` opts a selector out
+(`:global(html[data-theme="dark"]) .x`). Selectors that already start with `[data-c="name"]` stay
+as written. Both inline and as a file = `html/duplicate-module`.
 
 `p-` names are private to their folder, styles included: two `<p-badge>` in different folders
 never share CSS (the build gives each its own `data-c` and rewrites `[data-c="badge"]` in its own
@@ -38,6 +41,7 @@ A component with a script declares its props with `export let name = default`:
 | nothing | `export let step = 1` | the default, `1` |
 
 - Props are read-only (`js/prop-write`, also via `:model`): copy one into a `let` to change it (`let count = start`).
+- An object or list prop is read-only inside too: it is the caller's data. In dev, writing to it (`files[0].open = true`, `items.push(x)`) throws "props are read-only, also inside". Copy what you change: `let rows = files.map(file => ({ ...file }))`, or ask the owner to change it (an event, a store function).
 - A prop the script does not declare is an error at the call site (`html/unknown-prop`). `class` is not a prop: it is appended to the root's classes. `id` is a prop like any other (`export let id = ''`, then `:id="$id"`).
 - Name props in one lowercase word (`label`, `step`): HTML attributes are case-insensitive.
 - A component **without** a script has build-time props: `$label` is replaced by the caller's text, `:x="path"` by the caller's path; missing, `""` and `"false"` are falsy.

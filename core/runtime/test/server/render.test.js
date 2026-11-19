@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { render, renderHead, resolve, template } from '../../server/render.js'
+import { render, renderHead, renderPage, resolve, template } from '../../server/render.js'
 
 const TPL = '<ul><template data-tid="t1" data-for="item in data.items" data-key="item.id"><li></li></template>'
 const EMPTY = '<template data-empty data-tid="t9"><li>empty</li></template>'
@@ -129,6 +129,70 @@ test('state and shared are left to the client: directives intact, blocks without
   )
 })
 
+// Compiled script factories (what the build emits for `<script>` blocks).
+const listScript = {
+  default($, $pragma) {
+    $pragma.prop('items', [])
+    $pragma.prop('step', 1)
+    $.open = true
+    const count = () => $.items.length * $.step
+    return { count }
+  },
+}
+const LIST = (props) => [
+  'comp', 'list', props, [
+    ['html', '<ul data-c="list"'], ['class', '', [['open', 'state.open', false]]], ['html', '>'],
+    ['for', 't1', 'item', 'state.items', 'item.id', [['html', '<li>'], ['text', '{item.name}'], ['html', '</li>']]],
+    ['html', '<b>'], ['text', 'total {state.count}'], ['html', '</b></ul>'],
+  ],
+]
+
+test('script components render with their instance: props (path or text), lets and derived functions', () => {
+  const scope = { data: { items: [{ id: 1, name: 'one' }, { id: 2, name: 'two' }] }, params: {}, query: {}, page: {} }
+  const out = renderPage([LIST([['items', 'path', 'data.items'], ['step', 'text', '3']])], scope, { components: { list: listScript } })
+  assert.equal(out, '<ul data-c="list" class="open"><li data-of="t1" data-key="1">one</li><li data-of="t1" data-key="2">two</li><b>total 6</b></ul>')
+})
+
+test('a script component the server cannot run is left to the client (no module, browser-only code, stores, writes)', () => {
+  const scope = { data: { items: [{ id: 1, name: 'one' }] }, params: {}, query: {}, page: {} }
+  const client = '<ul data-c="list"></ul>'
+  const props = [['items', 'path', 'data.items']]
+  assert.equal(renderPage([LIST(props)], scope, {}), client.replace('></ul>', '><b></b></ul>'))
+  const failing = [
+    { default: () => { window.innerWidth } },
+    { default: ($, $pragma) => { $.n = $pragma.shared.cart.items.length } },
+    { default: ($, $pragma) => { $pragma.data.items.push({ id: 9 }) } },
+    { default: ($, $pragma) => { $pragma.prop('items', []); return { count: () => $pragma.shared.cart.n } } },
+  ]
+  for (const list of failing) {
+    assert.equal(renderPage([LIST(props)], scope, { components: { list } }), '<ul data-c="list"><b></b></ul>', String(list.default))
+  }
+  assert.equal(scope.data.items.length, 1, 'data stays untouched')
+  // a prop from the client side (a store) leaves the whole component to the client
+  assert.equal(renderPage([LIST([['items', 'path', 'shared.cart.items']])], scope, { components: { list: listScript } }), '<ul data-c="list"><b></b></ul>')
+})
+
+test('slot content renders in its owner scope; the page script renders too', () => {
+  const page = { default($) { $.title = 'from page'; return { upper: () => 'PAGE' } } }
+  const box = { default($) { $.title = 'from box' } }
+  const ops = [
+    ['html', '<h1>'], ['text', '{state.title} {state.upper}'], ['html', '</h1>'],
+    ['comp', 'box', [], [
+      ['html', '<section data-c="box"><h2>'], ['text', '{state.title}'], ['html', '</h2>'],
+      ['slot', 1, [['html', '<p data-slot="1">'], ['text', '{state.title}'], ['html', '</p>']]],
+      ['html', '<template data-slot="1" data-if="state.title" data-tid="t2"><i></i></template>'],
+      ['slot', 1, [['if', 't2', 'state.title', false, [['html', '<i>'], ['text', '{state.title}'], ['html', '</i>']]]]],
+      ['slot', 1, [['else', 't2', [['html', '<u>never</u>']]]]],
+      ['html', '</section>'],
+    ]],
+  ]
+  const out = renderPage(ops, { data: null, params: {}, query: {}, page: {} }, { page, components: { box } })
+  assert.equal(out, '<h1>from page PAGE</h1><section data-c="box"><h2>from box</h2><p data-slot="1">from page</p><template data-slot="1" data-if="state.title" data-tid="t2"><i></i></template><i data-of="t2">from page</i></section>')
+  // a page script that cannot run leaves page state to the client, still rendering the rest
+  const broken = { default() { document.title } }
+  assert.equal(renderPage([['html', '<h1>'], ['text', '{state.title}'], ['html', '</h1>']], { data: null, params: {}, query: {}, page: {} }, { page: broken }), '<h1></h1>')
+})
+
 test('for variable over data resolves on the server, even alongside state', () => {
   const ops = [['for', 't1', 'item', 'data.items', 'item.id', [['html', '<li'], ['class', '', [['sel', 'state.sel', false]]], ['html', '>'], ['text', '{item.name}'], ['html', '</li>']]]]
   assert.equal(render(ops, { data: { items: [{ id: 1, name: 'a' }] } }), '<li data-of="t1" data-key="1">a</li>')
@@ -153,4 +217,22 @@ test('head: title and attribute templates and paths are filled by the server', (
       '<link rel="canonical" href="https://x.dev/p/7">\n' +
       '</head><body></body></html>',
   )
+})
+
+test('head: JSON-LD gets {path} values JSON-escaped inside its strings; JSON syntax is kept', () => {
+  const ld = '{"@context": "https://schema.org", "@type": "Article", "headline": "{data.post.title}", "author": {"@type": "Person", "name": "By { data.post.author }"}, "url": "https://x.dev/blog/{params.slug}", "note": "\\"{data.missing}\\""}'
+  const html = `<html><head><title>Blog</title>\n<script type="application/ld+json">${ld}</script>\n</head><body><script type="application/ld+json">{"a": "{data.post.title}"}</script></body></html>`
+  const scope = { data: { post: { title: 'He said "hi" </script><b>', author: 'Ana\nBo' } }, params: { slug: 'a-b' } }
+  const out = renderHead(html, scope)
+  const filled = out.slice(out.indexOf('<script type="application/ld+json">') + 35, out.indexOf('</script>'))
+  assert.deepEqual(JSON.parse(filled), {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: 'He said "hi" </script><b>',
+    author: { '@type': 'Person', name: 'By Ana\nBo' },
+    url: 'https://x.dev/blog/a-b',
+    note: '""',
+  })
+  assert.ok(!filled.includes('</script>') && filled.includes('\\u003c/script>'), filled)
+  assert.ok(out.endsWith('<body><script type="application/ld+json">{"a": "{data.post.title}"}</script></body></html>'), 'only the head is filled')
 })

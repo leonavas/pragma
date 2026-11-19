@@ -79,6 +79,18 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - **[firm]** Events call with arguments: `@change="toggle(task)"`, `@input="search(event, $q)"`.
   Arguments are paths, simple literals or `event`; no expressions. *Why:* replaces
   `ctx.scope.task`, which made the agent guess the `<for>` variable name inside the action.
+- **[firm]** (DX review, 2026-11-19) Without parentheses a handler gets the event
+  (`@input="search"` → `search(event)`); with them only what is listed. New argument `el` (the
+  element with the `@`), because events are delegated and `event.currentTarget` is the document.
+  Store functions are handlers too (`@click="shared.cart.remove(item.id)"`), so components need no
+  wrapper actions. *Why:* every other framework passes the event by default; `fn` with no args
+  was the most common first-try bug.
+- **[firm]** (DX review, 2026-11-19) Component and page CSS is scoped by the build: each selector
+  gets `:where(<scope>, <scope> *)` on its last part (no specificity added), unless it already
+  names the scope; `:global(…)` opts out. *Why:* `button { color: red }` in a component shipped as
+  a global rule and nothing warned; agents from Svelte/Vue expect scoping. The hand-written
+  `[data-c="x"]` prefix keeps working, so existing CSS does not change (the site's global CSS
+  stayed at 14.8 kB gzip).
 - **[firm v0]** Prop truthiness is the same in HTML and JS: missing, `""`, `"false"` are falsy;
   bare attribute and other values truthy. In `ctx.$`, `"true"`/bare → `true`, `"false"` →
   `false`, other values stay strings.
@@ -107,6 +119,16 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   without rebuilding the DOM.
 - **[firm]** Never HTML in JS, not even in SSR: the server renders from the same `.html`,
   compiled to ops (`templates/<route>.json`).
+- **[firm v0]** With `ssr`, the server runs page and component scripts (BUG-S-17, 2026-11-19):
+  the compiled factory runs once per request with read-only `data`/`params`/`query`/`page`
+  (stores and browser services throw), so initial `let`s, props and derived values are in the
+  first HTML; `mount` and events stay in the browser. A script whose imports are not all app
+  code (npm package, `core/`), that throws on the server, or that gets a prop from a store is
+  left to the browser for that page or component only. *Why:* adding one `let` to a component
+  moved all its prop-driven content out of the SSR HTML (empty list until boot, nothing without
+  JS); running the same factory is the only way the server and the first client render agree.
+  Rejected: resolving only props on the server (derived values and initial state would still
+  flash), and a server-only variant of the script (two ways to write one component).
 - **[firm v0]** Server writes via `.server.js` `actions` and `call` (from `pragma`) →
   `POST /_action/<path>/<name>`.
 - **[firm v0]** Per-page head (SEO, link previews): a page writes `<title>`, `<meta>` and
@@ -147,7 +169,8 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - **[firm]** The top-level script is the component; no `export default`, `this` or `ctx`.
   Top-level `let` = reactive state; a top-level function used in `@event` is an action, used in
   `{}` or a value binding a derived value (called on each render; in JS you call it: `total()`);
-  `function mount() { …; return cleanup }` runs after mount; imports are hoisted out of the
+  `function mount(el) { …; return cleanup }` runs after mount with the component's root element
+  (a page: `<main data-page>`; BUG-S-18, it replaces `ctx.el`); imports are hoisted out of the
   per-instance factory. State is a deep Proxy (`items.push()` works) and every change schedules
   one render per microtask, so assigning a `let` from a timer just works (no `ctx.update`).
   *Why:* the old API split one idea into `export const state`, `export const actions` and
@@ -167,6 +190,17 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   attribute text (`"5"` → 5; bare/`"true"`/`"false"` → boolean); props are read-only
   (`js/prop-write`) and live (`:items="$visible"` passes the caller's value, not text). An
   undeclared prop at a call site is `html/unknown-prop`. `export` means "prop" and nothing else.
+- **[firm]** Object and array props are read-only all the way down (DX council, 2026-11-19): in
+  dev a prop object is a read-only view that throws on write (production skips the view).
+  *Why:* writing into a prop object silently changed the caller's data while `js/prop-write`
+  only stopped reassigning the name; copying is the explicit way to own a value.
+- **[firm]** Traps of "top-level `let` is reactive" are `check` errors, not docs (DX council):
+  `js/stale-derived` (a value computed once from state at startup), `js/derived-call` (a
+  derived function used as a value without `()`), `js/top-level-data` (`data` before the
+  loader), `js/dollar-in-script` (`$x` in JS). All script errors of a file come in one pass
+  with "did you mean" hints; only the old API stops the HTML name checks. `async mount()`
+  resolves to its cleanup. *Why:* the three reviewers hit each trap and `check` passed; an
+  agent fixes what `check` names.
 - **[firm]** Services come from the virtual module `pragma`: `shared`, `data`, `params`, `query`,
   `page`, `log`, `call`, `navigate`, `open`, `close`, `confirm`. They are live (`data` is the
   current page's once the loader is done). Only page, component and store scripts import it.

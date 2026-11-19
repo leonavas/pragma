@@ -1,18 +1,18 @@
 [data-c="principles"] { padding-block: 5rem; }
-[data-c="principles"] .principles-title {
+.principles-title {
   max-width: 22ch;
   font-size: clamp(1.75rem, 3.6vw, 2.5rem);
   font-weight: 500;
   line-height: 1.08;
   letter-spacing: -0.03em;
 }
-[data-c="principles"] .principle {
+.principle {
   display: grid;
   gap: 1rem;
   padding-block: 2rem;
   border-bottom: 1px solid var(--color-line);
 }
-[data-c="principles"] .principle-code {
+.principle-code {
   margin: 0;
   padding: 1rem 1.125rem;
   overflow-x: auto;
@@ -24,7 +24,7 @@
 }
 @media (min-width: 64rem) {
   [data-c="principles"] { padding-block: 7rem; }
-  [data-c="principles"] .principle {
+  .principle {
     grid-template-columns: 11rem minmax(0, 1fr) minmax(0, 1.1fr);
     gap: 3rem;
     align-items: start;

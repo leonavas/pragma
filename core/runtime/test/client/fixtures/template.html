@@ -6,7 +6,7 @@
   <title>Template</title>
   <script>self.__pragmaDev=true</script>
   <link rel="modulepreload" href="/assets/template.js">
-  <script type="application/json" id="pragma-route">{"pattern":"/template","page":"/assets/template.js","components":{"inner":"/assets/inner.js"},"stores":{},"loader":false,"ssr":false}</script>
+  <script type="application/json" id="pragma-route">{"pattern":"/template","page":"/assets/template.js","components":{"inner":"/assets/inner.js"},"stores":{"basket":"/assets/basket.js"},"loader":false,"ssr":false}</script>
   <script type="module" src="/core/boot.js"></script>
 </head>
 <body>
@@ -20,6 +20,14 @@
     <ul id="tasks"><template data-for="task in state.tasks" data-key="task.id" data-tid="t1"><li data-class-done="task.done"><label><input type="checkbox" data-attr-checked="task.done" data-on-change="toggle(task)"> <!--{task.title}--><!--}--></label><button class="rename" data-on-click="rename(task, 'Renamed')">rename</button></li></template></ul>
     <button id="record" data-on-click="record(event, 'a, b', -2.5, true, null, state.name)">record</button>
     <p id="log" data-text="{state.log}"></p>
+    <input id="search" aria-label="Search" data-on-input="search">
+    <p id="query" data-text="{state.query}"></p>
+    <button id="locate" data-on-click="locate(el, event)"><b>locate</b></button>
+    <p id="spot" data-text="{state.spot}"></p>
+    <button id="save-twice" data-on-click="saveTwice">save</button>
+    <p id="saves" data-text="{state.saves}"></p>
+    <button id="not-a-function" data-on-click="name">name</button>
+    <ul id="basket"><template data-for="item in shared.basket.items" data-key="item.id" data-tid="t8"><li><button class="drop" data-on-click="shared.basket.remove(item.id)" data-text="{item.name}"></button></li></template></ul>
     <pre id="code"><code>{literal}: <template data-for="line in state.tasks" data-key="line.id" data-tid="t9"><span data-attr-data-n="line.id" data-text="{line.title};"></span></template></code></pre>
     <div data-c="inner"><span class="own" data-text="{state.name}"></span> <!--1{state.name}--><!--}--></div>
   </main>

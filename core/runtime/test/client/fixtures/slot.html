@@ -29,7 +29,7 @@
     </section>
     <ul>
       <template data-for="item in state.items" data-key="item.id" data-tid="s2"><li>
-        <div data-c="box" data-prop-initial="1" data-with-max="item.max">
+        <div data-c="box" data-prop-initial="1" data-with-max="item.max" data-with-row="item">
           <output class="n" data-text="{state.n}"></output><span class="max" data-text="{state.max}"></span>
           <button class="item-btn" data-slot="1" data-on-click="pick(item)" data-text="{item.name}"></button>
         </div>

@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const headPattern = /<head>([\s\S]*?)<\/head>/
-const headTagPattern =/<title\b[^>]*>[^<]*<\/title>|<(?:meta|link)\b[^>]*>/g
+const headTagPattern = /<title\b[^>]*>[^<]*<\/title>|<(?:meta|link)\b[^>]*>|<script type="application\/ld\+json">[\s\S]*?<\/script>/g
 const attributePattern = /([^\s=]+)="([^"]*)"/g
 const plumbingPattern = /\bcharset=|name="viewport"|rel="(?:preload|modulepreload|stylesheet)"/
 const entities = { '&amp;': '&', '&quot;': '"', '&#39;': "'", '&lt;': '<', '&gt;': '>' }
@@ -17,8 +17,12 @@ function attributesOf(tag) {
   return Object.fromEntries([...tag.matchAll(attributePattern)].map(([, name, value]) => [name, decode(value)]))
 }
 
+const isJsonLd = tag => tag.startsWith('<script')
+const compact = tag => tag.replace(/\s*\n\s*/g, ' ')
+
 function keyOf(tag) {
   if (tag.startsWith('<title')) return 'title'
+  if (isJsonLd(tag)) return 'json-ld'
   const attributes = attributesOf(tag)
   if (tag.startsWith('<link')) return 'link ' + attributes.rel + ' ' + (attributes.hreflang ?? '')
   return 'meta ' + (attributes.name ?? attributes.property ?? attributes['http-equiv'])
@@ -31,7 +35,7 @@ function headTagsOf(html) {
 
 function valuesOf(tags) {
   const values = {}
-  for (const tag of tags) {
+  for (const tag of tags.filter(candidate => !isJsonLd(candidate))) {
     const attributes = attributesOf(tag)
     if (tag.startsWith('<title')) values.title = decode(tag.slice(tag.indexOf('>') + 1, tag.lastIndexOf('<')))
     else if (tag.startsWith('<link')) values[attributes.rel] = attributes.href
@@ -77,7 +81,7 @@ export async function fetchServed(origin, { path, source }, log) {
     const tags = html ? headTagsOf(body) : []
     const values = valuesOf(tags)
     const lines = html
-      ? tags.map(tag => ({ text: tag, origin: pageKeys.has(keyOf(tag)) ? 'page' : 'layout' }))
+      ? tags.map(tag => ({ text: compact(tag), origin: pageKeys.has(keyOf(tag)) ? 'page' : 'layout' }))
       : body.trimEnd().split('\n').slice(0, maxBodyLines).map(text => ({ text, origin: '' }))
     return {
       path,

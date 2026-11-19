@@ -54,16 +54,16 @@
 </div>
 
 <style>
-  [data-c="task-list"] .tasks-filter { color: var(--color-muted); text-decoration-color: var(--color-line-strong); text-underline-offset: 0.3em; }
-  [data-c="task-list"] .tasks-filter[aria-pressed="true"] { color: var(--color-accent); text-decoration-color: currentColor; }
-  [data-c="task-list"] .tasks-check { accent-color: var(--color-accent); }
-  [data-c="task-list"] .tasks-title {
+  .tasks-filter { color: var(--color-muted); text-decoration-color: var(--color-line-strong); text-underline-offset: 0.3em; }
+  .tasks-filter[aria-pressed="true"] { color: var(--color-accent); text-decoration-color: currentColor; }
+  .tasks-check { accent-color: var(--color-accent); }
+  .tasks-title {
     overflow-wrap: anywhere;
     background: linear-gradient(currentColor, currentColor) 0 55% / 0 1px no-repeat;
     transition: background-size 0.28s var(--ease-out), color 0.2s var(--ease-out);
   }
-  [data-c="task-list"] .done .tasks-title { color: var(--color-faint); background-size: 100% 1px; }
+  .done .tasks-title { color: var(--color-faint); background-size: 100% 1px; }
   @media (prefers-reduced-motion: reduce) {
-    [data-c="task-list"] .tasks-title { transition: none; }
+    .tasks-title { transition: none; }
   }
 </style>

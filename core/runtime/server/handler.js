@@ -1,4 +1,4 @@
-import { render, renderHead } from './render.js'
+import { renderPage, renderHead } from './render.js'
 import { createLogger, flush, fromClient, minSeverity, newSpanId, newTraceId, parseTraceparent, resourceFrom } from './log.js'
 
 const OTEL_MAX_BYTES = 256 * 1024
@@ -174,7 +174,7 @@ async function page(m, { query, request, env, log }) {
     const value = route.server?.load ? await route.server.load({ params, query, request, env, log }) : null
     payload = { data: value ?? null }
     scope.data = payload.data
-    body = render(route.template, scope)
+    body = renderPage(route.template, scope, { page: route.page, components: route.components, log })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     log.error(message, err)

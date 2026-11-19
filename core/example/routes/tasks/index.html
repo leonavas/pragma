@@ -13,11 +13,11 @@
   const invalid = () => String(!!error)
   const tone = () => (shared.tasks.completed() && !shared.tasks.pending() ? 'ok' : 'neutral')
   const filter = () => markCurrent(Object.keys(FILTERS), FILTERS[query.filter] ? query.filter : 'all')
-  const visible = () => {
+  const rows = () => {
     const matchesFilter = FILTERS[query.filter] ?? FILTERS.all
     return shared.tasks.items
       .filter(task => matchesFilter(task) && contains(task.title, search))
-      .map(task => ({ ...task, editing: task.id === editingId }))
+      .map(task => ({ task, editing: task.id === editingId }))
   }
 
   function validate(title, id) {
@@ -37,12 +37,7 @@
   }
 
   function toggle(task) {
-    const stored = shared.tasks.find(task.id)
-    stored.done = !stored.done
-  }
-
-  function remove(task) {
-    shared.tasks.remove(task.id)
+    task.done = !task.done
   }
 
   function edit(task) {
@@ -63,10 +58,6 @@
     if (!validate(title, id)) shared.tasks.find(id).title = title
   }
 
-  function completeAll() {
-    shared.tasks.completeAll()
-  }
-
   async function clearCompleted() {
     if (await confirm('clear-completed') !== 'ok') return
     shared.tasks.clearCompleted()
@@ -80,7 +71,7 @@
   <header class="flex flex-wrap items-center justify-between gap-4">
     <h1 class="text-3xl font-semibold tracking-tight">Tasks</h1>
     <c-dropdown id="task-actions" label="Actions">
-      <button type="button" @close @click="completeAll">Complete all</button>
+      <button type="button" @close @click="shared.tasks.completeAll">Complete all</button>
       <hr>
       <button type="button" class="text-danger-600" @click="clearCompleted">Clear completed…</button>
     </c-dropdown>
@@ -91,7 +82,7 @@
     <c-indicator title="Completed" :value="shared.tasks.summary" :tone="$tone"></c-indicator>
   </section>
 
-  <form class="flex flex-col gap-1" novalidate @submit="add(event)">
+  <form class="flex flex-col gap-1" novalidate @submit="add">
     <div class="flex gap-2">
       <input id="new-task" name="title" class="field flex-1" placeholder="New task" autocomplete="off" aria-label="New task" aria-describedby="task-error" :model="$newTitle" :aria-invalid="$invalid">
       <button class="btn btn-primary">Add</button>
@@ -109,16 +100,16 @@
   </div>
 
   <ul class="card divide-y divide-line p-0">
-    <for task in $visible key=task.id>
+    <for row in $rows key=row.task.id>
       <li class="flex items-center gap-3 px-4 py-2">
-        <input type="checkbox" class="size-4" :checked="task.done" :aria-label="task.title" @change="toggle(task)">
-        <if task.editing>
-          <input class="field flex-1" aria-label="Edit task" autofocus :model="$draft" @keydown="editKeydown(event)" @focusout="saveEdit">
+        <input type="checkbox" class="size-4" :checked="row.task.done" :aria-label="row.task.title" @change="toggle(row.task)">
+        <if row.editing>
+          <input class="field flex-1" aria-label="Edit task" autofocus :model="$draft" @keydown="editKeydown" @focusout="saveEdit">
         </if>
         <else>
-          <span class="flex-1 py-2" title="Double-click to edit" .line-through="task.done" .text-muted="task.done" @dblclick="edit(task)">{task.title}</span>
+          <span class="flex-1 py-2" title="Double-click to edit" .line-through="row.task.done" .text-muted="row.task.done" @dblclick="edit(row.task)">{row.task.title}</span>
         </else>
-        <button type="button" class="btn btn-icon" aria-label="Remove {task.title}" @click="remove(task)">×</button>
+        <button type="button" class="btn btn-icon" aria-label="Remove {row.task.title}" @click="shared.tasks.remove(row.task.id)">×</button>
       </li>
     </for>
     <empty>

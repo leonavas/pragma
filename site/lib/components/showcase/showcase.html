@@ -1,30 +1,180 @@
-<figure class="border border-line bg-sunken">
+<script>
+  import { log } from 'pragma'
+  import { codeKinds } from '../../../utils/code-lines.js'
+
+  export let source = null
+  export let caption = ''
+
+  const copyResetMs = 1800
+  const beatGapMs = 400
+  const timedWindowMs = 1000
+  const interactions = ['pointerdown', 'click', 'keydown', 'input', 'change', 'submit']
+
+  let activeId = ''
+  let expanded = false
+  let copiedId = ''
+  let blockedId = ''
+  let resetTimer = 0
+  let announcement = ''
+  let patches = ''
+  let beat = ''
+
+  const currentId = () => activeId || source.files[0]?.id
+  const expandedText = () => (expanded ? 'true' : 'false')
+  const lineCount = file => (file.lines.length === 1 ? '1 line' : file.lines.length + ' lines')
+
+  const rows = () => source.files.map(file => ({
+    file,
+    active: file.id === currentId(),
+    pressed: file.id === currentId() ? 'true' : 'false',
+    copied: file.id === copiedId,
+    blocked: file.id === blockedId,
+    lineCount: lineCount(file),
+  }))
+
+  function select(file) {
+    activeId = file.id
+  }
+
+  function toggleExpanded() {
+    expanded = !expanded
+  }
+
+  async function copy(file, el) {
+    clearTimeout(resetTimer)
+    try {
+      await navigator.clipboard.writeText(file.lines.map(line => line.text).join('\n'))
+      copiedId = file.id
+      blockedId = ''
+      announcement = `Copied ${file.name}, ${lineCount(file)}.`
+    } catch (failure) {
+      log.warn('source copy failed', { 'file.path': file.path, 'exception.message': failure.message })
+      getSelection()?.selectAllChildren(el.closest('.showcase-file').querySelector('pre'))
+      copiedId = ''
+      blockedId = file.id
+      announcement = `The clipboard is blocked. The code of ${file.name} is selected: copy it with the keyboard.`
+    }
+    resetTimer = setTimeout(() => {
+      copiedId = ''
+      blockedId = ''
+      announcement = ''
+    }, copyResetMs)
+  }
+
+  function highlightFor(kind) {
+    const name = 'code-' + codeKinds[kind]
+    if (!CSS.highlights.has(name)) {
+      const highlight = new Highlight()
+      highlight.priority = codeKinds[kind] === 'directive' ? 1 : 0
+      CSS.highlights.set(name, highlight)
+    }
+    return CSS.highlights.get(name)
+  }
+
+  function paint(root) {
+    if (!globalThis.CSS?.highlights) return () => {}
+    const painted = []
+    for (const code of root.querySelectorAll('pre[id]')) {
+      const file = source.files.find(candidate => candidate.id === code.id)
+      code.querySelectorAll('.code-line').forEach((line, index) => {
+        const marks = file?.lines[index]?.marks ?? []
+        if (!line.firstChild) return
+        for (let i = 0; i < marks.length; i += 3) {
+          const range = new StaticRange({ startContainer: line.firstChild, startOffset: marks[i], endContainer: line.firstChild, endOffset: marks[i + 1] })
+          highlightFor(marks[i + 2]).add(range)
+          painted.push([marks[i + 2], range])
+        }
+      })
+    }
+    return () => {
+      for (const [kind, range] of painted) highlightFor(kind).delete(range)
+    }
+  }
+
+  function formatMs(elapsedMs) {
+    if (elapsedMs < 0.1) return '<0.1 ms'
+    return (elapsedMs < 10 ? elapsedMs.toFixed(1) : Math.round(elapsedMs)) + ' ms'
+  }
+
+  function describePatch(count, elapsedMs) {
+    const updated = count === 1 ? '1 update' : count + ' updates'
+    return elapsedMs === null ? updated : updated + ' · ' + formatMs(elapsedMs)
+  }
+
+  function watch(stage) {
+    let interactedAt = 0
+    let beatAt = 0
+    const noteInteraction = event => {
+      if (stage.contains(event.target)) interactedAt = event.timeStamp
+    }
+    const observer = new MutationObserver(records => {
+      if (!beatAt && !interactedAt) return
+      const touched = new Set(records.map(record => record.target.nodeType === Node.ELEMENT_NODE ? record.target : record.target.parentElement))
+      touched.delete(null)
+      const now = performance.now()
+      const timed = interactedAt > 0 && now - interactedAt < timedWindowMs
+      const next = describePatch(touched.size, timed ? now - interactedAt : null)
+      const pulse = now - beatAt > beatGapMs
+      interactedAt = 0
+      if (pulse) beatAt = now
+      if (!pulse && next === patches) return
+      patches = next
+      if (pulse) beat = beat === 'a' ? 'b' : 'a'
+    })
+    observer.observe(stage, { subtree: true, childList: true, attributes: true, characterData: true })
+    for (const type of interactions) document.addEventListener(type, noteInteraction, true)
+    return () => {
+      observer.disconnect()
+      for (const type of interactions) document.removeEventListener(type, noteInteraction, true)
+    }
+  }
+
+  function mount(el) {
+    const unpaint = paint(el)
+    const stage = el.querySelector('.showcase-stage')
+    const unwatch = stage.querySelector('[data-c="frame"]') ? () => {} : watch(stage)
+    return () => {
+      clearTimeout(resetTimer)
+      unpaint()
+      unwatch()
+    }
+  }
+</script>
+
+<figure class="border border-line bg-sunken" .is-expanded="$expanded">
   <if page.error>
     <p class="px-4 py-5 font-mono text-xs text-danger-300" role="alert">{page.error.message}</p>
   </if>
   <else>
     <div class="flex min-w-0 flex-col">
       <div class="flex flex-wrap border-b border-line" role="group" aria-label="Source files">
-        <for file in $source.files key=file.id>
-          <c-source-tab :file="file" :files="$source.files" .is-active="file.active">{file.name}</c-source-tab>
+        <for row in $rows key=row.file.id>
+          <button type="button" class="showcase-tab relative flex-none cursor-pointer border-r border-b border-line px-3.5 py-3 font-mono text-xs transition-colors hover:text-ink" .is-active="row.active" :aria-pressed="row.pressed" :aria-controls="row.file.id" @click="select(row.file)">{row.file.name}</button>
         </for>
       </div>
       <div class="flex min-h-0 flex-1 flex-col">
-        <for file in $source.files key=file.id>
-          <div class="showcase-file min-h-0 min-w-0 flex-1 flex-col" .is-active="file.active" .is-long="file.long" .is-expanded="file.expanded">
+        <for row in $rows key=row.file.id>
+          <div class="showcase-file min-h-0 min-w-0 flex-1 flex-col" .is-active="row.active" .is-long="row.file.long">
             <div class="flex items-center justify-between gap-4 pt-1 pr-1 pl-4">
-              <p class="showcase-path min-w-0 truncate text-left font-mono text-xs text-faint"><span class="showcase-path-text">{file.dir}<span class="text-muted">{file.name}</span></span></p>
-              <c-source-copy :file="file"></c-source-copy>
+              <p class="showcase-path min-w-0 truncate text-left font-mono text-xs text-faint"><span class="showcase-path-text">{row.file.dir}<span class="text-muted">{row.file.name}</span></span></p>
+              <button type="button" class="showcase-copy inline-flex min-h-9 flex-none cursor-pointer items-center gap-2 px-2.5 font-mono text-xs" .is-done="row.copied" .is-blocked="row.blocked" @click="copy(row.file, el)">
+                <svg class="showcase-copy-icon size-3.5" viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" fill="none" stroke="currentColor"></rect><path d="M10.5 3.5v-1h-8v8h1" fill="none" stroke="currentColor"></path></svg>
+                <svg class="showcase-check-icon size-3.5" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"></path></svg>
+                <span class="showcase-copy-idle">Copy <span class="sr-only">{row.file.name}</span></span>
+                <span class="showcase-copy-done">Copied {row.lineCount}</span>
+                <span class="showcase-copy-blocked">Code selected</span>
+              </button>
             </div>
-            <c-source-colors :file="file"><code><for line in file.lines key=line.n><span class="code-line" :data-indent="line.indent">{line.text}</span></for></code></c-source-colors>
-            <c-source-expand :file="file" :files="$source.files"><span class="showcase-expand-more">Show all {file.lines.length} lines</span><span class="showcase-expand-less">Show fewer lines</span></c-source-expand>
+            <pre class="showcase-code" :id="row.file.id" tabindex="0" :aria-label="row.file.path"><code><for line in row.file.lines key=line.n><span class="code-line" :data-indent="line.indent">{line.text}</span></for></code></pre>
+            <button type="button" class="showcase-expand h-11 w-full cursor-pointer items-center justify-center border-t border-line font-mono text-xs text-muted hover:text-ink" :aria-expanded="$expandedText" :aria-controls="row.file.id" @click="toggleExpanded"><span class="showcase-expand-more">Show all {row.file.lines.length} lines</span><span class="showcase-expand-less">Show fewer lines</span></button>
           </div>
         </for>
       </div>
+      <p class="sr-only" role="status">{$announcement}</p>
     </div>
   </else>
   <div class="showcase-live flex min-w-0 flex-col">
-    <c-live-meter></c-live-meter>
+    <p class="flex min-h-11 items-center gap-2 whitespace-nowrap border-b border-line bg-ground px-4 font-mono text-xs uppercase tracking-wider text-faint"><span class="showcase-dot size-1.5 flex-none bg-accent" aria-hidden="true" :data-beat="$beat"></span>Live result<span class="ml-auto min-w-0 truncate normal-case tracking-normal tabular-nums text-muted" aria-hidden="true">{$patches}</span></p>
     <div class="showcase-stage"><slot></slot></div>
   </div>
   <figcaption class="col-span-full border-t border-line px-4 py-3 text-sm text-muted">{$caption}</figcaption>
@@ -114,16 +264,16 @@
   [data-c="showcase"] [data-indent="12"] { --indent: 12ch; }
   [data-c="showcase"] [data-indent="14"] { --indent: 14ch; }
   [data-c="showcase"] [data-indent="16"] { --indent: 16ch; }
-  [data-c="showcase"] ::highlight(code-keyword) { color: var(--code-keyword); }
-  [data-c="showcase"] ::highlight(code-string) { color: var(--code-string); }
-  [data-c="showcase"] ::highlight(code-number) { color: var(--code-number); }
-  [data-c="showcase"] ::highlight(code-tag) { color: var(--code-tag); }
-  [data-c="showcase"] ::highlight(code-attribute) { color: var(--code-attribute); }
-  [data-c="showcase"] ::highlight(code-title) { color: var(--code-property); }
-  [data-c="showcase"] ::highlight(code-comment) { color: var(--code-comment); }
-  [data-c="showcase"] ::highlight(code-punctuation) { color: var(--code-punctuation); }
-  [data-c="showcase"] ::highlight(code-directive) { color: var(--color-accent); }
-  [data-c="showcase"] ::highlight(code-component) { color: var(--code-number); }
+  [data-c="showcase"] .code-line::highlight(code-keyword) { color: var(--code-keyword); }
+  [data-c="showcase"] .code-line::highlight(code-string) { color: var(--code-string); }
+  [data-c="showcase"] .code-line::highlight(code-number) { color: var(--code-number); }
+  [data-c="showcase"] .code-line::highlight(code-tag) { color: var(--code-tag); }
+  [data-c="showcase"] .code-line::highlight(code-attribute) { color: var(--code-attribute); }
+  [data-c="showcase"] .code-line::highlight(code-title) { color: var(--code-property); }
+  [data-c="showcase"] .code-line::highlight(code-comment) { color: var(--code-comment); }
+  [data-c="showcase"] .code-line::highlight(code-punctuation) { color: var(--code-punctuation); }
+  [data-c="showcase"] .code-line::highlight(code-directive) { color: var(--color-accent); }
+  [data-c="showcase"] .code-line::highlight(code-component) { color: var(--code-number); }
   [data-c="showcase"] .is-expanded .showcase-expand-more { display: none; }
   [data-c="showcase"] .is-expanded .showcase-expand-less { display: inline; }
   [data-c="showcase"] .showcase-live {
@@ -154,7 +304,7 @@
   @media (max-width: 47.99rem) {
     [data-c="showcase"] .showcase-code { --line-gutter: 2.5rem; max-height: none; }
     [data-c="showcase"] .is-long .showcase-expand { display: flex; }
-    [data-c="showcase"] .is-long:not(.is-expanded) .showcase-code {
+    [data-c="showcase"]:not(.is-expanded) .is-long .showcase-code {
       max-height: 17rem;
       overflow: hidden;
       mask-image: linear-gradient(#000 calc(100% - 4rem), transparent);

@@ -96,11 +96,33 @@ pub enum Arg<'a> {
     Path(&'a str),
     /// `'text'`, `"text"`, number, `true`, `false`, `null`: written as is.
     Literal(&'a str),
+    /// The DOM event.
     Event,
+    /// The element with the `@event` directive.
+    El,
 }
 
-/// `name` or `name(arg, …)`. Err: what is wrong.
-pub fn parse_call(v: &str) -> Result<(&str, Vec<Arg<'_>>), String> {
+/// `fn`, `fn(arg, …)`, or a store function `shared.cart.add(…)`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Call<'a> {
+    pub name: &'a str,
+    /// `None` without parentheses: the function gets the event.
+    pub args: Option<Vec<Arg<'a>>>,
+}
+
+impl Call<'_> {
+    /// `shared.<store>.<fn>`.
+    pub fn is_store(&self) -> bool {
+        self.name.starts_with("shared.")
+    }
+
+    pub fn paths(&self) -> impl Iterator<Item = &str> {
+        self.args.iter().flatten().filter_map(|a| if let Arg::Path(p) = a { Some(*p) } else { None })
+    }
+}
+
+/// `fn`, `fn(arg, …)` or `shared.store.fn(…)`. Err: what is wrong.
+pub fn parse_call(v: &str) -> Result<Call<'_>, String> {
     let v = v.trim();
     let (name, args) = match v.find('(') {
         None => (v, None),
@@ -109,11 +131,18 @@ pub fn parse_call(v: &str) -> Result<(&str, Vec<Arg<'_>>), String> {
             None => return Err(format!("\"{v}\": missing `)`")),
         },
     };
-    if !is_ident(name) {
-        return Err(format!("\"{v}\": write a function name, optionally with arguments: `toggle` or `toggle(task)`"));
+    if let Some(bare) = name.strip_prefix('$') {
+        return Err(format!("\"{v}\": no `$` in events, write `{}` (`$` is for values: `{{$x}}`, `:attr=\"$x\"`)", v.replacen(name, bare, 1)));
     }
+    let store = name.split('.').count() == 3 && name.starts_with("shared.") && name.split('.').all(is_ident);
+    if !is_ident(name) && !store {
+        return Err(format!("\"{v}\": call a function of the script (`toggle`, `toggle(task)`) or of a store (`shared.cart.add(item)`)"));
+    }
+    let Some(args) = args else { return Ok(Call { name, args: None }) };
     let mut out = Vec::new();
-    let Some(args) = args.filter(|a| !a.trim().is_empty()) else { return Ok((name, out)) };
+    if args.trim().is_empty() {
+        return Ok(Call { name, args: Some(out) });
+    }
     let mut rest = args;
     loop {
         let t = rest.trim_start();
@@ -124,34 +153,61 @@ pub fn parse_call(v: &str) -> Result<(&str, Vec<Arg<'_>>), String> {
         let arg = t[..len].trim();
         out.push(match arg {
             "event" => Arg::Event,
+            "el" => Arg::El,
             "true" | "false" | "null" => Arg::Literal(arg),
             _ if arg.starts_with(['\'', '"']) || arg.parse::<f64>().is_ok_and(|n| n.is_finite()) => Arg::Literal(arg),
             _ if check_path(arg, false).is_ok() => Arg::Path(arg),
-            _ => return Err(format!("\"{v}\": argument `{arg}` must be a path, a simple literal ('text', 2, true) or event; no expressions")),
+            _ => return Err(format!("\"{v}\": argument `{}` must be a path, a simple literal ('text', 2, true), event or el; no expressions: compute it in a function of the script", source_form(arg))),
         });
         let after = t[len..].trim_start();
         match after.strip_prefix(',') {
             Some(next) => rest = next,
-            None if after.is_empty() => return Ok((name, out)),
+            None if after.is_empty() => return Ok(Call { name, args: Some(out) }),
             None => return Err(format!("\"{v}\": separate arguments with `,`")),
         }
     }
 }
 
-/// Event call back to text, with each path argument replaced by `map`.
-pub fn join_call(name: &str, args: &[Arg], mut map: impl FnMut(&str) -> String) -> String {
-    if args.is_empty() {
-        return name.to_string();
-    }
+/// Event call back to text, with each path argument replaced by `map` (`fn` and `fn()` stay apart).
+pub fn join_call(call: &Call, mut map: impl FnMut(&str) -> String) -> String {
+    let Some(args) = &call.args else { return call.name.to_string() };
     let args: Vec<String> = args
         .iter()
         .map(|a| match a {
             Arg::Path(p) => map(p),
             Arg::Literal(l) => l.to_string(),
             Arg::Event => "event".into(),
+            Arg::El => "el".into(),
         })
         .collect();
-    format!("{name}({})", args.join(", "))
+    format!("{}({})", call.name, args.join(", "))
+}
+
+/// The closest name to `wrong` among `names` (edit distance ≤ 2, or ≤ 1 for short names).
+pub fn did_you_mean<'a>(wrong: &str, names: impl IntoIterator<Item = &'a str>) -> Option<&'a str> {
+    let max = if wrong.chars().count() <= 3 { 1 } else { 2 };
+    names
+        .into_iter()
+        .filter(|n| *n != wrong)
+        .map(|n| (distance(&wrong.to_lowercase(), &n.to_lowercase()), n))
+        .filter(|(d, _)| *d <= max)
+        .min_by_key(|(d, n)| (*d, *n))
+        .map(|(_, n)| n)
+}
+
+fn distance(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut prev = row[0];
+        row[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let cur = row[j + 1];
+            row[j + 1] = (prev + usize::from(ca != *cb)).min(row[j] + 1).min(cur + 1);
+            prev = cur;
+        }
+    }
+    row[b.len()]
 }
 
 pub const ROOTS: &[&str] = &["data", "state", "shared", "params", "query", "page", "props", "$"];
@@ -209,8 +265,18 @@ pub fn check_path(v: &str, neg_ok: bool) -> Result<(), String> {
     if p.split('.').all(is_ident) {
         Ok(())
     } else {
-        Err(format!("invalid path \"{v}\": use only root.a.b (no expressions, calls or indexes)"))
+        let hint = if p.find('(').is_some_and(|i| !p[i + 1..].trim_start().starts_with(')')) {
+            "a value per item is a field: add it in the function that returns the list (`const rows = () => tasks.map(task => ({ ...task, price: format(task.amount) }))`) and use row.price"
+        } else {
+            "move the logic into a function in <script> (`const total = () => …`) and use $total"
+        };
+        Err(format!("invalid path \"{}\": use only root.a.b (no expressions, calls or indexes); {hint}", source_form(v)))
     }
+}
+
+/// A path as the author wrote it: `$x` (the build reads it as `$.x`).
+pub fn source_form(v: &str) -> String {
+    v.replace("$.", "$")
 }
 
 pub fn split_neg(v: &str) -> (bool, &str) {
@@ -229,6 +295,55 @@ pub fn parse_for(v: &str) -> Option<(&str, &str)> {
     let mut it = v.split_whitespace();
     let (var, kw, path) = (it.next()?, it.next()?, it.next()?);
     (kw == "in" && it.next().is_none() && is_ident(var)).then_some((var, path))
+}
+
+/// `<script type="application/ld+json">`: structured data (a head tag of the page, never a module).
+pub fn is_json_ld(e: &crate::html::Element) -> bool {
+    e.is("script") && e.value("type").is_some_and(|t| t.trim().eq_ignore_ascii_case("application/ld+json"))
+}
+
+/// `{path}` inside the strings of a JSON-LD text: (byte offset of `{`, byte length of `{…}`, path).
+/// Err: byte offset of a `{` without `}` in its string.
+pub fn json_ld_paths(text: &str) -> Result<Vec<(usize, usize, &str)>, usize> {
+    let b = text.as_bytes();
+    let (mut out, mut i, mut in_string) = (Vec::new(), 0, false);
+    while i < b.len() {
+        match b[i] {
+            b'\\' if in_string => i += 1,
+            b'"' => in_string = !in_string,
+            b'{' if in_string => {
+                let rest = &text[i + 1..];
+                match rest.find(['}', '"']) {
+                    Some(k) if rest.as_bytes()[k] == b'}' => {
+                        out.push((i, k + 2, rest[..k].trim()));
+                        i += k + 2;
+                        continue;
+                    }
+                    _ => return Err(i),
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    Ok(out)
+}
+
+/// Checks the JSON of a JSON-LD text (each `{path}` counts as string content).
+/// Err: (byte offset, message).
+pub fn json_ld_check(text: &str) -> Result<(), (usize, String)> {
+    let mut plain = text.to_string();
+    for (at, len, _) in json_ld_paths(text).map_err(|at| (at, "unclosed `{` in a JSON string: write {path}, or \\u007b for a literal brace".to_string()))? {
+        plain.replace_range(at..at + len, &"x".repeat(len));
+    }
+    if plain.trim().is_empty() {
+        return Err((0, "empty JSON-LD".into()));
+    }
+    serde_json::from_str::<serde_json::Value>(&plain).map(|_| ()).map_err(|e| {
+        let at = plain.split_inclusive('\n').take(e.line().saturating_sub(1)).map(str::len).sum::<usize>() + e.column().saturating_sub(1);
+        let msg = e.to_string();
+        (at.min(text.len()), msg.split(" at line ").next().unwrap_or(&msg).to_string())
+    })
 }
 
 /// Replaces the path root (keeping `!`).
@@ -263,17 +378,44 @@ mod tests {
 
     #[test]
     fn calls() {
-        assert_eq!(parse_call("toggle").unwrap(), ("toggle", vec![]));
-        assert_eq!(parse_call(" toggle() ").unwrap(), ("toggle", vec![]));
+        assert_eq!(parse_call("toggle").unwrap(), Call { name: "toggle", args: None });
+        assert_eq!(parse_call(" toggle() ").unwrap(), Call { name: "toggle", args: Some(vec![]) });
         assert_eq!(
-            parse_call("search(event, $.q, 'a, b', \"x\", -2.5, true, null, task.id)").unwrap(),
-            ("search", vec![Arg::Event, Arg::Path("$.q"), Arg::Literal("'a, b'"), Arg::Literal("\"x\""), Arg::Literal("-2.5"), Arg::Literal("true"), Arg::Literal("null"), Arg::Path("task.id")])
+            parse_call("search(event, $.q, 'a, b', \"x\", -2.5, true, null, task.id, el)").unwrap().args.unwrap(),
+            [Arg::Event, Arg::Path("$.q"), Arg::Literal("'a, b'"), Arg::Literal("\"x\""), Arg::Literal("-2.5"), Arg::Literal("true"), Arg::Literal("null"), Arg::Path("task.id"), Arg::El]
         );
-        for bad in ["toggle(task", "toggle(a + b)", "toggle(f(x))", "obj.method", "toggle(a b)", "toggle('x)", "1x"] {
+        let store = parse_call("shared.cart.remove(item.id)").unwrap();
+        assert!(store.is_store() && store.paths().eq(["item.id"]));
+        for bad in ["toggle(task", "toggle(a + b)", "toggle(f(x))", "obj.method", "shared.cart", "shared.cart.a.b", "toggle(a b)", "toggle('x)", "1x"] {
             assert!(parse_call(bad).is_err(), "{bad}");
         }
-        let (name, args) = parse_call("set(task, 'done', event)").unwrap();
-        assert_eq!(join_call(name, &args, |p| format!("state.{p}")), "set(state.task, 'done', event)");
+        assert!(parse_call("$increase").unwrap_err().contains("no `$` in events, write `increase`"));
+        assert!(parse_call("$set(x)").unwrap_err().contains("write `set(x)`"));
+        let call = parse_call("set(task, 'done', event)").unwrap();
+        assert_eq!(join_call(&call, |p| format!("state.{p}")), "set(state.task, 'done', event)");
+        assert_eq!(join_call(&parse_call("reset()").unwrap(), |p| p.into()), "reset()");
+        assert_eq!(join_call(&parse_call("reset").unwrap(), |p| p.into()), "reset");
+    }
+
+    #[test]
+    fn suggestions() {
+        assert_eq!(did_you_mean("cuont", ["count", "items", "total"]), Some("count"));
+        assert_eq!(did_you_mean("itms", ["count", "items"]), Some("items"));
+        assert_eq!(did_you_mean("zzz", ["count", "items"]), None);
+        assert_eq!(did_you_mean("ab", ["ac", "xyz"]), Some("ac"));
+        assert_eq!(did_you_mean("Count", ["count"]), Some("count"));
+    }
+
+    #[test]
+    fn json_ld() {
+        let text = "{\"@type\": \"Article\", \"author\": {\"name\": \"{data.post.author}\"}, \"headline\": \"News: { data.post.title }!\", \"q\": \"a\\\"{x}\"}";
+        let paths: Vec<&str> = json_ld_paths(text).unwrap().into_iter().map(|p| p.2).collect();
+        assert_eq!(paths, ["data.post.author", "data.post.title", "x"]);
+        assert_eq!(json_ld_check(text), Ok(()));
+        assert_eq!(json_ld_paths("{\"a\": \"{b\"}"), Err(7));
+        let (at, msg) = json_ld_check("{\n  \"a\": 1,\n  \"b\": }").unwrap_err();
+        assert_eq!((at, msg.as_str()), (19, "expected value"));
+        assert!(json_ld_check("  ").is_err());
     }
 
     #[test]

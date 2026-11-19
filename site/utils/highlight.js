@@ -12,6 +12,7 @@ const cache = new Map()
 const sigils = new Set(['@', '$', '.'])
 const blockTags = new Set(['if', 'else-if', 'else', 'for', 'empty'])
 const maxIndent = 16
+const interpolation = /(^|[^\\])\{[$\w][\w.$]*\}/g
 const kindOfScope = {
   'hl-keyword': 'keyword', 'hl-built_in': 'keyword', 'hl-literal': 'keyword',
   'hl-string': 'string', 'hl-regexp': 'string', 'hl-symbol': 'string',
@@ -88,11 +89,21 @@ function marksOf(tokens) {
   return marks
 }
 
+function interpolationMarks(text) {
+  const directive = codeKinds.indexOf('directive')
+  return [...text.matchAll(interpolation)].flatMap(found => [found.index + found[1].length, found.index + found[0].length, directive])
+}
+
 export function markLines(code, language) {
+  let embedded = false
   return highlightLines(code, language).map((line, index) => {
     const text = line.tokens.map(token => token.text).join('')
     const spaces = Math.min(text.length - text.trimStart().length, maxIndent)
     const indent = spaces - (spaces % 2)
-    return { n: index + 1, text, indent: text.trim() && indent ? indent : null, marks: marksOf(line.tokens) }
+    const marks = marksOf(line.tokens)
+    if (/^\s*<(script|style)\b/.test(text)) embedded = true
+    if (language === 'html' && !embedded) marks.push(...interpolationMarks(text))
+    if (/<\/(script|style)>/.test(text)) embedded = false
+    return { n: index + 1, text, indent: text.trim() && indent ? indent : null, marks }
   })
 }

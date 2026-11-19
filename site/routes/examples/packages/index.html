@@ -34,10 +34,10 @@ found 0 vulnerabilities
     <h2 id="tree-shaking">Tree shaking, measured: highlight.js on this site</h2>
     <div class="prose">
       <p>The code blocks on this site are colored by highlight.js. Importing the package index pulls in all 193 languages. Importing <code>highlight.js/lib/core</code> plus the three grammars the site needs is <strong>95% less gzip</strong>: the 190 unused language modules are dropped. The core itself is not shaken: its ESM entry re-exports CommonJS, and CommonJS ships whole.</p>
-      <p>The smallest chunk is the one the browser never loads. Every showcase tokenizes in <code>load</code>: <code>_source.server.js</code> runs highlight.js on Node and sends each line with its color ranges, the section pages use <code>ssr = true</code>, and <code>showcase.js</code> paints the ranges with the CSS Custom Highlight API. The code is in the first HTML and gets its colors when the component mounts, with no extra download. The client chunk exists only for the <a href="/examples/seo">SEO page</a>'s response view, which loads it with <code>import()</code>; lazy chunks are not preloaded and do not count toward the page budget.</p>
+      <p>The smallest chunk is the one the browser never loads. Every showcase tokenizes in <code>load</code>: <code>_source.server.js</code> runs highlight.js on Node and sends each line with its color ranges, the section pages use <code>ssr = true</code>, and the <code>mount(el)</code> of <code>c-showcase</code> paints the ranges with the CSS Custom Highlight API. The code is in the first HTML and gets its colors when the component mounts, with no extra download. The client chunk exists only for the <a href="/examples/seo">SEO page</a>'s response view, which loads it with <code>import()</code>; lazy chunks are not preloaded and do not count toward the page budget.</p>
     </div>
     <c-showcase :source="data.examples.highlighter" caption="Sizes of dist/client/assets/npm/highlight.js-*.js after pragma build. The tabs show the server-side tokenizer and the client-side painter.">
-      <p-size-table set="highlighter" label="highlight.js bundle size by import style"></p-size-table>
+      <p-size-table :rows="data.sizes.highlighter" label="highlight.js bundle size by import style"></p-size-table>
     </c-showcase>
   </section>
 
@@ -76,9 +76,9 @@ found 0 vulnerabilities
   <section class="doc-section" aria-labelledby="sizes">
     <h2 id="sizes">What common packages cost</h2>
     <div class="prose">
-      <p>Gzip size of the <code>/assets/npm/</code> file for each import, measured with <code>pragma build</code> on the packages test app in <code>core/cli/xtask/packages/app</code>. The runtime alone is 7.6 kB gzip per page, and the starter budgets allow 15 kB of initial JS and 10 kB per route, so chart.js only fits behind an <code>import()</code>.</p>
+      <p>Gzip size of the <code>/assets/npm/</code> file for each import, measured with <code>pragma build</code> on the packages test app in <code>core/cli/xtask/packages/app</code>. The runtime alone is 8.7 kB gzip per page, and the starter budgets allow 15 kB of initial JS and 10 kB per route, so chart.js only fits behind an <code>import()</code>.</p>
     </div>
-    <p-size-table set="packages" label="Gzip size per npm package import"></p-size-table>
+    <p-size-table :rows="data.sizes.packages" label="Gzip size per npm package import"></p-size-table>
     <div class="prose">
       <p>Prefer the platform first: <code>Intl</code> for dates, numbers and plurals, <code>fetch</code>, <code>crypto.randomUUID()</code>, <code>structuredClone</code>. Avoid <code>moment</code>, <code>lodash</code>, <code>axios</code>, <code>uuid</code>, <code>nanoid</code> and anything that builds HTML.</p>
     </div>

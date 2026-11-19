@@ -62,7 +62,7 @@
 </div>
 
 <style>
-  [data-c="queue"] .queue-input {
+  .queue-input {
     flex: 1;
     min-width: 0;
     height: 2rem;
@@ -74,9 +74,9 @@
     font-size: 0.8125rem;
     caret-color: var(--color-accent);
   }
-  [data-c="queue"] .queue-input::placeholder { color: var(--color-faint); }
-  [data-c="queue"] .queue-input:focus-visible { outline-offset: 0; border-color: var(--color-accent); }
-  [data-c="queue"] .queue-row {
+  .queue-input::placeholder { color: var(--color-faint); }
+  .queue-input:focus-visible { outline-offset: 0; border-color: var(--color-accent); }
+  .queue-row {
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -84,10 +84,10 @@
     border: 1px solid var(--color-line);
     background: var(--color-surface);
   }
-  [data-c="queue"] .queue-check { accent-color: var(--color-accent); }
-  [data-c="queue"] .queue-title { flex: 1; font-family: var(--font-mono); font-size: 0.8125rem; }
-  [data-c="queue"] .is-done .queue-title { color: var(--color-faint); text-decoration: line-through; }
-  [data-c="queue"] .queue-remove {
+  .queue-check { accent-color: var(--color-accent); }
+  .queue-title { flex: 1; font-family: var(--font-mono); font-size: 0.8125rem; }
+  .is-done .queue-title { color: var(--color-faint); text-decoration: line-through; }
+  .queue-remove {
     display: grid;
     place-items: center;
     width: 2rem;
@@ -95,7 +95,7 @@
     color: var(--color-faint);
     cursor: pointer;
   }
-  [data-c="queue"] .queue-remove:hover { color: var(--color-ink); }
-  [data-c="queue"] .queue-remove svg { width: 0.75rem; height: 0.75rem; }
-  [data-c="queue"] .queue-empty { padding: 0.75rem; color: var(--color-faint); font-size: 0.875rem; }
+  .queue-remove:hover { color: var(--color-ink); }
+  .queue-remove svg { width: 0.75rem; height: 0.75rem; }
+  .queue-empty { padding: 0.75rem; color: var(--color-faint); font-size: 0.875rem; }
 </style>

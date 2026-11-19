@@ -19,7 +19,7 @@
         <li><code>export let start = 0</code> declares a prop with a default. The default's type converts the attribute: <code>start="10"</code> arrives as the number <code>10</code>, so no <code>Number()</code> anywhere. Props are read-only: <code>let count = start</code> copies one into state.</li>
         <li><code>const atMinimum = () =&gt; …</code> is a derived value: used in a binding (<code>:disabled="$atMinimum"</code>), it runs on every render. In JS you call it: <code>atMinimum()</code>.</li>
         <li><code>function increase()</code> is an action when an event names it (<code>@click="increase"</code>). Assigning <code>count</code> schedules one render per microtask; there is no <code>setState</code> and no <code>this</code>.</li>
-        <li><code>&lt;style&gt;</code> is scoped with <code>[data-c="counter"]</code>, like a separate <code>counter.css</code>. Both a <code>&lt;script&gt;</code> and a <code>counter.js</code> for the same component is a check error (<code>html/duplicate-module</code>).</li>
+        <li><code>&lt;style&gt;</code> is scoped by the build: <code>.counter-step</code> only matches inside this component, with no added specificity, so write plain selectors. <code>:global(…)</code> opts a selector out, and the root itself is <code>[data-c="counter"]</code>. A separate <code>counter.css</code> works the same way; having both it and the <code>&lt;style&gt;</code> (or a <code>&lt;script&gt;</code> and a <code>counter.js</code>) is a check error (<code>html/duplicate-module</code>).</li>
       </ul>
       <p>The component lives in <code>_components/counter/</code> next to this page, so it is used as <code>&lt;p-counter&gt;</code>. Moving the folder to <code>lib/components/</code> would make it <code>&lt;c-counter&gt;</code> for every route.</p>
     </div>
@@ -66,7 +66,7 @@
     </c-showcase>
     <div class="prose">
       <p>Neither component has a script. In a component <strong>without</strong> a script, <code>&#123;$plugin.name&#125;</code> is an alias to the caller's path, resolved at build time, and <code>:model="$value"</code> writes straight back into the page's <code>query</code>, so the search field needs no code at all.</p>
-      <p>In a component <strong>with</strong> a script, <code>export let plugin = null</code> receives the object itself, live on every render, in HTML (<code>$plugin.name</code>) and in JS (<code>plugin.name</code>). The page script reads the loader's result with <code>import &#123; data &#125; from 'pragma'</code>.</p>
+      <p>In a component <strong>with</strong> a script, <code>export let plugin = null</code> receives the object itself, live on every render, in HTML (<code>$plugin.name</code>) and in JS (<code>plugin.name</code>). It is read-only inside too: it is the caller's data, and in dev <code>plugin.name = 'x'</code> throws "props are read-only, also inside". Copy what you change (<code>let rows = files.map(file =&gt; (&#123; ...file &#125;))</code>) or ask the owner to change it. The page script reads the loader's result with <code>import &#123; data &#125; from 'pragma'</code>.</p>
     </div>
   </section>
 
@@ -112,7 +112,7 @@
     <div class="prose">
       <p>Every component on this page sits in <code>routes/examples/components/_components/</code>, so it is a <code>&lt;p-…&gt;</code> visible to this folder and the folders below it. The lookup walks up from the page folder to <code>routes/</code>, so <code>routes/_components/x/</code> is visible to every route. <code>lib/components/x/</code> makes it <code>&lt;c-x&gt;</code> everywhere; promoting one is a move plus a rename from <code>p-</code> to <code>c-</code>.</p>
       <ul>
-        <li><code>p-</code> names are private to their folder, styles included. This page and the <a href="/examples/syntax#static-if">syntax page</a> each have their own <code>&lt;p-badge&gt;</code>; the build gives each one its own <code>data-c</code>, so both write <code>[data-c="badge"]</code> in their <code>&lt;style&gt;</code> and never share a rule.</li>
+        <li><code>p-</code> names are private to their folder, styles included. This page and the <a href="/examples/syntax#static-if">syntax page</a> each have their own <code>&lt;p-badge&gt;</code>; the build gives each one its own <code>data-c</code> and scopes each <code>&lt;style&gt;</code> to it, so both write <code>.badge-icon</code> and never share a rule.</li>
         <li>A <code>&lt;p-x&gt;</code> used outside <code>routes/</code> is an error, and so are two components with the same folder name on one page (<code>&lt;c-card&gt;</code> plus <code>&lt;p-card&gt;</code>).</li>
         <li>A component cannot have a <code>.server.js</code>: its data comes from the page's <code>load</code>, as in the list above.</li>
         <li>A component cannot use itself, and its root cannot be <code>&lt;template&gt;</code>, <code>&lt;slot&gt;</code> or another component.</li>

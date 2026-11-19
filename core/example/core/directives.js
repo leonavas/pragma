@@ -48,13 +48,15 @@ function fill(s, t) {
   return o
 }
 
-// `name` or `name(arg, …)`; arg: path, 'text', "text", number, true, false, null or event.
-const EVENT = {}
+// `fn` (gets the event), `fn(arg, …)` or `shared.store.fn(…)`; arg: path, 'text', "text", number,
+// true, false, null, event or el (the element with the directive).
+const EVENT = {}, EL = {}
 const LITERAL = { true: true, false: false, null: null }
 function call(v) {
-  const m = /^\s*([\w$]+)\s*(?:\(([^]*)\))?\s*$/.exec(v ?? '') ?? fail(`invalid event handler "${v}"`)
-  const args = (m[2]?.match(/'[^']*'|"[^"]*"|[^,\s]+/g) ?? []).map(a =>
+  const m = /^\s*([\w$.]+)\s*(?:\(([^]*)\))?\s*$/.exec(v ?? '') ?? fail(`invalid event handler "${v}"`)
+  const args = m[2] == null ? [EVENT] : (m[2].match(/'[^']*'|"[^"]*"|[^,\s]+/g) ?? []).map(a =>
     a === 'event' ? EVENT
+    : a === 'el' ? EL
     : a[0] === "'" || a[0] === '"' ? { v: a.slice(1, -1) }
     : a in LITERAL ? { v: LITERAL[a] }
     : /^-?\d+(\.\d+)?$/.test(a) ? { v: +a }
@@ -62,10 +64,14 @@ function call(v) {
   return { f: m[1], args }
 }
 
-// Handler written in `data-on-<type>`: [function name, arguments resolved against the element's scope].
+// Handler written in `data-on-<type>`: [function name, arguments resolved against the element's
+// scope, the function itself for a store handler (`shared.cart.add`)].
 export function eventCall(el, type, event) {
   const d = el[D] ?? parse(el), c = ((d.c ??= {})[type] ??= call(el.getAttribute('data-on-' + type))), s = el[S]
-  return [c.f, c.args.map(a => (a === EVENT ? event : 'v' in a ? a.v : s && get(s, a.p)))]
+  const args = c.args.map(a => (a === EVENT ? event : a === EL ? el : 'v' in a ? a.v : s && get(s, a.p)))
+  if (!c.f.includes('.')) return [c.f, args]
+  const p = path(c.f), store = s && get(s, p.slice(0, -1)), fn = store?.[p.at(-1)]
+  return [c.f, args, typeof fn === 'function' ? fn.bind(store) : undefined]
 }
 
 function parse(el) {

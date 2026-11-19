@@ -2,6 +2,7 @@
 
 mod base;
 mod doc;
+pub mod scope;
 mod table;
 #[cfg(test)]
 mod tests;

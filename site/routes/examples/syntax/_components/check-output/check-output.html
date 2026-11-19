@@ -1,19 +1,25 @@
-<div role="group" aria-label="pragma check --strict output">
-  <p class="check-command"><span class="check-prompt" aria-hidden="true">$</span> pragma check --strict</p>
-  <ul class="check-list">
-    <li><span class="check-line">wrong.html:2</span> <span class="check-rule">html/data-attribute</span> `data-text` is internal; write `:text="..."`</li>
-    <li><span class="check-line">wrong.html:3</span> <span class="check-rule">html/invalid-path</span> use only root.a.b (no expressions, calls or indexes)</li>
-    <li><span class="check-line">wrong.html:4</span> <span class="check-rule">html/invalid-path</span> use only root.a.b (no expressions, calls or indexes)</li>
-    <li><span class="check-line">wrong.html:5</span> <span class="check-rule">html/style-inline</span> the style attribute is not allowed; use classes</li>
-    <li><span class="check-line">wrong.html:6</span> <span class="check-rule">html/on-inline</span> inline onclick is not allowed; use @&lt;event&gt;="action"</li>
-    <li><span class="check-line">wrong.html:7</span> <span class="check-rule">html/on-inline</span> :style is not allowed</li>
-    <li><span class="check-line">wrong.html:8</span> <span class="check-rule">html/class</span> :class is not allowed: write static classes in class="…" and toggle each one with .name="path"</li>
-    <li><span class="check-line">wrong.html:9</span> <span class="check-rule">html/interpolation</span> <code>{{ }}</code> is not pragma syntax: bind text with :text="path"</li>
-    <li><span class="check-line">wrong.html:10</span> <span class="check-rule">html/block</span> use &lt;if path&gt;, with the path unquoted</li>
-    <li><span class="check-line">wrong.html:11</span> <span class="check-rule">html/for-without-key</span> &lt;for&gt; requires key=x.field</li>
-    <li><span class="check-line">wrong.html:12</span> <span class="check-rule">html/legacy-syntax</span> `state.name` is legacy syntax: use `$name`</li>
-    <li><span class="check-line">wrong.html:13</span> <span class="check-rule">html/unknown-directive</span> `v-if` is Vue syntax and does nothing in pragma; wrap the element in `&lt;if path&gt;…&lt;/if&gt;`</li>
-    <li><span class="check-line">wrong.html:14</span> <span class="check-rule">html/data-attribute</span> hand-written `data-tone` is not allowed; for state bind `:data-tone="$path"`</li>
+<div class="grid w-full gap-3 border border-line bg-sunken p-4 font-mono text-xs leading-relaxed" role="group" aria-label="pragma check --strict output">
+  <p class="text-ink"><span class="text-accent" aria-hidden="true">$</span> pragma check --strict</p>
+  <ul class="grid gap-2 text-muted">
+    <li><span class="text-faint">ticker.js:1</span> <span class="text-danger-300">js/legacy-api</span> old API: `export const state` → declare each value as a top-level `let` (`let count = 0`); props are `export let step = 1`</li>
+    <li><span class="text-faint">ticker.js:2</span> <span class="text-danger-300">js/legacy-api</span> old API: `ctx.$.x` → use the top-level `let x` or the prop `x` directly</li>
+    <li><span class="text-faint">ticker.js:6</span> <span class="text-danger-300">js/legacy-api</span> old API: `export const actions` → write top-level functions (`function add() &#123;…&#125;`) and call them from HTML (`@click="add"`, `@change="toggle(task)"`)</li>
+    <li><span class="text-faint">ticker.js:10</span> <span class="text-danger-300">js/legacy-api</span> old API: `export function mount(ctx)` → `function mount() &#123; …; return cleanup &#125;` without export; services come from `import &#123; … &#125; from 'pragma'`</li>
+    <li><span class="text-faint">ticker.js:11</span> <span class="text-danger-300">js/legacy-api</span> old API: `ctx.update(fn)` → assign the top-level `let` directly; renders are batched</li>
+    <li><span class="text-faint">wrong.html:13</span> <span class="text-danger-300">html/text-removed</span> `:text` was removed: write &#123;$name&#125; inside the element (e.g. &lt;p&gt;&#123;$name&#125;&lt;/p&gt;)</li>
+    <li><span class="text-faint">wrong.html:14</span> <span class="text-danger-300">html/invalid-path</span> invalid path "$items.length &gt; 0": use only root.a.b (no expressions, calls or indexes); move the logic into a function in &lt;script&gt; (`const total = () =&gt; …`) and use $total</li>
+    <li><span class="text-faint">wrong.html:15</span> <span class="text-danger-300">html/invalid-path</span> invalid path "$name.toUpperCase()": use only root.a.b (no expressions, calls or indexes); move the logic into a function in &lt;script&gt; (`const total = () =&gt; …`) and use $total</li>
+    <li><span class="text-faint">wrong.html:16</span> <span class="text-danger-300">html/data-attribute</span> `data-text` is internal; write `&#123;path&#125; inside the element`</li>
+    <li><span class="text-faint">wrong.html:17</span> <span class="text-danger-300">html/style-inline</span> the style attribute is not allowed; use classes</li>
+    <li><span class="text-faint">wrong.html:18</span> <span class="text-danger-300">html/on-inline</span> inline onclick is not allowed; use @&lt;event&gt;="action"</li>
+    <li><span class="text-faint">wrong.html:19</span> <span class="text-danger-300">html/class</span> :class is not allowed: write static classes in class="…" and toggle each one with .name="path" (e.g. .text-warning-700="$warn")</li>
+    <li><span class="text-faint">wrong.html:20</span> <span class="text-danger-300">html/interpolation</span> &#123;&#123; &#125;&#125; is not pragma syntax: write &#123;path&#125; in text and attributes (e.g. &lt;p&gt;Hi &#123;$name&#125;&lt;/p&gt;, alt="Photo of &#123;p.name&#125;"); inside &lt;code&gt; or &lt;pre&gt; it is shown as text</li>
+    <li><span class="text-faint">wrong.html:21</span> <span class="text-danger-300">html/interpolation</span> &#36;&#123; &#125; is not pragma syntax: write &#123;path&#125; in text and attributes; for a literal &#36; before a value write &amp;#36;&#123;path&#125;</li>
+    <li><span class="text-faint">wrong.html:22</span> <span class="text-danger-300">html/invalid-path</span> @click: "add($total + 1)": argument `$total + 1` must be a path, a simple literal ('text', 2, true) or event; no expressions</li>
+    <li><span class="text-faint">wrong.html:23</span> <span class="text-danger-300">html/block</span> use &lt;if path&gt;, with the path unquoted (e.g. &lt;if page.loading&gt;, &lt;if !$open&gt;)</li>
+    <li><span class="text-faint">wrong.html:24</span> <span class="text-danger-300">html/for-without-key</span> &lt;for&gt; requires key=x.field</li>
+    <li><span class="text-faint">wrong.html:25</span> <span class="text-danger-300">html/unknown-directive</span> `v-if` is Vue syntax and does nothing in pragma; wrap the element in `&lt;if path&gt;…&lt;/if&gt;`</li>
   </ul>
-  <p class="check-total">21 error(s), 0 warning(s)</p>
+  <p class="text-danger-300">24 error(s), 0 warning(s)</p>
 </div>
+

@@ -51,43 +51,43 @@
   }
 </script>
 
-<div>
+<div class="grid w-full min-w-0 gap-4">
   <if $hasChoice>
-    <div class="response-tabs" role="group" aria-label="Requested address">
+    <div class="flex flex-wrap gap-1.5" role="group" aria-label="Requested address">
       <for tab in $tabs key=tab.path>
-        <button type="button" class="response-tab" :aria-pressed="tab.pressed" @click="select(tab)">{tab.label}</button>
+        <button type="button" class="response-tab cursor-pointer border bg-ground px-2.5 py-1.5 font-mono text-xs" :aria-pressed="tab.pressed" @click="select(tab)">{tab.label}</button>
       </for>
     </div>
   </if>
   <if page.loading>
-    <div class="response-skeleton" aria-busy="true" aria-label="Requesting the page">
-      <span class="skeleton"></span>
-      <span class="skeleton"></span>
-      <span class="skeleton"></span>
+    <div class="grid gap-2.5 border border-line bg-sunken px-3 py-4" aria-busy="true" aria-label="Requesting the page">
+      <span class="skeleton h-2.5"></span>
+      <span class="skeleton h-2.5 w-3/4"></span>
+      <span class="skeleton h-2.5 w-1/2"></span>
     </div>
   </if>
   <else-if page.error>
-    <p class="response-error" role="alert">{page.error.message}</p>
+    <p class="font-mono text-xs text-danger-300" role="alert">{page.error.message}</p>
   </else-if>
   <else>
-    <div class="response-body">
+    <div class="grid min-w-0 gap-4">
       <div>
-        <div class="response-request">
-          <p class="response-path"><span class="response-method">GET</span><span>{$active.path}</span></p>
-          <p class="response-status" :data-tone="$active.tone"><span class="tabular-nums">{$statusText}</span><span class="response-type">{$active.type}</span></p>
+        <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border border-b-0 border-line bg-surface px-3 py-2.5 font-mono text-xs">
+          <p class="flex min-w-0 gap-2.5 break-all text-ink"><span class="flex-none text-faint">GET</span><span>{$active.path}</span></p>
+          <p class="flex gap-2.5 font-semibold" :data-tone="$active.tone"><span class="tabular-nums">{$statusText}</span><span class="font-normal text-faint">{$active.type}</span></p>
         </div>
         <if $hasLines>
           <pre class="response-code" tabindex="0" :aria-label="$codeLabel"><code><for line in $lines key=line.id><span class="response-line" :data-origin="line.origin"><span class="response-origin" :data-origin="line.origin">{line.origin}</span><span class="response-text"><for token in line.tokens key=token.id><span :data-hl="token.kind">{token.text}</span></for></span></span></for></code></pre>
         </if>
       </div>
-      <p class="response-note" :data-tone="$active.tone">{$active.note}</p>
+      <p class="response-note font-mono text-xs leading-relaxed" :data-tone="$active.tone">{$active.note}</p>
       <if $card>
-        <figure class="preview">
-          <img class="preview-image" :src="$card.imagePath" :alt="$card.imageAlt" width="1200" height="630" loading="lazy">
-          <figcaption class="preview-body">
-            <span class="preview-host">{$card.host}</span>
-            <strong class="preview-title">{$card.title}</strong>
-            <span class="preview-description">{$card.description}</span>
+        <figure class="grid overflow-hidden rounded-md border border-line-strong bg-surface shadow-lg">
+          <img class="block h-auto w-full bg-raised object-cover" :src="$card.imagePath" :alt="$card.imageAlt" width="1200" height="630" loading="lazy">
+          <figcaption class="grid min-w-0 gap-1 px-3.5 pt-3 pb-3.5">
+            <span class="font-mono text-xs text-faint">{$card.host}</span>
+            <strong class="line-clamp-2 text-sm font-semibold text-ink">{$card.title}</strong>
+            <span class="line-clamp-2 text-sm text-muted">{$card.description}</span>
           </figcaption>
         </figure>
       </if>
@@ -96,81 +96,25 @@
 </div>
 
 <style>
-  [data-c="http-response"] { display: grid; gap: 1rem; width: 100%; min-width: 0; }
-  [data-c="http-response"] .response-body { display: grid; gap: 1rem; min-width: 0; }
-  [data-c="http-response"] .response-tabs { display: flex; flex-wrap: wrap; gap: 0.375rem; }
-  [data-c="http-response"] .response-tab {
-    padding: 0.375rem 0.625rem;
-    border: 1px solid var(--color-line);
-    background: var(--color-ground);
-    color: var(--color-faint);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    cursor: pointer;
-    transition: color 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
-  }
-  [data-c="http-response"] .response-tab:hover { color: var(--color-ink); border-color: var(--color-line-strong); }
-  [data-c="http-response"] .response-tab[aria-pressed="true"] { border-color: var(--color-accent); color: var(--color-ink); }
-  [data-c="http-response"] .response-request {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.25rem 1rem;
-    padding: 0.625rem 0.75rem;
-    border: 1px solid var(--color-line);
-    border-bottom: 0;
-    background: var(--color-surface);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-  }
-  [data-c="http-response"] .response-path { display: flex; gap: 0.625rem; min-width: 0; color: var(--color-ink); overflow-wrap: anywhere; }
-  [data-c="http-response"] .response-method { flex: none; color: var(--color-faint); }
-  [data-c="http-response"] .response-status { display: flex; gap: 0.625rem; font-weight: 600; }
-  [data-c="http-response"] .response-type { color: var(--color-faint); font-weight: 400; }
-  [data-c="http-response"] [data-tone="ok"] { color: var(--color-accent); }
-  [data-c="http-response"] [data-tone="warn"] { color: var(--color-warning-300); }
-  [data-c="http-response"] [data-tone="error"] { color: var(--color-danger-300); }
-  [data-c="http-response"] .response-code {
+  .response-tab { border-color: var(--color-line); color: var(--color-faint); }
+  .response-tab:hover { color: var(--color-ink); }
+  .response-tab[aria-pressed="true"] { border-color: var(--color-accent); color: var(--color-ink); }
+  [data-tone="ok"] { color: var(--color-accent); }
+  [data-tone="warn"] { color: var(--color-warning-300); }
+  [data-tone="error"] { color: var(--color-danger-300); }
+  .response-code {
     max-height: 22rem;
-    margin: 0;
     padding: 0.625rem 0;
     overflow: auto;
     border: 1px solid var(--color-line);
     background: var(--color-sunken);
-    color: var(--color-ink);
     font-size: 0.75rem;
     line-height: 1.7;
   }
-  [data-c="http-response"] .response-code:focus-visible { outline-offset: -2px; }
-  [data-c="http-response"] .response-line { display: flex; padding-inline: 0.75rem; }
-  [data-c="http-response"] .response-origin { flex: none; width: 3.75rem; color: oklch(0.45 0.008 255); user-select: none; }
-  [data-c="http-response"] .response-origin:empty { display: none; }
-  [data-c="http-response"] .response-origin[data-origin="page"] { color: var(--color-accent); }
-  [data-c="http-response"] .response-line[data-origin="layout"] .response-text { opacity: 0.62; }
-  [data-c="http-response"] .response-text { min-width: 0; padding-left: 1.25em; text-indent: -1.25em; white-space: pre-wrap; overflow-wrap: anywhere; }
-  [data-c="http-response"] .response-note { font-family: var(--font-mono); font-size: 0.75rem; line-height: 1.6; }
-  [data-c="http-response"] .response-note:empty { display: none; }
-  [data-c="http-response"] .response-skeleton { display: grid; gap: 0.625rem; padding: 1rem 0.75rem; border: 1px solid var(--color-line); background: var(--color-sunken); }
-  [data-c="http-response"] .response-skeleton .skeleton { height: 0.625rem; background: var(--color-raised); }
-  [data-c="http-response"] .response-skeleton .skeleton:nth-child(2) { width: 78%; }
-  [data-c="http-response"] .response-skeleton .skeleton:nth-child(3) { width: 52%; }
-  [data-c="http-response"] .response-error { color: var(--color-danger-300); font-family: var(--font-mono); font-size: 0.75rem; }
-  [data-c="http-response"] .preview {
-    display: grid;
-    overflow: hidden;
-    border: 1px solid var(--color-line-strong);
-    border-radius: 6px;
-    background: var(--color-surface);
-    box-shadow: 0 12px 28px -14px oklch(0 0 0 / 0.7);
-  }
-  [data-c="http-response"] .preview-image { display: block; width: 100%; height: auto; aspect-ratio: 1200 / 630; object-fit: cover; background: var(--color-raised); }
-  [data-c="http-response"] .preview-body { display: grid; gap: 0.25rem; min-width: 0; padding: 0.75rem 0.875rem 0.875rem; }
-  [data-c="http-response"] .preview-host { color: var(--color-faint); font-family: var(--font-mono); font-size: 0.75rem; }
-  [data-c="http-response"] :is(.preview-title, .preview-description) { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-  [data-c="http-response"] .preview-title { color: var(--color-ink); font-size: 0.9375rem; font-weight: 600; line-height: 1.35; }
-  [data-c="http-response"] .preview-description { color: var(--color-muted); font-size: 0.8125rem; line-height: 1.45; }
-  @media (prefers-reduced-motion: reduce) {
-    [data-c="http-response"] .response-tab { transition: none; }
-  }
+  .response-line { display: flex; padding-inline: 0.75rem; }
+  .response-origin { flex: none; width: 3.75rem; color: var(--color-faint); user-select: none; }
+  .response-origin:empty, .response-note:empty { display: none; }
+  .response-origin[data-origin="page"] { color: var(--color-accent); }
+  [data-origin="layout"] .response-text { opacity: 0.62; }
+  .response-text { min-width: 0; padding-left: 1.25em; text-indent: -1.25em; white-space: pre-wrap; overflow-wrap: anywhere; }
 </style>

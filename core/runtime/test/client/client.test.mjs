@@ -279,6 +279,31 @@ test('script state is reactive: deep writes, array methods, one render per micro
   })
   assert.match(error, /"initial" is a prop and props are read-only/)
   assert.equal(await slot.evaluate(() => __boxes[0].initial), 5)
+  // dev: an object prop is read-only inside too (it is the caller's data); copies are free to change
+  const deep = await slot.evaluate(() => {
+    const box = __boxes.find(b => b.row)
+    const errors = []
+    for (const write of [() => { box.row.max = 99 }, () => { delete box.row.name }, () => { Object.assign(box.row, { id: 5 }) }]) {
+      try { write(); errors.push('written') } catch (e) { errors.push(e.message) }
+    }
+    const copy = { ...box.row }
+    copy.max = 99
+    return { errors, max: box.row.max, copy: copy.max, array: Array.isArray(__slot.$.items) }
+  })
+  assert.ok(deep.errors.every(m => /"row" is a prop: props are read-only, also inside/.test(m)), deep.errors.join(' | '))
+  assert.deepEqual([deep.max, deep.copy, deep.array], [3, 99, true])
+  assert.deepEqual(p.errors, [])
+})
+
+test('async mount: the resolved function is the cleanup', async () => {
+  const p = await open('/a')
+  await p.waitForFunction(() => self.__ticks > 2)
+  await p.evaluate(() => document.querySelector('#go-b').click())
+  await p.waitForFunction(() => document.title === 'Page B')
+  assert.equal(await p.evaluate(() => self.__cleaned), true)
+  const t = await p.evaluate(() => self.__ticks)
+  await p.waitForTimeout(80)
+  assert.equal(await p.evaluate(() => self.__ticks), t, 'the interval started by the async mount was cleared')
   assert.deepEqual(p.errors, [])
 })
 
@@ -340,8 +365,10 @@ test('router: link swaps main and title, unmounts the page and does not reload',
   await p.waitForTimeout(80)
   assert.equal(await p.evaluate(() => self.__ticks), t)
   assert.equal(await p.evaluate(() => document.activeElement.matches('main[data-page]')), true)
+  assert.equal(await p.evaluate(() => document.querySelector('main').dataset.page), 'b', 'the page CSS scope follows the page')
   await p.evaluate(() => document.querySelector('#d').click())
   await p.waitForSelector('#list li')
+  assert.equal(await p.evaluate(() => document.querySelector('main').dataset.page), '')
   assert.equal(await text(p, '#name'), 'Ana')
   assert.equal(await p.evaluate(() => self.__mark), 1)
   assert.deepEqual(p.errors, [])
@@ -515,5 +542,21 @@ test('events call functions with arguments: paths, literals and event', async ()
   assert.deepEqual(await p.$$eval('#tasks label', ls => ls.map(l => l.textContent)), [' Buy <milk>', ' Renamed'])
   await p.click('#record')
   assert.equal(await text(p, '#log'), 'click|a, b|-2.5|true||Ana')
+  await p.fill('#search', 'mug')
+  assert.equal(await text(p, '#query'), 'mug')
+  await p.click('#locate b')
+  assert.equal(await text(p, '#spot'), 'locate:click')
+  assert.deepEqual(await p.$$eval('#basket .drop', b => b.map(x => x.textContent)), ['Pen', 'Ink'])
+  await p.locator('#basket .drop', { hasText: 'Pen' }).click()
+  assert.deepEqual(await p.$$eval('#basket .drop', b => b.map(x => x.textContent)), ['Ink'])
   assert.deepEqual(p.errors, [])
+})
+
+test('a const holding a function made by a call is a handler; a non-function throws in dev', async () => {
+  const p = await open('/template')
+  await p.click('#save-twice')
+  assert.equal(await text(p, '#saves'), '2')
+  assert.deepEqual(p.errors, [])
+  await p.click('#not-a-function')
+  assert.match(p.errors.join(), /@click="name" needs a function, but "name" holds string/)
 })

@@ -180,46 +180,52 @@ node restarted on port 43459
         </div>
         <c-terminal title="~/my-app">
           <pre tabindex="0" aria-label="pragma check output with errors and warnings"><code><span class="term-cmd">pragma check</span>
-routes/broken.html:4:1 <span class="term-warn">warning</span> <span class="term-ink">[a11y/img-alt]</span> &lt;img&gt; without alt; use alt="" if the image is decorative
- 4 | &lt;img src="/chart.png"&gt;
-   | ^
-routes/broken.html:5:1 <span class="term-warn">warning</span> <span class="term-ink">[a11y/accessible-name]</span> &lt;button&gt; without an accessible name: add text, :text or aria-label
- 5 | &lt;button @click="refresh"&gt;&lt;/button&gt;
-   | ^
-routes/broken.html:6:1 <span class="term-warn">warning</span> <span class="term-ink">[a11y/label]</span> &lt;input&gt; without label: use &lt;label for&gt;, wrap it in a &lt;label&gt; or add aria-label
- 6 | &lt;input type="text" :model="$query"&gt;
-   | ^
-routes/broken.html:7:1 <span class="term-warn">warning</span> <span class="term-ink">[a11y/heading]</span> skipped heading level: &lt;h1&gt; followed by &lt;h3&gt;
- 7 | &lt;h3 class="w-[37px]" :class="$tone"&gt;Recent&lt;/h3&gt;
-   | ^
-routes/broken.html:7:5 <span class="term-err">error</span> <span class="term-ink">[css/arbitrary-value]</span> arbitrary value "w-[37px]" is not supported; use a utility from core/docs/classes.md or add a class in lib/theme.css
- 7 | &lt;h3 class="w-[37px]" :class="$tone"&gt;Recent&lt;/h3&gt;
-   |     ^
-routes/broken.html:7:22 <span class="term-err">error</span> <span class="term-ink">[html/class]</span> :class is not allowed: write static classes in class="…" and toggle each one with .name="path" (e.g. .text-warning-700="$warn")
- 7 | &lt;h3 class="w-[37px]" :class="$tone"&gt;Recent&lt;/h3&gt;
-   |                      ^
-routes/broken.html:8:4 <span class="term-err">error</span> <span class="term-ink">[html/interpolation]</span> {{ }} is not pragma syntax: bind text with :text="path" and attributes with :name="path" (inside &lt;code&gt; or &lt;pre&gt; it is shown as text)
- 8 | &lt;p&gt;{{ $query }}&lt;/p&gt;
-   |    ^
-routes/broken.html:10:3 <span class="term-err">error</span> <span class="term-ink">[html/head]</span> &lt;meta&gt; belongs in &lt;head&gt;: write it at the top level of the page fragment (or in the layout &lt;head&gt;)
- 10 |   &lt;meta name="robots" content="noindex"&gt;
-    |   ^
-routes/broken.js:5:11 <span class="term-err">error</span> <span class="term-ink">[js/vague-name]</span> name `tmp` does not say what it is or does; use a self-explanatory name (e.g. `product`, `totalItems`, `addToCart`)
- 5 |     const tmp = ctx.$.query
+routes/broken.html:6:11 <span class="term-err">error</span> <span class="term-ink">[js/vague-name]</span> name `tmp` does not say what it is or does; use a self-explanatory name (e.g. `product`, `totalItems`, `addToCart`)
+ 6 |     const tmp = query.trim()
    |           ^
-routes/broken.js:6:5 <span class="term-err">error</span> <span class="term-ink">[js/console]</span> `console` is not allowed; use `ctx.log` (or `log` from core/log.js)
- 6 |     console.log(tmp)
+routes/broken.html:7:5 <span class="term-err">error</span> <span class="term-ink">[js/console]</span> `console` is not allowed; use `log` (`import { log } from 'pragma'`, or core/log.js outside scripts)
+ 7 |     console.log(tmp)
    |     ^
-<span class="term-err">6 error(s)</span>, 4 warning(s)
+routes/broken.html:12:1 <span class="term-warn">warning</span> <span class="term-ink">[a11y/img-alt]</span> &lt;img&gt; without alt; use alt="" if the image is decorative
+ 12 | &lt;img src="/chart.png"&gt;
+    | ^
+routes/broken.html:13:1 <span class="term-warn">warning</span> <span class="term-ink">[a11y/accessible-name]</span> &lt;button&gt; without an accessible name: add text, {path} or aria-label
+ 13 | &lt;button @click="refresh"&gt;&lt;/button&gt;
+    | ^
+routes/broken.html:14:1 <span class="term-warn">warning</span> <span class="term-ink">[a11y/label]</span> &lt;input&gt; without label: use &lt;label for&gt;, wrap it in a &lt;label&gt; or add aria-label
+ 14 | &lt;input type="text" :model="$query"&gt;
+    | ^
+routes/broken.html:15:1 <span class="term-warn">warning</span> <span class="term-ink">[a11y/heading]</span> skipped heading level: &lt;h1&gt; followed by &lt;h3&gt;
+ 15 | &lt;h3 class="w-[37px]" :class="$tone"&gt;Recent&lt;/h3&gt;
+    | ^
+routes/broken.html:15:5 <span class="term-err">error</span> <span class="term-ink">[css/arbitrary-value]</span> arbitrary value "w-[37px]" is not supported; use a utility from core/docs/classes.md or add a class in lib/theme.css
+ 15 | &lt;h3 class="w-[37px]" :class="$tone"&gt;Recent&lt;/h3&gt;
+    |     ^
+routes/broken.html:15:22 <span class="term-err">error</span> <span class="term-ink">[html/class]</span> :class is not allowed: write static classes in class="…" and toggle each one with .name="path" (e.g. .text-warning-700="$warn")
+ 15 | &lt;h3 class="w-[37px]" :class="$tone"&gt;Recent&lt;/h3&gt;
+    |                      ^
+routes/broken.html:15:22 <span class="term-err">error</span> <span class="term-ink">[html/unknown-name]</span> $tone is not declared in the script of routes/broken.html: add `let tone = …` (state), `export let tone = …` (prop) or `function tone() { … }`
+ 15 | &lt;h3 class="w-[37px]" :class="$tone"&gt;Recent&lt;/h3&gt;
+    |                      ^
+routes/broken.html:16:4 <span class="term-err">error</span> <span class="term-ink">[html/interpolation]</span> {{ }} is not pragma syntax: write {path} in text and attributes (e.g. &lt;p&gt;Hi {$name}&lt;/p&gt;, alt="Photo of {p.name}"); inside &lt;code&gt; or &lt;pre&gt; it is shown as text
+ 16 | &lt;p&gt;{{ $query }}&lt;/p&gt;
+    |    ^
+routes/broken.html:17:4 <span class="term-err">error</span> <span class="term-ink">[html/text-removed]</span> `:text` was removed: write {$total} inside the element (e.g. &lt;p&gt;{$name}&lt;/p&gt;)
+ 17 | &lt;p :text="$total"&gt;&lt;/p&gt;
+    |    ^
+routes/broken.html:19:3 <span class="term-err">error</span> <span class="term-ink">[html/head]</span> &lt;meta&gt; belongs in &lt;head&gt;: write it at the top level of the page fragment (or in the layout &lt;head&gt;)
+ 19 |   &lt;meta name="robots" content="noindex"&gt;
+    |   ^
+<span class="term-err">8 error(s)</span>, 4 warning(s)
 <span class="term-cmd">pragma check --strict</span>
-<span class="term-dim">… the same ten findings, all reported as errors</span>
-<span class="term-err">10 error(s)</span>, 0 warning(s)</code></pre>
+<span class="term-dim">… the same twelve findings, all reported as errors</span>
+<span class="term-err">12 error(s)</span>, 0 warning(s)</code></pre>
         </c-terminal>
         <div class="prose">
           <p>The rules form a closed list. Anything outside the syntax is an error with a pointer to the fix, so an agent cannot quietly drift into another framework's habits.</p>
           <ul>
-            <li><strong>JS</strong>: <code>js/syntax</code>, <code>js/comment</code>, <code>js/console</code>, <code>js/vague-name</code>, <code>js/html-in-js</code> (no <code>innerHTML</code> or <code>createElement</code>), <code>js/jsdoc-types</code>, <code>js/import</code>, <code>js/ctx</code>.</li>
-            <li><strong>HTML</strong>: <code>html/syntax</code> (close every non-void tag), <code>html/comment</code>, <code>html/script</code>, <code>html/style-inline</code>, <code>html/on-inline</code>, <code>html/legacy-syntax</code>, <code>html/unknown-directive</code>, <code>html/invalid-path</code>, <code>html/invalid-root</code>, the block rules (<code>html/block</code>, <code>html/for-without-key</code>, <code>html/misplaced-else</code>…), <code>html/unknown-action</code>, <code>html/component</code>, <code>html/unknown-component</code>, <code>html/layout</code>, <code>html/title</code>, <code>html/class</code> (no <code>:class</code>), <code>html/interpolation</code> (no <code>{{ }}</code> or <code>${ }</code> outside <code>&lt;code&gt;</code>/<code>&lt;pre&gt;</code>), <code>html/data-attribute</code> (no hand-written <code>data-*</code>) and <code>html/head</code> (<code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> only at the top of a page or in the layout head). <code>html/unknown-directive</code> also names the pragma form for Vue, Alpine, Svelte, Angular and React attributes.</li>
+            <li><strong>JS</strong>: <code>js/syntax</code>, <code>js/comment</code>, <code>js/console</code>, <code>js/vague-name</code>, <code>js/html-in-js</code> (no <code>innerHTML</code> or <code>createElement</code>), <code>js/jsdoc-types</code>, <code>js/import</code>, and the script rules: <code>js/component-script</code> (no <code>var</code>, no top-level <code>await</code>, <code>export</code> only for props), <code>js/prop-write</code>, <code>js/const-state</code> (a mutated <code>const</code> the markup reads), <code>js/store-import</code> (stores only through <code>shared</code>) and <code>js/legacy-api</code> (the old <code>state(ctx)</code> API, with the migration).</li>
+            <li><strong>HTML</strong>: <code>html/syntax</code> (close every non-void tag), <code>html/comment</code>, <code>html/script</code>, <code>html/duplicate-module</code> (a <code>&lt;script&gt;</code> and an <code>x.js</code> for the same file), <code>html/style-inline</code>, <code>html/on-inline</code>, <code>html/legacy-syntax</code>, <code>html/unknown-directive</code>, <code>html/invalid-path</code>, <code>html/invalid-root</code>, the block rules (<code>html/block</code>, <code>html/for-without-key</code>, <code>html/misplaced-else</code>…), <code>html/unknown-name</code>, <code>html/unknown-prop</code>, <code>html/component</code>, <code>html/unknown-component</code>, <code>html/layout</code>, <code>html/title</code>, <code>html/class</code> (no <code>:class</code>), <code>html/text-removed</code> (no <code>:text</code>), <code>html/interpolation</code> (no <code>{{ }}</code> or <code>${ }</code> outside <code>&lt;code&gt;</code>/<code>&lt;pre&gt;</code>), <code>html/data-attribute</code> (no hand-written <code>data-*</code>) and <code>html/head</code> (<code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> only at the top of a page or in the layout head). <code>html/unknown-directive</code> also names the pragma form for Vue, Alpine, Svelte, Angular and React attributes.</li>
             <li><strong>CSS</strong>: <code>css/syntax</code>, <code>css/comment</code>, <code>css/unknown-class</code> (only the utilities in <code>classes.md</code> and classes your CSS defines), <code>css/arbitrary-value</code>.</li>
             <li><strong>App</strong>: <code>app/structure</code>, <code>app/route-conflict</code>, <code>app/package</code>, <code>app/pragma-json</code>, <code>app/budget</code>, and the warning <code>app/core-outdated</code> when <code>core/</code> differs from the installed binary.</li>
             <li><strong>Accessibility</strong>, checked on the expanded page with components inlined: <code>img-alt</code>, <code>accessible-name</code>, <code>label</code>, <code>dialog-name</code>, <code>click-non-interactive</code>, <code>heading</code>, <code>single-h1</code>, <code>tabindex</code>, <code>duplicate-id</code>, <code>iframe-title</code>, <code>a-no-href</code>. A bound attribute counts: <code>:aria-label</code> satisfies <code>aria-label</code>.</li>
@@ -237,16 +243,16 @@ routes/broken.js:6:5 <span class="term-err">error</span> <span class="term-ink">
 {
   "name": "my-app",
   "lang": "en",
-  "budgets": { "initialJsKb": 8, "routeJsKb": 10, "cssKb": 15 }
+  "budgets": { "initialJsKb": 9, "routeJsKb": 10, "cssKb": 15 }
 }
 <span class="term-cmd">pragma check --strict</span>
-pragma.json:4:1 <span class="term-err">error</span> <span class="term-ink">[app/budget]</span> initialJsKb exceeded in /: 8.8 kB gzip &gt; 8 kB
- 4 |   "budgets": { "initialJsKb": 8, "routeJsKb": 10, "cssKb": 15 }
+pragma.json:4:1 <span class="term-err">error</span> <span class="term-ink">[app/budget]</span> initialJsKb exceeded in /: 10.0 kB gzip &gt; 9 kB
+ 4 |   "budgets": { "initialJsKb": 9, "routeJsKb": 10, "cssKb": 15 }
    | ^
 <span class="term-err">1 error(s)</span>, 0 warning(s)</code></pre>
         </c-terminal>
         <div class="prose">
-          <p>The starter budgets are 15, 10 and 15. A page with no JS of its own costs 7.6 kB gzip, all of it runtime, so the budget is real room for your code. The fix for a budget error is smaller code, never a bigger number. What the build does so that you rarely hit one:</p>
+          <p>The starter budgets are 15, 10 and 15. A page with no script of its own costs 8.7 kB gzip, all of it runtime, so the budget is real room for your code. The fix for a budget error is smaller code, never a bigger number. What the build does so that you rarely hit one:</p>
           <ul>
             <li>Every route is prebuilt HTML, and a page with a <code>load</code> starts its data fetch from an inline script in <code>&lt;head&gt;</code>, before any module runs.</li>
             <li>Exactly the modules a page imports get a <code>modulepreload</code>. Modules are minified and hashed one by one; there is no app bundle.</li>
@@ -266,9 +272,9 @@ pragma.json:4:1 <span class="term-err">error</span> <span class="term-ink">[app/
         <c-terminal title="~/my-app">
           <pre tabindex="0" aria-label="pragma build output and the dist folder"><code><span class="term-cmd">pragma build</span>
 <span class="term-dim">page      JS gzip</span>
-/          <span class="term-ink">8.8 KB</span>
-/about     <span class="term-ink">7.6 KB</span>
-/orders    <span class="term-ink">7.6 KB</span>
+/         <span class="term-ink">10.0 KB</span>
+/about     <span class="term-ink">8.7 KB</span>
+/orders    <span class="term-ink">8.7 KB</span>
 CSS        <span class="term-ink">4.1 KB</span>
 3 page(s), with server
 <span class="term-ok">dist/ built in 6 ms</span>
@@ -313,7 +319,7 @@ content-length: 778
 etag: W/"8a3-18e95340ec2094a1"
 vary: accept-encoding
 content-encoding: br
-<span class="term-cmd">curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:5294/does-not-exist</span>
+<span class="term-cmd">curl -s -o /dev/null -w "%&#123;http_code&#125;\n" http://127.0.0.1:5294/does-not-exist</span>
 404</code></pre>
         </c-terminal>
         <div class="prose">

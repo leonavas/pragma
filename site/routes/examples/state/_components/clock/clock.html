@@ -2,12 +2,13 @@
   const timeFormat = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 
   let now = Date.now()
-  let width = window.innerWidth
+  let width = 0
   let resizes = 0
 
   const time = () => timeFormat.format(now)
 
   function mount() {
+    width = window.innerWidth
     const timer = setInterval(() => { now = Date.now() }, 1000)
     const measure = () => {
       width = window.innerWidth
@@ -45,7 +46,7 @@
     border: 1px solid var(--color-line);
     background: var(--color-line);
   }
-  [data-c="clock"] .clock-cell {
+  .clock-cell {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -53,7 +54,7 @@
     padding: 0.875rem 1rem;
     background: var(--color-surface);
   }
-  [data-c="clock"] .clock-value {
+  .clock-value {
     font-family: var(--font-mono);
     font-size: 1.125rem;
     font-variant-numeric: tabular-nums;

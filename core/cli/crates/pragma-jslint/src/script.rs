@@ -22,6 +22,10 @@ use std::path::Path;
 pub const RULE_LEGACY: &str = "js/legacy-api";
 pub const RULE_PROP_WRITE: &str = "js/prop-write";
 pub const RULE_SCRIPT: &str = "js/component-script";
+pub const RULE_TOP_LEVEL_DATA: &str = "js/top-level-data";
+pub const RULE_STALE: &str = "js/stale-derived";
+pub const RULE_DERIVED_CALL: &str = "js/derived-call";
+pub const RULE_DOLLAR: &str = "js/dollar-in-script";
 
 /// Names the virtual module `pragma` exports.
 pub const PRAGMA_EXPORTS: &[&str] = &["shared", "data", "params", "query", "page", "log", "call", "navigate", "open", "close", "confirm"];
@@ -61,6 +65,18 @@ impl ScriptInfo {
     pub fn is_function(&self, name: &str) -> bool {
         self.functions.iter().any(|n| n == name)
     }
+
+    /// What HTML may call (`@input="name"`): a top-level function, or a top-level `const` with any
+    /// value (`const saveLater = debounce(save, 300)`); the runtime calls the value it holds and, in
+    /// dev, reports it when that is not a function.
+    pub fn callable(&self, name: &str) -> bool {
+        self.is_function(name) || self.consts.iter().any(|n| n == name)
+    }
+
+    /// The names `callable` accepts, for "did you mean" hints.
+    pub fn callables(&self) -> impl Iterator<Item = &str> {
+        self.functions.iter().chain(&self.consts).map(String::as_str)
+    }
 }
 
 pub struct Script {
@@ -75,6 +91,8 @@ enum Sym {
     State,
     Prop,
     Const,
+    /// Top-level function (action or derived value).
+    Function,
     Pragma(&'static str),
 }
 
@@ -92,6 +110,12 @@ struct Transform<'s> {
     /// in place, so import diagnostics keep their positions). Later imports are hoisted to the top.
     open_at: u32,
     leading: bool,
+    /// `import … from 'pragma'` statements: removed even when the script has errors, so the module
+    /// graph does not report them as a second error.
+    pragma_imports: Vec<Span>,
+    /// Top-level `let`/`const` with a value that is not a function: (name, is `let`, start, the
+    /// first state or prop its value reads at startup).
+    candidates: HashMap<SymbolId, (String, bool, Span, Option<String>)>,
 }
 
 /// Rewrites a page, component or store script into its factory module and reports the script rules
@@ -116,11 +140,14 @@ pub fn transform(path: &Path, source: &str, kind: ScriptKind) -> Script {
         persist_at: None,
         open_at: 0,
         leading: true,
+        pragma_imports: Vec::new(),
+        candidates: HashMap::new(),
     };
     t.top_level(&ret.program);
     t.reserved(scoping);
-    let mut refs = Refs { t: &mut t, scoping, depth: 0 };
+    let mut refs = Refs { t: &mut t, scoping, depth: 0, init: None };
     refs.visit_program(&ret.program);
+    t.stale(scoping);
     if let Some(at) = t.persist_at {
         for key in t.info.persist.clone() {
             if !t.info.lets.contains(&key) {
@@ -130,7 +157,9 @@ pub fn transform(path: &Path, source: &str, kind: ScriptKind) -> Script {
     }
     let lines = LineIndex::new(source);
     let failed = !t.found.is_empty();
-    t.info.incomplete = failed;
+    // only the old API hides the declared names; other errors leave the HTML checks running, so
+    // every error of the file shows in one pass
+    t.info.incomplete = t.found.iter().any(|f| f.1 == RULE_LEGACY);
     t.found.sort_by_key(|f| f.0);
     let diags = t
         .found
@@ -140,7 +169,7 @@ pub fn transform(path: &Path, source: &str, kind: ScriptKind) -> Script {
             Diagnostic::error(path, line, column, rule, message.clone())
         })
         .collect();
-    let code = if failed { source.to_string() } else { t.assemble() };
+    let code = if failed { t.without_pragma_imports() } else { t.assemble() };
     Script { code, info: t.info, diags }
 }
 
@@ -199,6 +228,7 @@ impl Transform<'_> {
                                 _ => self.err(s.span().start, RULE_SCRIPT, "import names from 'pragma': `import { data, log } from 'pragma'`"),
                             }
                         }
+                        self.pragma_imports.push(d.span);
                         self.remove(d.span);
                     } else if d.source.value.as_str().is_some_and(|s| s.ends_with("core/state.js")) {
                         self.err(d.span.start, RULE_LEGACY, "old API: /core/state.js `store()` → a store is plain top-level `let` values and functions; persist fields with `export const persist = ['field']`");
@@ -248,8 +278,18 @@ impl Transform<'_> {
             self.info.functions.push(id.name.to_string());
             self.exposed.push(id.name.to_string());
             if let Some(sym) = id.symbol_id.get() {
-                self.syms.insert(sym, Sym::Const);
+                self.syms.insert(sym, Sym::Function);
             }
+        }
+    }
+
+    /// A top-level `let`/`const` whose value is not a function may be a stale derived value.
+    fn candidate(&mut self, decl: &oxc_ast::ast::VariableDeclarator, is_let: bool) {
+        if let (BindingPattern::BindingIdentifier(id), Some(init)) = (&decl.id, &decl.init)
+            && !is_function_expr(init)
+            && let Some(sym) = id.symbol_id.get()
+        {
+            self.candidates.insert(sym, (id.name.to_string(), is_let, decl.span, None));
         }
     }
 
@@ -259,12 +299,14 @@ impl Transform<'_> {
                 for (i, decl) in d.declarations.iter().enumerate() {
                     let BindingPattern::BindingIdentifier(id) = &decl.id else {
                         self.err(decl.span.start, RULE_SCRIPT, "a top-level `let` declares one state value per name; destructure inside a function, or use `const`");
+                        self.info.lets.extend(binding_names(&decl.id).into_iter().map(|(n, _, _)| n.to_string()));
                         continue;
                     };
                     self.info.lets.push(id.name.to_string());
                     if let Some(sym) = id.symbol_id.get() {
                         self.syms.insert(sym, Sym::State);
                     }
+                    self.candidate(decl, true);
                     if i == 0 {
                         self.edit(start, id.span.start, "");
                     }
@@ -279,13 +321,47 @@ impl Transform<'_> {
                         if function { self.info.functions.push(name.to_string()) } else { self.info.consts.push(name.to_string()) }
                         self.exposed.push(name.to_string());
                         if let Some(sym) = sym {
-                            self.syms.insert(sym, Sym::Const);
+                            self.syms.insert(sym, if function { Sym::Function } else { Sym::Const });
                         }
                     }
+                    self.candidate(decl, false);
                 }
             }
-            _ => self.err(d.span.start, RULE_SCRIPT, "use `let` (state) or `const`, not `var`"),
+            _ => {
+                self.err(d.span.start, RULE_SCRIPT, "use `let` (state) or `const`, not `var`");
+                self.info.lets.extend(d.declarations.iter().flat_map(|x| binding_names(&x.id)).map(|(n, _, _)| n.to_string()));
+            }
         }
+    }
+
+    /// `js/stale-derived`: a value computed once from state or a prop and never assigned again.
+    fn stale(&mut self, scoping: &Scoping) {
+        let mut found: Vec<(u32, String)> = Vec::new();
+        for (sym, (name, is_let, span, read)) in &self.candidates {
+            let Some(read) = read else { continue };
+            let written = *is_let && scoping.get_resolved_references(*sym).any(|r| r.is_write());
+            if written {
+                continue;
+            }
+            let init = self.text(*span).split_once('=').map_or("", |(_, v)| v.trim());
+            found.push((
+                span.start,
+                format!("`{name}` reads `{read}` once, when the script starts, and never updates: make it a function (`const {name} = () => {init}`) and use `${name}` in HTML, `{name}()` in JS; or assign it in an action to change it"),
+            ));
+        }
+        for (at, message) in found {
+            self.err(at, RULE_STALE, message);
+        }
+    }
+
+    /// The source with only the `pragma` imports removed (a script with errors is not rewritten).
+    fn without_pragma_imports(&self) -> String {
+        let mut out = self.source.to_string();
+        for span in self.pragma_imports.iter().rev() {
+            let blank: String = self.text(*span).chars().filter(|c| *c == '\n').collect();
+            out.replace_range(span.start as usize..span.end as usize, &blank);
+        }
+        out
     }
 
     fn export(&mut self, decl: &Declaration, span: Span) {
@@ -416,12 +492,28 @@ struct Refs<'t, 's, 'c> {
     scoping: &'c Scoping,
     /// Function nesting (0 = top level).
     depth: u32,
+    /// The stale-derived candidate whose value is being visited at the top level.
+    init: Option<SymbolId>,
 }
 
 impl Refs<'_, '_, '_> {
     fn sym(&self, id: &IdentifierReference) -> Option<Sym> {
         let reference = self.scoping.get_reference(id.reference_id.get()?);
         self.t.syms.get(&reference.symbol_id()?).copied()
+    }
+
+    fn resolved(&self, id: &IdentifierReference) -> bool {
+        id.reference_id.get().is_some_and(|r| self.scoping.get_reference(r).symbol_id().is_some())
+    }
+
+    /// `js/derived-call`: a top-level function read as a value (`if (empty)`, `` `${total}` ``).
+    fn uncalled(&mut self, e: &Expression) {
+        if let Expression::Identifier(id) = e.without_parentheses()
+            && self.sym(id) == Some(Sym::Function)
+        {
+            let name = &id.name;
+            self.t.err(id.span.start, RULE_DERIVED_CALL, format!("`{name}` is a function (a derived value): call it in JS: `{name}()` (`${name}` without `()` is only for HTML)"));
+        }
     }
 
     fn is_write(&self, id: &IdentifierReference) -> bool {
@@ -432,7 +524,7 @@ impl Refs<'_, '_, '_> {
         match self.sym(id)? {
             Sym::State | Sym::Prop => Some(format!("$.{}", id.name)),
             Sym::Pragma(n) => Some(format!("$pragma.{n}")),
-            Sym::Const => None,
+            Sym::Const | Sym::Function => None,
         }
     }
 
@@ -460,9 +552,80 @@ impl Refs<'_, '_, '_> {
 impl<'a> Visit<'a> for Refs<'_, '_, '_> {
     fn visit_identifier_reference(&mut self, it: &IdentifierReference<'a>) {
         self.prop_write(it);
+        let sym = self.sym(it);
+        if self.depth == 0 && sym == Some(Sym::Pragma("data")) {
+            self.t.err(it.span.start, RULE_TOP_LEVEL_DATA, "`data` is read when the script starts, before the loader is done: read it inside a function (`const products = () => data.products`)");
+        }
+        if self.depth == 0
+            && matches!(sym, Some(Sym::State | Sym::Prop))
+            && let Some(c) = self.init
+            && let Some(entry) = self.t.candidates.get_mut(&c)
+        {
+            entry.3.get_or_insert_with(|| it.name.to_string());
+        }
+        if let Some(plain) = it.name.strip_prefix('$').filter(|n| !n.is_empty() && *n != "pragma")
+            && !self.resolved(it)
+        {
+            let hint = if self.t.info.declares(plain) { format!("write `{plain}`") } else { format!("write the name without `$` (`{plain}`)") };
+            self.t.err(it.span.start, RULE_DOLLAR, format!("`${plain}` is HTML only; in <script> {hint}"));
+        }
         if let Some(text) = self.replacement(it) {
             self.t.edit(it.span.start, it.span.end, text);
         }
+    }
+
+    fn visit_variable_declarator(&mut self, it: &oxc_ast::ast::VariableDeclarator<'a>) {
+        let candidate = it.id.get_binding_identifier().and_then(|b| b.symbol_id.get()).filter(|s| self.depth == 0 && self.t.candidates.contains_key(s));
+        let outer = self.init;
+        self.init = candidate.or(outer);
+        walk::walk_variable_declarator(self, it);
+        self.init = outer;
+    }
+
+    fn visit_if_statement(&mut self, it: &oxc_ast::ast::IfStatement<'a>) {
+        self.uncalled(&it.test);
+        walk::walk_if_statement(self, it);
+    }
+
+    fn visit_conditional_expression(&mut self, it: &oxc_ast::ast::ConditionalExpression<'a>) {
+        self.uncalled(&it.test);
+        walk::walk_conditional_expression(self, it);
+    }
+
+    fn visit_logical_expression(&mut self, it: &oxc_ast::ast::LogicalExpression<'a>) {
+        self.uncalled(&it.left);
+        self.uncalled(&it.right);
+        walk::walk_logical_expression(self, it);
+    }
+
+    fn visit_binary_expression(&mut self, it: &oxc_ast::ast::BinaryExpression<'a>) {
+        self.uncalled(&it.left);
+        self.uncalled(&it.right);
+        walk::walk_binary_expression(self, it);
+    }
+
+    fn visit_template_literal(&mut self, it: &oxc_ast::ast::TemplateLiteral<'a>) {
+        for e in &it.expressions {
+            self.uncalled(e);
+        }
+        walk::walk_template_literal(self, it);
+    }
+
+    fn visit_while_statement(&mut self, it: &oxc_ast::ast::WhileStatement<'a>) {
+        self.uncalled(&it.test);
+        walk::walk_while_statement(self, it);
+    }
+
+    fn visit_do_while_statement(&mut self, it: &oxc_ast::ast::DoWhileStatement<'a>) {
+        self.uncalled(&it.test);
+        walk::walk_do_while_statement(self, it);
+    }
+
+    fn visit_for_statement(&mut self, it: &oxc_ast::ast::ForStatement<'a>) {
+        if let Some(test) = &it.test {
+            self.uncalled(test);
+        }
+        walk::walk_for_statement(self, it);
     }
 
     fn visit_object_property(&mut self, it: &ObjectProperty<'a>) {
@@ -523,6 +686,9 @@ impl<'a> Visit<'a> for Refs<'_, '_, '_> {
             && let Some(root) = member_root(m.object())
         {
             self.mutated_root(root);
+        }
+        if !matches!(it.operator, UnaryOperator::Typeof | UnaryOperator::Delete | UnaryOperator::Void) {
+            self.uncalled(&it.argument);
         }
         walk::walk_unary_expression(self, it);
     }

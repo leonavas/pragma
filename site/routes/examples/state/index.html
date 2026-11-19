@@ -48,7 +48,7 @@
       <p-queue></p-queue>
     </c-showcase>
     <div class="prose">
-      <p>State is a deep proxy: <code>job.done = true</code>, <code>jobs.push(…)</code> and <code>jobs = jobs.filter(…)</code> all render. Arguments can be paths (<code>job</code>, <code>$draft</code>, <code>data.x</code>), simple literals or <code>event</code>, never expressions. An async action renders when its first part returns ("Saving…") and again after each <code>await</code>; renders are batched per microtask.</p>
+      <p>State is a deep proxy: <code>job.done = true</code>, <code>jobs.push(…)</code> and <code>jobs = jobs.filter(…)</code> all render. Arguments can be paths (<code>job</code>, <code>$draft</code>, <code>data.x</code>), simple literals, <code>event</code> or <code>el</code>, never expressions. An async action renders when its first part returns ("Saving…") and again after each <code>await</code>; renders are batched per microtask.</p>
     </div>
   </section>
 
@@ -64,7 +64,7 @@
       </div>
     </c-showcase>
     <div class="prose">
-      <p><code>used="72"</code> arrives as the number <code>72</code> because the default is a number; a bare <code>critical</code> is <code>true</code> and <code>"false"</code> is <code>false</code>; a missing prop keeps its default, so the second meter's total is 100. Props are read-only: assigning one fails check with <code>js/prop-write</code>, so copy it into a <code>let</code> to change it (<code>let count = start</code>). A prop the script does not declare fails at the call site with <code>html/unknown-prop</code>. More in <a href="/examples/components">Components</a>.</p>
+      <p><code>used="72"</code> arrives as the number <code>72</code> because the default is a number; a bare <code>critical</code> is <code>true</code> and <code>"false"</code> is <code>false</code>; a missing prop keeps its default, so the second meter's total is 100. Props are read-only: assigning one fails check with <code>js/prop-write</code>, so copy it into a <code>let</code> to change it (<code>let count = start</code>). That goes deep: in dev, writing into an object prop (<code>item.done = true</code>) throws an error that names the prop; copy it first (<code>let draft = { ...item }</code>). A prop the script does not declare fails at the call site with <code>html/unknown-prop</code>. More in <a href="/examples/components">Components</a>.</p>
     </div>
   </section>
 
@@ -77,7 +77,7 @@
       <p-clock></p-clock>
     </c-showcase>
     <div class="prose">
-      <p>It is only for external effects: timers, <code>window</code> or <code>document</code> listeners, observers. The cleanup runs when the owner leaves the DOM; for a page, on navigation. Never fetch data in <code>mount</code>; that is what <code>load</code> is for.</p>
+      <p>It is only for external effects: timers, <code>window</code> or <code>document</code> listeners, observers. <code>mount</code> runs only in the browser, so it is also where browser-only reads belong: the clock reads <code>window.innerWidth</code> there, not at the top of the script, because on an SSR page the script also runs on the server. <code>mount(el)</code> receives the component's root element for an observer or a measurement; read from it, never write to it. The cleanup runs when the owner leaves the DOM; for a page, on navigation. An <code>async function mount()</code> works too: the runtime awaits it and uses the function it resolves to as the cleanup, even when the owner left before it resolved. Never fetch data in <code>mount</code>; that is what <code>load</code> is for.</p>
     </div>
   </section>
 
@@ -95,15 +95,46 @@
   </section>
 
   <section class="doc-section" aria-labelledby="services">
-    <h2 id="services">Event arguments and services from <code>'pragma'</code></h2>
+    <h2 id="services"><code>event</code>, <code>el</code> and services from <code>'pragma'</code></h2>
     <div class="prose">
-      <p>The DOM event is the argument <code>event</code>; everything else a script needs comes from <code>import { … } from 'pragma'</code>.</p>
+      <p>A handler without parentheses receives the DOM event: <code>@keydown="inspectKey"</code> calls <code>inspectKey(event)</code>. With parentheses it receives only what it lists, and two names are always there: <code>event</code> and <code>el</code>, the element that has the directive. Everything else a script needs comes from <code>import { … } from 'pragma'</code>.</p>
     </div>
-    <c-showcase :source="data.examples.probe" caption="Click a name or type a key: the readout shows the arguments the action received.">
+    <c-showcase :source="data.examples.probe" caption="Click the bold name, then the word run: event.target changes, el is always the button.">
       <p-probe></p-probe>
     </c-showcase>
     <div class="prose">
-      <p>The services are <code>shared</code> (stores), <code>data</code> (the <code>load</code> result), <code>params</code>, <code>query</code>, <code>page</code>, <code>log</code>, <code>call</code> (server actions), <code>navigate</code> and <code>open</code>, <code>close</code>, <code>confirm</code> (overlays). Read <code>data</code> and the route inside functions, never at the top level of the script. Never write to the DOM: read <code>event</code>, change state and let the bindings follow.</p>
+      <p>Use <code>el</code> instead of an id lookup or <code>event.currentTarget</code>, which is the root the runtime listens on, not your element. The services are <code>shared</code> (stores), <code>data</code> (the <code>load</code> result), <code>params</code>, <code>query</code>, <code>page</code>, <code>log</code>, <code>call</code> (server actions), <code>navigate</code> and <code>open</code>, <code>close</code>, <code>confirm</code> (overlays). Read <code>data</code> and the route inside functions, never at the top level of the script. Never write to the DOM: read <code>event</code>, change state and let the bindings follow.</p>
+    </div>
+  </section>
+
+  <section class="doc-section" aria-labelledby="script-mistakes">
+    <h2 id="script-mistakes">Script mistakes that <code>check</code> catches</h2>
+    <div class="prose">
+      <p>Four mistakes run without an error in the browser and show a wrong or stale value. <code>pragma check</code> stops each one and names the fix. This is real output for one page script:</p>
+    </div>
+    <c-terminal title="~/my-app">
+      <pre tabindex="0" aria-label="pragma check output for four script mistakes"><code><span class="term-cmd">pragma check --strict</span>
+routes/orders.html:4:16 <span class="term-err">error</span> <span class="term-ink">[js/top-level-data]</span> `data` is read when the script starts, before the loader is done: read it inside a function (`const products = () =&gt; data.products`)
+ 4 |   let orders = data.orders
+   |                ^
+routes/orders.html:6:7 <span class="term-err">error</span> <span class="term-ink">[js/stale-derived]</span> `label` reads `discount` once, when the script starts, and never updates: make it a function (`const label = () =&gt; discount + '% off'`) and use `$label` in HTML, `label()` in JS; or assign it in an action to change it
+ 6 |   let label = discount + '% off'
+   |       ^
+routes/orders.html:9:26 <span class="term-err">error</span> <span class="term-ink">[js/derived-call]</span> `empty` is a function (a derived value): call it in JS: `empty()` (`$empty` without `()` is only for HTML)
+ 9 |   const summary = () =&gt; (empty ? 'No orders' : orders.length + ' orders')
+   |                          ^
+routes/orders.html:12:5 <span class="term-err">error</span> <span class="term-ink">[js/dollar-in-script]</span> `$orders` is HTML only; in &lt;script&gt; write `orders`
+ 12 |     $orders = []
+    |     ^
+<span class="term-err">4 error(s)</span>, 0 warning(s)</code></pre>
+    </c-terminal>
+    <div class="prose">
+      <ul>
+        <li><code>js/top-level-data</code>: <code>data</code> is undefined until the loader ends, so read it in a function: <code>const orders = () =&gt; data.orders</code>.</li>
+        <li><code>js/stale-derived</code>: a <code>let</code> computed from another <code>let</code> or a prop is computed once. Make it a function, as in <a href="#derived">Derived values</a>.</li>
+        <li><code>js/derived-call</code>: in JS a derived value is a call, <code>empty()</code>; <code>empty</code> alone is the function, which is always truthy.</li>
+        <li><code>js/dollar-in-script</code>: <code>$</code> is HTML only. In the script every name is plain.</li>
+      </ul>
     </div>
   </section>
 

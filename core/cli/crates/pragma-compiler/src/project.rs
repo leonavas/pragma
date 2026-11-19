@@ -145,9 +145,14 @@ impl Project {
     /// module and CSS paths (the separate files or the embedded code).
     fn extract(&mut self, id: u32, js: PathBuf, css: PathBuf, all: &[PathBuf]) -> (Option<PathBuf>, Option<PathBuf>) {
         let html = self.files[id as usize].clone();
+        let page = html.starts_with("routes") && !html.components().any(|c| c.as_os_str() == "_components");
         let (mut scripts, mut styles, mut kept) = (Vec::new(), Vec::new(), Vec::new());
         for n in std::mem::take(&mut self.trees[id as usize]) {
             match n {
+                Node::Element(e) if crate::directive::is_json_ld(&e) && page => kept.push(Node::Element(e)),
+                Node::Element(e) if crate::directive::is_json_ld(&e) => {
+                    self.err_at(e.pos, "html/script", "JSON-LD <script type=\"application/ld+json\"> goes at the top level of a page, not in a component");
+                }
                 Node::Element(e) if e.is("script") => scripts.push(e),
                 Node::Element(e) if e.is("style") => styles.push(e),
                 n => kept.push(n),

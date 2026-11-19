@@ -5,7 +5,6 @@
 
   const pollMs = 400
   const clickWindowMs = 4000
-  const frameId = 'frame-' + crypto.randomUUID()
 
   let current = src
   let live = true
@@ -39,13 +38,13 @@
     beat = beat === 'a' ? 'b' : 'a'
   }
 
-  function reload() {
+  function reload(el) {
     loading = true
-    document.getElementById(frameId).contentWindow.location.reload()
+    el.closest('[data-c="frame"]').querySelector('iframe').contentWindow.location.reload()
   }
 
-  function mount() {
-    const frame = document.getElementById(frameId)
+  function mount(el) {
+    const frame = el.querySelector('iframe')
     let view = null
     let startedAt = 0
     let poll = 0
@@ -117,7 +116,7 @@
 
 <div class="flex w-full min-w-0 flex-col border border-line bg-ground">
   <div class="flex h-11 items-center gap-1 border-b border-line bg-sunken pr-1 font-mono text-xs">
-    <button type="button" class="frame-control inline-flex h-11 min-w-11 flex-none cursor-pointer items-center justify-center text-muted transition-colors hover:text-ink" @click="reload" :aria-label="$reloadLabel" .is-busy="$loading">
+    <button type="button" class="frame-control inline-flex h-11 min-w-11 flex-none cursor-pointer items-center justify-center text-muted transition-colors hover:text-ink" @click="reload(el)" :aria-label="$reloadLabel" .is-busy="$loading">
       <svg class="frame-reload size-3.5" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1" fill="none" stroke="currentColor" stroke-width="1.25"></path><path d="M12.4 1.6v2.9H9.5" fill="none" stroke="currentColor" stroke-width="1.25"></path></svg>
     </button>
     <p class="frame-address h-8 min-w-0 flex-1 truncate border border-line bg-ground px-3 text-left text-ink">
@@ -130,28 +129,28 @@
       <svg class="size-3.5" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5l-6 6M11.5 9.5v4h-9v-9h4" fill="none" stroke="currentColor" stroke-width="1.25"></path></svg>
     </a>
   </div>
-  <iframe class="frame-view block w-full border-0 bg-ground" :id="$frameId" src="{$src}" title="{$title}" loading="lazy"></iframe>
+  <iframe class="frame-view block w-full border-0 bg-ground" src="{$src}" title="{$title}" loading="lazy"></iframe>
 </div>
 
 <style>
-  [data-c="frame"] .frame-control:focus-visible { outline-offset: -4px; }
-  [data-c="frame"] .is-busy .frame-reload { animation: frame-spin 0.7s linear infinite; }
-  [data-c="frame"] .frame-address {
+  .frame-control:focus-visible { outline-offset: -4px; }
+  .is-busy .frame-reload { animation: frame-spin 0.7s linear infinite; }
+  .frame-address {
     line-height: calc(2rem - 2px);
     direction: rtl;
   }
-  [data-c="frame"] .frame-path {
+  .frame-path {
     direction: ltr;
     unicode-bidi: isolate;
   }
-  [data-c="frame"] .frame-path[data-beat="a"] { animation: frame-beat-a 1.2s var(--ease-out); }
-  [data-c="frame"] .frame-path[data-beat="b"] { animation: frame-beat-b 1.2s var(--ease-out); }
-  [data-c="frame"] [data-kind="router"] .frame-kind { color: var(--color-accent); }
-  [data-c="frame"] .frame-view { height: 26rem; }
+  .frame-path[data-beat="a"] { animation: frame-beat-a 1.2s var(--ease-out); }
+  .frame-path[data-beat="b"] { animation: frame-beat-b 1.2s var(--ease-out); }
+  [data-kind="router"] .frame-kind { color: var(--color-accent); }
+  .frame-view { height: 26rem; }
   [data-c="frame"][data-prop-height="sm"] .frame-view { height: 18rem; }
   [data-c="frame"][data-prop-height="lg"] .frame-view { height: 34rem; }
   @media (max-width: 29.99rem) {
-    [data-c="frame"] .frame-view { height: 24rem; }
+    .frame-view { height: 24rem; }
     [data-c="frame"][data-prop-height="lg"] .frame-view { height: 30rem; }
   }
   @keyframes frame-spin {
@@ -164,7 +163,7 @@
     from { color: var(--color-accent); }
   }
   @media (prefers-reduced-motion: reduce) {
-    [data-c="frame"] .is-busy .frame-reload { animation: none; opacity: 0.4; }
-    [data-c="frame"] .frame-path[data-beat] { animation: none; }
+    .is-busy .frame-reload { animation: none; opacity: 0.4; }
+    .frame-path[data-beat] { animation: none; }
   }
 </style>

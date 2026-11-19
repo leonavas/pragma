@@ -1,7 +1,8 @@
 export default function ($) {
   $.ticks = 0
 
-  function mount() {
+  async function mount() {
+    await null
     self.__ticks = 0
     const t = setInterval(() => { $.ticks = ++self.__ticks }, 20)
     return () => {

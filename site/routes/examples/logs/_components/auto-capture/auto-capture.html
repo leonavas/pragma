@@ -48,9 +48,9 @@
 
 <style>
   [data-c="auto-capture"] { display: grid; gap: 1rem; width: min(100%, 34rem); }
-  [data-c="auto-capture"] .auto-capture-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-  [data-c="auto-capture"] .auto-capture-events { display: grid; min-height: 9rem; align-content: start; border-top: 1px solid var(--color-line); }
-  [data-c="auto-capture"] .auto-capture-event {
+  .auto-capture-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .auto-capture-events { display: grid; min-height: 9rem; align-content: start; border-top: 1px solid var(--color-line); }
+  .auto-capture-event {
     display: grid;
     grid-template-columns: 9.5rem 1fr;
     gap: 0.75rem;
@@ -59,10 +59,10 @@
     font-family: var(--font-mono);
     font-size: 0.75rem;
   }
-  [data-c="auto-capture"] .auto-capture-kind { color: var(--color-danger-300); }
-  [data-c="auto-capture"] .auto-capture-message { color: var(--color-ink); overflow-wrap: anywhere; }
-  [data-c="auto-capture"] .auto-capture-empty { padding: 0.75rem 0; color: var(--color-faint); font-size: 0.875rem; }
+  .auto-capture-kind { color: var(--color-danger-300); }
+  .auto-capture-message { color: var(--color-ink); overflow-wrap: anywhere; }
+  .auto-capture-empty { padding: 0.75rem 0; color: var(--color-faint); font-size: 0.875rem; }
   @media (max-width: 30rem) {
-    [data-c="auto-capture"] .auto-capture-event { grid-template-columns: 1fr; gap: 0.125rem; }
+    .auto-capture-event { grid-template-columns: 1fr; gap: 0.125rem; }
   }
 </style>

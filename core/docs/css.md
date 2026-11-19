@@ -6,7 +6,12 @@ Use utilities (classes.md) first. Write a custom class only when they are not en
 |---|---|
 | `core/base.css` | preflight, layers, `.skeleton`, `[hidden]`, scroll lock. Do not edit. |
 | `lib/theme.css` | tokens and global custom classes (`@layer components`) |
-| component `<name>.css` | that component only; scope selectors with `[data-c="<name>"]` (for `p-` components the build makes it unique per folder) |
+| component `<style>` or `<name>.css` | that component only: the build scopes every selector to it (root and inside); `:global(…)` opts out; `[data-c="<name>"]` written by hand still works (for `p-` components the build makes it unique per folder) |
+| page `<style>` or `<page>.css` | that page only: scoped to its `<main data-page="…">` the same way |
+
+Scoping adds `:where(…)` to each selector's last part, so it adds no specificity. Write plain
+selectors (`button`, `.row:hover`, `li::marker`); use `:global(…)` only for something outside the
+component or page (`:global(html[data-theme="dark"]) .row`).
 
 The starter ships the theme-aware tokens `bg-surface`, `text-ink`, `text-muted`, `border-line`
 (they switch in dark mode) and the classes `.card`, `.btn`, `.btn-primary`, `.btn-danger`, `.dialog`.

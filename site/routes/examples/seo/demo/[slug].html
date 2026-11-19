@@ -9,6 +9,18 @@
 <meta property="og:image" :content="data.head.image">
 <meta property="og:image:alt" :content="data.head.imageAlt">
 <meta property="article:published_time" :content="data.head.published">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "{data.article.title}",
+  "description": "{data.head.description}",
+  "image": "{data.head.image}",
+  "datePublished": "{data.head.published}",
+  "mainEntityOfPage": "{data.head.url}",
+  "publisher": { "@type": "Organization", "name": "pragma" }
+}
+</script>
 
 <div class="wrap py-12 lg:py-16">
   <if data.article>

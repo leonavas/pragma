@@ -1,14 +1,25 @@
+<script>
+  let name = 'Ada'
+  let items = []
+  let tone = 'ok'
+  let open = false
+  const total = () => items.length
+  function add(amount) {
+    items.push(amount)
+  }
+</script>
+
 <title>Wrong</title>
+<h1 :text="$name">x</h1>
+<p>{$items.length > 0}</p>
+<p>{$name.toUpperCase()}</p>
 <p data-text="$name">x</p>
-<p :text="$items.length > 0">x</p>
-<p :text="$user.name.toUpperCase()">x</p>
 <p style="color: red">x</p>
-<button onclick="save()">Save</button>
-<p :style="$css">x</p>
+<button onclick="add()">Add</button>
 <p :class="$tone">x</p>
 <p>{{ $name }}</p>
+<p>Total: ${$total}</p>
+<button @click="add($total + 1)">Add</button>
 <if test="$open"><p>x</p></if>
-<for item in $items><p :text="item.name"></p></for>
-<p :text="state.name">x</p>
+<for item in $items><p>{item}</p></for>
 <p v-if="$open">x</p>
-<p data-tone="ok">x</p>

@@ -1,16 +1,21 @@
+import { coerce } from '../props.js'
+
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
 
 export function escape(value) {
   return String(value).replace(/[&<>"']/g, (c) => ESC[c])
 }
 
+// A function met on the path is a derived value of a script: it is called (as in the browser).
+const call = (value) => (typeof value === 'function' ? value() : value)
+
 export function resolve(scope, path) {
   const parts = path.split('.')
   if (!Object.hasOwn(scope, parts[0])) throw new Error(`unknown path: ${path}`)
-  let value = scope[parts[0]]
+  let value = call(scope[parts[0]])
   for (let i = 1; i < parts.length; i++) {
     if (value == null || !(parts[i] in Object(value))) throw new Error(`unknown path: ${path}`)
-    value = value[parts[i]]
+    value = call(value[parts[i]])
   }
   return value
 }
@@ -57,13 +62,18 @@ export function clientOnly(scope, value) {
 
 const test = (scope, path, neg) => Boolean(resolve(scope, path)) !== Boolean(neg)
 
-export function render(ops, scope) {
+// ctx.instance(id, props): instance scope of a component with a script, or null (left to the client).
+export function render(ops, scope, ctx = {}) {
+  return run(ops, scope, { outer: [], instance: () => null, ...ctx }, { done: null })
+}
+
+// `chain.done` (if/elif/else and for/empty): true = a branch was rendered, false = none, null = decided
+// on the client. A `slot` op shares its siblings' chain.
+function run(ops, scope, ctx, chain) {
   let out = ''
-  // if/elif/else and for/empty chain: true = a branch was rendered, false = none, null = decided on the client.
-  let done = null
   for (const op of ops) {
     if (op[0] in PATH_AT && clientOnly(scope, op[PATH_AT[op[0]]])) {
-      if (op[0] !== 'text' && op[0] !== 'attr' && op[0] !== 'show') done = null
+      if (op[0] !== 'text' && op[0] !== 'attr' && op[0] !== 'show') chain.done = null
       continue
     }
     switch (op[0]) {
@@ -95,16 +105,16 @@ export function render(ops, scope) {
       case 'if':
       case 'elif': {
         const [kind, tid, path, neg, body] = op
-        if (kind === 'elif' && done !== false) break
-        done = test(scope, path, neg)
-        if (done && body.length) out += instance(render(body, scope), tid)
+        if (kind === 'elif' && chain.done !== false) break
+        chain.done = test(scope, path, neg)
+        if (chain.done && body.length) out += instance(run(body, scope, ctx, { done: null }), tid)
         break
       }
       case 'else':
       case 'empty': {
         const [, tid, body] = op
-        if (done === false && body.length) out += instance(render(body, scope), tid)
-        done = null
+        if (chain.done === false && body.length) out += instance(run(body, scope, ctx, { done: null }), tid)
+        chain.done = null
         break
       }
       case 'for': {
@@ -117,16 +127,108 @@ export function render(ops, scope) {
           const key = String(resolve(inner, keyPath))
           if (seen.has(key)) throw new Error(`duplicate key in ${path}: ${key}`)
           seen.add(key)
-          out += instance(render(body, inner), tid, key)
+          out += instance(run(body, inner, ctx, { done: null }), tid, key)
         }
-        done = list.length > 0
+        chain.done = list.length > 0
         break
       }
+      case 'comp':
+        out += component(op, scope, ctx)
+        chain.done = null
+        break
+      case 'slot':
+        out += run(op[2], ctx.outer.at(-op[1]) ?? scope, ctx, chain)
+        break
       default:
         throw new Error(`unknown op: ${op[0]}`)
     }
   }
   return out
+}
+
+// Root of a component with a script: rendered with its instance (`state`) when the server can run
+// it; otherwise, or if rendering with it throws, its `state` bindings are left to the client.
+function component([, id, props, body], scope, ctx) {
+  const { state: _, ...outside } = scope
+  const values = {}
+  let known = true
+  for (const [name, kind, value] of props) {
+    if (kind === 'text') values[name] = value
+    else if (clientOnly(scope, value)) known = false
+    else values[name] = resolve(scope, value)
+  }
+  ctx.outer.push(scope)
+  try {
+    const state = known ? ctx.instance(id, values) : null
+    if (state) {
+      try {
+        return run(body, { ...outside, state }, ctx, { done: null })
+      } catch {}
+    }
+    return run(body, outside, ctx, { done: null })
+  } finally {
+    ctx.outer.pop()
+  }
+}
+
+const browserOnly = (name) => () => {
+  throw new Error(`${name} runs only in the browser`)
+}
+
+const readonlyCache = new WeakMap()
+function readonly(value) {
+  if (value === null || typeof value !== 'object') return value
+  let view = readonlyCache.get(value)
+  if (!view) {
+    const deny = () => {
+      throw new TypeError('data, params, query and page are read-only while the server renders')
+    }
+    view = new Proxy(value, { get: (t, k) => readonly(Reflect.get(t, k)), set: deny, deleteProperty: deny, defineProperty: deny })
+    readonlyCache.set(value, view)
+  }
+  return view
+}
+
+// What a script's `import { … } from 'pragma'` gives while the server renders: read-only data;
+// stores and browser actions throw, which leaves that page or component to the client.
+export function serverServices({ data, params, query, page }, log) {
+  return {
+    data: readonly(data), params: readonly(params), query: readonly(query), page: readonly(page), log,
+    shared: new Proxy({}, { get: browserOnly('shared') }),
+    call: browserOnly('call'), navigate: browserOnly('navigate'), open: browserOnly('open'), close: browserOnly('close'), confirm: browserOnly('confirm'),
+  }
+}
+
+// Runs a compiled page or component script once (no mount, no events): its top-level `let`s,
+// props and functions. Null when it has no script or throws (e.g. reads window or a store).
+export function instantiate(mod, props, services) {
+  if (typeof mod?.default !== 'function') return null
+  const target = {}
+  const prop = (name, d) => {
+    const k = name.toLowerCase()
+    Object.defineProperty(target, name, { enumerable: true, get: () => coerce(Object.hasOwn(props, k) ? props[k] : undefined, d) })
+  }
+  try {
+    const api = mod.default(target, { __proto__: services, prop }) ?? {}
+    for (const k in api) if (k !== 'mount') target[k] = api[k]
+    return target
+  } catch {
+    return null
+  }
+}
+
+// SSR of a page: its script and its components' scripts run on the server when the build bundled
+// them (`page`, `components` by data-c id); anything they cannot render stays to the client.
+export function renderPage(ops, scope, { page, components = {}, log } = {}) {
+  const services = serverServices(scope, log)
+  const ctx = { instance: (id, props) => instantiate(components[id], props, services) }
+  const state = instantiate(page, {}, services)
+  if (state) {
+    try {
+      return render(ops, { ...scope, state }, ctx)
+    } catch {}
+  }
+  return render(ops, scope, ctx)
 }
 
 function instance(html, tid, key) {
@@ -152,10 +254,47 @@ function lookup(scope, value) {
   }
 }
 
+const JSON_LD = /(<script\b[^>]*\btype="application\/ld\+json"[^>]*>)([^]*?)(<\/script>)/gi
+
+// A value inside a JSON string: JSON-escaped, and `<` too, so it can never close the <script>.
+function jsonValue(scope, path) {
+  try {
+    const v = resolve(scope, path)
+    return v == null ? '' : JSON.stringify(String(v)).slice(1, -1).replace(/</g, '\\u003c')
+  } catch {
+    return ''
+  }
+}
+
+// JSON-LD: `{path}` inside its strings becomes the value; JSON syntax outside strings is kept.
+export function fillJsonLd(body, scope) {
+  let out = ''
+  let inString = false
+  for (let i = 0; i < body.length; i++) {
+    const c = body[i]
+    if (inString && c === '\\') {
+      out += c + (body[++i] ?? '')
+      continue
+    }
+    if (c === '"') inString = !inString
+    else if (inString && c === '{') {
+      const close = body.indexOf('}', i)
+      const quote = body.indexOf('"', i)
+      if (close > 0 && (quote < 0 || close < quote)) {
+        out += jsonValue(scope, body.slice(i + 1, close).trim())
+        i = close
+        continue
+      }
+    }
+    out += c
+  }
+  return out
+}
+
 export function renderHead(html, scope) {
   const end = html.indexOf('</head>')
   if (end < 0) return html
-  const head = html.slice(0, end).replace(HEAD_TAG, (tag, name, raw, text, nl) => {
+  const head = html.slice(0, end).replace(JSON_LD, (tag, open, body, close) => open + fillJsonLd(body, scope) + close).replace(HEAD_TAG, (tag, name, raw, text, nl) => {
     const attrs = new Map()
     const bound = []
     for (const [, k, v] of raw.matchAll(ATTR)) {

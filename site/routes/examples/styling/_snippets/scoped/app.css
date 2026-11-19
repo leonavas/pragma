@@ -1,0 +1,17 @@
+@layer components {
+  [data-c="density-97d4f0"] {
+    --row-pad: 0.625rem;
+    display: grid;
+    gap: 0.875rem;
+    width: 100%;
+    max-width: 20rem;
+  }
+  [data-c="density-97d4f0"]:has([value="compact"]:checked) { --row-pad: 0.25rem; }
+  .density-option + .density-option:where([data-c="density-97d4f0"],[data-c="density-97d4f0"] *) { border-left: 1px solid var(--color-line-strong); }
+  .density-option:hover:where([data-c="density-97d4f0"],[data-c="density-97d4f0"] *) { color: var(--color-ink); }
+  .density-option:has(:checked):where([data-c="density-97d4f0"],[data-c="density-97d4f0"] *) { background: var(--color-accent); color: var(--color-accent-ink); }
+  .density-rows li:where([data-c="density-97d4f0"],[data-c="density-97d4f0"] *) {
+    padding-block: var(--row-pad);
+    border-bottom: 1px solid var(--color-line);
+  }
+}

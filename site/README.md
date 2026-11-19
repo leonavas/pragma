@@ -33,13 +33,15 @@ routes/
       index.html               skeleton with a TODO list
 lib/
   theme.css                    tokens (incl. --code-* colors, --skeleton-bg), fonts, global classes
-  components/
+  components/                  every component is one .html (<script>, markup, <style>)
     doc/                       <c-doc heading lede>: page shell with sidebar + h1 + lede
     section-nav/               <c-section-nav>: the single list of sections (class="compact" in sidebars)
-    showcase/                  <c-showcase :source caption>: server-rendered source tabs + live result
+    showcase/                  <c-showcase :source caption>: server-rendered source tabs, copy, highlight ranges,
+                               update counter and the live result, in one scripted component
     frame/                     <c-frame src title height>: a demo route in an iframe with a live address bar
     demo-page/                 <c-demo-page>: root of a demo route; hides the site header and footer
-    terminal/                  <c-terminal title>: static terminal window for real CLI output (see below)
+    terminal/                  <c-terminal title copy>: static terminal window for real CLI output (see below)
+    modal/ alert/ dropdown/    the starter overlays, restyled
 utils/
   highlight.js                 highlight.js wrapper: markLines() on the server, highlightLines() for token spans
   code-lines.js                codeKinds (shared with the client) and plainLines()
@@ -98,8 +100,11 @@ One folder per section under `routes/examples/<section>/`, rendered at `/example
 
 ## How to add an example
 
-1. Create the example as a real component in `routes/examples/<section>/_components/<name>/`
-   (`<name>.html`, optional `.js` and `.css` scoped with `[data-c="<name>"]`).
+1. Create the example as a real component in `routes/examples/<section>/_components/<name>/<name>.html`:
+   one file with its `<script>` (state, props, functions, `mount(el)`), the markup and its `<style>`
+   (scoped automatically; `:global(…)` opts out). That single file is the showcase's first tab, colored
+   as HTML, JS and CSS. Use separate `.js`/`.css` files only when they are clearly better (a page
+   script shown on its own, a large store in `lib/state/`).
 2. If the reader needs to see how it is used, add `_snippets/<name>/usage.html` with the call site.
 3. List the files in the section's `index.server.js` (paths relative to the section folder; the
    tab label is the file name, in this order; tabs are keyed by path, so two files may share a name):
@@ -111,7 +116,7 @@ One folder per section under `routes/examples/<section>/`, rendered at `/example
 
    export async function load() {
      const examples = await readExamples('routes/examples/<section>', {
-       counter: ['_snippets/counter/usage.html', '_components/counter/counter.html', '_components/counter/counter.js'],
+       counter: ['_components/counter/counter.html', '_snippets/counter/usage.html'],
      })
      return { examples }
    }
@@ -145,8 +150,7 @@ list its files in `readExamples`, and put a frame alone in the showcase slot:
 
 - One agent per section folder: `routes/examples/<section>/` is yours, including `_components/`
   and `_snippets/`. Name components after what they are (`counter`, `product-card`); the tag is
-  private to your folder, but CSS is not: `[data-c="name"]` is global, so a name already used in
-  another folder or in `lib/components/` shares its styles (BUGS.md BUG-S-11). Pick a unique name.
+  private to your folder, and so are its styles (`p-` components are scoped by folder).
 - Shared, coordinate before editing: `lib/theme.css`, `lib/components/*` (doc, showcase,
   section-nav, terminal), `routes/_layout.html`, `routes/examples/_source.server.js`, `utils/`,
   `pragma.json`, `package.json`, `public/` (robots, sitemap).
@@ -173,15 +177,22 @@ filesystem): deploying there needs the sources inlined at build time.
 ## Syntax highlighting and the tree-shaking test
 
 Library: **highlight.js 11**, imported with fine-grained subpaths in `utils/highlight.js`:
-`highlight.js/lib/core` plus `lib/languages/xml`, `javascript` and `css`. Directives (`:text`,
-`@click`, `.done`), block tags (`<if>`, `<for>`) and `<c-*>`/`<p-*>` components get their own colors.
+`highlight.js/lib/core` plus `lib/languages/xml`, `javascript` and `css`. A single-file component
+is one tab: the xml grammar hands its `<script>` to the JavaScript grammar and its `<style>` to CSS.
+Directives (`:attr`, `@click`, `.done`), `{path}` in text and attribute strings, block tags (`<if>`,
+`<for>`) and `<c-*>`/`<p-*>` components get their own colors.
 
 Showcase code is tokenized **on the server**: `_source.server.js` calls `markLines()` in `load`,
 which returns each line's text, its indent and its marks (`[start, end, kind]` offsets, kinds in
-`codeKinds`). The page is `ssr = true`, so every line is a `<span>` with plain text in the first
-HTML. In `mount`, `showcase.js` turns the marks into `StaticRange`s and registers them in the CSS
-Custom Highlight API (`CSS.highlights`, styled with `::highlight(code-*)` in `showcase.css`): the
-colors cost no DOM node and cause no layout shift. Browsers without the API show plain code.
+`codeKinds`). The page is `ssr = true`, and with `ssr` the server runs component scripts too, so
+the showcase's tabs, paths and every code line (a `<span>` with plain text) are in the first HTML.
+Its state never touches the page's data (props are read-only, also inside): `activeId`,
+`copiedId` and `expanded` are `let`s, and `rows()` derives one row per file (`row.active`,
+`row.copied`) for the template. `mount(el)` turns the marks into `StaticRange`s in the CSS Custom
+Highlight API (`CSS.highlights`, styled with `::highlight(code-*)` in its `<style>`; the `{path}`
+highlight has priority 1 so it paints over attribute strings) and watches the live result for the
+update counter: the colors cost no DOM node and cause no layout shift. Browsers without the API
+show plain code.
 Below 64rem long lines soft-wrap with a hanging indent (`:data-indent` + CSS); from 64rem they do
 not wrap (the browser would split `aria-label` at the hyphen) and the pane scrolls sideways. From
 80rem the code pane fills the row next to the live result (min 20rem). On phones, files longer

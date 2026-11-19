@@ -27,11 +27,11 @@
 
 <style>
   [data-c="env-vars"] { display: grid; border-top: 1px solid var(--color-line); }
-  [data-c="env-vars"] .env-vars-row { display: grid; gap: 0.375rem; padding: 1rem 0; border-bottom: 1px solid var(--color-line); }
-  [data-c="env-vars"] dt code { color: var(--color-accent); font-size: 0.75rem; overflow-wrap: anywhere; }
-  [data-c="env-vars"] dd { max-width: var(--measure); color: var(--color-muted); font-size: 0.9375rem; line-height: 1.6; }
-  [data-c="env-vars"] dd code { padding: 0.1em 0.35em; background: var(--color-raised); color: var(--color-ink); font-size: 0.8em; }
+  .env-vars-row { display: grid; gap: 0.375rem; padding: 1rem 0; border-bottom: 1px solid var(--color-line); }
+  dt code { color: var(--color-accent); font-size: 0.75rem; overflow-wrap: anywhere; }
+  dd { max-width: var(--measure); color: var(--color-muted); font-size: 0.9375rem; line-height: 1.6; }
+  dd code { padding: 0.1em 0.35em; background: var(--color-raised); color: var(--color-ink); font-size: 0.8em; }
   @media (min-width: 48rem) {
-    [data-c="env-vars"] .env-vars-row { grid-template-columns: 17rem 1fr; gap: 1.5rem; }
+    .env-vars-row { grid-template-columns: 17rem 1fr; gap: 1.5rem; }
   }
 </style>

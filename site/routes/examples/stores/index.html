@@ -18,7 +18,7 @@
       </div>
     </c-showcase>
     <div class="prose">
-      <p><code>lib/state/cart.js</code> has no imports and no exports: <code>let lines</code> is the state, <code>count</code> and <code>totalLabel</code> are derived, <code>add</code> and <code>remove</code> change it. HTML reads it as <code>{shared.cart.count}</code> and <code>&lt;for line in shared.cart.lines&gt;</code>; a script imports <code>shared</code> from <code>'pragma'</code> and calls <code>shared.cart.add(product)</code>. Importing the store file itself fails check with <code>js/store-import</code>.</p>
+      <p><code>lib/state/cart.js</code> has no imports and no exports: <code>let lines</code> is the state, <code>count</code> and <code>totalLabel</code> are derived, <code>add</code> and <code>remove</code> change it. HTML reads it as <code>{shared.cart.count}</code> and <code>&lt;for line in shared.cart.lines&gt;</code>, and calls its functions straight from an event: <code>@click="shared.cart.add(product)"</code>, with no wrapper in the component, so <code>p-basket</code> has no script at all. A script imports <code>shared</code> from <code>'pragma'</code> and calls <code>shared.cart.add(product)</code>. Importing the store file itself fails check with <code>js/store-import</code>.</p>
       <p>Without <code>persist</code> a store lives in memory: it survives client navigation between pages (try another section and come back) but not a reload. Any page or component can read it, including <code>_layout.html</code>, which has no script of its own.</p>
     </div>
   </section>

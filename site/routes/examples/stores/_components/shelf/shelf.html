@@ -1,15 +1,9 @@
 <script>
-  import { shared } from 'pragma'
-
   const products = [
     { id: 'mug', name: 'Mug', price: 14 },
     { id: 'tee', name: 'T-shirt', price: 28 },
     { id: 'cap', name: 'Cap', price: 22 },
   ]
-
-  function add(product) {
-    shared.cart.add(product)
-  }
 </script>
 
 <section aria-label="Shelf">
@@ -23,7 +17,7 @@
         <span class="text-sm">{product.name}</span>
         <span class="flex items-center gap-3">
           <span class="font-mono text-xs text-faint tabular-nums">&#36;{product.price}</span>
-          <button type="button" class="btn btn-small" aria-label="Add {product.name}" @click="add(product)">Add</button>
+          <button type="button" class="btn btn-small" aria-label="Add {product.name}" @click="shared.cart.add(product)">Add</button>
         </span>
       </li>
     </for>
@@ -32,7 +26,7 @@
 
 <style>
   [data-c="shelf"] { width: 100%; border: 1px solid var(--color-line); background: var(--color-surface); }
-  [data-c="shelf"] .store-panel-head {
+  .store-panel-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -41,7 +35,7 @@
     padding: 0 0.75rem;
     border-bottom: 1px solid var(--color-line);
   }
-  [data-c="shelf"] .store-row {
+  .store-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -49,5 +43,5 @@
     min-height: 3rem;
     padding: 0.375rem 0.75rem;
   }
-  [data-c="shelf"] .store-row + .store-row { border-top: 1px solid var(--color-line); }
+  .store-row + .store-row { border-top: 1px solid var(--color-line); }
 </style>

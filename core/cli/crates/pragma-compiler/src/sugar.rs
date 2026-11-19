@@ -122,11 +122,21 @@ fn block_tag(e: &mut Element, errors: &mut Vec<SugarError>) -> bool {
     let tag = e.name.to_ascii_lowercase();
     let attrs: Vec<Attr> = std::mem::take(&mut e.attrs);
     let bare = |a: &Attr| a.value.is_none();
+    let operators = "no operators or quotes in a block tag: write a function in the script (`const hasTasks = () => tasks.length > 0`) and use";
     let internal = match tag.as_str() {
         "if" | "else-if" => match attrs.as_slice() {
-            [cond] if bare(cond) => vec![internal(cond, &format!("data-{tag}"), Some(expand_dollar(&cond.name, cond.pos, errors)))],
+            [cond] if bare(cond) => {
+                // `<if $a.length > 0>`: the tag ended at the operator's `>`; the rest became text
+                if let Some(Node::Text(t, pos)) = e.children.first_mut()
+                    && let Some(end) = t.find('>').filter(|&i| !t[..i].contains('<') && !t[..i].trim().is_empty())
+                {
+                    errors.push((*pos, "html/invalid-path", format!("`<{tag} {} >{}`: {operators} <{tag} $hasTasks>", cond.name, &t[..end])));
+                    *t = t[end + 1..].to_string();
+                }
+                vec![internal(cond, &format!("data-{tag}"), Some(expand_dollar(&cond.name, cond.pos, errors)))]
+            }
             _ => {
-                errors.push((e.pos, "html/block", format!("use <{tag} path>, with the path unquoted (e.g. <{tag} page.loading>, <{tag} !$open>)")));
+                errors.push((e.pos, "html/block", format!("use <{tag} path>: one unquoted path (e.g. <{tag} page.loading>, <{tag} !$open>); {operators} <{tag} $hasTasks>")));
                 vec![Attr { name: format!("data-{tag}"), value: Some(String::new()), pos: e.pos }]
             }
         },
@@ -142,6 +152,11 @@ fn block_tag(e: &mut Element, errors: &mut Vec<SugarError>) -> bool {
             {
                 let path = expand_dollar(&path.name, path.pos, errors);
                 vec![internal(var, "data-for", Some(format!("{} in {path}", var.name))), internal(key, "data-key", key.value.clone())]
+            }
+            // no key: one error (`html/for-without-key`, from check), and the body still knows the variable
+            [var, kw, path] if bare(var) && bare(kw) && bare(path) && kw.name == "in" => {
+                let path = expand_dollar(&path.name, path.pos, errors);
+                vec![internal(var, "data-for", Some(format!("{} in {path}", var.name)))]
             }
             _ => {
                 errors.push((e.pos, "html/block", "use <for x in path key=x.field>".into()));
@@ -181,6 +196,12 @@ fn attrs(element: &mut Element, errors: &mut Vec<SugarError>) {
             continue;
         }
         let internal = if let Some(name) = lname.strip_prefix(':') {
+            if let Some(v) = attr.value.as_deref().filter(|v| v.contains('{')) {
+                let bare = v.trim().trim_start_matches('{').trim_end_matches('}');
+                let msg = format!("`:{name}` takes a bare path: `:{name}=\"{bare}\"`; to build text write `{name}=\"… {{{bare}}}\"` (no colon)");
+                errors.push((attr.pos, "html/invalid-path", msg));
+                continue;
+            }
             if OLD_BLOCK.contains(&name) {
                 let hint = if template || name != "key" { block_hint(name) } else { "<for x in path key=x.field>" };
                 errors.push((attr.pos, "html/legacy-syntax", format!("legacy syntax `{}`: use `{hint}`", attr.name)));
@@ -232,7 +253,7 @@ fn attr_template(attr: &mut Attr, lname: &str, component: bool, errors: &mut Vec
 /// `toggle($item, 'x')` → `toggle($.item, 'x')`; invalid calls are kept for `check`.
 fn expand_call(value: &str, pos: Pos, errors: &mut Vec<SugarError>) -> String {
     match directive::parse_call(value) {
-        Ok((name, args)) => directive::join_call(name, &args, |p| expand_dollar(p, pos, errors)),
+        Ok(call) => directive::join_call(&call, |p| expand_dollar(p, pos, errors)),
         Err(_) => value.to_string(),
     }
 }

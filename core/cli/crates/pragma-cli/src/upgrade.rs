@@ -76,6 +76,19 @@ pub fn outdated(root: &Path) -> Option<Diagnostic> {
     Some(Diagnostic::warning("core", 1, 1, "app/core-outdated", message))
 }
 
+/// Before `pragma build`: an outdated `core/` stops the build (the compiler may emit ops the old
+/// runtime cannot render), unless `allow`. Ok: the warning to print, if any.
+pub fn build_gate(root: &Path, allow: bool) -> Result<Option<Diagnostic>, (Diagnostic, String)> {
+    match outdated(root) {
+        None => Ok(None),
+        Some(warning) if allow => Ok(Some(warning)),
+        Some(mut error) => {
+            error.severity = pragma_diag::Severity::Error;
+            Err((error, "core/ is older than this pragma: run `pragma upgrade` first (or `pragma build --allow-outdated-core` to build with it anyway)".into()))
+        }
+    }
+}
+
 fn collect(dir: &Path, rel: &str, files: &mut Vec<String>) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
     for entry in entries.flatten() {

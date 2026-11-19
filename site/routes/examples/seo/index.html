@@ -49,6 +49,29 @@
     </c-showcase>
   </section>
 
+  <section class="doc-section" aria-labelledby="json-ld">
+    <h2 id="json-ld">Structured data with JSON-LD</h2>
+    <div class="prose">
+      <p>Write one <code>&lt;script type="application/ld+json"&gt;</code> per schema at the top level of the page. The build moves it into <code>&lt;head&gt;</code> and rejects invalid JSON with the line and column. Inside its strings, <code>{data.article.title}</code> works as it does in a <code>&lt;meta&gt;</code>: with <code>ssr = true</code> the server writes each value JSON-escaped, so a quote in a title cannot break the script. JSON-LD without <code>{}</code> is static and needs no <code>ssr</code>.</p>
+      <p>The field notes article in the showcase above declares an <code>Article</code> from the same <code>data</code> as its title and Open Graph tags. This is what the server sends:</p>
+    </div>
+    <c-terminal title="~">
+      <pre tabindex="0" aria-label="JSON-LD served by the article route"><code><span class="term-cmd">curl -s http://127.0.0.1:5181/examples/seo/demo/head-tags-from-data | grep -A11 ld+json</span>
+&lt;script type="application/ld+json"&gt;
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Head tags rendered from server data",
+  "description": "With ssr = true, bound title, meta and link tags are filled on the server, so previews show the real entity.",
+  "image": "https://pragma.dev/og.png",
+  "datePublished": "2026-11-16",
+  "mainEntityOfPage": "https://pragma.dev/examples/seo/demo/head-tags-from-data",
+  "publisher": { "@type": "Organization", "name": "pragma" }
+}
+&lt;/script&gt;</code></pre>
+    </c-terminal>
+  </section>
+
   <section class="doc-section" aria-labelledby="check-head">
     <h2 id="check-head">What <code>pragma check</code> rejects</h2>
     <div class="prose">
@@ -98,14 +121,27 @@
       </li>
       <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
         <div class="flex min-w-0 flex-col gap-2">
-          <p class="font-mono text-xs text-faint">routes/post.html</p>
-          <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;script type="application/ld+json"&gt;...&lt;/script&gt;</code></pre>
+          <p class="font-mono text-xs text-faint">routes/notes.html</p>
+          <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;script type="application/ld+json"&gt;{ "@type": "Article", "headline": "Notes", }&lt;/script&gt;</code></pre>
         </div>
-        <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/script] &lt;script&gt; takes no attributes: it is always an ES module</p>
+        <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/json-ld] invalid JSON-LD: trailing comma</p>
+      </li>
+      <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
+        <div class="flex min-w-0 flex-col gap-2">
+          <p class="font-mono text-xs text-faint">routes/post.html, with no ssr in post.server.js</p>
+          <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;script type="application/ld+json"&gt;{ "@type": "Article", "headline": "{data.title}" }&lt;/script&gt;</code></pre>
+        </div>
+        <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/head] JSON-LD with &#123;path&#125; is rendered by the server so crawlers see it: add export const ssr = true to routes/post.server.js</p>
+      </li>
+      <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
+        <div class="flex min-w-0 flex-col gap-2">
+          <p class="font-mono text-xs text-faint">lib/components/share/share.html</p>
+          <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;div&gt;
+  &lt;script type="application/ld+json"&gt;{ "@type": "Organization", "name": "Shop" }&lt;/script&gt;
+&lt;/div&gt;</code></pre>
+        </div>
+        <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/script] JSON-LD &lt;script type="application/ld+json"&gt; goes at the top level of a page</p>
       </li>
     </ul>
-    <div class="prose">
-      <p>The last one means JSON-LD structured data cannot be written in v0: a page's one <code>&lt;script&gt;</code> is always its ES module, and the layout has none.</p>
-    </div>
   </section>
 </c-doc>

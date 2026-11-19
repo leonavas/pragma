@@ -1,15 +1,101 @@
+<script>
+  const maxEntries = 5
+
+  let draft = ''
+  let counter = 0
+  let entries = []
+
+  function record(name, detail) {
+    counter += 1
+    entries = [{ id: counter, name, detail }, ...entries].slice(0, maxEntries)
+  }
+
+  function typed() {
+    record('@input', draft.length + ' chars')
+  }
+
+  function pressed(event) {
+    if (event.key !== 'Escape') return
+    draft = ''
+    record('@keydown', 'Escape cleared the field')
+  }
+
+  function doubled(el, event) {
+    record('@dblclick', 'el <' + el.localName + '>, target <' + event.target.localName + '>')
+  }
+
+  function save() {
+    record('@submit', 'saved "' + draft + '", no reload')
+    draft = ''
+  }
+</script>
+
 <div>
   <form class="events-form" @submit="save">
-    <input class="events-input" aria-label="Task title" placeholder="Type, press Esc or Enter" :model="$draft" @input="typed" @keydown="pressed" @focusout="left">
+    <input class="events-input" aria-label="Task title" placeholder="Type, press Esc or Enter" :model="$draft" @input="typed" @keydown="pressed" @focusout="record('@focusout', 'field lost focus')">
     <button class="btn btn-small">Save</button>
   </form>
-  <p class="events-target" @dblclick="doubled">Double-click this line</p>
+  <p class="events-target" @dblclick="doubled(el, event)">Double-click this line or <strong>this word</strong></p>
   <ol class="events-log" aria-label="Event log" aria-live="polite">
     <for entry in $entries key=entry.id>
-      <li class="events-entry"><span class="events-name" :text="entry.name"></span><span :text="entry.detail"></span></li>
+      <li class="events-entry"><span class="events-name">{entry.name}</span><span>{entry.detail}</span></li>
     </for>
     <empty>
       <li class="events-entry events-idle">No events yet</li>
     </empty>
   </ol>
 </div>
+
+<style>
+  [data-c="events"] {
+    display: grid;
+    gap: 1rem;
+    width: 100%;
+    max-width: 20rem;
+  }
+  .events-form {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .events-input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-sunken);
+    color: var(--color-ink);
+    font-size: 0.875rem;
+  }
+  .events-input::placeholder { color: var(--color-faint); }
+  .events-target {
+    padding: 0.625rem 0.75rem;
+    border: 1px dashed var(--color-line-strong);
+    color: var(--color-muted);
+    font-size: 0.875rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .events-target strong { color: var(--color-ink); font-weight: 500; }
+  .events-log {
+    display: grid;
+    align-content: start;
+    gap: 0.25rem;
+    min-height: 8.5rem;
+    padding: 0.75rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-sunken);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  .events-entry {
+    display: flex;
+    gap: 0.75rem;
+    color: var(--color-muted);
+  }
+  .events-name {
+    flex: none;
+    width: 5.5rem;
+    color: var(--color-accent);
+  }
+  .events-idle { color: var(--color-faint); }
+</style>

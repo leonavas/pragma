@@ -7,7 +7,62 @@
   </div>
   <ul class="density-rows">
     <li>routes/index.html</li>
-    <li>routes/index.js</li>
+    <li>lib/components/card/card.html</li>
     <li>lib/theme.css</li>
   </ul>
 </fieldset>
+
+<style>
+  [data-c="density"] {
+    --row-pad: 0.625rem;
+    display: grid;
+    gap: 0.875rem;
+    width: 100%;
+    max-width: 20rem;
+  }
+  [data-c="density"]:has([value="compact"]:checked) { --row-pad: 0.25rem; }
+  [data-c="density"]:has([value="roomy"]:checked) { --row-pad: 1rem; }
+  .density-legend {
+    margin-bottom: 0.5rem;
+    color: var(--color-faint);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .density-options {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border: 1px solid var(--color-line-strong);
+  }
+  .density-option {
+    padding: 0.5rem;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.15s var(--ease-out), color 0.15s var(--ease-out);
+  }
+  .density-option + .density-option { border-left: 1px solid var(--color-line-strong); }
+  .density-option:hover { color: var(--color-ink); }
+  .density-option:has(:checked) { background: var(--color-accent); color: var(--color-accent-ink); }
+  .density-option:has(:focus-visible) { outline: 1px solid var(--color-accent); outline-offset: 2px; }
+  .density-option input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .density-rows li {
+    padding-block: var(--row-pad);
+    border-bottom: 1px solid var(--color-line);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    transition: padding 0.2s var(--ease-out);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .density-option,
+    .density-rows li { transition: none; }
+  }
+</style>

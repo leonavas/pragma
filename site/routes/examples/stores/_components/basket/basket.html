@@ -1,25 +1,13 @@
-<script>
-  import { shared } from 'pragma'
-
-  function remove(line) {
-    shared.cart.remove(line)
-  }
-
-  function clear() {
-    shared.cart.clear()
-  }
-</script>
-
 <section aria-label="Cart">
   <header class="store-panel-head">
     <span class="font-mono text-xs text-faint">p-basket</span>
-    <button type="button" class="font-mono text-xs text-muted underline hover:text-accent" @click="clear" :disabled="shared.cart.empty">Clear</button>
+    <button type="button" class="font-mono text-xs text-muted underline hover:text-accent" @click="shared.cart.clear()" :disabled="shared.cart.empty">Clear</button>
   </header>
   <ul class="grid">
     <for line in shared.cart.lines key=line.id>
       <li class="store-row">
         <span class="text-sm">{line.name} <span class="font-mono text-xs text-faint">× {line.quantity}</span></span>
-        <button type="button" class="font-mono text-xs text-muted hover:text-accent" aria-label="Remove {line.name}" @click="remove(line)">Remove</button>
+        <button type="button" class="font-mono text-xs text-muted hover:text-accent" aria-label="Remove {line.name}" @click="shared.cart.remove(line)">Remove</button>
       </li>
     </for>
     <empty>
@@ -31,7 +19,7 @@
 
 <style>
   [data-c="basket"] { width: 100%; border: 1px solid var(--color-line); background: var(--color-surface); }
-  [data-c="basket"] .store-panel-head {
+  .store-panel-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -40,7 +28,7 @@
     padding: 0 0.75rem;
     border-bottom: 1px solid var(--color-line);
   }
-  [data-c="basket"] .store-row {
+  .store-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -48,6 +36,6 @@
     min-height: 3rem;
     padding: 0.375rem 0.75rem;
   }
-  [data-c="basket"] .store-row + .store-row { border-top: 1px solid var(--color-line); }
-  [data-c="basket"] button:disabled { opacity: 0.4; cursor: default; }
+  .store-row + .store-row { border-top: 1px solid var(--color-line); }
+  button:disabled { opacity: 0.4; cursor: default; }
 </style>

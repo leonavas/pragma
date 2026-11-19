@@ -120,8 +120,9 @@ export async function navigate(to, pop) {
 
   const swap = () => {
     leave()
-    const main = document.querySelector('main[data-page]')
-    main.replaceChildren(...doc.querySelector('main[data-page]').childNodes)
+    const main = document.querySelector('main[data-page]'), next = doc.querySelector('main[data-page]')
+    main.replaceChildren(...next.childNodes)
+    main.dataset.page = next.dataset.page
     syncHead(doc)
     const done = enter(route, mods, url, match(route.pattern, url.pathname) ?? {}, doc, pending)
     const y = pop ? positions.get(key) ?? 0 : 0

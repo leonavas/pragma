@@ -1,18 +1,6 @@
 <script>
   import { shared, confirm } from 'pragma'
 
-  function decrement(item) {
-    shared.cart.change(item.id, -1)
-  }
-
-  function increment(item) {
-    shared.cart.change(item.id, 1)
-  }
-
-  function remove(item) {
-    shared.cart.remove(item.id)
-  }
-
   async function clear() {
     if (await confirm('empty-cart') === 'ok') shared.cart.clear()
   }
@@ -28,10 +16,10 @@
           <span class="font-medium tabular-nums">{item.subtotal}</span>
         </div>
         <div class="flex items-center gap-1">
-          <button type="button" class="btn btn-icon" @click="decrement(item)"><span aria-hidden="true">−</span><span class="sr-only">Decrease</span></button>
+          <button type="button" class="btn btn-icon" @click="shared.cart.change(item.id, -1)"><span aria-hidden="true">−</span><span class="sr-only">Decrease</span></button>
           <output class="w-8 text-center tabular-nums">{item.quantity}</output>
-          <button type="button" class="btn btn-icon" @click="increment(item)" :disabled="item.full"><span aria-hidden="true">+</span><span class="sr-only">Increase</span></button>
-          <button type="button" class="ml-auto text-sm text-danger-600 hover:underline" @click="remove(item)">Remove</button>
+          <button type="button" class="btn btn-icon" @click="shared.cart.change(item.id, 1)" :disabled="item.full"><span aria-hidden="true">+</span><span class="sr-only">Increase</span></button>
+          <button type="button" class="ml-auto text-sm text-danger-600 hover:underline" @click="shared.cart.remove(item.id)">Remove</button>
         </div>
       </li>
     </for>

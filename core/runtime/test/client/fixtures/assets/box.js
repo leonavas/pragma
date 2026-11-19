@@ -1,6 +1,7 @@
 export default function ($, $pragma) {
   $pragma.prop('initial', 0)
   $pragma.prop('max', '')
+  $pragma.prop('row', null)
 
   $.title = 'from box'
   $.n = $.initial

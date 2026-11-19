@@ -57,6 +57,16 @@ From server data: write `{path}` in `<title>` and `:<attr>` or `{path}` in a `<m
 <meta property="og:type" content="article">
 <meta property="og:title" :content="data.post.title">
 <meta property="og:image" :content="data.post.image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "{data.post.title}",
+  "image": "{data.post.image}",
+  "datePublished": "{data.post.date}",
+  "author": { "@type": "Person", "name": "{data.post.author}" }
+}
+</script>
 <h1>{data.post.title}</h1>
 ```
 `routes/blog/[slug].server.js`:
@@ -69,6 +79,7 @@ export async function load({ params, request }) {
 ```
 
 - A missing value keeps the tag's static text or attribute; a `<meta>` without `content` or a `<link>` without `href` is dropped.
+- Structured data (JSON-LD): one `<script type="application/ld+json">` per schema, at the top level of the page (never in a component); it goes to `<head>`. It must be valid JSON (`html/json-ld`). `{path}` works only inside its strings (`"headline": "{data.post.title}"`), with `data`, `params` or `query` and `ssr`; the server writes each value JSON-escaped. A literal `{` inside a string is `{`. Without `{}` it is static and needs no `ssr`. Any other `<script type>` is an error (`html/script`).
 - Never put `canonical` or `og:url` in the layout: every page would point to the same URL.
 - `<meta>` and `<link>` anywhere else in a page or component are an error (`html/head`).
 - The router updates `<title>`, `<meta>` and `<link>` on every navigation.

@@ -1,3 +1,22 @@
+<script>
+  import { confirm } from 'pragma'
+
+  let deleted = false
+  let answer = ''
+
+  const answerText = () => (answer ? `confirm() resolved '${answer}'` : 'confirm() not called yet')
+
+  async function remove() {
+    answer = await confirm('delete-draft')
+    if (answer === 'ok') deleted = true
+  }
+
+  function restore() {
+    deleted = false
+    answer = ''
+  }
+</script>
+
 <div>
   <div class="draft-file">
     <span class="draft-name" .is-gone="$deleted">draft-notes.md</span>
@@ -8,10 +27,43 @@
       <button type="button" class="btn btn-small btn-danger" @click="remove">Delete</button>
     </else>
   </div>
-  <p class="draft-answer" role="status" :text="$answerText"></p>
+  <p class="draft-answer" role="status">{$answerText}</p>
   <c-alert id="delete-draft" title="Delete draft-notes.md?">
     <p>The file is removed for good. There is no trash to restore it from.</p>
     <button slot="actions" type="button" class="btn" @close value="cancel" autofocus>Keep it</button>
     <button slot="actions" type="button" class="btn btn-danger" @close value="ok">Delete</button>
   </c-alert>
 </div>
+
+<style>
+  [data-c="delete-draft"] {
+    display: grid;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 20rem;
+  }
+  .draft-file {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0.5rem 0.5rem 1rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-surface);
+  }
+  .draft-name {
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+  }
+  .draft-name.is-gone {
+    color: var(--color-faint);
+    text-decoration: line-through;
+  }
+  .draft-answer {
+    min-height: 1lh;
+    color: var(--color-faint);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+</style>

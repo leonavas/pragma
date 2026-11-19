@@ -1,11 +1,11 @@
 <title>Styling · pragma examples</title>
-<meta name="description" content="Styling in pragma, live: a closed subset of Tailwind v4 utilities, theme tokens in lib/theme.css and component CSS scoped by data-c, in one stylesheet.">
+<meta name="description" content="Styling in pragma, live: a closed subset of Tailwind v4 utilities, theme tokens in lib/theme.css and component CSS scoped by the build, in one stylesheet.">
 <link rel="canonical" href="https://pragma.dev/examples/styling">
 <meta property="og:url" content="https://pragma.dev/examples/styling">
 <meta property="og:title" content="pragma styling: utilities, tokens and scoped CSS">
 <meta property="og:description" content="Tailwind-style utilities, theme tokens and scoped component CSS in one small stylesheet.">
 
-<c-doc heading="Styling" lede="A closed subset of Tailwind v4 utilities, theme tokens in lib/theme.css and component CSS scoped by [data-c]. The build ships one hashed, minified stylesheet with only the utilities your pages use.">
+<c-doc heading="Styling" lede="A closed subset of Tailwind v4 utilities, theme tokens in lib/theme.css and component styles scoped by the build. It ships one hashed, minified stylesheet with only the utilities your pages use.">
   <section class="doc-section" aria-labelledby="utilities">
     <h2 id="utilities">Utilities, variants and what check rejects</h2>
     <div class="prose">
@@ -29,12 +29,18 @@
   </section>
 
   <section class="doc-section" aria-labelledby="scoped">
-    <h2 id="scoped">Component CSS, scoped by <code>[data-c]</code></h2>
+    <h2 id="scoped">Component CSS, scoped by the build</h2>
     <div class="prose">
-      <p>A component's <code>.css</code> is for what utilities cannot say: here, <code>:has(:checked)</code> drives the selected segment and a custom property that sets the row padding, with no JavaScript at all. The build marks the root with <code>data-c</code>, wraps the file in <code>@layer components</code> and adds it to the single app stylesheet.</p>
-      <p>Scope every selector with <code>[data-c="name"]</code>. For a <code>p-</code> component the build makes that name unique per folder, so two private components with the same name never share a rule. Forbidden: <code>!important</code>, ID selectors and external <code>@import</code>.</p>
+      <p>A component's <code>&lt;style&gt;</code> is for what utilities cannot say: here, <code>:has(:checked)</code> drives the selected segment and a custom property that sets the row padding, with no JavaScript at all. Write plain selectors: the build scopes each one to the component.</p>
+      <ul>
+        <li>The build marks the root with <code>data-c</code> and adds <code>:where(</code>root<code>, </code>root<code> *)</code> to the last part of every selector, as the <code>app.css</code> tab shows: <code>.density-option:hover</code> or even <code>li</code> never styles anything outside the component, and the scope adds no specificity.</li>
+        <li>Only the last part is scoped, so an outside ancestor needs nothing special: <code>html[data-theme="dark"] .density-option</code> still matches only this component's options.</li>
+        <li>The root is <code>[data-c="density"]</code>, and a selector that names it stays as written. <code>:global(…)</code> turns the scope off for the whole selector, for a rule that must reach outside: <code>:global(:root) &#123; --row-pad: 1rem; &#125;</code>.</li>
+        <li>A page's <code>&lt;style&gt;</code> is scoped to its <code>&lt;main data-page&gt;</code> the same way. All of it goes into <code>@layer components</code> of the single app stylesheet; a separate <code>density.css</code> works the same, and having both is a check error.</li>
+        <li>For a <code>p-</code> component the build makes the scope unique per folder (<code>density-97d4f0</code> in the tab), so two private components with the same name never share a rule. Forbidden: <code>!important</code>, ID selectors and external <code>@import</code>.</li>
+      </ul>
     </div>
-    <c-showcase :source="data.examples.scoped" caption="Native radios: arrow keys move the selection, Tab leaves the group.">
+    <c-showcase :source="data.examples.scoped" caption="Native radios: arrow keys move the selection, Tab leaves the group. The app.css tab is an excerpt of the build output for this component.">
       <p-density></p-density>
     </c-showcase>
   </section>
@@ -42,7 +48,7 @@
   <section class="doc-section" aria-labelledby="dynamic">
     <h2 id="dynamic">Dynamic styles: <code>.name</code> toggles and <code>data-*</code></h2>
     <div class="prose">
-      <p>There is no <code>:class</code> and no <code>style</code>: every class name is written out in the source, so check can validate it and the build can generate it. Toggle a class on a condition with <code>.text-accent="$passed"</code>. When the value itself varies, bind a <code>data-*</code> attribute (<code>:data-status="$status"</code>) and style each value with an attribute selector in the component CSS. Only the bound form is allowed: a hand-written <code>data-status="ok"</code> fails check with <code>html/data-attribute</code>.</p>
+      <p>There is no <code>:class</code> and no <code>style</code>: every class name is written out in the source, so check can validate it and the build can generate it. Toggle a class on a condition with <code>.text-accent="$passed"</code>. When the value itself varies, bind a <code>data-*</code> attribute (<code>:data-status="$status"</code>) and style each value with an attribute selector in the component's <code>&lt;style&gt;</code>. Only the bound form is allowed: a hand-written <code>data-status="ok"</code> fails check with <code>html/data-attribute</code>.</p>
     </div>
     <c-showcase :source="data.examples.dynamic" caption="The text color is two utility toggles; the dot reads data-status from the root.">
       <p-build-status></p-build-status>
@@ -52,7 +58,7 @@
   <section class="doc-section" aria-labelledby="theme">
     <h2 id="theme">Light and dark theme</h2>
     <div class="prose">
-      <p>Dark mode keys off <code>data-theme="dark"</code>: tokens redefined under <code>[data-theme="dark"]</code> switch on their own, and palette colors pair with <code>dark:</code> (<code>bg-white dark:bg-neutral-900</code>), which matches the element or any ancestor. In an app, <code>setTheme()</code> from <code>core/theme.js</code> sets it on <code>&lt;html&gt;</code> and saves it, as the <code>theme-switch</code> tabs show; importing that module also adds an inline script that restores the choice, or follows <code>prefers-color-scheme</code>, before first paint.</p>
+      <p>Dark mode keys off <code>data-theme="dark"</code>: tokens redefined under <code>[data-theme="dark"]</code> switch on their own, and palette colors pair with <code>dark:</code> (<code>bg-white dark:bg-neutral-900</code>), which matches the element or any ancestor. In an app, <code>setTheme()</code> from <code>core/theme.js</code> sets it on <code>&lt;html&gt;</code> and saves it, as the <code>theme-switch.html</code> tab shows; importing that module also adds an inline script that restores the choice, or follows <code>prefers-color-scheme</code>, before first paint.</p>
       <p>This site is dark only, so the live box sets <code>data-theme</code> on its own root to keep the switch inside the box. Without the <code>core/theme.js</code> import, dark mode never activates: there is no media-query fallback. The import may also be written in the absolute form <code>'/core/theme.js'</code>.</p>
     </div>
     <c-showcase :source="data.examples.theme" caption="--page-bg and --page-fg come from core/base.css; the card uses only palette utilities with dark: variants.">

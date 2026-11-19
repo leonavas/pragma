@@ -8,11 +8,12 @@
 
   let reading = [{ id: 'hint', field: 'arguments', value: 'click a button or type a key' }]
 
-  function inspect(target, event) {
+  function inspect(target, event, el) {
     reading = [
       { id: 'target', field: 'target.name', value: target.name },
       { id: 'type', field: 'event.type', value: event.type },
-      { id: 'detail', field: 'event.detail', value: String(event.detail) },
+      { id: 'clicked', field: 'event.target', value: '<' + event.target.localName + '>' },
+      { id: 'el', field: 'el', value: '<' + el.localName + '>' },
     ]
   }
 
@@ -28,9 +29,9 @@
 <div class="grid w-full max-w-sm gap-4">
   <div class="flex flex-wrap gap-2">
     <for target in $targets key=target.id>
-      <button type="button" class="btn btn-small" @click="inspect(target, event)">{target.name}</button>
+      <button type="button" class="btn btn-small" @click="inspect(target, event, el)">run <strong>{target.name}</strong></button>
     </for>
-    <input class="probe-input" aria-label="Type a key" placeholder="type a key" @keydown="inspectKey(event)">
+    <input class="probe-input" aria-label="Type a key" placeholder="type a key" @keydown="inspectKey">
   </div>
   <dl class="probe-reading">
     <for row in $reading key=row.id>
@@ -43,7 +44,7 @@
 </div>
 
 <style>
-  [data-c="probe"] .probe-input {
+  .probe-input {
     flex: 1;
     min-width: 7rem;
     height: 2rem;
@@ -55,22 +56,22 @@
     font-size: 0.75rem;
     caret-color: var(--color-accent);
   }
-  [data-c="probe"] .probe-input::placeholder { color: var(--color-faint); }
-  [data-c="probe"] .probe-input:focus-visible { outline-offset: 0; border-color: var(--color-accent); }
-  [data-c="probe"] .probe-reading {
+  .probe-input::placeholder { color: var(--color-faint); }
+  .probe-input:focus-visible { outline-offset: 0; border-color: var(--color-accent); }
+  .probe-reading {
     display: grid;
     border: 1px solid var(--color-line);
     background: var(--color-surface);
     font-family: var(--font-mono);
     font-size: 0.75rem;
   }
-  [data-c="probe"] .probe-row {
+  .probe-row {
     display: flex;
     justify-content: space-between;
     gap: 1rem;
     padding: 0.5rem 0.75rem;
   }
-  [data-c="probe"] .probe-row + .probe-row { border-top: 1px solid var(--color-line); }
-  [data-c="probe"] .probe-row dt { color: var(--color-faint); }
-  [data-c="probe"] .probe-row dd { color: var(--color-accent); text-align: right; overflow-wrap: anywhere; }
+  .probe-row + .probe-row { border-top: 1px solid var(--color-line); }
+  .probe-row dt { color: var(--color-faint); }
+  .probe-row dd { color: var(--color-accent); text-align: right; overflow-wrap: anywhere; }
 </style>

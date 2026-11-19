@@ -1,10 +1,55 @@
+<script>
+  const buildMs = 900
+
+  let status = 'idle'
+
+  const running = () => status === 'running'
+  const passed = () => status === 'passed'
+  const failed = () => status === 'failed'
+
+  function build(outcome) {
+    status = 'running'
+    setTimeout(() => { status = outcome }, buildMs)
+  }
+</script>
+
 <div :data-status="$status">
   <p class="status-line">
     <span class="status-dot" aria-hidden="true"></span>
-    <span class="font-mono text-sm text-muted" .text-accent="$passed" .text-danger-300="$failed" :text="$status"></span>
+    <span class="font-mono text-sm text-muted" .text-accent="$passed" .text-danger-300="$failed">{$status}</span>
   </p>
   <div class="flex flex-wrap gap-2">
-    <button type="button" class="btn btn-small" @click="run" :disabled="$running">Run build</button>
-    <button type="button" class="btn btn-small" @click="breakIt" :disabled="$running">Run with an error</button>
+    <button type="button" class="btn btn-small" @click="build('passed')" :disabled="$running">Run build</button>
+    <button type="button" class="btn btn-small" @click="build('failed')" :disabled="$running">Run with an error</button>
   </div>
 </div>
+
+<style>
+  [data-c="build-status"] {
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+  }
+  .status-line {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+  }
+  .status-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    background: var(--color-faint);
+  }
+  [data-c="build-status"][data-status="running"] .status-dot {
+    background: var(--color-warning-400);
+    animation: status-blink 0.8s steps(2) infinite;
+  }
+  [data-c="build-status"][data-status="passed"] .status-dot { background: var(--color-accent); }
+  [data-c="build-status"][data-status="failed"] .status-dot { background: var(--color-danger-400); }
+  @keyframes status-blink {
+    50% { opacity: 0.2; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-c="build-status"][data-status="running"] .status-dot { animation: none; }
+  }
+</style>

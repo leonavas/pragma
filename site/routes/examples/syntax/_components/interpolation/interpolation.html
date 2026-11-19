@@ -1,0 +1,57 @@
+<script>
+  let name = 'Ada Lovelace'
+
+  const slug = () => name.trim().toLowerCase().replaceAll(/\s+/g, '-') || 'anonymous'
+  const length = () => name.length
+</script>
+
+<div>
+  <label class="interpolation-field">
+    <span class="label">name</span>
+    <input class="interpolation-input" autocomplete="off" :model="$name">
+  </label>
+  <p class="interpolation-line">Hello {$name}, your name has {$length} characters.</p>
+  <a class="interpolation-link" href="#user-{$slug}" title="Profile of {$name}">#user-{$slug}</a>
+  <p class="interpolation-note">Literal braces: <code>{$name}</code> inside code, and \{$name} after a backslash.</p>
+</div>
+
+<style>
+  [data-c="interpolation"] {
+    display: grid;
+    gap: 0.875rem;
+    width: 100%;
+    max-width: 20rem;
+  }
+  .interpolation-field {
+    display: grid;
+    gap: 0.375rem;
+  }
+  .interpolation-input {
+    width: 100%;
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-sunken);
+    color: var(--color-ink);
+    font-size: 0.875rem;
+  }
+  .interpolation-line {
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-surface);
+    overflow-wrap: anywhere;
+  }
+  .interpolation-link {
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+    overflow-wrap: anywhere;
+  }
+  .interpolation-note {
+    color: var(--color-faint);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  .interpolation-note code { color: var(--color-ink); }
+</style>

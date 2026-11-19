@@ -37,24 +37,24 @@
     justify-items: center;
     gap: 1rem;
   }
-  [data-c="counter"] .counter-label {
+  .counter-label {
     color: var(--color-muted);
     font-family: var(--font-mono);
     font-size: 0.75rem;
   }
-  [data-c="counter"] .counter-controls {
+  .counter-controls {
     display: flex;
     border: 1px solid var(--color-line-strong);
     background: var(--color-surface);
   }
-  [data-c="counter"] .counter-step {
+  .counter-step {
     width: 3rem;
     font-size: 1.25rem;
     cursor: pointer;
   }
-  [data-c="counter"] .counter-step:hover { background: var(--color-raised); }
-  [data-c="counter"] .counter-step:disabled { color: var(--color-faint); cursor: not-allowed; }
-  [data-c="counter"] .counter-value {
+  .counter-step:hover { background: var(--color-raised); }
+  .counter-step:disabled { color: var(--color-faint); cursor: not-allowed; }
+  .counter-value {
     min-width: 5rem;
     padding: 0.75rem 1rem;
     border-inline: 1px solid var(--color-line-strong);
@@ -63,7 +63,7 @@
     font-variant-numeric: tabular-nums;
     text-align: center;
   }
-  [data-c="counter"] .counter-reset {
+  .counter-reset {
     color: var(--color-muted);
     font-family: var(--font-mono);
     font-size: 0.75rem;
@@ -71,5 +71,5 @@
     text-underline-offset: 0.3em;
     cursor: pointer;
   }
-  [data-c="counter"] .counter-reset:disabled { visibility: hidden; }
+  .counter-reset:disabled { visibility: hidden; }
 </style>

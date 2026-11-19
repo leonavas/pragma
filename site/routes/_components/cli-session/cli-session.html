@@ -30,7 +30,7 @@
 </figure>
 
 <style>
-  [data-c="cli-session"] .terminal-screen {
+  .terminal-screen {
     display: grid;
     gap: 0.15rem;
     padding: 1.25rem 1rem 1.5rem;
@@ -39,28 +39,28 @@
     font-stretch: 75%;
     color: var(--color-muted);
   }
-  [data-c="cli-session"] .terminal-line { display: flex; justify-content: space-between; gap: 1rem; white-space: pre; }
-  [data-c="cli-session"] .is-command { justify-content: start; gap: 0.75rem; margin-top: 0.75rem; color: var(--color-ink); }
-  [data-c="cli-session"] .terminal-line:first-child,
-  [data-c="cli-session"] .is-command + .is-command { margin-top: 0; }
-  [data-c="cli-session"] .terminal-time { color: var(--color-faint); }
+  .terminal-line { display: flex; justify-content: space-between; gap: 1rem; white-space: pre; }
+  .is-command { justify-content: start; gap: 0.75rem; margin-top: 0.75rem; color: var(--color-ink); }
+  .terminal-line:first-child,
+  .is-command + .is-command { margin-top: 0; }
+  .terminal-time { color: var(--color-faint); }
   @media (max-width: 23.99rem) {
-    [data-c="cli-session"] .terminal-time { display: none; }
+    .terminal-time { display: none; }
   }
   @media (min-width: 40rem) {
-    [data-c="cli-session"] .terminal-screen { padding-inline: 1.25rem; font-size: 0.8125rem; font-stretch: 100%; }
+    .terminal-screen { padding-inline: 1.25rem; font-size: 0.8125rem; font-stretch: 100%; }
   }
   @media (prefers-reduced-motion: no-preference) {
-    [data-c="cli-session"] .terminal-line { --delay: calc(sibling-index() * 0.14s - 0.14s); animation: terminal-line-in 0.01s var(--delay) both; }
-    [data-c="cli-session"] .terminal-typed { animation: terminal-type 0.2s steps(16) var(--delay) both; }
-    [data-c="cli-session"] .terminal-cursor { animation: terminal-blink 1.1s steps(1) 1.7s 6; }
-    [data-c="cli-session"] .is-restarting * { animation: none; }
-    [data-c="cli-session"] .is-restarting .terminal-line + .terminal-line { visibility: hidden; }
+    .terminal-line { --delay: calc(sibling-index() * 0.14s - 0.14s); animation: terminal-line-in 0.01s var(--delay) both; }
+    .terminal-typed { animation: terminal-type 0.2s steps(16) var(--delay) both; }
+    .terminal-cursor { animation: terminal-blink 1.1s steps(1) 1.7s 6; }
+    .is-restarting * { animation: none; }
+    .is-restarting .terminal-line + .terminal-line { visibility: hidden; }
   }
   @keyframes terminal-line-in { from { visibility: hidden; } }
   @keyframes terminal-type { from { clip-path: inset(0 100% 0 0); } }
   @keyframes terminal-blink { 50% { opacity: 0; } }
   @media (prefers-reduced-motion: reduce) {
-    [data-c="cli-session"] .terminal-replay { display: none; }
+    .terminal-replay { display: none; }
   }
 </style>

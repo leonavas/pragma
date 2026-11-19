@@ -17,9 +17,9 @@
   </section>
 
   <section class="doc-section" aria-labelledby="alert">
-    <h2 id="alert">Alert with <code>await ctx.confirm(id)</code></h2>
+    <h2 id="alert">Alert with <code>await confirm(id)</code></h2>
     <div class="prose">
-      <p><code>ctx.confirm(id)</code> opens the alert and resolves with the <code>value</code> of the <code>@close</code> button that was clicked, or <code>'cancel'</code> on Esc and Back. <code>&lt;c-alert&gt;</code> is a <code>&lt;dialog role="alertdialog"&gt;</code>, so a backdrop click does not dismiss it. For a destructive action, put <code>autofocus</code> on the safe button.</p>
+      <p><code>import &#123; confirm &#125; from 'pragma'</code>, then <code>await confirm(id)</code> opens the alert and resolves with the <code>value</code> of the <code>@close</code> button that was clicked, or <code>'cancel'</code> on Esc and Back. <code>&lt;c-alert&gt;</code> is a <code>&lt;dialog role="alertdialog"&gt;</code>, so a backdrop click does not dismiss it. For a destructive action, put <code>autofocus</code> on the safe button.</p>
     </div>
     <c-showcase :source="data.examples.alert" caption="Try Keep it, Delete and Esc: the status line shows what the promise resolved to.">
       <p-delete-draft></p-delete-draft>
@@ -29,8 +29,8 @@
   <section class="doc-section" aria-labelledby="dropdown">
     <h2 id="dropdown">Dropdown on the popover API</h2>
     <div class="prose">
-      <p><code>&lt;c-dropdown&gt;</code> is a <code>[popover]</code> under its button, flipped above when there is no room below. It closes on an outside click, Esc, <code>@close</code> and Back, and it does not lock scroll. Items can combine <code>@close</code> with <code>@click</code>; the action reads the clicked button as <code>ctx.el</code>.</p>
-      <p>The label here is a dynamic prop, <code>:label="$menuLabel"</code>: the dropdown has no <code>.js</code>, so it reads the caller's getter on every render.</p>
+      <p><code>&lt;c-dropdown&gt;</code> is a <code>[popover]</code> under its button, flipped above when there is no room below. It closes on an outside click, Esc, <code>@close</code> and Back, and it does not lock scroll. Items can combine <code>@close</code> with <code>@click</code>, and pass arguments: <code>@click="sortBy('size')"</code>.</p>
+      <p>The label here is a dynamic prop, <code>:label="$menuLabel"</code>: the dropdown has no script, so it reads the caller's derived function on every render.</p>
     </div>
     <c-showcase :source="data.examples.dropdown" caption="Keyboard: Tab to the button, Enter opens, Tab walks the items, Esc closes and returns focus.">
       <p-sort-menu></p-sort-menu>
@@ -38,10 +38,10 @@
   </section>
 
   <section class="doc-section" aria-labelledby="stacking">
-    <h2 id="stacking">Stacking, <code>ctx.open</code> and <code>ctx.close</code></h2>
+    <h2 id="stacking">Stacking, <code>open</code> and <code>close</code></h2>
     <div class="prose">
       <p>Overlays stack: Discard with an edited name opens an alert on top of the modal. Each open overlay pushes a history entry, so Back closes only the top one. Focus returns to whatever opened each layer, and the page behind stops scrolling while a modal or alert is open, with the scrollbar gutter reserved only if there was a scrollbar.</p>
-      <p>From JS, <code>ctx.open(id)</code> and <code>ctx.close(id)</code> do what <code>@open</code> and <code>@close</code> do. Open overlays only in response to a user action, and never keep "is open" in state: the <code>&lt;dialog&gt;</code> already knows.</p>
+      <p>From a script, <code>open(id)</code> and <code>close(id)</code> from <code>'pragma'</code> do what <code>@open</code> and <code>@close</code> do. Open overlays only in response to a user action, and never keep "is open" in state: the <code>&lt;dialog&gt;</code> already knows.</p>
     </div>
     <c-showcase :source="data.examples.stacking" caption="Edit the name, press Discard, then press Back: the alert closes and the modal stays.">
       <p-rename-project></p-rename-project>
@@ -51,7 +51,7 @@
   <section class="doc-section" aria-labelledby="restyle">
     <h2 id="restyle">They are ordinary components</h2>
     <div class="prose">
-      <p>The three overlays ship in the starter as <code>lib/components/modal</code>, <code>alert</code> and <code>dropdown</code>: plain HTML and CSS you can restyle like any other component. The behavior lives in <code>core/overlay.js</code>, which the build adds only to pages that contain a <code>&lt;dialog&gt;</code> or <code>[popover]</code>.</p>
+      <p>The three overlays ship in the starter as <code>lib/components/modal</code>, <code>alert</code> and <code>dropdown</code>: one <code>.html</code> each, with no script, that you can restyle like any other component. The behavior lives in <code>core/overlay.js</code>, which the build adds only to pages that contain a <code>&lt;dialog&gt;</code> or <code>[popover]</code>.</p>
       <ul>
         <li>Do not create a <code>&lt;dialog&gt;</code> or <code>[popover]</code> by hand, call <code>showModal()</code>, use <code>window.confirm</code> or <code>role="menu"</code>, or import <code>core/overlay.js</code> yourself.</li>
       </ul>

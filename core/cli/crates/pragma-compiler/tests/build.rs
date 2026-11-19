@@ -307,6 +307,52 @@ fn optional_prop_of_script_component() {
 }
 
 #[test]
+fn script_rules_report_at_the_html_line_in_one_pass() {
+    // page with an embedded script: script rules, HTML name checks and const-state in one run
+    let src = "<title>X</title>\n<script>\n  import { data } from 'pragma'\n  let items = data.items\n  let count = 0\n  let doubled = count * 2\n  const picked = []\n  function pick() { picked.push(1); if (empty) return }\n  const empty = () => count === 0\n  function bump() { $count += 1 }\n</script>\n<p @click=\"pick\">{$doubled} {$picked.length} {$cuont}</p>\n";
+    let d = check_with(&[("routes/shop/index.html", Some(src)), ("routes/shop/index.server.js", Some("export function load() { return { items: [] } }\n"))]);
+    let at = |rule: &str| -> Vec<u32> { d.iter().filter(|x| x.rule == rule && x.file == Path::new("routes/shop/index.html")).map(|x| x.line).collect() };
+    assert_eq!(at("js/top-level-data"), [4], "{d:#?}");
+    assert_eq!(at("js/stale-derived"), [6], "{d:#?}");
+    assert_eq!(at("js/derived-call"), [8], "{d:#?}");
+    assert_eq!(at("js/dollar-in-script"), [10], "{d:#?}");
+    assert_eq!(at("js/const-state"), [7], "{d:#?}");
+    assert_eq!(at("html/unknown-name"), [12], "{d:#?}");
+    // the old API hides the names, and its `pragma` import is not reported a second time
+    let old = "<title>X</title>\n<script>\n  import { data } from 'pragma'\n  export function mount(ctx) {}\n</script>\n<p>{$total}</p>\n";
+    let d = check_with(&[("routes/shop/index.html", Some(old)), ("routes/shop/index.server.js", Some("export function load() { return {} }\n"))]);
+    let rules: Vec<&str> = d.iter().map(|x| x.rule).collect();
+    assert_eq!(rules, ["js/legacy-api"], "{d:#?}");
+}
+
+#[test]
+fn unknown_prop_suggests_the_declared_one() {
+    let d = check_with(&[
+        ("lib/components/tag/tag.html", Some("<script>\n  export let label = ''\n</script>\n<span>{$label}</span>")),
+        (PAGE, Some("<c-tag lable=\"x\"></c-tag>\n<c-tag colour=\"red\"></c-tag>")),
+    ]);
+    let msgs: Vec<&str> = d.iter().filter(|x| x.rule == "html/unknown-prop").map(|x| x.message.as_str()).collect();
+    assert_eq!(msgs.len(), 2, "{d:#?}");
+    assert!(msgs[0].contains("did you mean `label`?") && !msgs[0].contains("export let lable"), "{}", msgs[0]);
+    assert!(msgs[1].contains("declare it with `export let colour = …`"), "{}", msgs[1]);
+}
+
+#[test]
+fn a_const_with_any_value_is_a_handler() {
+    let script = "<script>\n  function wrap(action) { return action }\n  let saves = 0\n  function save() { saves += 1 }\n  const saveLater = wrap(save)\n</script>\n";
+    let shop = "routes/shop/index.html";
+    let ok = check_with(&[
+        ("lib/state/cart.js", Some("let total = 0\nfunction add() { total += 1 }\nconst addLater = ((action) => action)(add)\n")),
+        (shop, Some(&format!("{script}<input aria-label=\"Draft\" @input=\"saveLater\">\n<button @click=\"saveLater(1)\">{{$saves}}</button>\n<button @click=\"shared.cart.addLater\">+</button>"))),
+    ]);
+    assert!(ok.is_empty(), "{ok:#?}");
+    let d = check_with(&[(shop, Some(&format!("{script}<button @click=\"saves\">a</button>\n<button @click=\"saveLatr\">b</button>")))]);
+    assert_eq!(d.iter().filter(|x| x.rule == "html/unknown-name").count(), 2, "{d:#?}");
+    assert!(d.iter().any(|x| x.line == 7 && x.message.contains("\"saves\" is not a function")), "{d:#?}");
+    assert!(d.iter().any(|x| x.line == 8 && x.message.contains("did you mean \"saveLater\"?")), "{d:#?}");
+}
+
+#[test]
 fn script_component_props_and_names() {
     let comp = |js: &str, html: &str, call: &str| {
         check_with(&[
@@ -613,8 +659,10 @@ fn script_and_style_inside_the_html() {
     let meter = fs::read_to_string(out.join("client/assets/lib/components/meter/meter.js")).unwrap();
     assert!(meter.contains("$pragma.prop(\"step\", 1)"), "{meter}");
     let css = fs::read_to_string(out.join("client/assets/app.css")).unwrap();
-    assert!(css.contains("/* routes/shop/index.html */") && css.contains(".shop-btn { padding: 1rem }"), "{css}");
-    assert!(css.contains("/* lib/components/meter/meter.html */") && css.contains("[data-c=\"meter\"] .x, .meter { margin: 0 }"), "{css}");
+    // styles are scoped: a component's to its root, a page's to its <main data-page="…">
+    assert!(css.contains("/* routes/shop/index.html */") && css.contains(".shop-btn:where([data-page=\"shop/index\"],[data-page=\"shop/index\"] *) { padding: 1rem }"), "{css}");
+    assert!(css.contains("/* lib/components/meter/meter.html */") && css.contains("[data-c=\"meter\"] .x, .meter:where([data-c=\"meter\"],[data-c=\"meter\"] *) { margin: 0 }"), "{css}");
+    assert!(html.contains("<main data-page=\"shop/index\">"), "{html}");
     // diagnostics in an embedded script point at the .html line
     let bad = page.replace("count += 1", "count += 1\n    console.log(count)");
     let d = check_with(&[("routes/shop/index.html", Some(&bad))]);
@@ -853,6 +901,35 @@ fn state_passed_to_script_component_prop() {
     // the caller's state goes in live as data-with-<prop>; a literal as data-prop-<prop>
     assert!(html.contains("data-with-total=\"state.items.length\""), "{html}");
     assert!(html.contains("data-prop-total=\"3\""), "{html}");
+}
+
+#[test]
+fn ssr_runs_page_and_component_scripts_on_the_server() {
+    let list = "<script>\n  import { format } from '../../../utils/fmt.js'\n  export let items = []\n  let open = true\n  const total = () => format(items.length)\n</script>\n<ul .hidden=\"!$open\"><for item in $items key=item.id><li>{item.name}</li></for><b>{$total}</b></ul>";
+    let clocky = "<script>\n  import { time } from 'clock'\n  let now = time()\n</script>\n<p>{$now}</p>";
+    let page = "<script>\n  import { data } from 'pragma'\n  let heading = 'Isle'\n</script>\n<title>Isle</title>\n<h1>{$heading}</h1>\n<c-list :items=\"data.items\"></c-list>\n<c-clocky></c-clocky>";
+    let mut files = with_clock(&[
+        ("lib/components/list/list.html", Some(list)),
+        ("lib/components/clocky/clocky.html", Some(clocky)),
+        ("routes/isle.html", Some(page)),
+        ("routes/isle.server.js", Some("export const ssr = true\nexport function load() {\n  return { items: [{ id: 1, name: 'one' }] }\n}\n")),
+    ]);
+    files.retain(|(f, _)| *f != "routes/index.js");
+    let t = app_with(&files);
+    let out = t.0.join("dev");
+    build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap_or_else(|d| panic!("{d:#?}"));
+    let ops = fs::read_to_string(out.join("templates/isle.json")).unwrap();
+    assert!(ops.contains("[\"comp\",\"list\",[[\"items\",\"path\",\"data.items\"]],"), "{ops}");
+    assert!(ops.contains("[\"text\",\"{state.heading}\"]") && ops.contains("[\"for\","), "{ops}");
+    let worker = fs::read_to_string(out.join("server/worker.js")).unwrap();
+    // the list and the page run on the server; clocky imports an npm package, so it stays on the client
+    assert!(worker.contains("from \"./lib/components/list/list.js\"") && worker.contains("from \"./routes/isle.js\""), "{worker}");
+    assert!(!worker.contains("from \"./lib/components/clocky/clocky.js\"") && !worker.contains("\"clocky\": m"), "{worker}");
+    let isle = worker.lines().find(|l| l.contains("pattern: \"/isle\"")).unwrap();
+    assert!(isle.contains(", page: m") && isle.contains("\"list\": m"), "{isle}");
+    let server_list = fs::read_to_string(out.join("server/lib/components/list/list.js")).unwrap();
+    assert!(server_list.contains("export default function ($, $pragma) {") && server_list.contains("$pragma.prop(\"items\", [])"), "{server_list}");
+    assert!(out.join("server/utils/fmt.js").is_file(), "the server bundle has the script's imports");
 }
 
 const PAGE_WITH_PACKAGE: &str = "import { format } from '../utils/fmt.js'\n\
@@ -1221,4 +1298,128 @@ fn directives_and_blocks_work_inside_pre_and_code() {
     let bad = scratch(&[(PAGE, "<pre><span @click=\"nope\">{$missing}</span></pre>")]);
     let d = check(&bad.0.join("app"));
     assert!(d.iter().any(|x| x.rule == "html/unknown-name"), "{d:#?}");
+}
+
+const DX_SCRIPT: &str = "<script>\n  let count = 0\n  let tasks = []\n  function increase() { count += 1 }\n</script>\n";
+const DX_CART: &str = "let items = []\n\nfunction remove(id) {\n  items = items.filter(item => item.id !== id)\n}\n";
+
+#[test]
+fn template_messages_name_the_fix() {
+    let lines = [
+        "<p>{count}</p>",
+        "<p>{$cuont}</p>",
+        "<button @click=\"incrase\">a</button>",
+        "<button @click=\"$increase\">b</button>",
+        "<button :disabled=\"{$count}\">c</button>",
+        "<if $tasks.length > 0><p>x</p></if>",
+        "<ul><for task in $tasks><li>{task.title}</li></for></ul>",
+        "<p>{$price(task)}</p>",
+        "<p>{shared.crat.items}</p>",
+        "<button @click=\"shared.cart.remvoe(1)\">d</button>",
+    ];
+    let page = format!("{DX_SCRIPT}{}", lines.join("\n"));
+    let t = scratch(&[(PAGE, &page), ("lib/state/cart.js", DX_CART)]);
+    let d = check(&t.0.join("app"));
+    let at = |n: usize| -> Vec<(&str, &str)> { d.iter().filter(|x| x.line as usize == n + 6).map(|x| (x.rule, x.message.as_str())).collect() };
+    let one = |n: usize, rule: &str, want: &str| {
+        let found = at(n);
+        assert_eq!(found.len(), 1, "line {}: {found:#?}", n + 6);
+        assert!(found[0].0 == rule && found[0].1.contains(want), "line {}: {found:#?}", n + 6);
+    };
+    one(0, "html/invalid-root", "\"count\" is a name of the script: in HTML write $count");
+    one(1, "html/unknown-name", "did you mean $count?");
+    one(2, "html/unknown-name", "did you mean \"increase\"?");
+    one(3, "html/invalid-path", "no `$` in events, write `increase`");
+    one(4, "html/invalid-path", "`:disabled` takes a bare path: `:disabled=\"$count\"`");
+    one(5, "html/invalid-path", "no operators or quotes in a block tag");
+    one(6, "html/for-without-key", "add key=task.id");
+    one(7, "html/invalid-path", "a value per item is a field");
+    one(8, "html/invalid-root", "did you mean shared.cart?");
+    one(9, "html/unknown-name", "Did you mean shared.cart.remove?");
+}
+
+#[test]
+fn events_pass_the_event_el_and_call_store_functions() {
+    let page = format!(
+        "{DX_SCRIPT}<input aria-label=\"Search\" @input=\"increase\">\n<button @click=\"increase()\">a</button>\n<ul><for item in shared.cart.items key=item.id><li><button @click=\"shared.cart.remove(item.id)\" @focus=\"increase(el, event)\">x</button></li></for></ul>"
+    );
+    let t = scratch(&[(PAGE, &page), ("lib/state/cart.js", DX_CART)]);
+    let app = t.0.join("app");
+    let d = check(&app);
+    assert!(d.is_empty(), "{d:#?}");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    for want in ["data-on-input=\"increase\"", "data-on-click=\"increase()\"", "data-on-click=\"shared.cart.remove(item.id)\"", "data-on-focus=\"increase(el, event)\"", "\"stores\":{\"cart\""] {
+        assert!(html.contains(want), "missing {want}:\n{html}");
+    }
+    let bad = format!("{DX_SCRIPT}<button @click=\"shared.nope.remove()\">a</button>\n<button @click=\"shared.cart\">b</button>\n<ul><for el in $tasks key=el.id><li>x</li></for></ul>");
+    let t = scratch(&[(PAGE, &bad), ("lib/state/cart.js", DX_CART)]);
+    let d = check(&t.0.join("app"));
+    expect(&d, "html/invalid-root", PAGE, 6);
+    expect(&d, "html/invalid-path", PAGE, 7);
+    expect(&d, "html/invalid-root", PAGE, 8);
+}
+
+#[test]
+fn invalid_path_quotes_the_source_and_suggests_a_function() {
+    let page = "<script>\n  let items = []\n  let name = ''\n</script>\n<title>X</title>\n<h1>X</h1>\n<p>{$items.length > 0}</p>\n<p>{$name.toUpperCase()}</p>\n<p :title=\"$items[0]\">x</p>";
+    let t = scratch(&[(PAGE, page)]);
+    let d = check(&t.0.join("app"));
+    let messages: Vec<&str> = d.iter().filter(|x| x.rule == "html/invalid-path").map(|x| x.message.as_str()).collect();
+    assert_eq!(messages.len(), 3, "{d:#?}");
+    for (m, src) in messages.iter().zip(["$items.length > 0", "$name.toUpperCase()", "$items[0]"]) {
+        assert!(m.starts_with(&format!("invalid path \"{src}\"")), "{m}");
+        assert!(m.contains("function in <script>") && !m.contains("$."), "{m}");
+    }
+}
+
+const LD_PAGE: &str ="<script>\n  let likes = 0\n</script>\n<title>{data.post.title}</title>\n<script type=\"application/ld+json\">\n{\"@context\": \"https://schema.org\", \"@type\": \"Article\",\n \"headline\": \"{data.post.title}\", \"author\": {\"@type\": \"Person\", \"name\": \"{data.post.author}\"},\n \"url\": \"https://shop.example/blog/{params.slug}\"}\n</script>\n<h1>{data.post.title}</h1>\n<p>{$likes}</p>";
+const LD_SERVER: &str = "export const ssr = true\n\nexport async function load({ params }) {\n  return { post: { title: 'Hi', author: 'Ana', slug: params.slug } }\n}\n";
+
+#[test]
+fn json_ld_goes_to_head_with_server_values() {
+    let t = scratch(&[("routes/blog/[slug].html", LD_PAGE), ("routes/blog/[slug].server.js", LD_SERVER)]);
+    let app = t.0.join("app");
+    let d = check(&app);
+    assert!(d.is_empty(), "{d:#?}");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let html = fs::read_to_string(out.join("client/blog/[slug].html")).unwrap();
+    let head = &html[..html.find("</head>").unwrap()];
+    assert!(head.contains("<script type=\"application/ld+json\">\n{\"@context\": \"https://schema.org\""), "{html}");
+    assert!(head.contains("\"headline\": \"{data.post.title}\""), "{html}");
+    assert_eq!(html.matches("application/ld+json").count(), 1, "{html}");
+    let static_ld = "<title>About</title>\n<script type=\"application/ld+json\">{\"@type\": \"Organization\", \"name\": \"Shop\"}</script>\n<h1>About</h1>";
+    let t = scratch(&[(PAGE, static_ld)]);
+    assert!(check(&t.0.join("app")).is_empty(), "static JSON-LD needs no ssr");
+}
+
+#[test]
+fn json_ld_errors() {
+    let bad_json = "<title>X</title>\n<script type=\"application/ld+json\">\n{\"a\": 1,\n \"b\": }\n</script>\n<h1>X</h1>";
+    let t = scratch(&[(PAGE, bad_json)]);
+    let d = check(&t.0.join("app"));
+    expect(&d, "html/json-ld", PAGE, 4);
+    assert!(!d.iter().any(|x| x.rule == "js/syntax" || x.rule == "html/script"), "{d:#?}");
+    let roots = "<title>X</title>\n<script type=\"application/ld+json\">{\"a\": \"{$x}\", \"b\": \"{a + b}\", \"c\": \"{data.c\"}</script>\n<h1>X</h1>";
+    let t = scratch(&[(PAGE, roots)]);
+    expect(&check(&t.0.join("app")), "html/json-ld", PAGE, 2);
+    let paths = "<title>X</title>\n<script type=\"application/ld+json\">{\"a\": \"{$x}\", \"b\": \"{a + b}\"}</script>\n<h1>X</h1>";
+    let t = scratch(&[(PAGE, paths)]);
+    let d = check(&t.0.join("app"));
+    expect(&d, "html/head", PAGE, 2);
+    expect(&d, "html/invalid-path", PAGE, 2);
+    let no_ssr = LD_SERVER.replace("export const ssr = true\n\n", "");
+    let page = LD_PAGE.replace("<title>{data.post.title}</title>", "<title>Blog</title>");
+    let t = scratch(&[("routes/blog/[slug].html", &page), ("routes/blog/[slug].server.js", &no_ssr)]);
+    let d = check(&t.0.join("app"));
+    assert!(d.iter().any(|x| x.rule == "html/head" && x.message.contains("JSON-LD")), "{d:#?}");
+    let placed = "<title>X</title>\n<div><script type=\"application/ld+json\">{}</script></div>\n<script type=\"text/plain\">x</script>\n<c-ld></c-ld>";
+    let t = scratch(&[(PAGE, placed), ("lib/components/ld/ld.html", "<script type=\"application/ld+json\">{}</script>\n<p>x</p>")]);
+    let d = check(&t.0.join("app"));
+    expect(&d, "html/script", PAGE, 2);
+    expect(&d, "html/script", PAGE, 3);
+    expect(&d, "html/script", "lib/components/ld/ld.html", 1);
+    assert!(!d.iter().any(|x| x.rule == "js/syntax"), "{d:#?}");
 }

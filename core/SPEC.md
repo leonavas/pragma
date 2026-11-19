@@ -94,7 +94,7 @@ no arguments on each render (`$total`, `shared.cart.total`).
 | `.<class>="[!]p"` | element | toggles the class |
 | `:show="[!]p"` | element | `hidden` when false |
 | `:model="$p"` | input/select/textarea | two-way; only `$` or `shared` |
-| `@<event>="fn"`, `@<event>="fn(a, …)"` | element | calls the owner's function; args: path, `'text'`/`"text"`, number, `true`/`false`/`null`, `event` (no expressions) |
+| `@<event>="fn"`, `@<event>="fn(a, …)"`, `@<event>="shared.store.fn(…)"` | element | calls the owner's function (or a store function); without parentheses it gets the event; with them only the listed args: path, `'text'`/`"text"`, number, `true`/`false`/`null`, `event`, `el` (the element with the `@`); no expressions, no `$` in the name |
 | `@open="id"` `@close` | button | opens/closes overlay (section 6) |
 
 `{}` rules: only paths (no `!`); `null`/`undefined` → empty; literal in text whose nearest
@@ -170,9 +170,12 @@ The build emits `templates/<route>.json`: a list of ops.
 ["else", tid, [ops]]
 ["for", tid, "var", "path", "keyPath", [ops]]
 ["empty", tid, [ops]]                       only if the preceding for had no items
+["comp", "id", [[prop, "text"|"path", value]], [ops]]   root of a component with a script (§5)
+["slot", n, [ops]]                          slot content, rendered in the scope n components up
 ```
-Each block op follows its template's html. A chain with a `state`/`shared` path is left entirely
-to the client; a `text`/`attr` template with any `state`/`shared` path is too (no op). Instances carry `data-of` and `data-key` as above. A block newly inserted on the
+Each block op follows its template's html. A chain with a `shared` path is left entirely to the
+client, and so is one with a `state` path when the server has no instance for that scope (§5); a
+`text`/`attr` template with such a path is too. Instances carry `data-of` and `data-key` as above. A block newly inserted on the
 client with `[autofocus]` receives focus.
 
 ## 4. Page, component and store scripts (client)
@@ -200,7 +203,7 @@ like `x.css` (both = `html/duplicate-module`). The layout has neither.
     await call('save', { id: params.id, count })
     saving = false
   }
-  function mount() {
+  function mount(el) {
     const timer = setInterval(() => { count += 1 }, 1000)
     return () => clearInterval(timer)
   }
@@ -212,11 +215,22 @@ The top-level script is the component (no `export default`, `this` or `ctx`):
 - top-level `let` = reactive state; top-level `const` / function = exposed to HTML. A function
   used in `@event` is an action (called with the call's arguments, §3), used in `{}` or a value
   binding a derived value (called with no arguments on each render; in JS call it: `atStart()`).
+  `@event` also takes any top-level `const` (`const saveLater = debounce(save, 300)`): the build
+  does not check its value; the runtime calls the function it holds and throws in dev when it is
+  not a function.
 - `export let name = default` = prop (§3): read-only (`js/prop-write`), live, coerced by the
   default's type (number: `"5"` → 5; boolean: bare/`"true"` → true, `"false"` → false; string:
-  text; other defaults: the value as passed). Pages and stores have no props.
-- `function mount() { …; return cleanup }` runs after the first render; the cleanup runs when the
-  page is left or the component removed.
+  text; other defaults: the value as passed). An object or array prop is read-only all the way
+  down: in dev the runtime hands it out through a read-only view that throws on any write.
+  Pages and stores have no props.
+- `function mount(el) { …; return cleanup }` runs after the first render, in the browser only;
+  `el` is the component's root element (for a page, its `<main data-page>`), for observers,
+  measuring or focusing its own DOM. The cleanup runs when the page is left or the component
+  removed. An `async mount` resolves to its cleanup; if the component is gone by then, the
+  cleanup runs at once.
+- Derived values: a top-level `let`/`const` computed from state at startup is
+  `js/stale-derived`, a function used as a value in JS without `()` is `js/derived-call`, `data`
+  read at the top level is `js/top-level-data`, `$x` in a script is `js/dollar-in-script`.
 - State is a deep Proxy over plain objects and arrays (`items.push(x)` works); every change
   schedules one render per microtask, from actions, `await`, timers or anywhere else. Maps,
   Sets, Dates and class instances are not tracked: replace them (`when = new Date()`).
@@ -226,7 +240,8 @@ The top-level script is the component (no `export default`, `this` or `ctx`):
   `$pragma` are reserved names.
 - Services: `import { shared, data, params, query, page, log, call, navigate, open, close, confirm } from 'pragma'`.
   They are live: `data` is undefined until the loader is done (read it in functions, or rely on
-  `ssr`). Only page, component and store scripts import `pragma` (`js/import` elsewhere).
+  `ssr`: then it is already set when the script runs). Only page, component and store scripts
+  import `pragma` (`js/import` elsewhere).
 - Old API (`export const state`/`actions`, `export function mount`, `ctx.$`, `ctx.update`,
   `store()`) is `js/legacy-api`.
 
@@ -262,6 +277,15 @@ export const ssr = false
 - `ssr = true`: the server runs `load`, renders the compiled template and embeds data in
   `<script type="application/json" id="pragma-data">`. The client binds directives without
   rebuilding the DOM.
+- With `ssr`, the server also runs the page script and the script of each component on the page
+  (once per request, no `mount`, no events), so `$x` bindings (initial `let`s, props, derived
+  functions) and slot content are in the first HTML. In those scripts `data`, `params`, `query`
+  and `page` are read-only, `shared`, `call`, `navigate`, `open`, `close` and `confirm` throw.
+  A script is left to the browser (its `$x` bindings filled at boot, as without `ssr`) when it
+  imports anything other than app code (`routes/`, `lib/`, `utils/`: no npm package, no
+  `core/` module), when it throws while running on the server (reading `window`, `document`,
+  `localStorage` or a store), or when a prop comes from a store. The rest of the page still
+  renders. Keep browser-only work in `mount(el)` and actions.
 - Error in `load` → `page.error` on the client; 500 with ERROR log on the server.
 
 ### 5.1 Head tags (SEO, link previews)
@@ -276,6 +300,13 @@ export const ssr = false
   (`html/head`). The build emits them as `data-text`/`data-attr-*` in the shell; the handler
   renders them before sending (escaped). A `:<attr>` path that is null/false keeps the static
   fallback; a `meta` left without `content` or a `link` without `href` is removed.
+- JSON-LD: `<script type="application/ld+json">` at the top level of a page (not in a
+  component, not nested: `html/script`) is structured data, never the page module. The build
+  moves it into `<head>` (appended), checks its JSON (`html/json-ld`, with line and column) and
+  allows `{path}` only inside JSON strings, with roots `data`, `params` or `query`
+  (`html/head`), needing `ssr` like bound head tags. The handler fills each value JSON-escaped
+  (`<` as `<`); the JSON syntax around it is kept. A literal `{` in a string is `{`.
+  Any other `<script type>` is `html/script`.
 - The router replaces `<title>` and every `<meta>`/`<link>` except charset, viewport,
   stylesheet and modulepreload with the target document's on each navigation.
 
@@ -332,8 +363,16 @@ Usage:
 - A class in HTML must be a supported utility or defined in project CSS (`lib/theme.css`,
   component `*.css`). Otherwise, check error.
 - Custom class: when a combination repeats in 3+ places or needs something outside the subset.
-  Component CSS goes in `<name>.css`, scoped with `[data-c="name"]`; for a `p-` component the
-  build rewrites that selector (`"name"`, `'name'` or unquoted) in its own `.css` to its id.
+  Component CSS goes in its `<style>` or `<name>.css`; for a `p-` component the build rewrites
+  `[data-c="name"]` (`"name"`, `'name'` or unquoted) in its own CSS to its id.
+- Scoping (automatic): each selector of a component's CSS that does not already contain its
+  `[data-c="id"]` gets `:where([data-c="id"],[data-c="id"] *)` on its subject (before a
+  pseudo-element), so it matches only the component root and its content and adds no specificity.
+  A page's `<style>`/`.css` is scoped the same way to `[data-page="<page>"]`: the build writes
+  the page name on the layout `<main data-page>` of pages with CSS, and the router copies it on
+  navigation. A selector with `:global(…)` is not scoped (the wrapper is removed). Style rules
+  inside `@media`, `@supports`, `@layer`, `@container`, `@starting-style` are scoped; other
+  at-rules (`@keyframes`, `@font-face`…) are copied.
 - v0 output: one global minified CSS (lightningcss) with hash.
 
 ## 9. Build (`pragma build`)
@@ -368,7 +407,11 @@ Errors with file:line:column, rule and message.
   place and read in HTML (`js/const-state`); `import` of a store (`js/store-import`); `var`,
   destructuring `let`, exports other than props/`persist`, top-level `await`, unknown name
   imported from `pragma`, reserved `$`/`$pragma` (`js/component-script`); `pragma` imported
-  outside a script (`js/import`).
+  outside a script (`js/import`); `data` read at the top level (`js/top-level-data`); a
+  top-level `let`/`const` computed from state or a prop at startup and never reassigned
+  (`js/stale-derived`); a top-level function used as a value in a test, operator or template
+  without a call (`js/derived-call`); `$x` in a script (`js/dollar-in-script`). All script rules
+  of a file are reported in one pass; only `js/legacy-api` stops the HTML name checks.
 - HTML: unknown or legacy syntax; invalid path root; `<for>` without `key`; malformed block or
   `<template>` in source; misplaced `<else-if>`/`<else>`/`<empty>`; block without single root;
   `$x`, `@fn` or `fn(…)` not declared by the owner's script, or a script-less owner
@@ -414,6 +457,9 @@ Errors with file:line:column, rule and message.
   (writes changed and missing files, removes files the binary does not have) and prints each
   file updated, added or removed. Writes nothing outside `core/` (`AGENTS.md`, `pragma.json`,
   `routes/`, `lib/`… are the app's).
+- An outdated `core/` (`app/core-outdated`) is a warning in `check` and at the start of `dev`, and
+  stops `pragma build` with an error (the compiler may emit ops an older runtime cannot render)
+  unless `--allow-outdated-core`.
 
 ## 12. Logs (OpenTelemetry)
 
@@ -496,8 +542,12 @@ default `dialog::backdrop` and `.skeleton` (pulsing block honoring `prefers-redu
 // core/server/handler.js
 export function createHandler({ routes }) → { fetch(request, env, ctx) }
 // routes: [{ pattern: '/shop/:id', server: <.server.js namespace>, ssr: bool,
-//            template: <compiled ops> | null, shell: '<prebuilt page html>' | null }]
+//            template: <compiled ops> | null, shell: '<prebuilt page html>' | null,
+//            page?: <page script module>, components?: { '<data-c id>': <component script module> } }]
 ```
+- `page`/`components`: the compiled scripts (factories, §4) an `ssr` route renders with, only
+  those whose imports are all app code; `render.js` `renderPage(ops, scope, { page, components, log })`
+  runs them with read-only services and falls back to the client per page or component.
 - Handles `/_data/*`, `/_action/*`, `/_otel` and `ssr` pages (body and head tags). Everything
   else: `env.ASSETS.fetch(request)` (Workers) or the Node adapter's static server; on a 404 it
   resolves non-ssr param routes via `/_pragma/manifest.json` and otherwise answers `_404.html`
