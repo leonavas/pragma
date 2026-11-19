@@ -178,7 +178,7 @@ fn forbidden_imports() {
         app("import x from 'http://a/x.js'"),
         vec![(1, 15, "js/import")]
     );
-    assert_eq!(app("import fs from 'node:fs'"), vec![(1, 16, "js/import")]);
+    assert_eq!(app("import fs from 'node:fs'"), vec![(1, 16, "app/package")]);
     assert_eq!(app("import x from '/lib/x.js'"), vec![(1, 15, "js/import")]);
     assert_eq!(
         app("const loaded = await import(`pkg`)"),
@@ -199,6 +199,17 @@ fn npm_packages_allowed() {
 }
 
 #[test]
+fn node_builtins_detected() {
+    for spec in ["fs", "fs/promises", "path", "node:fs", "node:test", "crypto", "buffer"] {
+        assert!(pragma_jslint::is_node_builtin(spec), "{spec}");
+    }
+    for spec in ["dayjs", "fs-extra", "pathe", "@scope/fs", "./fs.js"] {
+        assert!(!pragma_jslint::is_node_builtin(spec), "{spec}");
+    }
+    assert!(pragma_jslint::node_builtin_message("fs").starts_with("`fs` is a Node module and doesn't run in the browser"));
+}
+
+#[test]
 fn node_only_on_server() {
     let src = "import { readFile } from 'node:fs/promises'";
     assert_eq!(diags("routes/shop/[id].server.js", src, &APP), vec![]);
@@ -206,11 +217,11 @@ fn node_only_on_server() {
     assert_eq!(diags("core/runtime/server/node.mjs", src, &CORE), vec![]);
     assert_eq!(
         diags("core/runtime/router.js", src, &CORE),
-        vec![(1, 26, "js/import")]
+        vec![(1, 26, "app/package")]
     );
     assert_eq!(
         diags("routes/shop/[id].js", src, &APP),
-        vec![(1, 26, "js/import")]
+        vec![(1, 26, "app/package")]
     );
     assert_eq!(
         diags("routes/shop/[id].server.js", "import postgres from 'pg'", &APP),

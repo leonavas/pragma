@@ -7,11 +7,15 @@ const products = [
   { name: 'Bread', category: 'bakery' },
 ]
 
-const saveLater = debounce(ctx => ctx.update(counters => { counters.saves += 1 }), 150)
+const saveLater = debounce(ctx => ctx.update(current => {
+  current.saves += 1
+  current.savedDraft = current.draft
+}), 200)
 
 export const state = () => ({
-  clicks: 0,
+  draft: '',
   saves: 0,
+  savedDraft: '',
   get productsByCategory() {
     return Object.entries(groupBy(products, product => product.category))
       .map(([category, inCategory]) => category + ': ' + inCategory.length)
@@ -20,8 +24,7 @@ export const state = () => ({
 })
 
 export const actions = {
-  registerClick(ctx) {
-    ctx.$.clicks += 1
+  scheduleSave(ctx) {
     saveLater(ctx)
   },
 }

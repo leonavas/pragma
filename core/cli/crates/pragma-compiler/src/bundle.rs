@@ -173,19 +173,26 @@ fn save_cache(dir: &Path, key: &str, b: &Bundle) {
     let _ = fs::write(dir.join("key"), key);
 }
 
-fn package_of(text: &str) -> Option<String> {
-    let rest = &text[text.rfind("node_modules/")? + "node_modules/".len()..];
+fn name_after(rest: &str) -> Option<String> {
     let mut parts = rest.split('/');
     let first = parts.next()?;
     let name = if first.starts_with('@') { format!("{first}/{}", parts.next()?) } else { first.to_string() };
     Some(name.trim_end_matches(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.')).to_string())
 }
 
+fn package_of(text: &str) -> Option<String> {
+    name_after(&text[text.rfind("node_modules/")? + "node_modules/".len()..])
+}
+
+fn packages_in(text: &str) -> Vec<String> {
+    text.match_indices("node_modules/").filter_map(|(i, m)| name_after(&text[i + m.len()..])).collect()
+}
+
 fn locate<'a>(text: &str, requests: &'a BTreeMap<String, Request>) -> &'a (PathBuf, u32, u32) {
-    let pkg = package_of(text);
+    let pkgs = packages_in(text);
     requests
         .iter()
-        .find(|(spec, _)| pkg.as_deref() == Some(pragma_jslint::package_name(spec)))
+        .find(|(spec, _)| pkgs.iter().any(|p| p == pragma_jslint::package_name(spec)))
         .or_else(|| requests.iter().find(|(spec, _)| text.contains(&format!("\"{spec}\"")) || text.contains(&format!("'{spec}'"))))
         .or_else(|| requests.iter().next())
         .map(|(_, r)| &r.at)
@@ -194,6 +201,37 @@ fn locate<'a>(text: &str, requests: &'a BTreeMap<String, Request>) -> &'a (PathB
 
 fn is_pure_js(id: &str) -> bool {
     id.starts_with('\0') || id.starts_with("rolldown:") || [".js", ".mjs", ".cjs", ".json"].iter().any(|e| id.ends_with(e))
+}
+
+fn not_js(file: &str) -> String {
+    let pkg = package_of(file).unwrap_or_default();
+    let inner = file.rsplit_once(&format!("node_modules/{pkg}/")).map_or(file, |(_, rest)| rest);
+    format!("package \"{pkg}\" imports {inner}, which is not JavaScript; only JavaScript packages work on the client")
+}
+
+fn describe(kind: &str, text: &str, id: &str, fallback: &'static str) -> (&'static str, String) {
+    let importer = package_of(&format!("{text} {id}")).unwrap_or_default();
+    match kind {
+        "UNRESOLVED_IMPORT" => {
+            let spec = text.split('\'').nth(1).unwrap_or(text.trim());
+            if pragma_jslint::is_node_builtin(spec) {
+                (crate::deps::RULE_PACKAGE, format!("package \"{importer}\" imports the Node module `{spec}`, which doesn't run in the browser"))
+            } else {
+                (crate::deps::RULE_PACKAGE, format!("package \"{importer}\" imports \"{spec}\", which cannot be resolved; run `npm install` or `bun install`"))
+            }
+        }
+        "MISSING_EXPORT" => match text.split('"').nth(3).filter(|f| !is_pure_js(f)) {
+            Some(f) => (crate::deps::RULE_PACKAGE, not_js(f)),
+            None => (crate::deps::RULE_IMPORT, format!("package: {}", text.trim())),
+        },
+        _ => (fallback, format!("package: {}", text.trim())),
+    }
+}
+
+fn push_once(diags: &mut Vec<Diagnostic>, d: Diagnostic) {
+    if !diags.iter().any(|x| x.file == d.file && x.line == d.line && x.rule == d.rule && x.message == d.message) {
+        diags.push(d);
+    }
 }
 
 pub fn bundle(root: &Path, cache_dir: &Path, prod: bool, requests: &BTreeMap<String, Request>, diags: &mut Vec<Diagnostic>) -> Option<Bundle> {
@@ -235,6 +273,7 @@ pub fn bundle(root: &Path, cache_dir: &Path, prod: bool, requests: &BTreeMap<Str
             main_fields: Some(["browser", "module", "main"].map(String::from).to_vec()),
             ..ResolveOptions::default()
         }),
+        module_types: Some([("css".to_string(), rolldown_common::ModuleType::Empty)].into_iter().collect()),
         legal_comments: Some(LegalComments::None),
         log_level: Some(LogLevel::Silent),
         ..BundlerOptions::default()
@@ -258,9 +297,14 @@ pub fn bundle(root: &Path, cache_dir: &Path, prod: bool, requests: &BTreeMap<Str
         Ok(Err(errs)) => {
             for e in errs.into_vec() {
                 let text = e.to_string();
-                let (file, line, col) = locate(&format!("{} {text}", e.id().unwrap_or_default()), requests);
-                let rule = if e.kind().to_string() == "MISSING_EXPORT" { crate::deps::RULE_IMPORT } else { crate::deps::RULE_PACKAGE };
-                diags.push(Diagnostic::error(file, *line, *col, rule, format!("package: {}", text.trim())));
+                let id = e.id().unwrap_or_default().to_string();
+                let (file, line, col) = locate(&format!("{id} {text}"), requests);
+                let (rule, message) = if Path::new(&id).is_absolute() && !is_pure_js(&id) {
+                    (crate::deps::RULE_PACKAGE, not_js(&id))
+                } else {
+                    describe(&e.kind().to_string(), &text, &id, crate::deps::RULE_PACKAGE)
+                };
+                push_once(diags, Diagnostic::error(file, *line, *col, rule, message));
             }
             return None;
         }
@@ -271,21 +315,26 @@ pub fn bundle(root: &Path, cache_dir: &Path, prod: bool, requests: &BTreeMap<Str
     };
     let before = diags.len();
     for id in &ids {
-        if !is_pure_js(id) {
+        if !is_pure_js(id) && Path::new(id).is_absolute() {
             let (file, line, col) = locate(id, requests);
             let rel = id.strip_prefix(&format!("{}/", root.display())).unwrap_or(id);
-            diags.push(Diagnostic::error(file, *line, *col, crate::deps::RULE_PACKAGE, format!("the package uses {rel}, which is not plain JS; only JavaScript packages work on the client")));
+            push_once(diags, Diagnostic::error(file, *line, *col, crate::deps::RULE_PACKAGE, not_js(rel)));
         }
     }
     for w in &out.warnings {
         let kind = w.kind().to_string();
         if matches!(kind.as_str(), "UNRESOLVED_IMPORT" | "MISSING_EXPORT" | "IMPORT_IS_UNDEFINED" | "MISSING_GLOBAL_NAME") {
             let text = w.to_string();
-            let (file, line, col) = locate(&format!("{} {text}", w.id().unwrap_or_default()), requests);
-            let rule = if kind == "UNRESOLVED_IMPORT" { crate::deps::RULE_PACKAGE } else { crate::deps::RULE_IMPORT };
-            diags.push(Diagnostic::error(file, *line, *col, rule, format!("package: {}", text.trim())));
+            let id = w.id().unwrap_or_default().to_string();
+            if Path::new(&id).is_absolute() && !is_pure_js(&id) {
+                continue;
+            }
+            let (file, line, col) = locate(&format!("{id} {text}"), requests);
+            let (rule, message) = describe(&kind, &text, &id, crate::deps::RULE_IMPORT);
+            push_once(diags, Diagnostic::error(file, *line, *col, rule, message));
         }
     }
+    let flagged = diags.len() > before;
     let mut files = Vec::new();
     let mut entries = BTreeMap::new();
     let by_name: BTreeMap<&str, &Group> = groups.iter().map(|g| (g.name.as_str(), g)).collect();
@@ -301,6 +350,7 @@ pub fn bundle(root: &Path, cache_dir: &Path, prod: bool, requests: &BTreeMap<Str
                 }
                 files.push((c.filename.to_string(), c.code.clone()));
             }
+            rolldown_common::Output::Asset(_) if flagged => {}
             rolldown_common::Output::Asset(a) => {
                 let (file, line, col) = locate(&a.filename, requests);
                 diags.push(Diagnostic::error(file, *line, *col, crate::deps::RULE_PACKAGE, format!("the package emits {}, which is not JS; package CSS and assets do not work on the client", a.filename)));

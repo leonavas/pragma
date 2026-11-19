@@ -188,7 +188,7 @@ fn module_graph(
             let mut ok = None;
             if pragma_jslint::is_package(&imp.spec) {
                 let resolved = match deps.check_listed(&imp.spec, client) {
-                    Err(e) => Err((deps::RULE_IMPORT, e)),
+                    Err(e) => Err(e),
                     Ok(()) if client => deps.resolve(dir, &imp.spec).map(Some),
                     Ok(()) => Ok(None),
                 };
@@ -397,6 +397,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         let comp_actions_owned: Vec<(String, Vec<String>)> = exp.components.values().filter_map(|c| c.module.as_ref().map(|m| (c.name.clone(), actions_of(m)))).collect();
         let ctx = expand::PageCtx {
             loader,
+            ssr,
             params: page.pattern.split('/').filter_map(|s| s.strip_prefix(':')).map(str::to_string).collect(),
             page_actions: page_actions.as_deref(),
             page_file: &p.files[page.html as usize],
@@ -406,6 +407,12 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         sc.run(&exp.body);
         if p.layout.is_none() {
             sc.run(&exp.page);
+        }
+        sc.head(&exp.head);
+        for m in page.module.iter().chain(exp.components.values().filter_map(|c| c.module.as_ref())) {
+            if let Some(src) = p.read(m) {
+                sc.stores.extend(shared_refs(&src).filter(|s| p.stores.contains_key(*s)).map(str::to_string));
+            }
         }
         diags.extend(sc.diags);
         used_classes.extend(sc.classes);
@@ -531,19 +538,16 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             "loader": o.loader,
             "ssr": o.ssr,
         });
-        let title = o.exp.title.clone().or_else(|| {
-            o.exp.head.iter().find_map(|n| match n {
-                html::Node::Element(e) if e.is("title") => {
-                    let mut s = String::new();
-                    html::serialize(&e.children, &mut s);
-                    Some(s.trim().to_string())
-                }
-                _ => None,
-            })
-        });
         let mut doc = String::with_capacity(4096);
         doc.push_str(&format!("<!doctype html>\n<html lang=\"{}\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n", html::escape_attr(&p.config.lang)));
-        doc.push_str(&format!("<title>{}</title>\n", title.unwrap_or_else(|| html::escape_text(&p.config.name))));
+        match o.exp.head.iter().find_map(|n| match n {
+            html::Node::Element(e) if e.is("title") => Some(e),
+            _ => None,
+        }) {
+            Some(t) => compile::write_element(t, &mut doc, true),
+            None => doc.push_str(&format!("<title>{}</title>", html::escape_text(&p.config.name))),
+        }
+        doc.push('\n');
         let extras: Vec<html::Node> = o.exp.head.iter().filter(|n| !matches!(n, html::Node::Element(e) if e.is("title"))).cloned().collect();
         let mut ex = String::new();
         compile::write_nodes(&extras, &mut ex, true);
@@ -645,7 +649,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             "name": p.config.name,
             "main": "worker.js",
             "compatibility_date": "2025-11-01",
-            "assets": { "directory": "../client", "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": true },
+            "assets": { "directory": "../client", "binding": "ASSETS", "run_worker_first": true },
         });
         w.write("server/wrangler.jsonc", serde_json::to_string_pretty(&wrangler).unwrap().as_bytes());
     } else if report.has_server {
@@ -661,6 +665,16 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         }
     }
     (sort_diags(diags), report)
+}
+
+/// Stores read from JS as `ctx.shared.<name>` (or a destructured `shared.<name>`).
+fn shared_refs(src: &str) -> impl Iterator<Item = &str> {
+    src.match_indices("shared.").filter_map(|(i, m)| {
+        let boundary = src[..i].chars().next_back().is_none_or(|c| !(c.is_ascii_alphanumeric() || c == '_' || c == '$'));
+        let rest = &src[i + m.len()..];
+        let end = rest.find(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '$')).unwrap_or(rest.len());
+        (boundary && end > 0).then(|| &rest[..end])
+    })
 }
 
 fn with_ignore_map(code: String) -> String {

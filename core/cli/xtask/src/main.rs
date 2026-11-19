@@ -145,7 +145,7 @@ fn packages(ctx: &Ctx) -> bool {
     tools(ctx)
         && pragma_release(ctx)
         && run(
-            "real npm packages: check, build, tree-shaking and Chromium",
+            "real npm packages: check, build, serve, dev, live reload (Chromium and Firefox)",
             Command::new("node")
                 .args(["--test", "--test-concurrency=1"])
                 .arg(ctx.cli.join("xtask/packages/packages.test.mjs"))

@@ -2,6 +2,7 @@
 
 <h1>es-toolkit</h1>
 <p>Products by category: <span id="products-by-category" :text="$productsByCategory"></span></p>
-<button type="button" class="btn btn-primary" @click="registerClick">Click</button>
-<p>Clicks: <span id="clicks" :text="$clicks"></span></p>
+<label for="draft">Draft</label>
+<input id="draft" class="rounded-lg border border-line px-3 py-2" :model="$draft" @input="scheduleSave">
 <p>Saves: <span id="saves" :text="$saves"></span></p>
+<p>Saved draft: <span id="saved-draft" :text="$savedDraft"></span></p>

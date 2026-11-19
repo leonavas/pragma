@@ -40,7 +40,7 @@ Between two options, choose the ES module one.
 | Importing a name the package does not export | `js/import` |
 | UI frameworks (React, Preact, Vue, Svelte, Solid, lit, jQuery, Alpine…) | `js/import` |
 
-The error points at the import in your file. In `.server.js`, any package from `package.json` works, including `node:*`.
+The error points at the import in your file. In `.server.js`, any package from `package.json` works, plus Node built-ins (`fs`, `node:*`) without listing. A built-in name listed in `package.json` (a polyfill such as `buffer`) is bundled as a package.
 
 ## Recommended
 

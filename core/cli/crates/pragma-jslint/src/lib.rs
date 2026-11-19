@@ -24,6 +24,7 @@ pub const RULE_HTML: &str = "js/html-in-js";
 pub const RULE_CONSOLE: &str = "js/console";
 pub const RULE_JSDOC: &str = "js/jsdoc-types";
 pub const RULE_IMPORT: &str = "js/import";
+pub const RULE_PACKAGE: &str = "app/package";
 pub const RULE_COMMENT: &str = "js/comment";
 pub const RULE_NAME: &str = "js/vague-name";
 pub const RULE_CTX: &str = "js/ctx";
@@ -163,11 +164,11 @@ impl Linter<'_> {
         {
             return;
         }
-        let message = if let Some(rest) = specifier.strip_prefix("node:") {
-            if self.server {
-                return;
+        let message = if specifier.starts_with("node:") {
+            if !self.server {
+                self.report(span, RULE_PACKAGE, node_builtin_message(specifier));
             }
-            format!("`node:{rest}` can only be imported in *.server.js and core/server/")
+            return;
         } else if specifier.starts_with("http:")
             || specifier.starts_with("https:")
             || specifier.starts_with("//")
@@ -185,6 +186,14 @@ impl Linter<'_> {
         };
         self.report(span, RULE_IMPORT, message);
     }
+}
+
+pub fn is_node_builtin(specifier: &str) -> bool {
+    specifier.starts_with("node:") || nodejs_built_in_modules::BUILTINS.binary_search(&specifier).is_ok()
+}
+
+pub fn node_builtin_message(specifier: &str) -> String {
+    format!("`{specifier}` is a Node module and doesn't run in the browser; use it in a .server.js")
 }
 
 pub fn is_package(specifier: &str) -> bool {

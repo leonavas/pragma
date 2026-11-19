@@ -50,7 +50,7 @@ impl Deps {
         }
         let resolver = Resolver::new(ResolveOptions {
             condition_names: ["browser", "import", "module", "default"].map(String::from).to_vec(),
-            main_fields: ["module", "main"].map(String::from).to_vec(),
+            main_fields: ["browser", "module", "main"].map(String::from).to_vec(),
             alias_fields: vec![vec!["browser".into()]],
             extensions: [".js", ".mjs", ".cjs"].map(String::from).to_vec(),
             symlinks: false,
@@ -60,18 +60,21 @@ impl Deps {
         Deps { root: root.to_path_buf(), listed, has_manifest: manifest.is_some(), resolver }
     }
 
-    pub fn check_listed(&self, spec: &str, client: bool) -> Result<(), String> {
+    pub fn check_listed(&self, spec: &str, client: bool) -> Result<(), (&'static str, String)> {
         let name = pragma_jslint::package_name(spec);
         if client && UI_LIBS.contains(&name) {
-            return Err(format!("package \"{name}\" is a UI framework; in pragma markup lives in .html and the runtime owns the DOM"));
+            return Err((RULE_IMPORT, format!("package \"{name}\" is a UI framework; in pragma markup lives in .html and the runtime owns the DOM")));
         }
         if self.listed.contains(name) {
             return Ok(());
         }
-        if !self.has_manifest {
-            return Err(format!("package \"{name}\" needs a package.json; create one with `npm init -y` and install with `npm i {name}` or `bun add {name}`"));
+        if pragma_jslint::is_node_builtin(spec) {
+            return if client { Err((RULE_PACKAGE, pragma_jslint::node_builtin_message(spec))) } else { Ok(()) };
         }
-        Err(format!("package \"{name}\" is not in package.json dependencies; install with `npm i {name}` or `bun add {name}`"))
+        if !self.has_manifest {
+            return Err((RULE_IMPORT, format!("package \"{name}\" needs a package.json; create one with `npm init -y` and install with `npm i {name}` or `bun add {name}`")));
+        }
+        Err((RULE_IMPORT, format!("package \"{name}\" is not in package.json dependencies; install with `npm i {name}` or `bun add {name}`")))
     }
 
     pub fn resolve(&self, from: &Path, spec: &str) -> Result<PathBuf, (&'static str, String)> {
@@ -81,10 +84,16 @@ impl Deps {
                 return Err((RULE_IMPORT, format!("\"{spec}\" not found in node_modules; run `npm install` or `bun install`")));
             }
             Err(ResolveError::Ignored(_)) => return Err((RULE_PACKAGE, format!("\"{spec}\" is not available in the browser (package browser field)"))),
+            Err(ResolveError::Json(e)) => {
+                let pkg = pragma_jslint::package_name(spec);
+                return Err((RULE_PACKAGE, format!("invalid package.json in {pkg}: {}", e.message)));
+            }
             Err(e) => return Err((RULE_PACKAGE, format!("cannot resolve \"{spec}\": {e}"))),
         };
-        let Ok(rel) = full.strip_prefix(&self.root) else {
-            return Err((RULE_PACKAGE, format!("\"{spec}\" resolves outside the project ({}); install the package in the app node_modules", full.display())));
+        let real = std::fs::canonicalize(&full).unwrap_or_else(|_| full.clone());
+        let inside = std::fs::canonicalize(&self.root).map_or(true, |root| real.starts_with(root));
+        let Some(rel) = full.strip_prefix(&self.root).ok().filter(|_| inside) else {
+            return Err((RULE_PACKAGE, format!("\"{spec}\" resolves outside the project ({}); install the package in the app node_modules", real.display())));
         };
         let rel_s = crate::project::rel_str(rel);
         if ![".js", ".mjs", ".cjs"].iter().any(|e| rel_s.ends_with(e)) {
