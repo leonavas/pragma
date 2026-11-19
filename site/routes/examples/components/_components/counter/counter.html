@@ -8,16 +8,21 @@
   const atMinimum = () => count - step < 0
   const atStart = () => count === start
 
-  function decrease() {
-    count -= step
+  function stepSize(event) {
+    return event.shiftKey ? step * 10 : step
   }
 
-  function increase() {
-    count += step
+  function decrease(event) {
+    count = Math.max(0, count - stepSize(event))
   }
 
-  function reset() {
+  function increase(event) {
+    count += stepSize(event)
+  }
+
+  function reset(el) {
     count = start
+    el.parentElement.querySelector('[aria-label="Increase"]').focus()
   }
 </script>
 
@@ -28,7 +33,7 @@
     <output class="counter-value">{$count}</output>
     <button type="button" class="counter-step" aria-label="Increase" @click="increase">+</button>
   </div>
-  <button type="button" class="counter-reset" @click="reset" :disabled="$atStart">Reset</button>
+  <button type="button" class="counter-reset" @click="reset(el)" :disabled="$atStart">Reset</button>
 </div>
 
 <style>

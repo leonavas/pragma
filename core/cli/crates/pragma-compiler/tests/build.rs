@@ -644,7 +644,7 @@ fn script_tag() {
 #[test]
 fn script_and_style_inside_the_html() {
     let page = "<title>Shop</title>\n<script>\n  import { log } from 'pragma'\n\n  let count = 0\n  function add() {\n    count += 1\n    log.info('added')\n  }\n</script>\n\n<button class=\"shop-btn\" @click=\"add\">{$count}</button>\n\n<style>\n  .shop-btn { padding: 1rem }\n</style>\n";
-    let comp_html = "<script type=\"module\">\n  export let step = 1\n  let total = 0\n  function bump() { total += step }\n</script>\n<p class=\"meter\" @click=\"bump\">{$total}</p>\n<style>\n  [data-c=\"meter\"] .x, .meter { margin: 0 }\n</style>\n";
+    let comp_html = "<script type=\"module\">\n  export let step = 1\n  let total = 0\n  function bump() { total += step }\n</script>\n<p class=\"meter\" @click=\"bump\">{$total}</p>\n<style>\n  [data-c=\"meter\"] .x, .meter { margin: 0 }\n  :global(html[data-theme=\"dark\"]) .meter { color: blue }\n</style>\n";
     let t = app_with(&[("routes/shop/index.html", Some(page)), ("lib/components/meter/meter.html", Some(comp_html)), (PAGE, Some("<c-meter step=\"3\"></c-meter>"))]);
     let app = t.0.join("app");
     let d = check(&app);
@@ -662,6 +662,8 @@ fn script_and_style_inside_the_html() {
     // styles are scoped: a component's to its root, a page's to its <main data-page="…">
     assert!(css.contains("/* routes/shop/index.html */") && css.contains(".shop-btn:where([data-page=\"shop/index\"],[data-page=\"shop/index\"] *) { padding: 1rem }"), "{css}");
     assert!(css.contains("/* lib/components/meter/meter.html */") && css.contains("[data-c=\"meter\"] .x, .meter:where([data-c=\"meter\"],[data-c=\"meter\"] *) { margin: 0 }"), "{css}");
+    // :global(…) opts out only what is inside it: `.meter` stays scoped (BUG-S-21)
+    assert!(css.contains("html[data-theme=\"dark\"] .meter:where([data-c=\"meter\"],[data-c=\"meter\"] *) { color: blue }"), "{css}");
     assert!(html.contains("<main data-page=\"shop/index\">"), "{html}");
     // diagnostics in an embedded script point at the .html line
     let bad = page.replace("count += 1", "count += 1\n    console.log(count)");

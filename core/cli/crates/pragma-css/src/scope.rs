@@ -10,7 +10,9 @@ const OLD_PSEUDO_ELEMENTS: &[&str] = &[":before", ":after", ":first-line", ":fir
 /// Scopes every style rule of `css` to `scope` (an attribute selector such as `[data-c="card"]`):
 /// a selector that does not mention it (any of `spellings`) gets `:where(scope, scope *)` on its
 /// subject, so it matches the owner's root and what is inside it, with no added specificity.
-/// A selector with `:global(…)` is not scoped (the wrapper is removed).
+/// `:global(…)` opts out only what is inside it (the wrapper is removed): the scope goes on the last
+/// compound that does not start with it (`:global(html.dark) .row` → `html.dark .row:where(…)`);
+/// a selector made only of `:global(…)` compounds (`:global(:root)`) is not scoped.
 pub fn scope(css: &str, scope: &str, spellings: &[String]) -> String {
     let mut out = String::with_capacity(css.len() + css.len() / 4);
     let mut rest = css;
@@ -58,16 +60,16 @@ pub fn scope(css: &str, scope: &str, spellings: &[String]) -> String {
 
 fn selector(s: &str, scope: &str, spellings: &[String]) -> String {
     let (lead, trimmed, trail) = (&s[..s.len() - s.trim_start().len()], s.trim(), &s[s.trim_end().len()..]);
-    if trimmed.contains(":global(") {
-        return format!("{lead}{}{trail}", unwrap_global(trimmed));
-    }
-    if trimmed.is_empty() || spellings.iter().any(|sp| trimmed.contains(sp.as_str())) {
-        return s.to_string();
-    }
-    let subject = subject_start(trimmed);
-    let compound = &trimmed[subject..];
-    let pseudo = pseudo_element(compound).map_or(trimmed.len(), |i| subject + i);
-    format!("{lead}{}:where({scope},{scope} *){}{trail}", &trimmed[..pseudo], &trimmed[pseudo..])
+    let written = spellings.iter().any(|sp| trimmed.contains(sp.as_str()));
+    let target = compounds(trimmed).into_iter().rev().find(|(start, _)| !trimmed[*start..].starts_with(":global("));
+    let scoped = match target {
+        Some((start, end)) if !written => {
+            let at = pseudo_element(&trimmed[start..end]).map_or(end, |i| start + i);
+            format!("{}:where({scope},{scope} *){}", &trimmed[..at], &trimmed[at..])
+        }
+        _ => trimmed.to_string(),
+    };
+    format!("{lead}{}{trail}", unwrap_global(&scoped))
 }
 
 /// `:global(x)` → `x`, everywhere in the selector.
@@ -85,10 +87,11 @@ fn unwrap_global(s: &str) -> String {
     out
 }
 
-/// Byte offset where the last compound selector begins (after the last top-level combinator).
-fn subject_start(s: &str) -> usize {
+/// Byte ranges of the compound selectors (split at the top-level combinators), in order.
+fn compounds(s: &str) -> Vec<(usize, usize)> {
     let b = s.as_bytes();
-    let (mut depth, mut start, mut i, mut quote) = (0i32, 0, 0, 0u8);
+    let (mut depth, mut i, mut quote, mut start) = (0i32, 0, 0u8, None::<usize>);
+    let mut out = Vec::new();
     while i < b.len() {
         let c = b[i];
         if quote != 0 {
@@ -97,18 +100,27 @@ fn subject_start(s: &str) -> usize {
             } else if c == quote {
                 quote = 0;
             }
+        } else if depth == 0 && matches!(c, b' ' | b'\t' | b'\n' | b'>' | b'+' | b'~') {
+            if let Some(from) = start.take() {
+                out.push((from, i));
+            }
+            i += 1;
+            continue;
         } else {
             match c {
                 b'"' | b'\'' => quote = c,
                 b'(' | b'[' => depth += 1,
                 b')' | b']' => depth -= 1,
-                b' ' | b'\t' | b'\n' | b'>' | b'+' | b'~' if depth == 0 => start = i + 1,
                 _ => {}
             }
         }
+        start.get_or_insert(i);
         i += 1;
     }
-    start
+    if let Some(from) = start {
+        out.push((from, b.len()));
+    }
+    out
 }
 
 /// Offset of the pseudo-element (`::x` or an old one-colon form) in a compound selector.
@@ -230,7 +242,17 @@ mod tests {
     fn written_scope_and_global_are_kept() {
         let css = "[data-c=\"card\"] .t{x:1} .dark [data-c='card']{x:1} [data-c=\"card\"][open]{x:1}";
         assert_eq!(card(css), css);
-        assert_eq!(card(":global(body.locked) .x, :global(:root){--a:1}"), "body.locked .x, :root{--a:1}");
+        assert_eq!(card("[data-c=card] :global(.x){a:1}"), "[data-c=card] .x{a:1}");
+    }
+
+    #[test]
+    fn global_opts_out_only_what_is_inside_it() {
+        assert_eq!(card(":global(html[data-theme=\"dark\"]) .row{x:1}"), format!("html[data-theme=\"dark\"] .row{W}{{x:1}}"));
+        assert_eq!(card(":global(body.locked) .x::before, :global(:root){--a:1}"), format!("body.locked .x{W}::before, :root{{--a:1}}"));
+        assert_eq!(card(":global(:root), :global(body.locked):hover, :global(.a) > :global(.b){x:1}"), ":root, body.locked:hover, .a > .b{x:1}");
+        assert_eq!(card(".list :global(.hit){x:1}"), format!(".list{W} .hit{{x:1}}"));
+        assert_eq!(card("button:global(.active){x:1}"), format!("button.active{W}{{x:1}}"));
+        assert_eq!(card(":global(.dark) li:nth-child(2n + 1) > a[title~=\"a b\"]{x:1}"), format!(".dark li:nth-child(2n + 1) > a[title~=\"a b\"]{W}{{x:1}}"));
     }
 
     #[test]

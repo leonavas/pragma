@@ -370,7 +370,10 @@ Usage:
   pseudo-element), so it matches only the component root and its content and adds no specificity.
   A page's `<style>`/`.css` is scoped the same way to `[data-page="<page>"]`: the build writes
   the page name on the layout `<main data-page>` of pages with CSS, and the router copies it on
-  navigation. A selector with `:global(…)` is not scoped (the wrapper is removed). Style rules
+  navigation. `:global(…)` opts out only what is inside it (Svelte semantics; the wrapper is
+  removed): the scope goes on the last compound that does not start with `:global(`
+  (`:global(html.dark) .row` → `html.dark .row:where(…)`, `.list :global(.hit)` →
+  `.list:where(…) .hit`); a selector whose every compound starts with it is global. Style rules
   inside `@media`, `@supports`, `@layer`, `@container`, `@starting-style` are scoped; other
   at-rules (`@keyframes`, `@font-face`…) are copied.
 - v0 output: one global minified CSS (lightningcss) with hash.

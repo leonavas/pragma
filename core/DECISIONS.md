@@ -91,6 +91,10 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   a global rule and nothing warned; agents from Svelte/Vue expect scoping. The hand-written
   `[data-c="x"]` prefix keeps working, so existing CSS does not change (the site's global CSS
   stayed at 14.8 kB gzip).
+- **[firm]** (BUG-S-21, 2026-11-19) `:global(…)` opts out only what is inside it (Svelte
+  semantics): `:global(html[data-theme="dark"]) .row` keeps `.row` scoped; only a selector whose
+  every compound is `:global(…)` is global. *Why:* the old rule unscoped the whole selector, so the
+  documented dark-mode example colored every `.row` of the app.
 - **[firm v0]** Prop truthiness is the same in HTML and JS: missing, `""`, `"false"` are falsy;
   bare attribute and other values truthy. In `ctx.$`, `"true"`/bare → `true`, `"false"` →
   `false`, other values stay strings.

@@ -11,15 +11,17 @@
     <div class="prose">
       <p>A top-level <code>let</code> is state, <code>export let</code> is a prop, a function is an action or a derived value, and <code>&#123;$count&#125;</code> puts a value in the text.</p>
     </div>
-    <c-showcase :source="data.examples.counter" caption="Each click runs a function that assigns count; the runtime reapplies only the bindings, it never rebuilds the DOM.">
+    <c-showcase :source="data.examples.counter" caption="Shift-click moves ten steps. Each click runs a function that assigns count; the runtime reapplies only the bindings, it never rebuilds the DOM.">
       <p-counter label="Steps of 5" start="10" step="5"></p-counter>
     </c-showcase>
     <div class="prose">
       <ul>
         <li><code>export let start = 0</code> declares a prop with a default. The default's type converts the attribute: <code>start="10"</code> arrives as the number <code>10</code>, so no <code>Number()</code> anywhere. Props are read-only: <code>let count = start</code> copies one into state.</li>
         <li><code>const atMinimum = () =&gt; …</code> is a derived value: used in a binding (<code>:disabled="$atMinimum"</code>), it runs on every render. In JS you call it: <code>atMinimum()</code>.</li>
-        <li><code>function increase()</code> is an action when an event names it (<code>@click="increase"</code>). Assigning <code>count</code> schedules one render per microtask; there is no <code>setState</code> and no <code>this</code>.</li>
-        <li><code>&lt;style&gt;</code> is scoped by the build: <code>.counter-step</code> only matches inside this component, with no added specificity, so write plain selectors. <code>:global(…)</code> opts a selector out, and the root itself is <code>[data-c="counter"]</code>. A separate <code>counter.css</code> works the same way; having both it and the <code>&lt;style&gt;</code> (or a <code>&lt;script&gt;</code> and a <code>counter.js</code>) is a check error (<code>html/duplicate-module</code>).</li>
+        <li><code>function increase(event)</code> is an action when an event names it. Without parentheses, <code>@click="increase"</code> passes the DOM event, here to read <code>event.shiftKey</code>. Assigning <code>count</code> schedules one render per microtask; there is no <code>setState</code> and no <code>this</code>.</li>
+        <li>With parentheses the function gets only what you list: paths, literals, <code>event</code> and <code>el</code>, the element that has the <code>@</code>. Reset hides itself after a click, so <code>@click="reset(el)"</code> moves the focus to <strong>+</strong> and keyboard users keep their place.</li>
+        <li>A store function works the same way, with no wrapper: <code>@click="shared.cart.add(product)"</code>. A component that only reads and calls a store needs no script, as on the <a href="/examples/stores">stores page</a>.</li>
+        <li><code>&lt;style&gt;</code> is scoped by the build: <code>.counter-step</code> only matches inside this component, with no added specificity, so write plain selectors. <code>:global(…)</code> opts out only what is inside it (<code>:global(html[data-theme="dark"]) .counter-step</code> is still this component's buttons), and the root itself is <code>[data-c="counter"]</code>. A separate <code>counter.css</code> works the same way; having both it and the <code>&lt;style&gt;</code> (or a <code>&lt;script&gt;</code> and a <code>counter.js</code>) is a check error (<code>html/duplicate-module</code>).</li>
       </ul>
       <p>The component lives in <code>_components/counter/</code> next to this page, so it is used as <code>&lt;p-counter&gt;</code>. Moving the folder to <code>lib/components/</code> would make it <code>&lt;c-counter&gt;</code> for every route.</p>
     </div>

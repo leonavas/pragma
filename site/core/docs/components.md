@@ -19,9 +19,9 @@ name/
 
 The `<script>` is the component's state and behavior (state.md); `<style>` (or `name.css`) is
 its CSS. The build scopes every selector to the component (its root and what is inside it):
-`button { … }` never styles a button outside it. `:global(…)` opts a selector out
-(`:global(html[data-theme="dark"]) .x`). Selectors that already start with `[data-c="name"]` stay
-as written. Both inline and as a file = `html/duplicate-module`.
+`button { … }` never styles a button outside it. `:global(…)` opts out only what is inside it:
+`:global(html[data-theme="dark"]) .x` is this component's `.x` in dark mode; `:global(body.locked)`
+alone is global (css.md). Selectors that already start with `[data-c="name"]` stay as written. Both inline and as a file = `html/duplicate-module`.
 
 `p-` names are private to their folder, styles included: two `<p-badge>` in different folders
 never share CSS (the build gives each its own `data-c` and rewrites `[data-c="badge"]` in its own
