@@ -98,6 +98,13 @@ const BASE: &str = r#"@layer base {
   dialog::backdrop {
     background-color: rgb(0 0 0 / 0.5);
   }
+  /* Chromium (GPU) can capture an empty old snapshot and paint it white: fade the new page in over the background */
+  ::view-transition-old(root) {
+    display: none;
+  }
+  ::view-transition-new(root) {
+    mix-blend-mode: normal;
+  }
   .skeleton {
     display: block;
     min-height: 1em;
