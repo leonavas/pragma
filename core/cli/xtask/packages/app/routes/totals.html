@@ -1,5 +1,19 @@
+<script>
+  import groupBy from 'lodash/groupBy'
+  import sumBy from 'lodash/sumBy'
+
+  const stock = [
+    { name: 'Coffee', kind: 'drink', units: 4 },
+    { name: 'Tea', kind: 'drink', units: 6 },
+    { name: 'Bread', kind: 'food', units: 5 },
+  ]
+
+  const totalStock = sumBy(stock, item => item.units)
+  const stockGroups = Object.keys(groupBy(stock, item => item.kind)).join(', ')
+</script>
+
 <title>Totals</title>
 
 <h1>lodash on a second page</h1>
-<p>Total stock: <span id="total-stock" :text="$totalStock"></span></p>
-<p>Groups: <span id="stock-groups" :text="$stockGroups"></span></p>
+<p>Total stock: <span id="total-stock">{$totalStock}</span></p>
+<p>Groups: <span id="stock-groups">{$stockGroups}</span></p>

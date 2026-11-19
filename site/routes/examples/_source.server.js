@@ -30,9 +30,7 @@ async function readSource(folder, entry, example, index) {
     lines,
     long: phoneRows(lines) > longSourceRows,
     active: index === 0,
-    pressed: index === 0 ? 'true' : 'false',
-    copied: false,
-    blocked: false,
+    expanded: false,
   }
 }
 

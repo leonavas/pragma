@@ -1,17 +1,170 @@
+<script>
+  export let src = ''
+  export let title = ''
+  export let height = 'md'
+
+  const pollMs = 400
+  const clickWindowMs = 4000
+  const frameId = 'frame-' + crypto.randomUUID()
+
+  let current = src
+  let live = true
+  let loading = false
+  let kind = ''
+  let timing = ''
+  let beat = ''
+
+  const reloadLabel = () => 'Reload ' + current
+  const openLabel = () => 'Open ' + current + ' in a new tab'
+
+  function addressOf(view) {
+    try {
+      return view.location.protocol === 'about:' ? '' : view.location.pathname + view.location.search + view.location.hash
+    } catch {
+      return ''
+    }
+  }
+
+  function loadMs(view) {
+    const [entry] = view.performance.getEntriesByType('navigation')
+    return entry ? Math.round(entry.loadEventStart || entry.domContentLoadedEventEnd) : 0
+  }
+
+  function show(address, nextKind, elapsedMs) {
+    loading = false
+    kind = nextKind
+    timing = nextKind && elapsedMs > 0 ? elapsedMs + ' ms' : ''
+    if (!address || address === current) return
+    current = address
+    beat = beat === 'a' ? 'b' : 'a'
+  }
+
+  function reload() {
+    loading = true
+    document.getElementById(frameId).contentWindow.location.reload()
+  }
+
+  function mount() {
+    const frame = document.getElementById(frameId)
+    let view = null
+    let startedAt = 0
+    let poll = 0
+    let swaps = null
+
+    const routed = () => {
+      const address = view && addressOf(view)
+      const elapsedMs = performance.now() - startedAt
+      const timed = startedAt > 0 && elapsedMs < clickWindowMs
+      if (!address || (!timed && address === current)) return
+      startedAt = 0
+      show(address, 'router', timed ? Math.max(1, Math.round(elapsedMs)) : 0)
+    }
+    const follow = () => {
+      const address = view && addressOf(view)
+      if (address && address !== current && !startedAt) routed()
+    }
+    const swapped = () => {
+      if (startedAt) routed()
+    }
+    const markStart = event => {
+      if (event.type === 'submit' || event.target.closest?.('a[href]')) startedAt = performance.now()
+    }
+    const leaving = () => {
+      loading = true
+    }
+    const detach = () => {
+      clearInterval(poll)
+      swaps?.disconnect()
+      if (!view) return
+      view.removeEventListener('click', markStart, true)
+      view.removeEventListener('submit', markStart, true)
+      view.removeEventListener('popstate', follow)
+      view.removeEventListener('pagehide', leaving)
+      view.navigation?.removeEventListener('currententrychange', routed)
+      view = null
+    }
+    const attach = () => {
+      detach()
+      view = frame.contentWindow
+      view.addEventListener('click', markStart, true)
+      view.addEventListener('submit', markStart, true)
+      view.addEventListener('popstate', follow)
+      view.addEventListener('pagehide', leaving)
+      if (view.navigation) {
+        view.navigation.addEventListener('currententrychange', routed)
+        return
+      }
+      poll = setInterval(follow, pollMs)
+      const page = view.document.querySelector('main[data-page]')
+      swaps = new MutationObserver(swapped)
+      if (page) swaps.observe(page, { childList: true })
+    }
+    const loaded = event => {
+      if (event.target !== frame || !addressOf(frame.contentWindow)) return
+      startedAt = 0
+      attach()
+      show(addressOf(view), 'load', loadMs(view))
+    }
+
+    document.addEventListener('load', loaded, true)
+    if (frame.contentDocument?.readyState === 'complete') loaded({ target: frame })
+    return () => {
+      document.removeEventListener('load', loaded, true)
+      detach()
+    }
+  }
+</script>
+
 <div class="flex w-full min-w-0 flex-col border border-line bg-ground">
   <div class="flex h-11 items-center gap-1 border-b border-line bg-sunken pr-1 font-mono text-xs">
     <button type="button" class="frame-control inline-flex h-11 min-w-11 flex-none cursor-pointer items-center justify-center text-muted transition-colors hover:text-ink" @click="reload" :aria-label="$reloadLabel" .is-busy="$loading">
       <svg class="frame-reload size-3.5" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1" fill="none" stroke="currentColor" stroke-width="1.25"></path><path d="M12.4 1.6v2.9H9.5" fill="none" stroke="currentColor" stroke-width="1.25"></path></svg>
     </button>
     <p class="frame-address h-8 min-w-0 flex-1 truncate border border-line bg-ground px-3 text-left text-ink">
-      <span class="frame-path" :show="!$live" :text="$src"></span>
-      <span class="frame-path" hidden :show="$live" :data-beat="$beat" :text="$current"></span>
+      <span class="frame-path" :show="!$live">{$src}</span>
+      <span class="frame-path" hidden :show="$live" :data-beat="$beat">{$current}</span>
     </p>
-    <p class="hidden flex-none whitespace-nowrap pl-2 pr-1 tabular-nums text-faint sm:block" :show="$timing" :data-kind="$navigation"><span class="frame-kind" :text="$navigation"></span><span class="px-1.5 text-line-strong" aria-hidden="true">·</span><span class="text-muted" :text="$timing"></span></p>
+    <p class="hidden flex-none whitespace-nowrap pl-2 pr-1 tabular-nums text-faint sm:block" :show="$timing" :data-kind="$kind"><span class="frame-kind">{$kind}</span><span class="px-1.5 text-line-strong" aria-hidden="true">·</span><span class="text-muted">{$timing}</span></p>
     <a class="frame-control inline-flex h-11 min-w-11 flex-none items-center justify-center gap-2 text-muted no-underline transition-colors hover:text-ink sm:px-3" :href="$current" target="_blank" rel="noopener" :aria-label="$openLabel">
       <span class="hidden sm:inline">Open</span>
       <svg class="size-3.5" viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5l-6 6M11.5 9.5v4h-9v-9h4" fill="none" stroke="currentColor" stroke-width="1.25"></path></svg>
     </a>
   </div>
-  <iframe class="frame-view block w-full border-0 bg-ground" :src="$src" :title="$title" loading="lazy"></iframe>
+  <iframe class="frame-view block w-full border-0 bg-ground" :id="$frameId" src="{$src}" title="{$title}" loading="lazy"></iframe>
 </div>
+
+<style>
+  [data-c="frame"] .frame-control:focus-visible { outline-offset: -4px; }
+  [data-c="frame"] .is-busy .frame-reload { animation: frame-spin 0.7s linear infinite; }
+  [data-c="frame"] .frame-address {
+    line-height: calc(2rem - 2px);
+    direction: rtl;
+  }
+  [data-c="frame"] .frame-path {
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+  [data-c="frame"] .frame-path[data-beat="a"] { animation: frame-beat-a 1.2s var(--ease-out); }
+  [data-c="frame"] .frame-path[data-beat="b"] { animation: frame-beat-b 1.2s var(--ease-out); }
+  [data-c="frame"] [data-kind="router"] .frame-kind { color: var(--color-accent); }
+  [data-c="frame"] .frame-view { height: 26rem; }
+  [data-c="frame"][data-prop-height="sm"] .frame-view { height: 18rem; }
+  [data-c="frame"][data-prop-height="lg"] .frame-view { height: 34rem; }
+  @media (max-width: 29.99rem) {
+    [data-c="frame"] .frame-view { height: 24rem; }
+    [data-c="frame"][data-prop-height="lg"] .frame-view { height: 30rem; }
+  }
+  @keyframes frame-spin {
+    to { rotate: 360deg; }
+  }
+  @keyframes frame-beat-a {
+    from { color: var(--color-accent); }
+  }
+  @keyframes frame-beat-b {
+    from { color: var(--color-accent); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-c="frame"] .is-busy .frame-reload { animation: none; opacity: 0.4; }
+    [data-c="frame"] .frame-path[data-beat] { animation: none; }
+  }
+</style>

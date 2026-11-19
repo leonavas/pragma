@@ -18,7 +18,7 @@ npm i date-fns --ignore-scripts
 ```js
 import { format } from 'date-fns'
 
-export const state = () => ({ today: format(new Date(), 'PPP') })
+let today = format(new Date(), 'PPP')
 ```
 
 - Use a quoted specifier, never a template literal.

@@ -7,10 +7,10 @@
 <section class="wrap" aria-labelledby="live-title">
   <div class="grid gap-8 py-16 lg:py-24">
     <div class="max-w-2xl">
-      <h2 id="live-title" class="text-2xl font-medium tracking-tight sm:text-3xl">The source, running on this page</h2>
-      <p class="mt-4 text-muted">The task list from the Closed principle, live. Check a task, add one, hide the done ones: each action changes state and the runtime reapplies the bindings. No virtual DOM, no re-render.</p>
+      <h2 id="live-title" class="text-2xl font-medium tracking-tight sm:text-3xl">One file: markup, script and style</h2>
+      <p class="mt-4 text-muted">A component is one .html file. A top-level <code class="text-ink">let</code> is state, a function is an action or a derived value, and <code class="text-ink">{path}</code> puts a value in the text. Check a task, add one, hide the done ones: each action assigns a variable and the runtime reapplies the bindings. No hooks, no virtual DOM.</p>
     </div>
-    <c-showcase :source="data.examples.tasks" caption="The tabs are read from disk when this page loads, so the source you see is the source that runs.">
+    <c-showcase :source="data.examples.tasks" caption="This is the whole component, read from disk when the page renders: the source you see is the source that runs.">
       <p-task-list></p-task-list>
     </c-showcase>
   </div>

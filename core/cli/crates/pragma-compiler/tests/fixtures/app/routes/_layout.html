@@ -5,7 +5,7 @@
 <header class="flex items-center gap-4 p-4">
   <a href="/">Home</a>
   <c-counter></c-counter>
-  <span :text="shared.cart.total">0</span>
+  <span>{shared.cart.total}</span>
 </header>
 <main data-page><slot></slot></main>
-<footer class="text-sm text-neutral-500" :text="query.ref"></footer>
+<footer class="text-sm text-neutral-500">{query.ref}</footer>

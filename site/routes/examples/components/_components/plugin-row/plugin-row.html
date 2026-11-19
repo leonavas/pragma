@@ -1,5 +1,24 @@
 <li>
-  <span class="plugin-name" :text="$plugin.name"></span>
-  <span class="plugin-kind" :text="$plugin.kind"></span>
-  <span class="plugin-size" :text="$plugin.size"></span>
+  <span class="plugin-name">{$plugin.name}</span>
+  <span class="plugin-kind">{$plugin.kind}</span>
+  <span class="plugin-size">{$plugin.size}</span>
 </li>
+
+<style>
+  [data-c="plugin-row"] {
+    display: grid;
+    grid-template-columns: 1fr auto 4.5rem;
+    gap: 1rem;
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--color-line);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  [data-c="plugin-row"] .plugin-name { color: var(--color-ink); }
+  [data-c="plugin-row"] .plugin-kind { color: var(--color-faint); }
+  [data-c="plugin-row"] .plugin-size {
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+</style>

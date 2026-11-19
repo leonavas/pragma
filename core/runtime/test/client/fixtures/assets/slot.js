@@ -1,20 +1,21 @@
-export const state = ctx => ({
-  title: 'from page',
-  field: '',
-  visible: true,
-  clicks: 0,
-  picked: '',
-  marked: false,
-  editing: false,
-  items: [{ id: 1, name: 'one', max: 3 }, { id: 2, name: 'two', max: 7 }],
-  get double() { return ctx.shared.account.total * 2 },
-})
+export default function ($, $pragma) {
+  $.title = 'from page'
+  $.field = ''
+  $.visible = true
+  $.clicks = 0
+  $.picked = ''
+  $.marked = false
+  $.editing = false
+  $.items = [{ id: 1, name: 'one', max: 3 }, { id: 2, name: 'two', max: 7 }]
 
-export const actions = {
-  page(ctx) { ctx.$.clicks++; ctx.shared.account.n++ },
-  pick(ctx) { ctx.$.picked = ctx.scope.item.name },
-}
+  const double = () => $pragma.shared.account.total() * 2
 
-export function mount(ctx) {
-  self.__slot = ctx
+  function page() { $.clicks++; $pragma.shared.account.n++ }
+  function pick(item) { $.picked = item.name }
+
+  function mount() {
+    self.__slot = { $, update: fn => fn($) }
+  }
+
+  return { double, page, pick, mount }
 }

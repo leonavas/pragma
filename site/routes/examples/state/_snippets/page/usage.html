@@ -3,9 +3,6 @@
     <span class="label">Your name</span>
     <input class="h-10 border border-line-strong bg-sunken px-3" autocomplete="given-name" :model="$visitor">
   </label>
-  <p class="text-lg" :text="$greeting"></p>
-  <div class="flex items-center justify-between gap-3">
-    <p class="font-mono text-xs text-faint">owner: <span :text="$ownerTag"></span></p>
-    <button type="button" class="btn btn-small" @click="forget" :disabled="$anonymous">Forget</button>
-  </div>
+  <p class="text-lg">{$greeting}</p>
+  <div><button type="button" class="btn btn-small" @click="forget" :disabled="$anonymous">Forget</button></div>
 </div>

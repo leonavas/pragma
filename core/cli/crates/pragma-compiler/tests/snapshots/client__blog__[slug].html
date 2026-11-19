@@ -13,7 +13,6 @@
 <link rel="modulepreload" href="/assets/lib/state/cart.js">
 <link rel="modulepreload" href="/assets/core/router.js">
 <link rel="modulepreload" href="/assets/core/log.js">
-<link rel="modulepreload" href="/assets/core/state.js">
 <script type="application/json" id="pragma-route">{"pattern":"/blog/:slug","page":"/assets/routes/blog/[slug].js","components":{"counter":"/assets/lib/components/counter/counter.js"},"stores":{"cart":"/assets/lib/state/cart.js"},"loader":true,"ssr":true}</script>
 <script type="module" src="/assets/core/boot.js"></script>
 <script type="module" src="/_pragma/dev.js"></script>
@@ -21,18 +20,18 @@
 <body>
 <header class="flex items-center gap-4 p-4">
   <a href="/">Home</a>
-  <button data-c="counter" class="btn" data-on-click="add"><span data-text="state.n">0</span></button>
-  <span data-text="shared.cart.total">0</span>
+  <button data-c="counter" class="btn" data-on-click="add"><span data-text="{state.count}"></span></button>
+  <span data-text="{shared.cart.total}"></span>
 </header>
 <main data-page>
 <article class="p-4">
-  <h1 data-text="data.post.heading">Title</h1>
+  <h1 data-text="{data.post.heading}"></h1>
   <ul>
-    <template data-for="t in data.post.tags" data-key="t.id" data-tid="tea69c8b"><li data-class-active="t.active" class="tag" data-text="t.name"></li></template>
+    <template data-for="t in data.post.tags" data-key="t.id" data-tid="tea69c8b"><li data-class-active="t.active" class="tag" data-text="{t.name}"></li></template>
   </ul>
   <p data-show="state.read">read</p>
 </article>
 </main>
-<footer class="text-sm text-neutral-500" data-text="query.ref"></footer>
+<footer class="text-sm text-neutral-500" data-text="{query.ref}"></footer>
 </body>
 </html>

@@ -1,10 +1,9 @@
-export const state = ctx => ({
-  visitor: '',
-  ownerTag: `${ctx.el.localName}[data-page]`,
-  get greeting() { return this.visitor.trim() ? `Hello, ${this.visitor.trim()}.` : 'Hello, whoever you are.' },
-  get anonymous() { return !this.visitor.trim() },
-})
+let visitor = ''
 
-export const actions = {
-  forget(ctx) { ctx.$.visitor = '' },
+const name = () => visitor.trim()
+const greeting = () => name() ? `Hello, ${name()}.` : 'Hello, whoever you are.'
+const anonymous = () => !name()
+
+function forget() {
+  visitor = ''
 }

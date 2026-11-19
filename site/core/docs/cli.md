@@ -23,17 +23,24 @@ Run `pragma check --strict` before finishing: zero errors, zero warnings. Output
 | `js/import` | import only project files, `core/` and `package.json` dependencies (packages.md); `import()` only with a quoted specifier (`import('./chart.js')`), never a variable or `${}` |
 | `js/comment`, `html/comment`, `css/comment` | delete the comment; name things clearly |
 | `js/vague-name` | descriptive names. Flagged: generic words (`tmp`, `data`, `info`, `handler`, `util`…), names ending in a digit, names under 3 chars except `$ i j k id ok el ctx url log` and parameters of expression-body arrows |
-| `js/ctx` | `ctx.$`, not `ctx.state`/`ctx.props` |
+| `js/legacy-api` | old API (`export const state`/`actions`, `export function mount`, `ctx.$`, `ctx.update`, `store()`): top-level `let` for state, functions for actions and derived values, `function mount()`, `export let` for props (components.md, state.md) |
+| `js/prop-write` | props are read-only (also through `:model`): copy into a `let` (`let current = start`) |
+| `js/const-state` | a top-level `const` changed in place and read in HTML does not update the page: declare it with `let` |
+| `js/store-import` | reach stores through `shared` (`import { shared } from 'pragma'`, then `shared.cart`) |
+| `js/component-script` | script shape (state.md): no `var`, no destructuring `let`, only `export let` props (stores: only `export const persist`), no top-level `await`, only `pragma`'s names, `$`/`$pragma` reserved |
 | `html/legacy-syntax`, `html/unknown-directive` | syntax.md. Vue, Alpine, Svelte, Angular and React attributes (`v-if`, `x-show`, `v-bind:href`, `on:click`, `*ngIf`, `[disabled]`, `className`) do nothing here: the message names the pragma form (`<if path>`, `:show`, `:href`, `@click`) |
-| `html/data-attribute` | no hand-written `data-*`: reserved ones name their short form (`data-text` → `:text`); others suggest `:data-x="path"`, `.name="path"`, `aria-*` or role/label/id |
-| `html/invalid-path`, `html/invalid-root` | only `root.a.b` with a valid root (syntax.md) |
+| `html/data-attribute` | no hand-written `data-*`: reserved ones name their short form (`data-text` → `{path}` inside the element); others suggest `:data-x="path"`, `.name="path"`, `aria-*` or role/label/id |
+| `html/invalid-path`, `html/invalid-root` | only `root.a.b` with a valid root (syntax.md); in `{}` close the brace (`\{` for a literal one); event arguments are paths, `'text'`, numbers, `true`/`false`/`null` or `event`, never expressions |
+| `html/text-removed` | `:text` was removed: write `{path}` inside the element (`<p>{$name}</p>`) |
 | `html/block`, `html/block-single-root`, `html/for-without-key`, `html/misplaced-else`, `html/misplaced-empty`, `html/outside-template` | block rules (syntax.md) |
-| `html/unknown-action` | export the action from the owner's `.js` |
+| `html/unknown-name` | declare it at the top level of the owner's script: `let x` (state), `export let x` (prop), `function x()` (action or derived); the layout has no script |
+| `html/unknown-prop` | the component's script must declare the prop: `export let name = default` |
+| `html/duplicate-module` | one place per component: `<script>`/`<style>` inside the `.html` or `x.js`/`x.css`, not both |
 | `html/component`, `html/unknown-component` | components.md |
 | `html/layout`, `html/title`, `html/head` | routes.md (SEO) |
-| `html/class` | toggle classes with `.name="path"`, never `:class` (syntax.md) |
-| `html/interpolation` | no `{{ }}`/`${ }`: use `:text`/`:attr` (syntax.md) |
-| `html/script`, `html/style-inline`, `html/on-inline` | behavior in `.js`, style in classes |
+| `html/class` | toggle classes with `.name="path"`, never `:class` or `{}` in `class` (syntax.md) |
+| `html/interpolation` | no `{{ }}`/`${ }`: write `{path}` (syntax.md) |
+| `html/script`, `html/style-inline`, `html/on-inline` | one `<script>` and one `<style>`, at the top level of a page or component `.html`, without attributes (`<script>` takes only `type="module"`); otherwise behavior in a script function, style in classes |
 | `css/unknown-class`, `css/arbitrary-value` | classes.md, css.md |
 | `app/structure`, `app/route-conflict` | structure.md, routes.md |
 | `app/package` | packages.md |
@@ -46,7 +53,7 @@ Run `pragma check --strict` before finishing: zero errors, zero warnings. Output
 | Rule | Fix |
 |---|---|
 | `img-alt` | `alt` on every `<img>`; `alt=""` if decorative |
-| `accessible-name` | `<button>`/`<a>` with text, `:text`, `aria-label` or `title` |
+| `accessible-name` | `<button>`/`<a>` with text, `{path}`, `aria-label` or `title` |
 | `label` | field with `<label for>`, wrapped in `<label>`, or `aria-label` |
 | `dialog-name` | `<dialog>` with `aria-label` or `aria-labelledby` |
 | `click-non-interactive` | `@click` on `<button>`/`<a>`; otherwise add `role` and `tabindex` |
@@ -57,7 +64,7 @@ Run `pragma check --strict` before finishing: zero errors, zero warnings. Output
 | `iframe-title` | `title` on `<iframe>` |
 | `a-no-href` | every `<a>` has `href`; actions use `<button>` |
 
-`:<attr>` counts as the attribute (`:aria-label="task.title"`).
+`:<attr>` and `{}` in the attribute count as the attribute (`:aria-label="task.title"`, `aria-label="Remove {task.title}"`).
 
 ## `dist/`
 

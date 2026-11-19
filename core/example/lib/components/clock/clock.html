@@ -1,1 +1,12 @@
-<time class="tabular-nums" :text="$time">--:--:--</time>
+<script>
+  const currentTime = () => new Date().toLocaleTimeString('en-GB')
+
+  let time = currentTime()
+
+  function mount() {
+    const timer = setInterval(() => { time = currentTime() }, 1000)
+    return () => clearInterval(timer)
+  }
+</script>
+
+<time class="tabular-nums">{$time}</time>

@@ -1,6 +1,35 @@
+<script>
+  import { BarController, BarElement, CategoryScale, Chart, LinearScale } from 'chart.js'
+
+  Chart.register(BarController, BarElement, CategoryScale, LinearScale)
+
+  let salesChart = null
+  let monthCount = 3
+
+  function addApril() {
+    if (!salesChart || salesChart.data.labels.includes('Apr')) return
+    salesChart.data.labels.push('Apr')
+    salesChart.data.datasets[0].data.push(23)
+    salesChart.update()
+    monthCount = salesChart.data.labels.length
+  }
+
+  function mount() {
+    salesChart = new Chart(document.getElementById('sales-by-month'), {
+      type: 'bar',
+      data: { labels: ['Jan', 'Feb', 'Mar'], datasets: [{ label: 'Sales', data: [12, 19, 7], backgroundColor: '#2563eb' }] },
+      options: { animation: false, responsive: false },
+    })
+    return () => {
+      salesChart.destroy()
+      salesChart = null
+    }
+  }
+</script>
+
 <title>chart.js</title>
 
 <h1>chart.js</h1>
 <canvas id="sales-by-month" width="480" height="240" role="img" aria-label="Sales by month"></canvas>
 <button type="button" class="btn btn-primary" @click="addApril">Add April</button>
-<p>Months: <span id="month-count" :text="$monthCount"></span></p>
+<p>Months: <span id="month-count">{$monthCount}</span></p>

@@ -1,9 +1,75 @@
-<div role="group" :aria-label="$label">
-  <span class="counter-label" :text="$label"></span>
+<script>
+  export let label = ''
+  export let start = 0
+  export let step = 1
+
+  let count = start
+
+  const atMinimum = () => count - step < 0
+  const atStart = () => count === start
+
+  function decrease() {
+    count -= step
+  }
+
+  function increase() {
+    count += step
+  }
+
+  function reset() {
+    count = start
+  }
+</script>
+
+<div role="group" aria-label="{$label}">
+  <span class="counter-label">{$label}</span>
   <div class="counter-controls">
     <button type="button" class="counter-step" aria-label="Decrease" @click="decrease" :disabled="$atMinimum">−</button>
-    <output class="counter-value" :text="$count"></output>
+    <output class="counter-value">{$count}</output>
     <button type="button" class="counter-step" aria-label="Increase" @click="increase">+</button>
   </div>
   <button type="button" class="counter-reset" @click="reset" :disabled="$atStart">Reset</button>
 </div>
+
+<style>
+  [data-c="counter"] {
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+  }
+  [data-c="counter"] .counter-label {
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  [data-c="counter"] .counter-controls {
+    display: flex;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-surface);
+  }
+  [data-c="counter"] .counter-step {
+    width: 3rem;
+    font-size: 1.25rem;
+    cursor: pointer;
+  }
+  [data-c="counter"] .counter-step:hover { background: var(--color-raised); }
+  [data-c="counter"] .counter-step:disabled { color: var(--color-faint); cursor: not-allowed; }
+  [data-c="counter"] .counter-value {
+    min-width: 5rem;
+    padding: 0.75rem 1rem;
+    border-inline: 1px solid var(--color-line-strong);
+    font-family: var(--font-mono);
+    font-size: 1.75rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+  [data-c="counter"] .counter-reset {
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-decoration: underline;
+    text-underline-offset: 0.3em;
+    cursor: pointer;
+  }
+  [data-c="counter"] .counter-reset:disabled { visibility: hidden; }
+</style>

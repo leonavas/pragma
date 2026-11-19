@@ -10,16 +10,62 @@ const fail = msg => { throw new Error('pragma: ' + msg) }
 const path = v => v.split('.')
 const cond = v => (v[0] === '!' ? [path(v.slice(1)), true] : [path(v), false])
 
+// A function met on a path is a derived value: called with no args.
 export function get(s, p) {
   let v = s
   for (const k of p) {
-    if (v == null || !(k in Object(v))) {
+    const o = v
+    if (o == null || !(k in Object(o))) {
       if (self.__pragmaDev && p[0] !== 'query') fail(`unknown path "${p.join('.')}"`)
       return
     }
-    v = v[k]
+    v = o[k]
+    if (typeof v === 'function') v = v.call(o)
   }
   return v
+}
+
+// Template "a {path} b": [literal, path, literal, …]; `\{` is a literal brace.
+const TPL = /\\\{|\{([^{}]*)\}/g
+export function template(v) {
+  const t = ['']
+  let at = 0
+  for (const m of v.matchAll(TPL)) {
+    t[t.length - 1] += v.slice(at, m.index)
+    if (m[1] == null) t[t.length - 1] += '{'
+    else t.push(path(m[1]), '')
+    at = m.index + m[0].length
+  }
+  t[t.length - 1] += v.slice(at)
+  return t
+}
+
+const str = v => (v == null ? '' : String(v))
+
+function fill(s, t) {
+  let o = t[0]
+  for (let i = 1; i < t.length; i += 2) o += str(get(s, t[i])) + t[i + 1]
+  return o
+}
+
+// `name` or `name(arg, …)`; arg: path, 'text', "text", number, true, false, null or event.
+const EVENT = {}
+const LITERAL = { true: true, false: false, null: null }
+function call(v) {
+  const m = /^\s*([\w$]+)\s*(?:\(([^]*)\))?\s*$/.exec(v ?? '') ?? fail(`invalid event handler "${v}"`)
+  const args = (m[2]?.match(/'[^']*'|"[^"]*"|[^,\s]+/g) ?? []).map(a =>
+    a === 'event' ? EVENT
+    : a[0] === "'" || a[0] === '"' ? { v: a.slice(1, -1) }
+    : a in LITERAL ? { v: LITERAL[a] }
+    : /^-?\d+(\.\d+)?$/.test(a) ? { v: +a }
+    : { p: path(a) })
+  return { f: m[1], args }
+}
+
+// Handler written in `data-on-<type>`: [function name, arguments resolved against the element's scope].
+export function eventCall(el, type, event) {
+  const d = el[D] ?? parse(el), c = ((d.c ??= {})[type] ??= call(el.getAttribute('data-on-' + type))), s = el[S]
+  return [c.f, c.args.map(a => (a === EVENT ? event : 'v' in a ? a.v : s && get(s, a.p)))]
 }
 
 function parse(el) {
@@ -41,9 +87,9 @@ function parse(el) {
     if (!name.startsWith('data-')) continue
     const n = name.slice(5), i = n.indexOf('-'), a = n.slice(i + 1)
     switch (i < 0 ? n : n.slice(0, i + 1)) {
-      case 'text': d.b.push([0, path(value)]); break
+      case 'text': d.b.push([0, template(value)]); break
       case 'show': d.b.push([1, ...cond(value)]); break
-      case 'attr-': d.b.push([2, path(value), 0, a]); break
+      case 'attr-': d.b.push(value.includes('{') ? [4, template(value), 0, a] : [2, path(value), 0, a]); break
       case 'class-': d.b.push([3, ...cond(value), a]); break
       case 'with-': (d.w ??= []).push([a, path(value)]); break
       case 'on-': hooks.on(a); d.e = 1; break
@@ -56,21 +102,33 @@ function parse(el) {
       case 'slot': d.u = +value
     }
   }
+  // `{path}` beside child elements: <!--{path}-->text<!--}-->; the text node between them is bound.
+  // <!--n{path}--> is slot content: it belongs to the owner n components up.
+  for (let n = el.firstChild, m; n; n = n.nextSibling) {
+    if (n.nodeType !== 8 || !(m = /^(\d*)\{(.*)\}$/.exec(n.data))) continue
+    let t = n.nextSibling
+    if (t?.nodeType !== 3) n.after((t = document.createTextNode('')))
+    d.b.push([5, path(m[2]), t, +m[1]])
+  }
   return (el[D] = d.b.length || d.w || d.e || d.x || d.u ? d : NONE)
 }
 
 function bind(el, [t, p, n, a], s) {
-  let v = get(s, p)
+  let v
   if (t === 0) {
-    v = v == null ? '' : String(v)
-    if (el.textContent !== v) el.textContent = v
+    if (el.textContent !== (v = fill(s, p))) el.textContent = v
+  } else if (t === 4) {
+    if (el.getAttribute(a) !== (v = fill(s, p))) el.setAttribute(a, v)
+  } else if (t === 5) {
+    if (n.data !== (v = str(get(s, p)))) n.data = v
   } else if (t === 2) {
+    v = get(s, p)
     v = v === false || v == null ? null : v === true ? '' : String(v)
     if (el.getAttribute(a) !== v) v == null ? el.removeAttribute(a) : el.setAttribute(a, v)
     // Once the user touches it, the attribute no longer drives the state: set the property.
     if ((a === 'checked' || a === 'selected') && el[a] !== (v != null)) el[a] = v != null
   } else {
-    v = !v === n
+    v = !get(s, p) === n
     if (t === 1) { if (el.hasAttribute('hidden') === v) el.toggleAttribute('hidden', !v) }
     else if (el.classList.contains(a) !== v) el.classList.toggle(a, v)
   }
@@ -100,18 +158,16 @@ const lexical = (s, d) => (d.u && outer.at(-d.u)) || s
 
 function visit(el, s, d = el[D] ?? parse(el)) {
   s = lexical(s, d)
+  // data-with-<name>: values from the caller's scope (props of a component with a script).
+  let w = null
   if (d.w) {
-    const o = s
-    s = { __proto__: o }
-    for (const [a, p] of d.w) s[a] = get(o, p)
+    w = {}
+    for (const [a, p] of d.w) w[a] = get(s, p)
+    s = Object.assign({ __proto__: s }, w)
   }
-  if (d.x === 1) {
-    outer.push(s)
-    // Root data-* are the component JS props: they must exist before state(ctx).
-    for (const b of d.b) if (b[0] === 2 && b[3].startsWith('data-') && b[1][0] !== 'state') bind(el, b, s)
-  }
-  if (d.x) s = hooks.enter(el, s, d.x)
-  for (const b of d.b) bind(el, b, s)
+  if (d.x === 1) outer.push(s)
+  if (d.x) s = hooks.enter(el, s, d.x, w)
+  for (const b of d.b) bind(el, b, b[0] === 5 && b[3] ? (outer.at(-b[3]) ?? s) : s)
   if (d.e) el[S] = s
   if (el.firstElementChild) walk(el, s)
   if (d.m) model(el, s, d.m)

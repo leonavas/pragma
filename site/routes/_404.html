@@ -1,6 +1,10 @@
 <title>Page not found · pragma</title>
 <meta name="robots" content="noindex">
 
+<script>
+  const requestedPath = () => decodeURI(location.pathname)
+</script>
+
 <div class="wrap grid gap-10 pt-16 lg:grid-cols-2 lg:items-center lg:gap-16 lg:pt-28">
   <div>
     <h1 class="text-4xl font-medium tracking-tighter sm:text-5xl">Page not found</h1>
@@ -11,8 +15,8 @@
     </div>
   </div>
   <c-terminal title="pragma serve">
-    <pre tabindex="0" aria-label="The request and the 404 answer"><code><span class="term-cmd">GET <span :text="$requestedPath">this address</span></span>
-<span class="term-err">404</span> no route matches <span class="term-ink" :text="$requestedPath">this address</span>
+    <pre tabindex="0" aria-label="The request and the 404 answer"><code><span class="term-cmd">GET {$requestedPath}</span>
+<span class="term-err">404</span> no route matches <span class="term-ink">{$requestedPath}</span>
 <span class="term-dim">served routes/_404.html</span></code></pre>
   </c-terminal>
 </div>

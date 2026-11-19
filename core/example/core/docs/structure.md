@@ -9,8 +9,8 @@ Fixed. Create no other top-level folders. Never edit `core/`.
   package.json             optional: npm packages in dependencies (packages.md)
   routes/
     _layout.html  _404.html
-    index.html             page /
-    index.js               behavior (optional)
+    index.html             page / (optional <script> and <style> at the top)
+    index.js               the page script as a file, instead of the <script> (optional)
     index.server.js        data (optional)
     shop/
       [id].html            /shop/:id
@@ -19,7 +19,7 @@ Fixed. Create no other top-level folders. Never edit `core/`.
       _components/<name>/  <p-name>
   lib/
     components/<name>/     <c-name>; modal, alert, dropdown ship with the starter
-    state/<name>.js        stores
+    state/<name>.js        stores (reached through `shared`, never imported)
     theme.css              tokens and custom classes
   utils/                   pure functions
   public/                  static files (images, fonts, robots.txt), served as-is
@@ -31,7 +31,7 @@ Fixed. Create no other top-level folders. Never edit `core/`.
 
 | Thing | Location |
 |---|---|
-| Page | `routes/<path>.html` + `.js` + `.server.js` (same base name) |
+| Page | `routes/<path>.html` (with its `<script>`/`<style>`, or `.js`) + `.server.js` (same base name) |
 | Server-only helper or JSON | `routes/<folder>/_name.server.js`, `_name.json` |
 | Component for one route folder | `routes/<folder>/_components/<name>/` |
 | Shared component | `lib/components/<name>/` |
@@ -40,6 +40,6 @@ Fixed. Create no other top-level folders. Never edit `core/`.
 | Pure function | `utils/<name>.js` |
 
 - A leading `_` makes a file or folder private (not a route). Only `_layout.html` and `_404.html` are special.
-- No `<script>` in `routes/` or `lib/`. No `src/`, `pages/`, `styles/`, `helpers/`.
-- CSS lives in a component's `.css` or `lib/theme.css`.
+- `<script>` and `<style>` only once each, at the top level of a page or component `.html` (never in the layout); or the same base name as `.js`/`.css`, not both. No `src/`, `pages/`, `styles/`, `helpers/`.
+- CSS lives in a component's or page's `<style>` (or the component's `.css`), or `lib/theme.css`.
 - Names: component folder = lowercase letters, digits, hyphens; route param `[name]` = letters, digits, `_`; store file = JS identifier.

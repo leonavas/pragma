@@ -1,15 +1,77 @@
+<script>
+  import { log } from 'pragma'
+
+  const releaseDates = [
+    { version: 'v0.3.0', date: '2026-11-02' },
+    { version: 'v0.2.0', date: '2026-08-14' },
+    { version: 'v0.1.0', date: '2025-12-01' },
+  ]
+  const statusByPhase = {
+    idle: 'dayjs is not loaded yet.',
+    loading: 'Fetching the chunk...',
+    failed: 'Could not load dayjs.',
+  }
+
+  let phase = 'idle'
+  let loadMs = 0
+  let agoByVersion = {}
+
+  const busy = () => phase === 'loading'
+  const buttonText = () => (phase === 'ready' ? 'Recompute' : 'Load dayjs')
+  const releases = () => releaseDates.map(release => ({ ...release, ago: agoByVersion[release.version] ?? '—' }))
+  const status = () => (phase === 'ready' ? 'dayjs arrived in ' + loadMs + ' ms, after first paint.' : statusByPhase[phase])
+
+  async function loadRelativeTimes() {
+    const startedAt = performance.now()
+    phase = 'loading'
+    try {
+      const [{ default: dayjs }, { default: relativeTime }] = await Promise.all([
+        import('dayjs'),
+        import('dayjs/plugin/relativeTime'),
+      ])
+      dayjs.extend(relativeTime)
+      agoByVersion = Object.fromEntries(releaseDates.map(release => [release.version, dayjs(release.date).fromNow()]))
+      loadMs = Math.round(performance.now() - startedAt)
+      phase = 'ready'
+    } catch (failure) {
+      log.warn('dayjs import failed', { 'exception.message': failure.message })
+      phase = 'failed'
+    }
+  }
+</script>
+
 <div>
   <ul class="relative-time-list">
     <for release in $releases key=release.version>
       <li class="relative-time-row">
-        <span class="relative-time-version" :text="release.version"></span>
-        <span class="relative-time-date" :text="release.date"></span>
-        <span class="relative-time-ago" :text="release.ago"></span>
+        <span class="relative-time-version">{release.version}</span>
+        <span class="relative-time-date">{release.date}</span>
+        <span class="relative-time-ago">{release.ago}</span>
       </li>
     </for>
   </ul>
   <div class="relative-time-footer">
-    <button type="button" class="btn btn-small" @click="loadRelativeTimes" :disabled="$busy" :text="$buttonText"></button>
-    <p class="relative-time-status" role="status" :text="$status"></p>
+    <button type="button" class="btn btn-small" @click="loadRelativeTimes" :disabled="$busy">{$buttonText}</button>
+    <p class="relative-time-status" role="status">{$status}</p>
   </div>
 </div>
+
+<style>
+  [data-c="relative-time"] { display: grid; gap: 1rem; width: min(100%, 26rem); }
+  [data-c="relative-time"] .relative-time-list { border-top: 1px solid var(--color-line); }
+  [data-c="relative-time"] .relative-time-row {
+    display: grid;
+    grid-template-columns: 4.5rem 6.5rem 1fr;
+    gap: 0.75rem;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--color-line);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+  }
+  [data-c="relative-time"] .relative-time-version { color: var(--color-ink); }
+  [data-c="relative-time"] .relative-time-date { color: var(--color-faint); }
+  [data-c="relative-time"] .relative-time-ago { color: var(--color-accent); text-align: right; }
+  [data-c="relative-time"] .relative-time-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; }
+  [data-c="relative-time"] .relative-time-status { color: var(--color-faint); font-family: var(--font-mono); font-size: 0.75rem; }
+</style>

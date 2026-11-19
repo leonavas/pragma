@@ -1,11 +1,12 @@
 //! Component expansion (macro, SPEC §3) and scoped validation on the expanded page.
-use crate::directive::{self, Dir};
+use crate::directive::{self, Dir, Part};
 use crate::html::{Attr, Element, Node, Pos, escape_text, is_blank};
 use crate::project::{Component, Page, Project, component_tag, is_component_tag, rel_str};
 use crate::validate::diag;
 use crate::{Fnv, short_hash};
 use pragma_diag::Diagnostic;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use pragma_jslint::script::ScriptInfo;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 
 pub struct Expanded {
@@ -27,10 +28,8 @@ struct Scope<'s> {
     props: Option<&'s Props>,
     aliases: HashMap<String, String>,
     bound_props: HashMap<String, String>,
-    stateful: bool,
-    known_props: Option<&'s HashSet<String>>,
-    /// Keys of the component's `state()` when known statically: then `$x` is state only for them.
-    state_keys: Option<&'s HashSet<String>>,
+    /// The owner has a script: every `$x` is `state.x` (its instance scope, props included).
+    script: bool,
     slots: Option<&'s Slots>,
     inst: u64,
 }
@@ -54,28 +53,7 @@ pub struct Expander<'p> {
     pub diags: Vec<Diagnostic>,
     used: BTreeMap<String, Component>,
     stack: Vec<&'p Path>,
-    known_props: HashMap<String, HashSet<String>>,
-    stateful: HashSet<PathBuf>,
-    state_keys: HashMap<PathBuf, HashSet<String>>,
-}
-
-fn collect_props(nodes: &[Node], out: &mut HashMap<String, HashSet<String>>) {
-    for node in nodes {
-        let Node::Element(element) = node else { continue };
-        let tag = element.name.to_ascii_lowercase();
-        if let Some((_, name)) = component_tag(&tag) {
-            let names = out.entry(name.to_string()).or_default();
-            for attr in &element.attrs {
-                let lname = attr.name.to_ascii_lowercase();
-                if let Some(bound) = lname.strip_prefix("data-with-") {
-                    names.insert(bound.to_string());
-                } else if !lname.starts_with("data-") && lname != "slot" {
-                    names.insert(lname);
-                }
-            }
-        }
-        collect_props(&element.children, out);
-    }
+    scripts: &'p HashMap<PathBuf, ScriptInfo>,
 }
 
 fn first_element(nodes: &[Node]) -> Option<&Element> {
@@ -108,24 +86,8 @@ fn collect_slots(nodes: &[Node], out: &mut BTreeSet<String>) {
 }
 
 impl<'p> Expander<'p> {
-    pub fn new(p: &'p Project) -> Self {
-        let mut known_props = HashMap::new();
-        for tree in &p.trees {
-            collect_props(tree, &mut known_props);
-        }
-        let stateful: HashSet<PathBuf> = p
-            .components
-            .values()
-            .flat_map(|m| m.values())
-            .filter_map(|c| c.module.as_ref())
-            .filter(|m| p.read(m).is_some_and(|src| crate::js::exports(&src).iter().any(|(n, _)| n == "state")))
-            .cloned()
-            .collect();
-        let state_keys = stateful
-            .iter()
-            .filter_map(|m| Some((m.clone(), pragma_jslint::exported_state_keys(&p.read(m)?)?.into_iter().collect())))
-            .collect();
-        Expander { p, diags: Vec::new(), used: BTreeMap::new(), stack: Vec::new(), known_props, stateful, state_keys }
+    pub fn new(p: &'p Project, scripts: &'p HashMap<PathBuf, ScriptInfo>) -> Self {
+        Expander { p, diags: Vec::new(), used: BTreeMap::new(), stack: Vec::new(), scripts }
     }
 
     fn err(&mut self, pos: Pos, rule: &'static str, msg: impl Into<String>) {
@@ -152,7 +114,7 @@ impl<'p> Expander<'p> {
                 _ => content.push(n.clone()),
             }
         }
-        let sc = Scope { from: &page.dir, props: None, aliases: HashMap::new(), bound_props: HashMap::new(), stateful: true, known_props: None, state_keys: None, slots: None, inst: 0 };
+        let sc = Scope { from: &page.dir, props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: None, inst: 0 };
         let page_nodes = self.expand_nodes(&content, &sc);
         let mut head = Vec::new();
         let mut body = Vec::new();
@@ -170,7 +132,7 @@ impl<'p> Expander<'p> {
                 }
             }
             let slots: Slots = HashMap::from([(String::new(), page_nodes.clone())]);
-            let lsc = Scope { from: Path::new("routes"), props: None, aliases: HashMap::new(), bound_props: HashMap::new(), stateful: true, known_props: None, state_keys: None, slots: Some(&slots), inst: 0 };
+            let lsc = Scope { from: Path::new("routes"), props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: 0 };
             body = self.expand_nodes(&rest, &lsc);
         }
         merge_head(&mut head, own_head);
@@ -188,30 +150,18 @@ impl<'p> Expander<'p> {
             let rest = &p[2..];
             let name = rest.split('.').next().unwrap_or("");
             let tail = &rest[name.len()..];
-            let Some(props) = sc.props else {
+            // a page, or a component with a script: its instance scope (state, props, functions)
+            let (Some(props), false) = (sc.props, sc.script) else {
                 return Res::Path(format!("{bang}state.{rest}"));
             };
+            // component without a script: `:x` props are the caller's paths, the rest build-time text
             if let Some(target) = sc.bound_props.get(name) {
                 return Res::Path(format!("{bang}{target}{tail}"));
             }
-            let key = name.to_ascii_lowercase();
-            // with known state keys, any other `$x` is a prop (falsy when this caller omits it),
-            // whatever other files pass (BUG-S-15); otherwise guess from the props callers pass
-            let is_state = sc.stateful
-                && match sc.state_keys {
-                    Some(keys) => keys.contains(name),
-                    None => !sc.known_props.is_some_and(|k| k.contains(&key)),
-                };
-            if !tail.is_empty() && (props.contains_key(&key) || !is_state) {
+            if !tail.is_empty() {
                 return Res::Path(v.to_string());
             }
-            if let Some(value) = props.get(&key) {
-                return Res::Prop(Some(value.clone()));
-            }
-            if is_state {
-                return Res::Path(format!("{bang}state.{rest}"));
-            }
-            return Res::Prop(None);
+            return Res::Prop(props.get(&name.to_ascii_lowercase()).cloned());
         }
         if r == "props" {
             if let Some(props) = sc.props {
@@ -233,7 +183,9 @@ impl<'p> Expander<'p> {
                 Node::Text(..) => out.push(nodes[i].clone()),
                 Node::Element(e) => {
                     let lname = e.name.to_ascii_lowercase();
-                    if is_component_tag(&lname) {
+                    if lname == directive::INTERP {
+                        out.push(self.interp(e, sc));
+                    } else if is_component_tag(&lname) {
                         out.extend(self.component(e, sc));
                     } else if lname == "slot" && sc.slots.is_some() {
                         let name = e.value("name").unwrap_or("");
@@ -334,8 +286,29 @@ impl<'p> Expander<'p> {
                 continue;
             };
             let v = a.value.as_deref().unwrap_or("");
+            match d {
+                Dir::Text => {
+                    match self.template(v, sc, true) {
+                        Ok(t) => el.attrs.push(Attr { value: Some(t), ..a.clone() }),
+                        Err(literal) => text = Some(literal),
+                    }
+                    continue;
+                }
+                Dir::Attr(n) if directive::has_braces(v) => {
+                    match self.template(v, sc, false) {
+                        Ok(t) => el.attrs.push(Attr { value: Some(t), ..a.clone() }),
+                        Err(literal) => el.attrs.push(Attr { name: n.to_string(), value: Some(literal), pos: a.pos }),
+                    }
+                    continue;
+                }
+                Dir::On(_) => {
+                    el.attrs.push(Attr { value: Some(self.event_call(v, sc)), ..a.clone() });
+                    continue;
+                }
+                _ => {}
+            }
             let res = match d {
-                Dir::Text | Dir::Show | Dir::Attr(_) | Dir::Class(_) | Dir::If | Dir::ElseIf | Dir::Model => self.resolve(v, sc),
+                Dir::Show | Dir::Attr(_) | Dir::Class(_) | Dir::If | Dir::ElseIf | Dir::Model => self.resolve(v, sc),
                 Dir::For => {
                     if let Some((var, path)) = directive::parse_for(v) {
                         for_var = Some(var.to_string());
@@ -353,7 +326,6 @@ impl<'p> Expander<'p> {
                 Res::Prop(prop) => {
                     let neg = v.starts_with('!');
                     match d {
-                        Dir::Text => text = Some(prop.flatten().unwrap_or_default()),
                         Dir::Attr(n) => {
                             if let Some(val) = prop {
                                 el.attrs.push(Attr { name: n.to_string(), value: val, pos: a.pos });
@@ -381,7 +353,7 @@ impl<'p> Expander<'p> {
             el.attrs.push(Attr { name: "data-tid".into(), value: Some(tid), pos: e.pos });
         }
         el.children = match text {
-            Some(t) => vec![Node::Text(escape_text(&t), e.pos)],
+            Some(t) => vec![Node::Text(t, e.pos)],
             None => match for_var.filter(|v| sc.aliases.contains_key(v)) {
                 Some(var) => {
                     let mut inner = sc.clone();
@@ -417,20 +389,32 @@ impl<'p> Expander<'p> {
         let mut bound_props = HashMap::new();
         let mut forward = Vec::new();
         let mut class_extra = None;
+        // a component with a script declares its props (`export let`); they reach the instance as
+        // data-prop-<name> (text) and data-with-<name> (a path in the caller's scope)
+        let script = comp.module.as_ref().and_then(|m| self.scripts.get(m));
+        let mut static_props: Vec<(String, String)> = Vec::new();
         for a in &e.attrs {
             let lname = a.name.to_ascii_lowercase();
+            let prop = lname.strip_prefix("data-with-").unwrap_or(&lname);
+            if let Some(s) = script
+                && prop != "class"
+                && prop != "slot"
+                && !(prop.starts_with("data-") && prop == lname)
+                && !s.props.iter().any(|x| x.eq_ignore_ascii_case(prop))
+            {
+                let has = if s.props.is_empty() { "its script declares no props".to_string() } else { format!("its props: {}", s.props.join(", ")) };
+                self.err(a.pos, "html/unknown-prop", format!("<{tag}> has no prop `{prop}` ({has}); declare it with `export let {prop} = …`"));
+            }
             if let Some(alias) = lname.strip_prefix("data-with-") {
                 match self.resolve(a.value.as_deref().unwrap_or(""), sc) {
+                    Res::Path(p) if script.is_some() => forward.push(Attr { name: format!("data-with-{alias}"), value: Some(p), pos: a.pos }),
                     Res::Path(p) => {
-                        if comp.module.is_some() {
-                            if directive::root(&p) == "state" {
-                                self.err(a.pos, "html/component", format!(":{alias}: <{tag}> has a .js and cannot receive $ from its user; pass data., shared. or the <for> item, or use a store"));
-                            }
-                            forward.push(Attr { name: format!("data-attr-data-{alias}"), value: Some(p.clone()), pos: a.pos });
-                        }
                         bound_props.insert(alias.to_string(), p);
                     }
                     Res::Prop(value) => {
+                        if let Some(v) = &value {
+                            static_props.push((alias.to_string(), v.clone().unwrap_or_else(|| "true".into())));
+                        }
                         props.insert(alias.to_string(), value.flatten());
                     }
                 }
@@ -440,6 +424,8 @@ impl<'p> Expander<'p> {
             } else {
                 if lname == "class" {
                     class_extra = a.value.clone();
+                } else {
+                    static_props.push((lname.clone(), a.value.clone().unwrap_or_else(|| "true".into())));
                 }
                 props.insert(lname, a.value.clone());
             }
@@ -474,9 +460,7 @@ impl<'p> Expander<'p> {
         h.write(rel_str(&p.files[e.pos.file as usize]).as_bytes());
         h.write(&e.pos.line.to_le_bytes());
         h.write(&e.pos.col.to_le_bytes());
-        let known = self.known_props.get(&name).cloned().unwrap_or_default();
-        let state_keys = comp.module.as_ref().and_then(|m| self.state_keys.get(m)).cloned();
-        let inner = Scope { from: &comp.scope, props: Some(&props), aliases, bound_props, stateful: comp.module.as_ref().is_some_and(|m| self.stateful.contains(m)), known_props: Some(&known), state_keys: state_keys.as_ref(), slots: Some(&slots), inst: h.finish() };
+        let inner = Scope { from: &comp.scope, props: Some(&props), aliases, bound_props, script: comp.module.is_some(), slots: Some(&slots), inst: h.finish() };
         self.stack.push(&comp.dir);
         let mut nodes = self.expand_nodes(std::slice::from_ref(root), &inner);
         self.stack.pop();
@@ -493,12 +477,8 @@ impl<'p> Expander<'p> {
         if let Some(Node::Element(r)) = nodes.iter_mut().find(|n| matches!(n, Node::Element(_))) {
             r.attrs.insert(0, Attr { name: "data-c".into(), value: Some(comp.id.clone()), pos: r.pos });
             if comp.module.is_some() {
-                for a in &e.attrs {
-                    let k = a.name.to_ascii_lowercase();
-                    let attr = format!("data-{k}");
-                    if props.contains_key(&k) && k != "class" && k != "id" && !r.has(&attr) {
-                        r.attrs.push(Attr { name: attr, value: Some(a.value.clone().unwrap_or_else(|| "true".into())), pos: r.pos });
-                    }
+                for (k, v) in static_props {
+                    r.attrs.push(Attr { name: format!("data-prop-{k}"), value: Some(v), pos: r.pos });
                 }
             }
             if let Some(c) = class_extra {
@@ -516,6 +496,60 @@ impl<'p> Expander<'p> {
             self.err(a.pos, "html/component", format!("{} already exists on the root of <{tag}>", a.name));
         }
         nodes
+    }
+}
+
+/// `{}` templates and event calls (@sfc-template).
+impl Expander<'_> {
+    /// Resolves the paths of a `{}` template. Ok: the template still has runtime paths.
+    /// Err: only static props were used; the literal text (HTML-escaped when `text`).
+    fn template(&self, v: &str, sc: &Scope, text: bool) -> Result<String, String> {
+        let Ok(parts) = directive::template(v) else { return Ok(v.to_string()) };
+        let mut dynamic = false;
+        let parts: Vec<Part> = parts
+            .into_iter()
+            .map(|part| match part {
+                Part::Path(p) => match self.resolve(&p, sc) {
+                    Res::Path(p) => {
+                        dynamic = true;
+                        Part::Path(p)
+                    }
+                    Res::Prop(prop) => {
+                        let value = prop.flatten().unwrap_or_default();
+                        Part::Text(if text { escape_text(&value) } else { value })
+                    }
+                },
+                text => text,
+            })
+            .collect();
+        if dynamic {
+            Ok(directive::join_template(&parts))
+        } else {
+            Err(parts.into_iter().map(|p| if let Part::Text(t) = p { t } else { String::new() }).collect())
+        }
+    }
+
+    /// `toggle(task, $q)`: path arguments resolved (`state.q`, caller paths); static props become literals.
+    fn event_call(&self, v: &str, sc: &Scope) -> String {
+        let Ok((name, args)) = directive::parse_call(v) else { return v.to_string() };
+        directive::join_call(name, &args, |p| match self.resolve(p, sc) {
+            Res::Path(p) => p,
+            Res::Prop(None) => "null".into(),
+            Res::Prop(Some(None)) => "true".into(),
+            Res::Prop(Some(Some(value))) => {
+                let quote = if value.contains('\'') { '"' } else { '\'' };
+                format!("{quote}{}{quote}", value.replace(quote, ""))
+            }
+        })
+    }
+
+    /// `#interp` (`{}` beside elements): a runtime marker, or plain text when only static props are used.
+    fn interp(&mut self, e: &Element, sc: &Scope) -> Node {
+        let v = e.value("data-text").unwrap_or("");
+        match self.template(v, sc, true) {
+            Ok(_) => Node::Element(self.element(e, sc)),
+            Err(literal) => Node::Text(literal, e.pos),
+        }
     }
 }
 
@@ -574,15 +608,23 @@ fn merge_class(el: &mut Element, extra: &str) {
     }
 }
 
+/// The script of a page or component: where it is (for messages) and what it declares.
+#[derive(Clone, Copy)]
+pub struct OwnerScript<'a> {
+    /// The `.html` for an embedded `<script>`, else the `.js`.
+    pub file: &'a Path,
+    pub info: &'a ScriptInfo,
+}
+
 /// Page data for scoped validation.
 pub struct PageCtx<'a> {
     pub loader: bool,
     pub ssr: bool,
     pub params: Vec<String>,
-    pub page_actions: Option<&'a [String]>,
+    pub page_script: Option<OwnerScript<'a>>,
     pub page_file: &'a Path,
-    /// Components used with a module: `data-c` id -> (tag for messages, exported actions).
-    pub comp_actions: HashMap<String, (&'a str, &'a [String])>,
+    /// Components used with a script: `data-c` id -> (tag for messages, script).
+    pub comp_scripts: HashMap<String, (&'a str, OwnerScript<'a>)>,
 }
 
 #[derive(Clone)]
@@ -620,18 +662,18 @@ impl Scoped<'_> {
                 continue;
             }
             for a in &e.attrs {
-                if !matches!(directive::parse(&a.name.to_ascii_lowercase()), Some(Some(Dir::Text | Dir::Attr(_)))) {
-                    continue;
+                let lname = a.name.to_ascii_lowercase();
+                let Some(Some(d @ (Dir::Text | Dir::Attr(_)))) = directive::parse(&lname) else { continue };
+                for v in crate::validate::values(d, a.value.as_deref().unwrap_or("")) {
+                    if !matches!(directive::root(&v), "data" | "params" | "query") {
+                        continue;
+                    }
+                    if !self.ctx.ssr && !std::mem::replace(&mut told, true) {
+                        let f = rel_str(&self.ctx.page_file.with_extension("server.js"));
+                        self.err(a.pos, "html/head", format!("bound head tags are rendered by the server so crawlers see them: add export const ssr = true to {f}"));
+                    }
+                    self.path(a.pos, &v, &[], &Owner::Page, true);
                 }
-                let v = a.value.as_deref().unwrap_or("");
-                if !matches!(directive::root(v), "data" | "params" | "query") {
-                    continue;
-                }
-                if !self.ctx.ssr && !std::mem::replace(&mut told, true) {
-                    let f = rel_str(&self.ctx.page_file.with_extension("server.js"));
-                    self.err(a.pos, "html/head", format!("bound head tags are rendered by the server so crawlers see them: add export const ssr = true to {f}"));
-                }
-                self.path(a.pos, v, &[], &Owner::Page, true);
             }
         }
     }
@@ -662,7 +704,7 @@ impl Scoped<'_> {
         let comp = e.value("data-c");
         if let Some(c) = comp {
             self.outer.push((owner.clone(), vars.clone()));
-            if self.ctx.comp_actions.contains_key(c) {
+            if self.ctx.comp_scripts.contains_key(c) {
                 owner = Owner::Comp(c.to_string());
             }
         }
@@ -681,7 +723,16 @@ impl Scoped<'_> {
                 Dir::Model if !matches!(directive::root(v), "state" | "shared") && directive::check_path(v, false).is_ok() => {
                     self.err(a.pos, "html/invalid-root", format!(":model only accepts $ or shared; \"{v}\""));
                 }
-                Dir::Text | Dir::Show | Dir::Attr(_) | Dir::If | Dir::ElseIf | Dir::Model => self.path(a.pos, v, vars, &owner, in_page),
+                Dir::Model if directive::root(v) == "state" => {
+                    self.path(a.pos, v, vars, &owner, in_page);
+                    self.model_target(a.pos, v, &owner);
+                }
+                Dir::Text | Dir::Attr(_) => {
+                    for p in crate::validate::values(d, v) {
+                        self.path(a.pos, &p, vars, &owner, in_page);
+                    }
+                }
+                Dir::Show | Dir::If | Dir::ElseIf | Dir::Model => self.path(a.pos, v, vars, &owner, in_page),
                 Dir::Class(c) => {
                     self.classes.insert(c.to_string());
                     self.path(a.pos, v, vars, &owner, in_page);
@@ -693,7 +744,16 @@ impl Scoped<'_> {
                         pushed = true;
                     }
                 }
-                Dir::On(_) => self.action(a.pos, v, &owner),
+                Dir::On(_) => {
+                    if let Ok((name, args)) = directive::parse_call(v) {
+                        self.action(a.pos, name, &owner);
+                        for arg in args {
+                            if let directive::Arg::Path(p) = arg {
+                                self.path(a.pos, p, vars, &owner, in_page);
+                            }
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -706,24 +766,63 @@ impl Scoped<'_> {
         }
     }
 
+    /// The script that owns `$x` and `@fn` here, and how to name it in messages. A script with errors
+    /// counts as declaring everything (its own errors are reported already).
+    fn owner_script(&self, owner: &Owner) -> Option<(String, OwnerScript<'_>)> {
+        match owner {
+            Owner::None => None,
+            Owner::Page => self.ctx.page_script.map(|s| (format!("the script of {}", rel_str(self.ctx.page_file)), s)),
+            Owner::Comp(c) => self.ctx.comp_scripts.get(c.as_str()).map(|(tag, s)| (format!("the script of {tag}"), *s)),
+        }
+    }
+
+    fn no_script(&mut self, pos: Pos, what: &str, owner: &Owner) {
+        match owner {
+            Owner::None => self.err(pos, "html/unknown-name", format!("{what}: the layout has no script; use a component with a <script>")),
+            _ => {
+                let f = rel_str(self.ctx.page_file);
+                self.err(pos, "html/unknown-name", format!("{what}: {f} has no <script> (owner: the page, or the nearest component with a script; slot content belongs to whoever wrote it)"));
+            }
+        }
+    }
+
     fn action(&mut self, pos: Pos, name: &str, owner: &Owner) {
         if !directive::is_ident(name) {
             return;
         }
-        let page_js = rel_str(&self.ctx.page_file.with_extension("js"));
-        match owner {
-            Owner::None => self.err(pos, "html/unknown-action", format!("action \"{name}\" has no owner: the layout has no module; use a component with a .js")),
-            Owner::Page => match self.ctx.page_actions {
-                None => self.err(pos, "html/unknown-action", format!("action \"{name}\": the page has no module ({page_js})")),
-                Some(acts) if !acts.iter().any(|a| a == name) => self.err(pos, "html/unknown-action", format!("action \"{name}\" is not in the actions of {page_js}")),
-                _ => {}
-            },
-            Owner::Comp(c) => {
-                let (tag, acts) = self.ctx.comp_actions.get(c.as_str()).copied().unwrap_or((c.as_str(), &[]));
-                if !acts.iter().any(|a| a == name) {
-                    self.err(pos, "html/unknown-action", format!("action \"{name}\" is not in the actions of component {tag} (owner: nearest component with a module; slot content belongs to whoever wrote it)"));
-                }
-            }
+        let Some((whose, script)) = self.owner_script(owner) else {
+            return self.no_script(pos, &format!("@… calls \"{name}\""), owner);
+        };
+        if !script.info.incomplete && !script.info.is_function(name) {
+            let what = if script.info.declares(name) { "is not a function" } else { "is not declared" };
+            self.err(pos, "html/unknown-name", format!("\"{name}\" {what} in {whose}: write `function {name}() {{ … }}` at its top level"));
+        }
+    }
+
+    /// `:model` writes: only a top-level `let`.
+    fn model_target(&mut self, pos: Pos, v: &str, owner: &Owner) {
+        let name = v.split('.').nth(1).unwrap_or("");
+        let Some((_, script)) = self.owner_script(owner) else { return };
+        if script.info.props.iter().any(|p| p == name) {
+            self.err(pos, "js/prop-write", format!(":model=\"${name}\" writes a prop, and props are read-only; copy it into a `let`"));
+        } else if script.info.declares(name) && !script.info.lets.iter().any(|l| l == name) {
+            self.err(pos, "html/invalid-root", format!(":model=\"${name}\" needs a top-level `let {name}` (state), not a const or a function"));
+        }
+    }
+
+    /// `state.x`: `x` must be declared by the owner's script; a const it changes in place is not state.
+    fn state_name(&mut self, pos: Pos, name: &str, owner: &Owner) {
+        let Some((whose, script)) = self.owner_script(owner) else {
+            return self.no_script(pos, &format!("${name}"), owner);
+        };
+        if script.info.incomplete {
+            return;
+        }
+        if !script.info.declares(name) {
+            self.err(pos, "html/unknown-name", format!("${name} is not declared in {whose}: add `let {name} = …` (state), `export let {name} = …` (prop) or `function {name}() {{ … }}`"));
+        } else if let Some((_, line, col)) = script.info.mutated_consts.iter().find(|(n, _, _)| n == name) {
+            let (file, line, col) = (script.file.to_path_buf(), *line, *col);
+            self.diags.push(Diagnostic::error(file, line, col, "js/const-state", format!("`{name}` is changed in place and used in HTML, but a `const` is not state: declare it with `let {name}`")));
         }
     }
 
@@ -747,14 +846,7 @@ impl Scoped<'_> {
                     self.err(pos, "html/invalid-root", format!("data requires a load in {f}"));
                 }
             }
-            "state" => match owner {
-                Owner::None => self.err(pos, "html/invalid-root", "$ does not exist in the layout (the layout has no module)"),
-                Owner::Page if self.ctx.page_actions.is_none() => {
-                    let f = rel_str(&self.ctx.page_file.with_extension("js"));
-                    self.err(pos, "html/invalid-root", format!("$ requires the module {f} with export const state"));
-                }
-                _ => {}
-            },
+            "state" => self.state_name(pos, second.unwrap_or(""), owner),
             "shared" => match second {
                 Some(s) if self.p.stores.contains_key(s) => {
                     self.stores.insert(s.to_string());

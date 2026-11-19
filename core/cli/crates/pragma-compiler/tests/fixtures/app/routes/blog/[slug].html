@@ -1,8 +1,8 @@
 <title>Post</title>
 <article class="p-4">
-  <h1 :text="data.post.heading">Title</h1>
+  <h1>{data.post.heading}</h1>
   <ul>
-    <for t in data.post.tags key=t.id><li .active="t.active" class="tag" :text="t.name"></li></for>
+    <for t in data.post.tags key=t.id><li .active="t.active" class="tag">{t.name}</li></for>
   </ul>
   <p :show="$read">read</p>
 </article>

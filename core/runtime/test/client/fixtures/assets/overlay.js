@@ -1,3 +1,5 @@
-export const actions = {
-  open(ctx) { ctx.open('m') },
+export default function ($, $pragma) {
+  function open() { $pragma.open('m') }
+
+  return { open }
 }

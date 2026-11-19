@@ -2,8 +2,8 @@
 
 | File | Export | Use |
 |---|---|---|
-| `x.server.js` | `load({ params, query, request, env, log })` | return value becomes `data` / `ctx.data` |
-| `x.server.js` | `actions.name({ input, params, env, log })` | called by `ctx.call('name', input)` |
+| `x.server.js` | `load({ params, query, request, env, log })` | return value becomes `data` (HTML, and `data` from `pragma` in the page script) |
+| `x.server.js` | `actions.name({ input, params, env, log })` | called by `call('name', input)` from `pragma` |
 | `x.server.js` | `ssr = true` | data in the first HTML (SEO, link previews, LCP) |
 | `_name.server.js` | helpers | private to the folder; only `.server.js` files import it |
 
@@ -27,24 +27,29 @@ export const actions = {
 }
 ```
 
-`routes/shop/[id].js`:
-```js
-export const state = () => ({ sending: false, error: '' })
+The `<script>` of `routes/shop/[id].html`:
+```html
+<script>
+  import { data, params, call, log } from 'pragma'
 
-export const actions = {
-  async like(ctx) {
-    ctx.$.sending = true
+  let sending = false
+  let error = ''
+
+  async function like() {
+    sending = true
     try {
-      ctx.data.product.likes = (await ctx.call('like')).likes
+      data.product.likes = (await call('like')).likes
     } catch (failure) {
-      ctx.log.error('product like failed', { 'product.id': ctx.params.id, 'exception.message': failure.message })
-      ctx.$.error = 'Could not save right now.'
+      log.error('product like failed', { 'product.id': params.id, 'exception.message': failure.message })
+      error = 'Could not save right now.'
     } finally {
-      ctx.$.sending = false
+      sending = false
     }
-  },
-}
+  }
+</script>
 ```
+
+`data` is live and reactive: changing `data.product.likes` updates the page.
 
 ## Skeleton (page with `load`, without `ssr`)
 
@@ -56,12 +61,12 @@ export const actions = {
   </ul>
 </if>
 <else-if page.error>
-  <p role="alert" :text="page.error.message"></p>
+  <p role="alert">{page.error.message}</p>
 </else-if>
 <else>
   <ul>
     <for p in data.products key=p.id>
-      <li class="card" :text="p.name"></li>
+      <li class="card">{p.name}</li>
     </for>
   </ul>
 </else>
@@ -72,7 +77,8 @@ Keep the title, back link and filters outside the loading chain. Shape the skele
 ## Rules
 
 - An error thrown in `load` sets `page.error` and returns 500. "Not found" is data: return `{ product: null }`.
-- Every write and everything that uses a secret goes through a server action. Afterwards, update `ctx.data` or `$`.
+- Every write and everything that uses a secret goes through a server action. Afterwards, update `data` or a `let`.
+- `data` is undefined until the load ends (unless `ssr`): read it inside functions, never at the top level of the script.
 - Sources: `fetch` with a secret from `env`, a database via `env`, or `import products from './_products.json' with { type: 'json' }`.
 - Default is no SSR. The prebuilt HTML has the content outside `<if>`/`<for>`; the `page.loading` branch is an inert `<template>` and the skeleton appears as soon as `core/boot.js` runs (no skeleton without JS).
 - With `ssr = true` the HTML is the same, rendered with data; the skeleton is never shown. Use it for pages that crawlers or link previews must see, and for head tags bound to `data` (routes.md, SEO).

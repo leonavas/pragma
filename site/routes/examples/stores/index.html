@@ -1,47 +1,54 @@
 <title>Stores · pragma examples</title>
-<meta name="description" content="Shared state in pragma, live: stores in lib/state read as shared.name in HTML and ctx.shared in JS, with getters, methods and localStorage persistence.">
+<meta name="description" content="Shared state in pragma, live: a store in lib/state is top-level let and functions, reached as shared.name from any page or component, optionally persisted to localStorage.">
 <link rel="canonical" href="https://pragma.dev/examples/stores">
 <meta property="og:url" content="https://pragma.dev/examples/stores">
 <meta property="og:title" content="pragma stores: shared and persisted state">
-<meta property="og:description" content="One plain object shared by every page, optionally persisted and synced across tabs.">
+<meta property="og:description" content="The same rule as a component script, shared by every page, optionally persisted and synced across tabs.">
 
-<c-doc heading="Stores" lede="Shared state lives in lib/state/&lt;name&gt;.js and reads as shared.&lt;name&gt; in HTML and ctx.shared.&lt;name&gt; in JS, on any page. A store is a plain object with getters and methods, optionally persisted to localStorage.">
+<c-doc heading="Stores" lede="A store is lib/state/&lt;name&gt;.js written like a component script: top-level let is state, functions are actions and derived values. Every page and component reaches it as shared.&lt;name&gt;, and it can persist to localStorage.">
   <section class="doc-section" aria-labelledby="shared">
     <h2 id="shared">One store, two components</h2>
     <div class="prose">
-      <p><code>store(object)</code> from <code>core/state.js</code> returns the object itself: plain fields for state, getters for derived values (<code>count</code>, <code>totalLabel</code>), methods for mutations used by more than one place. <code>p-shelf</code> and <code>p-basket</code> never talk to each other; both read and write <code>shared.cart</code>, and every action re-renders the whole page, so both stay in sync.</p>
-      <p>Without <code>persist</code> the store lives in memory: it survives client navigation between pages (try another section and come back) but not a reload. Any page or component can bind it, including <code>_layout.html</code>, which has no <code>.js</code> of its own.</p>
+      <p><code>p-shelf</code> and <code>p-basket</code> never talk to each other: both read and change <code>shared.cart</code>.</p>
     </div>
-    <c-showcase :source="data.examples.cart" caption="Add from the shelf, remove from the cart: two owners, one object.">
+    <c-showcase :source="data.examples.cart" caption="Add from the shelf, remove from the cart: two owners, one store.">
       <div class="grid w-full gap-4">
         <p-shelf></p-shelf>
         <p-basket></p-basket>
       </div>
     </c-showcase>
+    <div class="prose">
+      <p><code>lib/state/cart.js</code> has no imports and no exports: <code>let lines</code> is the state, <code>count</code> and <code>totalLabel</code> are derived, <code>add</code> and <code>remove</code> change it. HTML reads it as <code>{shared.cart.count}</code> and <code>&lt;for line in shared.cart.lines&gt;</code>; a script imports <code>shared</code> from <code>'pragma'</code> and calls <code>shared.cart.add(product)</code>. Importing the store file itself fails check with <code>js/store-import</code>.</p>
+      <p>Without <code>persist</code> a store lives in memory: it survives client navigation between pages (try another section and come back) but not a reload. Any page or component can read it, including <code>_layout.html</code>, which has no script of its own.</p>
+    </div>
   </section>
 
   <section class="doc-section" aria-labelledby="persist">
     <h2 id="persist"><code>persist</code>: drafts that survive reloads, synced across pages</h2>
     <div class="prose">
-      <p><code>store(object, { persist: 'scratchpad' })</code> restores the object from <code>localStorage['pragma:scratchpad']</code> when the module loads and writes it back after each render, getters excluded. Use it for preferences, drafts and local-only data, never for anything the server owns.</p>
-      <p>Persisted stores also listen to the <code>storage</code> event, so every other tab of the same origin updates live. The frame below is a separate route, <code>demo/scratchpad.html</code>, with no <code>.js</code>; type in either textarea and watch the other one follow, then reload the page.</p>
+      <p><code>export const persist = ['draft', 'pinned']</code> keeps those two <code>let</code>s in <code>localStorage['pragma:scratchpad']</code>.</p>
     </div>
-    <c-showcase :source="data.examples.scratchpad" caption="Two documents, one localStorage key. :model works on shared paths, so the second page needs no JavaScript.">
+    <c-showcase :source="data.examples.scratchpad" caption="Two documents, one localStorage key. :model works on shared paths, so the second page needs no script.">
       <div class="grid w-full gap-4">
         <p-draft-pad></p-draft-pad>
         <c-frame src="/examples/stores/demo/scratchpad" title="Second page reading the same store" height="sm"></c-frame>
       </div>
     </c-showcase>
+    <div class="prose">
+      <p>The store restores the listed values when its module loads and writes them back after each render. It also listens to the <code>storage</code> event, so every other tab of the same origin follows live: type in either textarea, then reload the page. Persist preferences, drafts and local-only data, never anything the server owns. <code>persist</code> is the only export a store may have.</p>
+    </div>
   </section>
 
-  <section class="doc-section" aria-labelledby="loading">
-    <h2 id="loading">A store read only from JavaScript</h2>
+  <section class="doc-section" aria-labelledby="from-script">
+    <h2 id="from-script">A store read only from a script</h2>
     <div class="prose">
-      <p>The build ships a store to every page that references it: a <code>shared.x</code> path in HTML, <code>ctx.shared.x</code> in a page or component module, or a static import. <code>p-shipping</code> never mentions the cart in its HTML; its getter reads <code>ctx.shared.cart.total</code> and the HTML shows <code>$message</code>. A <code>shared.x</code> with no <code>lib/state/x.js</code> fails check with <code>html/invalid-root</code>.</p>
-      <p>Getters in a component can read stores freely, because they run on every render. Add items to the cart above and this line follows.</p>
+      <p>A derived function can read a store, and it runs again on every render.</p>
     </div>
-    <c-showcase :source="data.examples.shipping" caption="Derived from a store, inside a component getter: no copy of the total is kept anywhere.">
+    <c-showcase :source="data.examples.shipping" caption="Derived from the store inside a component: no copy of the total is kept anywhere. Add items to the cart above.">
       <p-shipping></p-shipping>
     </c-showcase>
+    <div class="prose">
+      <p><code>p-shipping</code> never mentions the cart in its HTML: <code>remaining()</code> calls <code>shared.cart.total()</code> and the HTML shows <code>{$message}</code>. In a script, a store's derived values are functions you call; in HTML they are paths. The build ships a store to every page that reaches it, from HTML or from a script, and a <code>shared.x</code> with no <code>lib/state/x.js</code> fails check.</p>
+    </div>
   </section>
 </c-doc>

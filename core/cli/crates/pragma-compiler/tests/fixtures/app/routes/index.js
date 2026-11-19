@@ -1,10 +1,10 @@
-import { cart } from '../lib/state/cart.js'
 import { format } from '../utils/fmt.js'
+import { shared, log } from 'pragma'
 
-export const state = () => ({ open: false, items: [] })
-export const actions = {
-  toggle(ctx) {
-    ctx.$.open = !ctx.$.open
-    ctx.log.info(format(cart.total))
-  },
+let open = false
+let items = []
+
+function toggle() {
+  open = !open
+  log.info(format(shared.cart.total))
 }

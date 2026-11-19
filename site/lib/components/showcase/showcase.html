@@ -1,41 +1,189 @@
-<figure class="border border-line bg-sunken" .is-expanded="$expanded">
+<figure class="border border-line bg-sunken">
   <if page.error>
-    <p class="px-4 py-5 font-mono text-xs text-danger-300" role="alert" :text="page.error.message"></p>
+    <p class="px-4 py-5 font-mono text-xs text-danger-300" role="alert">{page.error.message}</p>
   </if>
   <else>
     <div class="flex min-w-0 flex-col">
       <div class="flex flex-wrap border-b border-line" role="group" aria-label="Source files">
         <for file in $source.files key=file.id>
-          <button type="button" class="showcase-tab relative flex-none cursor-pointer border-r border-b border-line px-3.5 py-3 font-mono text-xs transition-colors hover:text-ink" :aria-pressed="file.pressed" :aria-controls="file.id" @click="select" :text="file.name"></button>
+          <c-source-tab :file="file" :files="$source.files" .is-active="file.active">{file.name}</c-source-tab>
         </for>
       </div>
       <div class="flex min-h-0 flex-1 flex-col">
         <for file in $source.files key=file.id>
-          <div class="showcase-file min-h-0 min-w-0 flex-1 flex-col" .is-active="file.active" .is-long="file.long">
+          <div class="showcase-file min-h-0 min-w-0 flex-1 flex-col" .is-active="file.active" .is-long="file.long" .is-expanded="file.expanded">
             <div class="flex items-center justify-between gap-4 pt-1 pr-1 pl-4">
-              <p class="showcase-path min-w-0 truncate text-left font-mono text-xs text-faint"><span class="showcase-path-text"><span :text="file.dir"></span><span class="text-muted" :text="file.name"></span></span></p>
-              <button type="button" class="showcase-copy inline-flex min-h-9 flex-none cursor-pointer items-center gap-2 px-2.5 font-mono text-xs" @click="copy" .is-done="file.copied" .is-blocked="file.blocked">
-                <svg class="showcase-copy-icon size-3.5" viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" fill="none" stroke="currentColor"></rect><path d="M10.5 3.5v-1h-8v8h1" fill="none" stroke="currentColor"></path></svg>
-                <svg class="showcase-check-icon size-3.5" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"></path></svg>
-                <span class="showcase-copy-idle">Copy <span class="sr-only" :text="file.name"></span></span>
-                <span class="showcase-copy-done">Copied <span :text="file.lines.length"></span> lines</span>
-                <span class="showcase-copy-blocked">Code selected</span>
-              </button>
+              <p class="showcase-path min-w-0 truncate text-left font-mono text-xs text-faint"><span class="showcase-path-text">{file.dir}<span class="text-muted">{file.name}</span></span></p>
+              <c-source-copy :file="file"></c-source-copy>
             </div>
-            <pre class="showcase-code" :id="file.id" tabindex="0" :aria-label="file.path"><code><for line in file.lines key=line.n><span class="code-line" :data-indent="line.indent" :text="line.text"></span></for></code></pre>
-            <button type="button" class="showcase-expand h-11 w-full cursor-pointer items-center justify-center border-t border-line font-mono text-xs text-muted hover:text-ink" @click="toggleExpanded" :aria-expanded="$expandedText" :aria-controls="file.id">
-              <span class="showcase-expand-more">Show all <span :text="file.lines.length"></span> lines</span>
-              <span class="showcase-expand-less">Show fewer lines</span>
-            </button>
+            <c-source-colors :file="file"><code><for line in file.lines key=line.n><span class="code-line" :data-indent="line.indent">{line.text}</span></for></code></c-source-colors>
+            <c-source-expand :file="file" :files="$source.files"><span class="showcase-expand-more">Show all {file.lines.length} lines</span><span class="showcase-expand-less">Show fewer lines</span></c-source-expand>
           </div>
         </for>
       </div>
-      <p class="sr-only" role="status" :text="$announcement"></p>
     </div>
   </else>
   <div class="showcase-live flex min-w-0 flex-col">
-    <p class="flex min-h-11 items-center gap-2 whitespace-nowrap border-b border-line bg-ground px-4 font-mono text-xs uppercase tracking-wider text-faint"><span class="showcase-dot size-1.5 flex-none bg-accent" aria-hidden="true" :data-beat="$beat"></span>Live result<span class="ml-auto min-w-0 truncate normal-case tracking-normal tabular-nums text-muted" aria-hidden="true" :text="$patches"></span></p>
+    <c-live-meter></c-live-meter>
     <div class="showcase-stage"><slot></slot></div>
   </div>
-  <figcaption class="col-span-full border-t border-line px-4 py-3 text-sm text-muted" :text="$caption"></figcaption>
+  <figcaption class="col-span-full border-t border-line px-4 py-3 text-sm text-muted">{$caption}</figcaption>
 </figure>
+
+<style>
+  [data-c="showcase"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-c="showcase"] .showcase-tab {
+    margin-bottom: -1px;
+    color: var(--color-faint);
+  }
+  [data-c="showcase"] .showcase-tab.is-active {
+    background: var(--color-ground);
+    color: var(--color-ink);
+  }
+  [data-c="showcase"] .showcase-tab.is-active::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 -1px;
+    height: 1px;
+    background: var(--color-accent);
+  }
+  [data-c="showcase"] :is(.showcase-tab, .showcase-copy, .showcase-expand, .showcase-code):focus-visible { outline-offset: -3px; }
+  [data-c="showcase"] .showcase-file.is-active { display: flex; }
+  [data-c="showcase"] .showcase-path { direction: rtl; }
+  [data-c="showcase"] .showcase-path-text {
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+  [data-c="showcase"] .showcase-copy { color: var(--color-muted); }
+  [data-c="showcase"] .showcase-copy:hover { color: var(--color-ink); }
+  [data-c="showcase"] :is(.showcase-file, .showcase-check-icon, .showcase-copy-done, .showcase-copy-blocked, .showcase-expand, .showcase-expand-less) { display: none; }
+  [data-c="showcase"] .showcase-copy.is-done { color: var(--color-accent); }
+  [data-c="showcase"] .is-done :is(.showcase-copy-idle, .showcase-copy-icon) { display: none; }
+  [data-c="showcase"] .is-done .showcase-copy-done { display: inline; }
+  [data-c="showcase"] .is-done .showcase-check-icon {
+    display: block;
+    stroke-dasharray: 16;
+    animation: showcase-check 0.32s var(--ease-out) both;
+  }
+  [data-c="showcase"] .showcase-copy.is-blocked { color: var(--color-warning-300); }
+  [data-c="showcase"] .is-blocked .showcase-copy-idle { display: none; }
+  [data-c="showcase"] .is-blocked .showcase-copy-blocked { display: inline; }
+  [data-c="showcase"] .showcase-code {
+    --line-gutter: 3rem;
+    --hang: 2ch;
+    flex: 1;
+    max-height: 32rem;
+    margin: 0;
+    padding: 0.5rem 0 1.25rem;
+    overflow: auto;
+    color: var(--color-ink);
+    font-size: 0.8125rem;
+    font-stretch: 87.5%;
+    line-height: 1.7;
+    tab-size: 2;
+    counter-reset: line;
+  }
+  [data-c="showcase"] .code-line {
+    position: relative;
+    display: block;
+    min-height: 1lh;
+    padding-right: 1.25rem;
+    padding-left: calc(var(--line-gutter) + var(--indent, 0ch) + var(--hang));
+    text-indent: calc(-1 * (var(--indent, 0ch) + var(--hang)));
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    counter-increment: line;
+  }
+  [data-c="showcase"] .code-line::before {
+    content: counter(line);
+    position: absolute;
+    left: 0;
+    width: calc(var(--line-gutter) - 1rem);
+    color: oklch(0.45 0.008 255);
+    text-align: right;
+    text-indent: 0;
+  }
+  [data-c="showcase"] [data-indent="2"] { --indent: 2ch; }
+  [data-c="showcase"] [data-indent="4"] { --indent: 4ch; }
+  [data-c="showcase"] [data-indent="6"] { --indent: 6ch; }
+  [data-c="showcase"] [data-indent="8"] { --indent: 8ch; }
+  [data-c="showcase"] [data-indent="10"] { --indent: 10ch; }
+  [data-c="showcase"] [data-indent="12"] { --indent: 12ch; }
+  [data-c="showcase"] [data-indent="14"] { --indent: 14ch; }
+  [data-c="showcase"] [data-indent="16"] { --indent: 16ch; }
+  [data-c="showcase"] ::highlight(code-keyword) { color: var(--code-keyword); }
+  [data-c="showcase"] ::highlight(code-string) { color: var(--code-string); }
+  [data-c="showcase"] ::highlight(code-number) { color: var(--code-number); }
+  [data-c="showcase"] ::highlight(code-tag) { color: var(--code-tag); }
+  [data-c="showcase"] ::highlight(code-attribute) { color: var(--code-attribute); }
+  [data-c="showcase"] ::highlight(code-title) { color: var(--code-property); }
+  [data-c="showcase"] ::highlight(code-comment) { color: var(--code-comment); }
+  [data-c="showcase"] ::highlight(code-punctuation) { color: var(--code-punctuation); }
+  [data-c="showcase"] ::highlight(code-directive) { color: var(--color-accent); }
+  [data-c="showcase"] ::highlight(code-component) { color: var(--code-number); }
+  [data-c="showcase"] .is-expanded .showcase-expand-more { display: none; }
+  [data-c="showcase"] .is-expanded .showcase-expand-less { display: inline; }
+  [data-c="showcase"] .showcase-live {
+    border-top: 1px solid var(--color-line);
+    background: var(--color-ground) radial-gradient(oklch(0.27 0.008 255) 1px, transparent 1px) -10px -10px / 20px 20px;
+  }
+  [data-c="showcase"] .showcase-dot[data-beat="a"] { animation: showcase-beat-a 0.7s var(--ease-out); }
+  [data-c="showcase"] .showcase-dot[data-beat="b"] { animation: showcase-beat-b 0.7s var(--ease-out); }
+  [data-c="showcase"] .showcase-stage {
+    display: grid;
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr);
+    place-items: center;
+    min-height: 14rem;
+    padding: 2rem 1rem;
+    overflow-x: auto;
+  }
+  [data-c="showcase"] .showcase-stage > * { max-width: 100%; }
+  @keyframes showcase-check {
+    from { stroke-dashoffset: 16; }
+  }
+  @keyframes showcase-beat-a {
+    from { scale: 2.2; }
+  }
+  @keyframes showcase-beat-b {
+    from { scale: 2.2; }
+  }
+  @media (max-width: 47.99rem) {
+    [data-c="showcase"] .showcase-code { --line-gutter: 2.5rem; max-height: none; }
+    [data-c="showcase"] .is-long .showcase-expand { display: flex; }
+    [data-c="showcase"] .is-long:not(.is-expanded) .showcase-code {
+      max-height: 17rem;
+      overflow: hidden;
+      mask-image: linear-gradient(#000 calc(100% - 4rem), transparent);
+    }
+  }
+  @media (min-width: 40rem) {
+    [data-c="showcase"] .showcase-stage { padding: 2.5rem 1.5rem; }
+  }
+  @media (min-width: 64rem) {
+    [data-c="showcase"] .code-line { white-space: pre; }
+  }
+  @media (min-width: 80rem) {
+    [data-c="showcase"] { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+    [data-c="showcase"] .showcase-live { border-top: 0; border-left: 1px solid var(--color-line); }
+    [data-c="showcase"]:not(:has(.showcase-stage [data-c="frame"])) .showcase-code {
+      flex: 1 1 0;
+      min-height: 20rem;
+      max-height: none;
+    }
+  }
+  [data-c="showcase"]:has(.showcase-stage [data-c="frame"]) { grid-template-columns: minmax(0, 1fr); }
+  [data-c="showcase"]:has(.showcase-stage [data-c="frame"]) .showcase-live { border-top: 1px solid var(--color-line); border-left: 0; }
+  [data-c="showcase"] .showcase-stage:has([data-c="frame"]) {
+    place-items: stretch;
+    min-height: 0;
+    padding: 0.75rem;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-c="showcase"] .is-done .showcase-check-icon,
+    [data-c="showcase"] .showcase-dot[data-beat] { animation: none; }
+  }
+</style>

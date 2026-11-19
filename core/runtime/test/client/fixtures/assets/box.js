@@ -1,6 +1,16 @@
-export const state = ctx => ({ title: 'from box', n: Number(ctx.$.initial), max: ctx.$.max ?? '' })
+export default function ($, $pragma) {
+  $pragma.prop('initial', 0)
+  $pragma.prop('max', '')
 
-export const actions = {
-  inc(ctx) { ctx.$.n++ },
-  box() {},
+  $.title = 'from box'
+  $.n = $.initial
+
+  function inc() { $.n++ }
+  function box() {}
+
+  function mount() {
+    (self.__boxes ??= []).push($)
+  }
+
+  return { inc, box, mount }
 }

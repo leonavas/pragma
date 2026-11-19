@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Template</title>
+  <script>self.__pragmaDev=true</script>
+  <link rel="modulepreload" href="/assets/template.js">
+  <script type="application/json" id="pragma-route">{"pattern":"/template","page":"/assets/template.js","components":{"inner":"/assets/inner.js"},"stores":{},"loader":false,"ssr":false}</script>
+  <script type="module" src="/core/boot.js"></script>
+</head>
+<body>
+  <main data-page>
+    <span id="qty" data-text="{state.count}"></span>
+    <p id="hello" data-text="Hello {state.name}, you have {state.count} items \{literal} &amp; more"></p>
+    <a id="link" data-attr-href="/u/{state.id}?tab=1" data-attr-title="Open {state.name}">user</a>
+    <p id="mixed"><b>Total:</b> <!--{state.total}--><!--}--> tasks, <!--{state.name}--><!--}-->!</p>
+    <p id="adopt">Hi <!--{state.name}-->SSR<!--}-->!</p>
+    <p id="pending" data-text="{state.pending.length} pending"></p>
+    <ul id="tasks"><template data-for="task in state.tasks" data-key="task.id" data-tid="t1"><li data-class-done="task.done"><label><input type="checkbox" data-attr-checked="task.done" data-on-change="toggle(task)"> <!--{task.title}--><!--}--></label><button class="rename" data-on-click="rename(task, 'Renamed')">rename</button></li></template></ul>
+    <button id="record" data-on-click="record(event, 'a, b', -2.5, true, null, state.name)">record</button>
+    <p id="log" data-text="{state.log}"></p>
+    <pre id="code"><code>{literal}: <template data-for="line in state.tasks" data-key="line.id" data-tid="t9"><span data-attr-data-n="line.id" data-text="{line.title};"></span></template></code></pre>
+    <div data-c="inner"><span class="own" data-text="{state.name}"></span> <!--1{state.name}--><!--}--></div>
+  </main>
+</body>
+</html>

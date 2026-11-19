@@ -94,7 +94,7 @@ impl A11y<'_> {
             _ => {}
         }
         if (name == "a" || name == "button") && !named(e) && !e.has("data-text") && !has_text(&e.children) {
-            self.warn(e.pos, "a11y/accessible-name", format!("<{name}> without an accessible name: add text, :text or aria-label"));
+            self.warn(e.pos, "a11y/accessible-name", format!("<{name}> without an accessible name: add text, {{path}} or aria-label"));
         }
         if e.has("data-on-click") && !INTERACTIVE.contains(&name.as_str()) && !(e.has("role") && has(e, "tabindex")) {
             self.warn(e.pos, "a11y/click-non-interactive", format!("@click on <{name}>: use <button>, or add role and tabindex"));

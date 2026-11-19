@@ -15,7 +15,6 @@
 <link rel="modulepreload" href="/assets/core/router.js">
 <link rel="modulepreload" href="/assets/core/log.js">
 <link rel="modulepreload" href="/assets/utils/fmt.js">
-<link rel="modulepreload" href="/assets/core/state.js">
 <script type="application/json" id="pragma-route">{"pattern":"/","page":"/assets/routes/index.js","components":{"card":"/assets/lib/components/card/card.js","counter":"/assets/lib/components/counter/counter.js"},"stores":{"cart":"/assets/lib/state/cart.js"},"loader":false,"ssr":false}</script>
 <script type="module" src="/assets/core/boot.js"></script>
 <script type="module" src="/_pragma/dev.js"></script>
@@ -23,28 +22,30 @@
 <body>
 <header class="flex items-center gap-4 p-4">
   <a href="/" aria-current="page">Home</a>
-  <button data-c="counter" class="btn" data-on-click="add"><span data-text="state.n">0</span></button>
-  <span data-text="shared.cart.total">0</span>
+  <button data-c="counter" class="btn" data-on-click="add"><span data-text="{state.count}"></span></button>
+  <span data-text="{shared.cart.total}"></span>
 </header>
 <main data-page>
 <section class="p-4">
   <h1 class="text-2xl font-bold">Products</h1>
   <button class="btn" data-on-click="toggle" data-open="about">Toggle</button>
-  <div data-c="card" class="card p-4 featured mt-4" data-heading="Featured" data-featured="true">
-  <h2 class="text-lg">Featured</h2>
-  <span class="badge">★</span>
+  <div data-c="card" class="card p-4 mt-4" data-class-featured="state.featured" data-prop-heading="Featured" data-prop-featured="true">
+  <h2 class="text-lg" data-text="{state.heading}"></h2>
+  <template data-if="state.featured" data-tid="te2ffd2e"><span class="badge">★</span></template>
+  <template data-else data-tid="tb27dc23"><span>-</span></template>
   
     <p>Card body</p>
     
   
-  <footer><button class="btn" data-on-click="buy">Buy</button><button class="btn" data-on-click="toggle" data-text="state.open" data-slot="1">Toggle</button></footer>
+  <footer><button class="btn" data-on-click="buy">Buy</button><button class="btn" data-on-click="toggle" data-text="{state.open}" data-slot="1"></button></footer>
 </div>
   <ul data-show="state.open">
     <template data-for="item in state.items" data-key="item.id" data-tid="t132a051"><li>
-        <span data-text="item.name">name</span>
-        <template data-if="item.promo" data-tid="t097d4db"><div data-c="card" class="card p-4" data-heading="Promo">
-  <h2 class="text-lg">Promo</h2>
-  <span>-</span>
+        <span data-text="{item.name}"></span>
+        <template data-if="item.promo" data-tid="t097d4db"><div data-c="card" class="card p-4" data-class-featured="state.featured" data-prop-heading="Promo">
+  <h2 class="text-lg" data-text="{state.heading}"></h2>
+  <template data-if="state.featured" data-tid="t78ae42f"><span class="badge">★</span></template>
+  <template data-else data-tid="t95cf9e5"><span>-</span></template>
   <b>promo</b>
   <footer><button class="btn" data-on-click="buy">Buy</button><small>no actions</small></footer>
 </div></template>
@@ -54,6 +55,6 @@
   </ul>
 </section>
 </main>
-<footer class="text-sm text-neutral-500" data-text="query.ref"></footer>
+<footer class="text-sm text-neutral-500" data-text="{query.ref}"></footer>
 </body>
 </html>

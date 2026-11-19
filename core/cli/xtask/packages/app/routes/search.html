@@ -1,3 +1,14 @@
+<script>
+  import Fuse from 'fuse.js'
+
+  const products = ['Roasted coffee', 'Green tea', 'Brown sugar', 'Black tea', 'Oat milk'].map((name, index) => ({ id: index + 1, name }))
+  const productSearch = new Fuse(products, { keys: ['name'], threshold: 0.3 })
+
+  let term = ''
+
+  const results = () => (term ? productSearch.search(term).map(result => result.item) : products)
+</script>
+
 <title>fuse.js</title>
 
 <h1>fuse.js</h1>
@@ -5,7 +16,7 @@
 <input id="term" type="search" class="rounded-lg border border-line px-3 py-2" :model="$term">
 <ul id="results">
   <for product in $results key=product.id>
-    <li :text="product.name"></li>
+    <li>{product.name}</li>
   </for>
   <empty>
     <li>Nothing found</li>

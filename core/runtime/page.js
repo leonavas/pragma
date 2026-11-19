@@ -1,6 +1,7 @@
-import { render, hooks, scopeOf, input } from './directives.js'
+import { render, hooks, scopeOf, input, eventCall } from './directives.js'
 import { log } from './log.js'
-import { persistStores, onStoreChange } from './state.js'
+import { reactive, onChange, persist, persistStores } from './state.js'
+import { coerce } from './props.js'
 import { load, call } from './loader.js'
 import { navigate } from './router.js'
 
@@ -27,34 +28,50 @@ function flush() {
   if (!cur) return
   render(document.body, { __proto__: null, shared, params: cur.params, query: cur.query, page: cur.page })
   persistStores()
+  // `function mount(el)`: el is the component root, or the page's `<main data-page>`
   for (const o of mounts.splice(0)) {
     if (!mounted.has(o)) continue
-    try { o.off = o.mod.mount?.(o.ctx) } catch (e) { reportError(e) }
+    try { o.off = o.mount?.(o.el) } catch (e) { reportError(e) }
   }
 }
 
-const prop = v => (v === 'true' ? true : v === 'false' ? false : v)
+// What `import { … } from 'pragma'` gives a script (the build rewrites `data` to `$pragma.data`): live
+// values, so `data` is the current page's once the loader is done.
+const services = {
+  shared, log, navigate, open, close, confirm,
+  get data() { return reactive(cur?.data) },
+  get params() { return cur?.params },
+  get query() { return cur?.query },
+  get page() { return cur?.page },
+  call: (name, data) => call(cur.url, name, data),
+}
 
-function owner(el, mod) {
-  const o = { el, mod }
-  o.ctx = {
-    el, shared, log, open, close, confirm, navigate,
-    get data() { return cur.data },
-    get params() { return cur.params },
-    get query() { return cur.query },
-    get page() { return cur.page },
-    call: (name, data) => call(cur.url, name, data),
-    update(fn) { fn(o.state); schedule() },
-    $: new Proxy({}, {
-      get: (_, key) => o.state && key in o.state ? o.state[key] : prop(el.dataset[key]),
-      set: (_, key, value) => (o.state[key] = value, true),
-      has: (_, key) => (o.state && key in o.state) || key in el.dataset,
-    }),
+// A page or component instance: `scope` is what its HTML reads as `$x` (state, props, functions).
+// Props come from data-with-<name> (values from the caller's scope, `w`) or data-prop-<name> (text).
+function instance(el, mod, w) {
+  const target = {}, o = { el, w, target }
+  o.scope = reactive(target)
+  const prop = (name, d) => {
+    const k = name.toLowerCase()
+    Object.defineProperty(target, name, {
+      enumerable: true,
+      get: () => coerce(o.w && Object.hasOwn(o.w, k) ? o.w[k] : el.getAttribute('data-prop-' + k) ?? undefined, d),
+    })
   }
-  o.state = mod.state?.(o.ctx) ?? {}
+  const api = mod.default?.(o.scope, { __proto__: services, prop }) ?? {}
+  for (const k in api) if (k !== 'mount') target[k] = api[k]
+  o.mount = api.mount
   mounted.add(o)
   mounts.push(o)
   return (el[C] = o)
+}
+
+function store(name, mod) {
+  const target = {}, scope = reactive(target)
+  const api = mod.default?.(scope, services) ?? {}
+  for (const k in api) target[k] = api[k]
+  persist(target, name, mod.persist)
+  return scope
 }
 
 function unmount(o) {
@@ -64,35 +81,36 @@ function unmount(o) {
 
 hooks.on = t => types.has(t) || (types.add(t), document.addEventListener(t, onEvent, true))
 hooks.remove = n => { for (const o of mounted) if (n.contains(o.el)) unmount(o) }
-hooks.enter = (el, s, x) => {
-  if (x === 2) return { __proto__: s, data: cur.data, state: cur.o.state, [O]: cur.o }
+hooks.enter = (el, s, x, w = null) => {
+  if (x === 2) return { __proto__: s, data: cur.data, state: cur.o.scope, [O]: cur.o }
   const mod = comps[el.dataset.c]
   if (!mod) return s
-  const o = el[C] ?? owner(el, mod)
-  return { __proto__: s, state: o.state, [O]: o }
+  const o = el[C] ?? instance(el, mod, w)
+  o.w = w
+  return { __proto__: s, state: o.scope, [O]: o }
 }
 
 function onEvent(e) {
   if (e.type === 'input' && input(e)) schedule()
   const el = e.target.closest?.(`[data-on-${e.type}]`)
   if (!el) return
-  const o = scopeOf(el)?.[O] ?? cur.o, name = el.getAttribute('data-on-' + e.type), fn = o.mod.actions?.[name]
-  if (!fn) {
-    if (self.__pragmaDev) throw new Error(`pragma: unknown action "${name}"`)
+  const o = scopeOf(el)?.[O] ?? cur.o, [name, args] = eventCall(el, e.type, e), fn = o.target[name]
+  if (typeof fn !== 'function') {
+    if (self.__pragmaDev) throw new Error(`pragma: "${name}" is not a function of the script`)
     return
   }
   if (e.type === 'submit') e.preventDefault()
   let r
-  try { r = fn({ __proto__: o.ctx, event: e, el, scope: scopeOf(el) }) } finally { schedule() }
+  try { r = fn(...args) } finally { schedule() }
   if (typeof r?.then === 'function') r.finally(schedule)
 }
 
-onStoreChange(schedule)
+onChange(schedule)
 
 export async function importRoute(r) {
   const all = o => Promise.all(Object.entries(o ?? {}).map(async ([k, u]) => [k, await import(u)]))
   const [page, c, s] = await Promise.all([r.page && import(r.page), all(r.components), all(r.stores)])
-  return { page, comps: Object.fromEntries(c), stores: Object.fromEntries(s.map(([k, m]) => [k, m.default])) }
+  return { page, comps: Object.fromEntries(c), stores: Object.fromEntries(s) }
 }
 
 export function leave() {
@@ -102,11 +120,12 @@ export function leave() {
 
 export function enter(route, mods, url, params, doc, pending) {
   Object.assign(comps, mods.comps)
-  Object.assign(shared, mods.stores)
+  for (const [name, mod] of Object.entries(mods.stores)) shared[name] ??= store(name, mod)
   if (document.querySelector('dialog,[popover]')) overlays()
   const p = (cur = { route, url, params, query: Object.fromEntries(url.searchParams), page: { loading: false, error: null } })
-  p.o = owner(document.querySelector('main[data-page]'), mods.page ?? {})
+  // with ssr the loader sets `data` synchronously, so the page script sees it as the server did
   const done = load(p, doc, pending).then(() => cur === p && schedule())
+  p.o = instance(document.querySelector('main[data-page]'), mods.page ?? {}, null)
   flush()
   return done
 }

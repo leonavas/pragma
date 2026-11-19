@@ -295,7 +295,7 @@ export function appSuite(mode, app) {
           assert.deepEqual(await storage('pragma:cart'), { items: [] })
         })
 
-        it('cart and tasks persist across navigation and reload in localStorage, without getters', async () => {
+        it('cart and tasks persist across navigation and reload in localStorage, only the persist fields', async () => {
           await page.goto('/shop')
           await addFirstProduct()
           await nav('Tasks').click()
@@ -308,6 +308,7 @@ export function appSuite(mode, app) {
           const cart = await storage('pragma:cart')
           assert.deepEqual(Object.keys(cart), ['items'])
           assert.deepEqual(cart.items.map(({ id, quantity }) => ({ id, quantity })), [{ id: 'coffee', quantity: 1 }])
+          assert.deepEqual(Object.keys(cart.items[0]).sort(), ['id', 'name', 'price', 'quantity', 'stock'])
           const tasks = await storage('pragma:tasks')
           assert.deepEqual(Object.keys(tasks), ['items'])
           assert.deepEqual(tasks.items.map(task => task.title), ['Buy coffee', 'Pay bills', 'Call the pharmacy', 'Persist me'])
@@ -753,9 +754,9 @@ export function appSuite(mode, app) {
       })
 
       describe('server actions', () => {
-        it('like via ctx.call: pending state, traceparent, server log, persisted on reload', async () => {
+        it('like via call(): pending state, traceparent, server log, persisted on reload', async () => {
           await page.goto('/shop/banana')
-          const likes = page.locator('main [data-text="data.product.likes"]')
+          const likes = page.locator('#likes')
           const likesBefore = Number(await likes.textContent())
           let release
           const gate = new Promise(resolve => { release = resolve })
@@ -767,7 +768,7 @@ export function appSuite(mode, app) {
           assert.equal((await action).status(), 200)
           assert.equal((await action).request().method(), 'POST')
           assert.ok((await action).request().headers().traceparent)
-          await page.waitForFunction(expected => Number(document.querySelector('main [data-text="data.product.likes"]').textContent) === expected, likesBefore + 1)
+          await page.waitForFunction(expected => Number(document.querySelector('#likes').textContent) === expected, likesBefore + 1)
           await page.locator('main button:enabled', { hasText: 'Like' }).waitFor()
           await page.unroute('**/_action/shop/banana/like')
           await page.reload()
@@ -779,7 +780,7 @@ export function appSuite(mode, app) {
         it('like error path: failing action shows the error, keeps the count, recovers', async () => {
           allowErrors(SERVER_ERROR, /failed to like product/)
           await page.goto('/shop/apple')
-          const likes = page.locator('main [data-text="data.product.likes"]')
+          const likes = page.locator('#likes')
           const likesBefore = Number(await likes.textContent())
           const status = page.locator('main [role="status"]')
           await page.route('**/_action/shop/apple/like', route => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: { message: 'boom' } }) }))
@@ -794,7 +795,7 @@ export function appSuite(mode, app) {
 
           await page.unroute('**/_action/shop/apple/like')
           await page.getByRole('button', { name: 'Like' }).click()
-          await page.waitForFunction(expected => Number(document.querySelector('main [data-text="data.product.likes"]').textContent) === expected, likesBefore + 1)
+          await page.waitForFunction(expected => Number(document.querySelector('#likes').textContent) === expected, likesBefore + 1)
           assert.equal(await status.textContent(), '')
 
           const missing = await fetch(app().url + '/_action/shop/missing/like', { method: 'POST', headers: { 'content-type': 'application/json' }, body: 'null' })

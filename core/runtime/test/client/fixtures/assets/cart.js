@@ -1,3 +1,7 @@
-import { store } from '/core/state.js'
+export const persist = ['items']
 
-export default store({ items: [] }, { persist: 'cart' })
+export default function ($) {
+  $.items = []
+
+  return {}
+}

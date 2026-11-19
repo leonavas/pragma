@@ -13,17 +13,15 @@ export async function load() {
   const examples = await readExamples('routes/examples/data', {
     catalog: [
       'demo/catalog.html',
-      'demo/catalog.js',
       'demo/catalog.server.js',
       'demo/_catalog.server.js',
       'demo/_products.json',
     ],
     guestbook: [
       '_components/guestbook/guestbook.html',
-      '_components/guestbook/guestbook.js',
       'index.server.js',
     ],
-    ssr: ['demo/ssr.server.js', 'demo/ssr.html', 'demo/ssr.js'],
+    ssr: ['demo/ssr.html', 'demo/ssr.server.js'],
     failure: ['demo/catalog.server.js', 'demo/catalog.html'],
   })
   return { examples, guestbook: entries }

@@ -1,8 +1,36 @@
+<script>
+  import { groupBy } from 'es-toolkit'
+  import { debounce } from 'es-toolkit/function'
+
+  const products = [
+    { name: 'Coffee', category: 'drinks' },
+    { name: 'Tea', category: 'drinks' },
+    { name: 'Bread', category: 'bakery' },
+  ]
+
+  const productsByCategory = Object.entries(groupBy(products, product => product.category))
+    .map(([category, inCategory]) => category + ': ' + inCategory.length)
+    .join(', ')
+
+  let draft = ''
+  let saves = 0
+  let savedDraft = ''
+
+  const saveLater = debounce(() => {
+    saves += 1
+    savedDraft = draft
+  }, 200)
+
+  function scheduleSave() {
+    saveLater()
+  }
+</script>
+
 <title>es-toolkit</title>
 
 <h1>es-toolkit</h1>
-<p>Products by category: <span id="products-by-category" :text="$productsByCategory"></span></p>
+<p>Products by category: <span id="products-by-category">{$productsByCategory}</span></p>
 <label for="draft">Draft</label>
 <input id="draft" class="rounded-lg border border-line px-3 py-2" :model="$draft" @input="scheduleSave">
-<p>Saves: <span id="saves" :text="$saves"></span></p>
-<p>Saved draft: <span id="saved-draft" :text="$savedDraft"></span></p>
+<p>Saves: <span id="saves">{$saves}</span></p>
+<p>Saved draft: <span id="saved-draft">{$savedDraft}</span></p>

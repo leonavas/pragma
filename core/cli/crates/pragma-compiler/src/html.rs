@@ -367,9 +367,11 @@ pub fn serialize_element(e: &Element, out: &mut String) {
     out.push('>');
 }
 
+/// Text outside an element, `{path}` included.
 pub fn stray_text(nodes: &[Node]) -> Option<Pos> {
     nodes.iter().find_map(|n| match n {
         Node::Text(t, p) if !t.trim().is_empty() => Some(*p),
+        Node::Element(e) if e.name == crate::directive::INTERP => Some(e.pos),
         _ => None,
     })
 }

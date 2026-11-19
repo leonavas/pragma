@@ -1,13 +1,15 @@
-export const state = ctx => ({
-  likes: 0,
-  query: '',
-  get likesText() { return this.likes === 1 ? '1 like' : this.likes + ' likes' },
-  get visiblePlugins() {
-    const needle = this.query.trim().toLowerCase()
-    return (ctx.data?.plugins ?? []).filter(plugin => plugin.name.includes(needle) || plugin.kind.includes(needle))
-  },
-})
+import { data } from 'pragma'
 
-export const actions = {
-  like(ctx) { ctx.$.likes += 1 },
+let likes = 0
+let query = ''
+
+const likesText = () => (likes === 1 ? '1 like' : likes + ' likes')
+
+function visiblePlugins() {
+  const needle = query.trim().toLowerCase()
+  return (data?.plugins ?? []).filter(plugin => plugin.name.includes(needle) || plugin.kind.includes(needle))
+}
+
+function like() {
+  likes += 1
 }

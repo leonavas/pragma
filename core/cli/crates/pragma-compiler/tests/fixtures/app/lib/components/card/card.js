@@ -1,5 +1,8 @@
-export const actions = {
-  buy(ctx) {
-    ctx.shared.cart.total += 1
-  },
+import { shared } from 'pragma'
+
+export let heading = ''
+export let featured = false
+
+function buy() {
+  shared.cart.total += 1
 }

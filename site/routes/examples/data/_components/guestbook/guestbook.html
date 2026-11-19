@@ -1,3 +1,25 @@
+<script>
+  import { data, call } from 'pragma'
+
+  let name = ''
+  let message = ''
+  let sending = false
+  let error = ''
+
+  async function sign() {
+    sending = true
+    error = ''
+    try {
+      data.guestbook = (await call('sign', { name, message })).guestbook
+      message = ''
+    } catch (failure) {
+      error = failure.message
+    } finally {
+      sending = false
+    }
+  }
+</script>
+
 <div class="grid w-full gap-5">
   <form class="grid gap-3" @submit="sign">
     <label class="guestbook-field">
@@ -10,7 +32,7 @@
     </label>
     <div class="flex items-center gap-3">
       <button class="btn btn-primary btn-small" :disabled="$sending">Sign</button>
-      <p class="guestbook-error" role="status" :text="$error"></p>
+      <p class="guestbook-error" role="status">{$error}</p>
     </div>
   </form>
   <if page.loading>
@@ -19,16 +41,50 @@
     </ul>
   </if>
   <else-if page.error>
-    <p class="guestbook-error" role="alert" :text="page.error.message"></p>
+    <p class="guestbook-error" role="alert">{page.error.message}</p>
   </else-if>
   <else>
     <ol class="grid gap-2" aria-label="Guestbook entries">
       <for entry in data.guestbook key=entry.id>
         <li class="guestbook-entry">
-          <p class="guestbook-meta"><span :text="entry.name"></span> <span class="text-faint" :text="entry.at"></span></p>
-          <p class="text-sm" :text="entry.message"></p>
+          <p class="guestbook-meta">{entry.name} <span class="text-faint">{entry.at}</span></p>
+          <p class="text-sm">{entry.message}</p>
         </li>
       </for>
     </ol>
   </else>
 </div>
+
+<style>
+  [data-c="guestbook"] .guestbook-field {
+    display: grid;
+    gap: 0.375rem;
+  }
+  [data-c="guestbook"] .guestbook-input {
+    height: 2.5rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-sunken);
+    color: var(--color-ink);
+    font-size: 0.9375rem;
+    caret-color: var(--color-accent);
+  }
+  [data-c="guestbook"] .guestbook-input:focus-visible { outline-offset: 0; border-color: var(--color-accent); }
+  [data-c="guestbook"] .guestbook-error {
+    color: var(--color-danger-300);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  [data-c="guestbook"] .guestbook-entry {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-ground);
+  }
+  [data-c="guestbook"] .guestbook-meta {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--color-accent);
+  }
+</style>

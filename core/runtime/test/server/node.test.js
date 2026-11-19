@@ -13,7 +13,7 @@ const handler = createHandler({
       pattern: '/blog/:slug',
       server: { load: ({ params }) => ({ slug: params.slug }) },
       ssr: true,
-      template: [['html', '<h1>'], ['text', 'data.slug'], ['html', '</h1>']],
+      template: [['html', '<h1>'], ['text', '{data.slug}'], ['html', '</h1>']],
       shell: '<!doctype html><html><head></head><body><main data-page></main></body></html>',
     },
   ],

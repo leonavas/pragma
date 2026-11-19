@@ -1,4 +1,4 @@
-<title :text="data.head.title">Field notes · pragma</title>
+<title>{data.head.title}</title>
 <meta name="description" :content="data.head.description">
 <meta name="robots" :content="data.head.robots">
 <link rel="canonical" :href="data.head.url">
@@ -13,10 +13,10 @@
 <div class="wrap py-12 lg:py-16">
   <if data.article>
     <article class="prose">
-      <h1 class="text-3xl font-medium tracking-tight text-ink" :text="data.article.title"></h1>
-      <p class="font-mono text-xs text-faint"><time :datetime="data.article.published" :text="data.article.date"></time></p>
+      <h1 class="text-3xl font-medium tracking-tight text-ink">{data.article.title}</h1>
+      <p class="font-mono text-xs text-faint"><time :datetime="data.article.published">{data.article.date}</time></p>
       <for paragraph in data.article.body key=paragraph.id>
-        <p :text="paragraph.text"></p>
+        <p>{paragraph.text}</p>
       </for>
       <p><a href="/examples/seo/demo">All field notes</a></p>
     </article>

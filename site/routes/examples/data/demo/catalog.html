@@ -1,6 +1,18 @@
 <title>Catalog demo · pragma examples</title>
 <meta name="robots" content="noindex">
 
+<script>
+  import { query } from 'pragma'
+
+  const current = () => query.fail ? 'broken' : query.category ?? 'all'
+  const filterLink = () => ({
+    all: current() === 'all' && 'true',
+    hardware: current() === 'hardware' && 'true',
+    books: current() === 'books' && 'true',
+    broken: current() === 'broken' && 'true',
+  })
+</script>
+
 <c-demo-page>
   <nav class="flex flex-wrap gap-x-5 gap-y-2 font-mono text-xs" aria-label="Category">
     <a href="/examples/data/demo/catalog" class="nav-link" :aria-current="$filterLink.all">All</a>
@@ -17,7 +29,7 @@
   </if>
   <else-if page.error>
     <div class="grid gap-1 border border-danger-500/50 bg-danger-950/40 p-4" role="alert">
-      <p class="font-mono text-sm text-danger-300" :text="page.error.message"></p>
+      <p class="font-mono text-sm text-danger-300">{page.error.message}</p>
       <p class="text-sm text-muted">HTTP 500 from /_data. The rest of the page still works: pick a category.</p>
     </div>
   </else-if>
@@ -26,12 +38,12 @@
       <ul class="grid gap-2">
         <for product in data.products key=product.id>
           <li class="flex items-center justify-between gap-4 border border-line px-4 py-3">
-            <span class="text-sm" :text="product.name"></span>
-            <span class="font-mono text-xs tabular-nums text-muted" :text="product.priceLabel"></span>
+            <span class="text-sm">{product.name}</span>
+            <span class="font-mono text-xs tabular-nums text-muted">{product.priceLabel}</span>
           </li>
         </for>
       </ul>
-      <p class="font-mono text-xs text-faint">loaded at <span class="tabular-nums" :text="data.loadedAt"></span> UTC</p>
+      <p class="font-mono text-xs text-faint">loaded at <span class="tabular-nums">{data.loadedAt}</span> UTC</p>
     </div>
   </else>
 </c-demo-page>

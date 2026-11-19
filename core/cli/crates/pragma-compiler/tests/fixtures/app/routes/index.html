@@ -4,12 +4,12 @@
   <button class="btn" @click="toggle" @open="about">Toggle</button>
   <c-card heading="Featured" featured class="mt-4">
     <p>Card body</p>
-    <button slot="aside" class="btn" @click="toggle" :text="$open">Toggle</button>
+    <button slot="aside" class="btn" @click="toggle">{$open}</button>
   </c-card>
   <ul :show="$open">
     <for item in $items key=item.id>
       <li>
-        <span :text="item.name">name</span>
+        <span>{item.name}</span>
         <if item.promo>
           <c-card heading="Promo"><b>promo</b></c-card>
         </if>

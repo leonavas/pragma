@@ -1,0 +1,30 @@
+<script>
+  import { codeKinds } from '../../../utils/code-lines.js'
+
+  export let file = null
+
+  function highlightFor(kind) {
+    const name = 'code-' + codeKinds[kind]
+    if (!CSS.highlights.has(name)) CSS.highlights.set(name, new Highlight())
+    return CSS.highlights.get(name)
+  }
+
+  function mount() {
+    if (!globalThis.CSS?.highlights) return
+    const painted = []
+    document.getElementById(file.id).querySelectorAll('.code-line').forEach((line, index) => {
+      const marks = file.lines[index]?.marks ?? []
+      if (!line.firstChild) return
+      for (let i = 0; i < marks.length; i += 3) {
+        const range = new StaticRange({ startContainer: line.firstChild, startOffset: marks[i], endContainer: line.firstChild, endOffset: marks[i + 1] })
+        highlightFor(marks[i + 2]).add(range)
+        painted.push([marks[i + 2], range])
+      }
+    })
+    return () => {
+      for (const [kind, range] of painted) highlightFor(kind).delete(range)
+    }
+  }
+</script>
+
+<pre class="showcase-code" :id="$file.id" tabindex="0" :aria-label="$file.path"><slot></slot></pre>

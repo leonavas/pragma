@@ -1,3 +1,9 @@
-import { store } from '/core/state.js'
+export const persist = ['n']
 
-export default store({ n: 1, get total() { return this.n * 10 } }, { persist: 'account' })
+export default function ($) {
+  $.n = 1
+
+  const total = () => $.n * 10
+
+  return { total }
+}

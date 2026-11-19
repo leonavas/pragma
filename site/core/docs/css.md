@@ -36,16 +36,13 @@ The starter ships the theme-aware tokens `bg-surface`, `text-ink`, `text-muted`,
 ```js
 import { theme, setTheme } from '../../../core/theme.js'
 
-export const state = () => ({
-  dark: theme() === 'dark',
-  get label() { return this.dark ? 'Light theme' : 'Dark theme' },
-})
+let dark = theme() === 'dark'
 
-export const actions = {
-  toggle(ctx) {
-    ctx.$.dark = !ctx.$.dark
-    setTheme(ctx.$.dark ? 'dark' : 'light')
-  },
+const label = () => (dark ? 'Light theme' : 'Dark theme')
+
+function toggle() {
+  dark = !dark
+  setTheme(dark ? 'dark' : 'light')
 }
 ```
 

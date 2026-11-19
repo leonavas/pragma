@@ -14,7 +14,6 @@
 <link rel="modulepreload" href="/assets/lib/state/cart.js">
 <link rel="modulepreload" href="/assets/core/router.js">
 <link rel="modulepreload" href="/assets/core/log.js">
-<link rel="modulepreload" href="/assets/core/state.js">
 <script type="application/json" id="pragma-route">{"pattern":"/shop/:id","page":"/assets/routes/shop/[id].js","components":{"counter":"/assets/lib/components/counter/counter.js"},"stores":{"cart":"/assets/lib/state/cart.js"},"loader":true,"ssr":false}</script>
 <script type="module" src="/assets/core/boot.js"></script>
 <script type="module" src="/_pragma/dev.js"></script>
@@ -22,19 +21,19 @@
 <body>
 <header class="flex items-center gap-4 p-4">
   <a href="/">Home</a>
-  <button data-c="counter" class="btn" data-on-click="add"><span data-text="state.n">0</span></button>
-  <span data-text="shared.cart.total">0</span>
+  <button data-c="counter" class="btn" data-on-click="add"><span data-text="{state.count}"></span></button>
+  <span data-text="{shared.cart.total}"></span>
 </header>
 <main data-page>
 <template data-if="page.loading" data-tid="tab343cf"><div class="skeleton h-8"></div></template>
 <template data-else data-tid="t46bd2e7"><article>
-    <h1 data-text="data.product.name">…</h1>
-    <strong data-c="price-cead5e" class="text-primary-600" data-text="data.product.price">$0</strong>
+    <h1 data-text="{data.product.name}"></h1>
+    <strong data-c="price-cead5e" class="text-primary-600" data-text="{data.product.price}"></strong>
     <a data-attr-href="data.product.url" data-class-hidden="!data.product.url" href="#">view</a>
-    <span data-text="params.id"></span>
+    <span data-text="Product {params.id}"></span>
     <input data-model="state.qty" aria-label="Quantity">
   </article></template>
 </main>
-<footer class="text-sm text-neutral-500" data-text="query.ref"></footer>
+<footer class="text-sm text-neutral-500" data-text="{query.ref}"></footer>
 </body>
 </html>

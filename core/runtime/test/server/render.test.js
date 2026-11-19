@@ -1,20 +1,20 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { render, resolve } from '../../server/render.js'
+import { render, renderHead, resolve, template } from '../../server/render.js'
 
 const TPL = '<ul><template data-tid="t1" data-for="item in data.items" data-key="item.id"><li></li></template>'
 const EMPTY = '<template data-empty data-tid="t9"><li>empty</li></template>'
 
 const forOps = [
   ['html', TPL],
-  ['for', 't1', 'item', 'data.items', 'item.id', [['html', '<li'], ['attr', 'title', 'item.name'], ['html', '>'], ['text', 'item.name'], ['html', '</li>']]],
+  ['for', 't1', 'item', 'data.items', 'item.id', [['html', '<li'], ['attr', 'title', 'item.name'], ['html', '>'], ['text', '{item.name}'], ['html', '</li>']]],
   ['html', EMPTY],
   ['empty', 't1', [['html', '<li>empty</li>']]],
   ['html', '</ul>'],
 ]
 
 test('text and attr are escaped', () => {
-  const ops = [['html', '<p'], ['attr', 'title', 'data.t'], ['html', '>'], ['text', 'data.t'], ['html', '</p>']]
+  const ops = [['html', '<p'], ['attr', 'title', 'data.t'], ['html', '>'], ['text', '{data.t}'], ['html', '</p>']]
   const out = render(ops, { data: { t: `<script>"x"&'y'</script>` } })
   assert.equal(out, '<p title="&lt;script&gt;&quot;x&quot;&amp;&#39;y&#39;&lt;/script&gt;">&lt;script&gt;&quot;x&quot;&amp;&#39;y&#39;&lt;/script&gt;</p>')
 })
@@ -25,7 +25,23 @@ test('attr: true is empty, false/null/undefined remove it', () => {
 })
 
 test('text of null and undefined is empty', () => {
-  assert.equal(render([['text', 'data.a'], ['text', 'data.b']], { data: { a: null, b: undefined } }), '')
+  assert.equal(render([['text', '{data.a}'], ['text', '{data.b}']], { data: { a: null, b: undefined } }), '')
+})
+
+test('text templates: literals are HTML source, values are escaped, \\{ is a brace', () => {
+  const scope = { data: { name: 'Ana & <Bo>', n: 0 } }
+  assert.equal(render([['text', 'Hi {data.name}, {data.n} items &amp; \\{more}']], scope), 'Hi Ana &amp; &lt;Bo&gt;, 0 items &amp; {more}')
+  assert.deepEqual(template('a {x.y} \\{b} {z}'), ['a ', 'x.y', ' {b} ', 'z', ''])
+})
+
+test('attribute templates are always strings', () => {
+  const ops = [['html', '<a'], ['attr', 'href', '/shop/{data.id}?q="{data.q}"'], ['attr', 'title', '{data.missing}'], ['html', '>']]
+  assert.equal(render(ops, { data: { id: 7, q: 'a"b', missing: null } }), '<a href="/shop/7?q=&quot;a&quot;b&quot;" title="">')
+})
+
+test('markers beside elements: the server fills the text between them', () => {
+  const ops = [['html', '<label><input> <!--{data.title}-->'], ['text', '{data.title}'], ['html', '<!--}--></label>']]
+  assert.equal(render(ops, { data: { title: 'Buy <milk>' } }), '<label><input> <!--{data.title}-->Buy &lt;milk&gt;<!--}--></label>')
 })
 
 test('class merges static and conditional classes with negation', () => {
@@ -70,14 +86,14 @@ test('for renders instances with data-of and data-key; empty when the list is em
 })
 
 test('nested for sees outer variables', () => {
-  const ops = [['for', 'a', 'g', 'data.groups', 'g.id', [['html', '<ul>'], ['for', 'b', 'i', 'g.items', 'i', [['html', '<li>'], ['text', 'g.id'], ['text', 'i'], ['html', '</li>']]], ['html', '</ul>']]]]
+  const ops = [['for', 'a', 'g', 'data.groups', 'g.id', [['html', '<ul>'], ['for', 'b', 'i', 'g.items', 'i', [['html', '<li>'], ['text', '{g.id}{i}'], ['html', '</li>']]], ['html', '</ul>']]]]
   const out = render(ops, { data: { groups: [{ id: 'G', items: ['1', '2'] }] } })
   assert.equal(out, '<ul data-of="a" data-key="G"><li data-of="b" data-key="1">G1</li><li data-of="b" data-key="2">G2</li></ul>')
 })
 
 test('unknown path throws', () => {
-  assert.throws(() => render([['text', 'data.does.not.exist']], { data: {} }), /unknown path: data\.does\.not\.exist/)
-  assert.throws(() => render([['text', 'page.x']], { data: {} }), /unknown path/)
+  assert.throws(() => render([['text', '{data.does.not.exist}']], { data: {} }), /unknown path: data\.does\.not\.exist/)
+  assert.throws(() => render([['text', '{page.x}']], { data: {} }), /unknown path/)
   assert.throws(() => render([['show', 'data.a.b', false]], { data: { a: null } }), /unknown path/)
   assert.equal(resolve({ data: { s: 'abc' } }, 'data.s.length'), 3)
 })
@@ -98,26 +114,43 @@ test('render is deterministic', () => {
 
 test('state and shared are left to the client: directives intact, blocks without instances', () => {
   const ops = [
-    ['html', '<p data-text="state.n"'], ['show', 'shared.ui.open', false], ['attr', 'title', 'state.t'],
-    ['class', 'base', [['on', 'state.on', false], ['loaded', 'data.ok', false]]], ['html', '>'], ['text', 'state.n'], ['html', '</p>'],
+    ['html', '<p data-text="{state.n}"'], ['show', 'shared.ui.open', false], ['attr', 'title', 'state.t'], ['attr', 'alt', 'x {state.t} {data.ok}'],
+    ['class', 'base', [['on', 'state.on', false], ['loaded', 'data.ok', false]]], ['html', '>'], ['text', '{state.n}'], ['text', 'n: {data.ok} {shared.cart.n}'], ['html', '</p>'],
     ['html', '<template data-tid="t1" data-if="state.x"><b></b></template>'],
     ['if', 't1', 'state.x', false, [['html', '<b>x</b>']]],
     ['else', 't1', [['html', '<i>y</i>']]],
     ['html', '<template data-tid="t2" data-for="i in shared.cart.items" data-key="i.id"><li></li></template>'],
-    ['for', 't2', 'i', 'shared.cart.items', 'i.id', [['html', '<li>'], ['text', 'i.name'], ['html', '</li>']]],
+    ['for', 't2', 'i', 'shared.cart.items', 'i.id', [['html', '<li>'], ['text', '{i.name}'], ['html', '</li>']]],
     ['empty', 't2', [['html', '<li>empty</li>']]],
   ]
   assert.equal(
     render(ops, { data: { ok: true } }),
-    '<p data-text="state.n" class="base loaded"></p><template data-tid="t1" data-if="state.x"><b></b></template><template data-tid="t2" data-for="i in shared.cart.items" data-key="i.id"><li></li></template>',
+    '<p data-text="{state.n}" class="base loaded"></p><template data-tid="t1" data-if="state.x"><b></b></template><template data-tid="t2" data-for="i in shared.cart.items" data-key="i.id"><li></li></template>',
   )
 })
 
 test('for variable over data resolves on the server, even alongside state', () => {
-  const ops = [['for', 't1', 'item', 'data.items', 'item.id', [['html', '<li'], ['class', '', [['sel', 'state.sel', false]]], ['html', '>'], ['text', 'item.name'], ['html', '</li>']]]]
+  const ops = [['for', 't1', 'item', 'data.items', 'item.id', [['html', '<li'], ['class', '', [['sel', 'state.sel', false]]], ['html', '>'], ['text', '{item.name}'], ['html', '</li>']]]]
   assert.equal(render(ops, { data: { items: [{ id: 1, name: 'a' }] } }), '<li data-of="t1" data-key="1">a</li>')
-  assert.throws(() => render([['for', 't1', 'item', 'data.items', 'item.id', [['html', '<li>'], ['text', 'item.missing'], ['html', '</li>']]]], { data: { items: [{ id: 1 }] } }), /unknown path: item\.missing/)
+  assert.throws(() => render([['for', 't1', 'item', 'data.items', 'item.id', [['html', '<li>'], ['text', '{item.missing}'], ['html', '</li>']]]], { data: { items: [{ id: 1 }] } }), /unknown path: item\.missing/)
   for (const path of ['data.x', 'params.x', 'query.x']) {
-    assert.throws(() => render([['text', path]], { data: {}, params: {}, query: {} }), /unknown path/)
+    assert.throws(() => render([['text', `{${path}}`]], { data: {}, params: {}, query: {} }), /unknown path/)
   }
+})
+
+test('head: title and attribute templates and paths are filled by the server', () => {
+  const html =
+    '<html><head><title data-text="{data.p.name} &amp; co | Shop">Shop</title>\n' +
+    '<meta property="og:title" data-attr-content="{data.p.name}">\n' +
+    '<link rel="canonical" data-attr-href="https://x.dev/p/{params.id}">\n' +
+    '<meta name="robots" data-attr-content="data.missing">\n' +
+    '</head><body></body></html>'
+  const out = renderHead(html, { data: { p: { name: 'Mug "XL"' } }, params: { id: '7' } })
+  assert.equal(
+    out,
+    '<html><head><title>Mug &quot;XL&quot; &amp; co | Shop</title>\n' +
+      '<meta property="og:title" content="Mug &quot;XL&quot;">\n' +
+      '<link rel="canonical" href="https://x.dev/p/7">\n' +
+      '</head><body></body></html>',
+  )
 })

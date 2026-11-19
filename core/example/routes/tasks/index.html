@@ -1,3 +1,79 @@
+<script>
+  import { shared, query, confirm, log } from 'pragma'
+  import { contains, markCurrent } from '../../utils/text.js'
+
+  const FILTERS = { all: () => true, pending: task => !task.done, completed: task => task.done }
+
+  let newTitle = ''
+  let error = ''
+  let search = ''
+  let editingId = null
+  let draft = ''
+
+  const invalid = () => String(!!error)
+  const tone = () => (shared.tasks.completed() && !shared.tasks.pending() ? 'ok' : 'neutral')
+  const filter = () => markCurrent(Object.keys(FILTERS), FILTERS[query.filter] ? query.filter : 'all')
+  const visible = () => {
+    const matchesFilter = FILTERS[query.filter] ?? FILTERS.all
+    return shared.tasks.items
+      .filter(task => matchesFilter(task) && contains(task.title, search))
+      .map(task => ({ ...task, editing: task.id === editingId }))
+  }
+
+  function validate(title, id) {
+    if (title.length < 3) return 'Use at least 3 characters.'
+    if (title.length > 80) return 'Use at most 80 characters.'
+    if (shared.tasks.exists(title, id)) return 'This task already exists.'
+    return ''
+  }
+
+  function add(event) {
+    const title = newTitle.trim()
+    error = validate(title)
+    if (error) return
+    shared.tasks.add(title)
+    newTitle = ''
+    event.target.elements.title.focus()
+  }
+
+  function toggle(task) {
+    const stored = shared.tasks.find(task.id)
+    stored.done = !stored.done
+  }
+
+  function remove(task) {
+    shared.tasks.remove(task.id)
+  }
+
+  function edit(task) {
+    editingId = task.id
+    draft = task.title
+  }
+
+  function editKeydown(event) {
+    if (event.key === 'Escape') editingId = null
+    if (event.key === 'Enter') saveEdit()
+  }
+
+  function saveEdit() {
+    const id = editingId
+    const title = draft.trim()
+    if (!id) return
+    editingId = null
+    if (!validate(title, id)) shared.tasks.find(id).title = title
+  }
+
+  function completeAll() {
+    shared.tasks.completeAll()
+  }
+
+  async function clearCompleted() {
+    if (await confirm('clear-completed') !== 'ok') return
+    shared.tasks.clearCompleted()
+    log.info('completed tasks removed')
+  }
+</script>
+
 <title>Tasks · Minimart</title>
 
 <div class="flex flex-col gap-6">
@@ -15,12 +91,12 @@
     <c-indicator title="Completed" :value="shared.tasks.summary" :tone="$tone"></c-indicator>
   </section>
 
-  <form class="flex flex-col gap-1" novalidate @submit="add">
+  <form class="flex flex-col gap-1" novalidate @submit="add(event)">
     <div class="flex gap-2">
       <input id="new-task" name="title" class="field flex-1" placeholder="New task" autocomplete="off" aria-label="New task" aria-describedby="task-error" :model="$newTitle" :aria-invalid="$invalid">
       <button class="btn btn-primary">Add</button>
     </div>
-    <p id="task-error" class="min-h-5 text-sm text-danger-600" :text="$error"></p>
+    <p id="task-error" class="min-h-5 text-sm text-danger-600">{$error}</p>
   </form>
 
   <div class="flex flex-wrap items-center justify-between gap-3">
@@ -35,14 +111,14 @@
   <ul class="card divide-y divide-line p-0">
     <for task in $visible key=task.id>
       <li class="flex items-center gap-3 px-4 py-2">
-        <input type="checkbox" class="size-4" :checked="task.done" :aria-label="task.title" @change="toggle">
+        <input type="checkbox" class="size-4" :checked="task.done" :aria-label="task.title" @change="toggle(task)">
         <if task.editing>
-          <input class="field flex-1" aria-label="Edit task" autofocus :model="$draft" @keydown="editKeydown" @focusout="saveEdit">
+          <input class="field flex-1" aria-label="Edit task" autofocus :model="$draft" @keydown="editKeydown(event)" @focusout="saveEdit">
         </if>
         <else>
-          <span class="flex-1 py-2" title="Double-click to edit" .line-through="task.done" .text-muted="task.done" :text="task.title" @dblclick="edit"></span>
+          <span class="flex-1 py-2" title="Double-click to edit" .line-through="task.done" .text-muted="task.done" @dblclick="edit(task)">{task.title}</span>
         </else>
-        <button type="button" class="btn btn-icon" :aria-label="task.removeLabel" @click="remove">×</button>
+        <button type="button" class="btn btn-icon" aria-label="Remove {task.title}" @click="remove(task)">×</button>
       </li>
     </for>
     <empty>

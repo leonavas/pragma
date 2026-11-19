@@ -77,16 +77,16 @@ for (const name of browsers) {
       await h1Is('Dashboard')
     })
 
-    it('page JS edit reloads with the new behavior', async () => {
+    it('page script edit reloads with the new behavior', async () => {
       await page.goto('/tasks')
       await mark()
-      edit('routes/tasks/index.js', "'Use at least 3 characters.'", "'Too short.'")
+      edit('routes/tasks/index.html', "'Use at least 3 characters.'", "'Too short.'")
       await page.waitForFunction(() => self.__marker === undefined && /\d of \d/.test(document.querySelector('[data-c="indicator"] p')?.textContent))
       await page.getByRole('textbox', { name: 'New task' }).fill('ab')
       await page.getByRole('textbox', { name: 'New task' }).press('Enter')
       await page.locator('#task-error', { hasText: 'Too short.' }).waitFor()
       await mark()
-      edit('routes/tasks/index.js', "'Too short.'", "'Use at least 3 characters.'")
+      edit('routes/tasks/index.html', "'Too short.'", "'Use at least 3 characters.'")
       await page.waitForFunction(() => self.__marker === undefined && /\d of \d/.test(document.querySelector('[data-c="indicator"] p')?.textContent))
     })
 

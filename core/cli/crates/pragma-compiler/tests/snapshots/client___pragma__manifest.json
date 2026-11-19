@@ -9,8 +9,7 @@
       "/assets/lib/state/cart.js",
       "/assets/core/router.js",
       "/assets/core/log.js",
-      "/assets/utils/fmt.js",
-      "/assets/core/state.js"
+      "/assets/utils/fmt.js"
     ],
     "loader": false,
     "ssr": false
@@ -23,8 +22,7 @@
       "/assets/lib/components/counter/counter.js",
       "/assets/lib/state/cart.js",
       "/assets/core/router.js",
-      "/assets/core/log.js",
-      "/assets/core/state.js"
+      "/assets/core/log.js"
     ],
     "loader": true,
     "ssr": true
@@ -36,8 +34,7 @@
       "/assets/lib/components/counter/counter.js",
       "/assets/lib/state/cart.js",
       "/assets/core/router.js",
-      "/assets/core/log.js",
-      "/assets/core/state.js"
+      "/assets/core/log.js"
     ],
     "loader": false,
     "ssr": false
@@ -50,8 +47,7 @@
       "/assets/lib/components/counter/counter.js",
       "/assets/lib/state/cart.js",
       "/assets/core/router.js",
-      "/assets/core/log.js",
-      "/assets/core/state.js"
+      "/assets/core/log.js"
     ],
     "loader": true,
     "ssr": false

@@ -2123,6 +2123,7 @@ dependencies = [
  "oxc_codegen",
  "oxc_minifier",
  "oxc_parser",
+ "oxc_semantic",
  "oxc_span",
  "oxc_syntax",
  "pragma-diag",

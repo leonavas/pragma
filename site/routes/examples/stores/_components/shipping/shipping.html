@@ -1,1 +1,22 @@
-<p .is-free="$qualifies" role="status" :text="$message"></p>
+<script>
+  import { shared } from 'pragma'
+
+  const freeShippingFrom = 50
+
+  const remaining = () => Math.max(freeShippingFrom - shared.cart.total(), 0)
+  const qualifies = () => remaining() === 0
+  const message = () => qualifies() ? 'Free shipping unlocked.' : `Add $${remaining()} more for free shipping.`
+</script>
+
+<p .is-free="$qualifies" role="status">{$message}</p>
+
+<style>
+  [data-c="shipping"] {
+    padding: 0.75rem 1rem;
+    border: 1px dashed var(--color-line-strong);
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  [data-c="shipping"].is-free { border-style: solid; border-color: var(--color-accent); color: var(--color-accent); }
+</style>

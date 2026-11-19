@@ -25,11 +25,11 @@ and scroll lock.
 ```
 
 ```js
-export const actions = {
-  async remove(ctx) {
-    if (await ctx.confirm('remove') !== 'ok') return
-    await ctx.call('remove', { id: ctx.params.id })
-  },
+import { confirm, call, params } from 'pragma'
+
+async function remove() {
+  if (await confirm('remove') !== 'ok') return
+  await call('remove', { id: params.id })
 }
 ```
 
@@ -39,10 +39,10 @@ export const actions = {
 | `c-alert` | `id`, `title` | default, `actions` | Esc, `@close`, Back |
 | `c-dropdown` | `id`, `label` | default (`<a>`, `<button>`, `<hr>`) | outside click, Esc, `@close`, Back |
 
-| JS | Effect |
+| JS (`import { open, close, confirm } from 'pragma'`) | Effect |
 |---|---|
-| `ctx.open(id)` / `ctx.close(id)` | open / close |
-| `await ctx.confirm(id)` | opens; resolves with the `value` of the clicked `@close` button, or `'cancel'` |
+| `open(id)` / `close(id)` | open / close |
+| `await confirm(id)` | opens; resolves with the `value` of the clicked `@close` button, or `'cancel'` |
 
 ## Rules
 

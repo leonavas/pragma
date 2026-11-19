@@ -14,11 +14,11 @@ const SHELL = `<!doctype html>
 
 const TEMPLATE = [
   ['html', '<h1>'],
-  ['text', 'data.title'],
+  ['text', '{data.title}'],
   ['html', '</h1><ul><template data-tid="t1" data-for="tag in data.tags" data-key="tag.id"><li></li></template>'],
-  ['for', 't1', 'tag', 'data.tags', 'tag.id', [['html', '<li>'], ['text', 'tag.name'], ['html', '</li>']]],
+  ['for', 't1', 'tag', 'data.tags', 'tag.id', [['html', '<li>'], ['text', '{tag.name}'], ['html', '</li>']]],
   ['html', '</ul><p>'],
-  ['text', 'params.slug'],
+  ['text', '{params.slug}'],
   ['html', '</p>'],
 ]
 

@@ -3,19 +3,19 @@ export const ssr = true
 const votes = new Map([['prebuilt', 12], ['ssr', 7], ['islands', 3]])
 const labels = { prebuilt: 'Prebuilt HTML + /_data fetch', ssr: 'ssr = true', islands: 'Client-only rendering' }
 
-function titleOf(options) {
-  return `${options.reduce((sum, option) => sum + option.total, 0)} votes · SSR demo`
+function tally() {
+  return [...votes].map(([id, total]) => ({ id, label: labels[id], total }))
 }
 
-function tally() {
-  return [...votes].map(([id, total]) => ({ id, label: labels[id], voteLabel: `Vote for ${labels[id]}`, total }))
+function sumOf(options) {
+  return options.reduce((sum, option) => sum + option.total, 0)
 }
 
 export async function load({ request }) {
   const options = tally()
   return {
-    title: titleOf(options),
     options,
+    votes: sumOf(options),
     renderedAt: new Date().toISOString().slice(11, 23),
     agent: (request.headers.get('user-agent') ?? 'unknown').split(' ')[0],
   }
@@ -27,6 +27,6 @@ export const actions = {
     votes.set(input.id, votes.get(input.id) + 1)
     log.info('ssr demo vote', { 'vote.option': input.id })
     const options = tally()
-    return { options, title: titleOf(options) }
+    return { options, votes: sumOf(options) }
   },
 }

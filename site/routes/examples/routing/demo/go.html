@@ -1,9 +1,19 @@
 <title>Go to · routing demo</title>
 <meta name="robots" content="noindex">
 
+<script>
+  import { navigate } from 'pragma'
+
+  let slug = 'closed-syntax'
+
+  function openPost() {
+    navigate('/examples/routing/demo/' + encodeURIComponent(slug.trim()))
+  }
+</script>
+
 <c-demo-page>
   <p-demo-nav></p-demo-nav>
-  <form class="flex max-w-sm flex-col items-start gap-3" @submit="open">
+  <form class="flex max-w-sm flex-col items-start gap-3" @submit="openPost">
     <label class="grid w-full gap-2 text-sm">
       <span class="text-muted">Post slug</span>
       <input class="border border-line-strong bg-sunken px-3 py-2 text-ink" :model="$slug" required>

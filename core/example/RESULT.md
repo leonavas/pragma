@@ -28,10 +28,10 @@ PRAGMA=/path/to/pragma npm test     # runs pragma serve and pragma dev on copies
 | Route | Files | Features |
 |---|---|---|
 | layout | `routes/_layout.html` | nav with automatic `aria-current`; cart badge (`shared.cart.count`) |
-| `/` Dashboard | `routes/index.html`, `index.js` | `c-indicator` ×3 (`value`/`tone` aliases, tone getters in `state(ctx)`); `c-counter` ×3 with different props (one inside `c-tabs`); `c-clock` (`mount` with cleanup); `c-theme-toggle` (`core/theme.js`, no flash); `c-tabs` (named slots, ← →); `c-modal` |
-| `/tasks` | `routes/tasks/index.*` | persisted `tasks` store with getters and methods; validated form; keyed list with inline edit (`autofocus` in a new block); `c-search`; `c-filters` with `?filter=` in the URL; `c-dropdown` + `c-alert` with `ctx.confirm` |
-| `/shop` | `routes/shop/index.*` | `load` in `index.server.js` (source `routes/shop/_products.json`, translated from `tests_1/shared/produtos.json`, 400 ms delay) with skeleton, error with `?fail=1` and server-side `?category=` filter; client-side search via getter; `_components/product-card`, `add-to-cart` (props via `data-attr-data-*`), `cart-summary` (alert with `confirm`) |
-| `/shop/:id` | `routes/shop/[id].*` | `ssr = true`; reuses `p-add-to-cart`; server action `like` via `ctx.call` with OTel logs on both sides |
+| `/` Dashboard | `routes/index.html` | `c-indicator` ×3 (`value`/`tone` aliases, tone functions in the page `<script>`); `c-counter` ×3 with typed props (`export let step = 1`, one inside `c-tabs`); `c-clock` (`mount` with cleanup, a timer assigns a `let`); `c-theme-toggle` (`core/theme.js`, no flash); `c-tabs` (named slots, ← →, `@click="select('first')"`); `c-modal` |
+| `/tasks` | `routes/tasks/index.html` | persisted `tasks` store (`let items`, derived functions, actions); validated form; keyed list with inline edit (`autofocus` in a new block) and event arguments (`@change="toggle(task)"`); `c-search`; `c-filters` with `?filter=` in the URL; `c-dropdown` + `c-alert` with `confirm` |
+| `/shop` | `routes/shop/index.html`, `index.server.js` | `load` (source `routes/shop/_products.json`, translated from `tests_1/shared/produtos.json`, 400 ms delay) with skeleton, error with `?fail=1` and server-side `?category=` filter; client-side search in a derived function; `_components/product-card` (no script), `add-to-cart` (object prop `export let product`), `cart-summary` (alert with `confirm`) |
+| `/shop/:id` | `routes/shop/[id].html`, `[id].server.js` | `ssr = true`; reuses `p-add-to-cart`; server action `like` via `call()` with OTel logs on both sides |
 | 404 | `routes/_404.html` | |
 
 Stores: `lib/state/cart.js` and `lib/state/tasks.js` (persisted). Pure utilities:
@@ -50,8 +50,8 @@ Stores: `lib/state/cart.js` and `lib/state/tasks.js` (persisted). Pure utilities
   navigation; data caching is out of v0). The 400 ms delay lives in `load`.
 - **Category filter** runs on the server (`load({ query })`); text search runs on the client.
 - **"Try again"** is a link to `/shop` (without `?fail=1`).
-- **Tabs** has 3 fixed tabs (props `a`, `b`, `c` and slots with the same names): props are text,
-  not lists.
+- **Tabs** has 3 fixed tabs (props `first`, `second`, `third` and slots with the same names): props
+  are text, not lists.
 - **Like** (`/shop/:id`) is extra: it shows a server action; the counter lives in server memory.
 - Initial tasks come from the store (no `localStorage`), as the SPEC asks.
 - Prices are formatted as USD (`utils/money.js`); the SPEC data is in BRL.

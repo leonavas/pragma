@@ -1,6 +1,10 @@
 self.__ssrModuleRan = true
 
-export const state = () => ({ n: 0, open: false })
-export const actions = {
-  inc(ctx) { ctx.$.n++ },
+export default function ($) {
+  $.n = 0
+  $.open = false
+
+  function inc() { $.n++ }
+
+  return { inc }
 }

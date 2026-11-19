@@ -3,7 +3,6 @@ use oxc_allocator::Allocator;
 use oxc_ast::Comment;
 use oxc_ast::ast::{
     ArrowFunctionExpression, BindingIdentifier, ComputedMemberExpression, ExportAllDeclaration, ExportFromDeclaration, Expression, FormalParameters,
-    Function, FunctionBody,
     IdentifierReference, ImportDeclaration, ImportExpression, ObjectProperty, ObjectPropertyKind, Program,
     Statement, StaticMemberExpression, StringLiteral, TemplateLiteral,
 };
@@ -15,6 +14,8 @@ use oxc_span::{GetSpan, SourceType, Span};
 use oxc_syntax::module_record::{ExportExportName, ExportImportName, ImportImportName};
 use pragma_diag::Diagnostic;
 use std::path::{Component, Path};
+
+pub mod script;
 
 pub struct LintContext {
     pub is_core: bool,
@@ -28,7 +29,6 @@ pub const RULE_IMPORT: &str = "js/import";
 pub const RULE_PACKAGE: &str = "app/package";
 pub const RULE_COMMENT: &str = "js/comment";
 pub const RULE_NAME: &str = "js/vague-name";
-pub const RULE_CTX: &str = "js/ctx";
 
 const SHORT_OK: &[&str] = &["$", "i", "j", "k", "id", "ok", "el", "ctx", "url", "log"];
 const VAGUE: &[&str] = &[
@@ -146,11 +146,6 @@ impl Linter<'_> {
                 RULE_HTML,
                 format!("`{name}` is only allowed in the runtime (core/); markup lives in .html"),
             ),
-            "state" | "props" if object_name == Some("ctx") && !self.ctx.is_core => self.report(
-                span,
-                RULE_CTX,
-                format!("`ctx.{name}` does not exist; use `ctx.$` (state and props)"),
-            ),
             "console" if matches!(object_name, Some("globalThis" | "window" | "self")) => {
                 self.report(span, RULE_CONSOLE, console_message());
             }
@@ -223,7 +218,7 @@ pub fn package_name(specifier: &str) -> &str {
 }
 
 fn console_message() -> String {
-    "`console` is not allowed; use `ctx.log` (or `log` from core/log.js)".to_string()
+    "`console` is not allowed; use `log` (`import { log } from 'pragma'`, or core/log.js outside scripts)".to_string()
 }
 
 impl<'a> Visit<'a> for Linter<'_> {
@@ -612,64 +607,6 @@ pub fn exported_actions(source: &str) -> Vec<String> {
             ObjectPropertyKind::SpreadProperty(_) => None,
         })
         .collect()
-}
-
-/// Keys (getters included) of the object that `export const state = (ctx) => ({ ... })` creates,
-/// also as a function (`export function state() { ...; return { ... } }`). `None` when they are
-/// not known statically (spread, computed key, a return that is not the last statement).
-pub fn exported_state_keys(source: &str) -> Option<Vec<String>> {
-    let allocator = Allocator::default();
-    let ret = parse(&allocator, source);
-    if ret.diagnostics.has_errors() {
-        return None;
-    }
-    let local = ret.module_record.local_export_entries.iter().find_map(|e| match &e.export_name {
-        ExportExportName::Name(n) if n.name.as_str() == "state" => e.local_name.name(),
-        _ => None,
-    })?;
-    let object = match top_level_init(&ret.program, local.as_str()).map(Expression::without_parentheses) {
-        Some(Expression::ArrowFunctionExpression(f)) => match f.body.as_expression() {
-            Some(e) => Some(e.without_parentheses()),
-            None => f.body.as_function_body().and_then(returned_value),
-        },
-        Some(Expression::FunctionExpression(f)) => f.body.as_deref().and_then(returned_value),
-        Some(_) => None,
-        None => top_level_function(&ret.program, local.as_str()).and_then(|f| f.body.as_deref()).and_then(returned_value),
-    };
-    let Some(Expression::ObjectExpression(obj)) = object else {
-        return None;
-    };
-    obj.properties
-        .iter()
-        .map(|p| match p {
-            ObjectPropertyKind::ObjectProperty(p) => p.key.static_name()?.as_str().map(str::to_string),
-            ObjectPropertyKind::SpreadProperty(_) => None,
-        })
-        .collect()
-}
-
-/// `return x` as the last statement of a body that has no other control flow.
-fn returned_value<'p, 'a>(body: &'p FunctionBody<'a>) -> Option<&'p Expression<'a>> {
-    let (last, rest) = body.statements.split_last()?;
-    let plain = rest.iter().all(|s| matches!(s, Statement::VariableDeclaration(_) | Statement::ExpressionStatement(_)));
-    match last {
-        Statement::ReturnStatement(r) if plain => r.argument.as_ref().map(Expression::without_parentheses),
-        _ => None,
-    }
-}
-
-fn top_level_function<'p, 'a>(program: &'p Program<'a>, name: &str) -> Option<&'p Function<'a>> {
-    program.body.iter().find_map(|stmt| {
-        let f = match stmt {
-            Statement::FunctionDeclaration(f) => f,
-            Statement::ExportDeclaration(e) => match &e.declaration {
-                oxc_ast::ast::Declaration::FunctionDeclaration(f) => f,
-                _ => return None,
-            },
-            _ => return None,
-        };
-        f.id.as_ref().is_some_and(|id| id.name.as_str() == name).then_some(&**f)
-    })
 }
 
 fn top_level_init<'p, 'a>(program: &'p Program<'a>, name: &str) -> Option<&'p Expression<'a>> {

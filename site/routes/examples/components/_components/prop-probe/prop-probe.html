@@ -1,12 +1,42 @@
+<script>
+  export let call = ''
+  export let step = 1
+  export let locked = false
+  export let label = 'none'
+
+  const describe = value => JSON.stringify(value) + ' · ' + typeof value
+  const stepValue = () => describe(step)
+  const lockedValue = () => describe(locked)
+  const labelValue = () => describe(label)
+</script>
+
 <dl>
-  <dt class="probe-call" :text="$call"></dt>
-  <dd class="probe-row">
-    <span>HTML <code>$locked</code></span>
-    <if $locked><strong class="probe-yes">truthy</strong></if>
-    <else><strong class="probe-no">falsy</strong></else>
-  </dd>
-  <dd class="probe-row">
-    <span>JS <code>ctx.$.locked</code></span>
-    <strong .probe-yes="$jsTruthy" .probe-no="$jsFalsy" :text="$jsReading"></strong>
-  </dd>
+  <dt class="probe-call">{$call}</dt>
+  <dd class="probe-row"><code>step = 1</code><strong>{$stepValue}</strong></dd>
+  <dd class="probe-row"><code>locked = false</code><strong .probe-yes="$locked">{$lockedValue}</strong></dd>
+  <dd class="probe-row"><code>label = 'none'</code><strong>{$labelValue}</strong></dd>
 </dl>
+
+<style>
+  [data-c="prop-probe"] {
+    display: grid;
+    gap: 0.375rem;
+    width: 100%;
+    max-width: 22rem;
+    padding: 0.875rem 1rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-surface);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  [data-c="prop-probe"] .probe-call { margin-bottom: 0.25rem; color: var(--color-ink); }
+  [data-c="prop-probe"] .probe-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    color: var(--color-muted);
+  }
+  [data-c="prop-probe"] code { color: var(--color-faint); }
+  [data-c="prop-probe"] strong { font-weight: 500; }
+  [data-c="prop-probe"] .probe-yes { color: var(--color-accent); }
+</style>

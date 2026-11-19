@@ -1,9 +1,9 @@
 <article class="card flex h-full flex-col gap-3">
   <div class="flex items-start justify-between gap-2">
-    <h2 class="font-semibold leading-snug"><a class="hover:underline" :href="$product.url" :text="$product.name"></a></h2>
+    <h2 class="font-semibold leading-snug"><a class="hover:underline" :href="$product.url">{$product.name}</a></h2>
     <span class="rounded-full bg-danger-100 px-2 py-0.5 text-xs font-medium text-danger-700" :show="$product.soldOut">Sold out</span>
   </div>
-  <p class="text-sm text-muted" :text="$product.categoryName"></p>
-  <p class="text-lg font-semibold tabular-nums" :text="$product.priceLabel"></p>
-  <p-add-to-cart class="mt-auto" :id="$product.id" :name="$product.name" :price="$product.price" :stock="$product.stock"></p-add-to-cart>
+  <p class="text-sm text-muted">{$product.categoryName}</p>
+  <p class="text-lg font-semibold tabular-nums">{$product.priceLabel}</p>
+  <p-add-to-cart class="mt-auto" :product="$product"></p-add-to-cart>
 </article>

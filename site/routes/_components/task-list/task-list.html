@@ -1,7 +1,40 @@
+<script>
+  let draft = ''
+  let pendingOnly = false
+  let nextId = 4
+  let tasks = [
+    { id: 1, title: 'Write the page in one .html file', done: true },
+    { id: 2, title: 'Show values with {path}', done: false },
+    { id: 3, title: 'Run pragma check --strict', done: false },
+  ]
+
+  const visible = () => (pendingOnly ? tasks.filter(task => !task.done) : tasks)
+  const pending = () => tasks.filter(task => !task.done).length
+  const total = () => tasks.length
+  const filterText = () => (pendingOnly ? 'Show all' : 'Hide done')
+  const filterPressed = () => (pendingOnly ? 'true' : 'false')
+
+  function add() {
+    const title = draft.trim()
+    if (!title) return
+    tasks.push({ id: nextId, title, done: false })
+    nextId += 1
+    draft = ''
+  }
+
+  function toggle(task) {
+    task.done = !task.done
+  }
+
+  function toggleFilter() {
+    pendingOnly = !pendingOnly
+  }
+</script>
+
 <div class="grid w-full max-w-sm gap-3.5">
   <div class="flex items-center justify-between gap-4 font-mono text-xs">
-    <p class="text-faint tabular-nums" role="status" :text="$summary">2 of 3 pending</p>
-    <button type="button" class="tasks-filter cursor-pointer py-1.5 underline hover:text-ink" @click="toggleFilter" :aria-pressed="$filterPressed" :text="$filterText">Hide done</button>
+    <p class="text-faint tabular-nums" role="status">{$pending} of {$total} pending</p>
+    <button type="button" class="tasks-filter cursor-pointer py-1.5 underline hover:text-ink" @click="toggleFilter" :aria-pressed="$filterPressed">{$filterText}</button>
   </div>
   <form class="flex gap-2" @submit="add">
     <input class="h-8 min-w-0 flex-1 border border-line-strong bg-sunken px-3 text-sm text-ink focus-visible:border-accent" type="text" maxlength="48" placeholder="Add a task" aria-label="New task" :model="$draft">
@@ -10,8 +43,8 @@
   <ul class="border-t border-line">
     <for task in $visible key=task.id>
       <li class="flex min-h-11 items-center gap-3 border-b border-line" .done="task.done">
-        <input type="checkbox" class="tasks-check size-4 shrink-0 cursor-pointer" :checked="task.done" :aria-label="task.title" @change="toggle">
-        <span class="tasks-title min-w-0" :text="task.title"></span>
+        <input type="checkbox" class="tasks-check size-4 shrink-0 cursor-pointer" :checked="task.done" :aria-label="task.title" @change="toggle(task)">
+        <span class="tasks-title min-w-0">{task.title}</span>
       </li>
     </for>
     <empty>
@@ -19,3 +52,18 @@
     </empty>
   </ul>
 </div>
+
+<style>
+  [data-c="task-list"] .tasks-filter { color: var(--color-muted); text-decoration-color: var(--color-line-strong); text-underline-offset: 0.3em; }
+  [data-c="task-list"] .tasks-filter[aria-pressed="true"] { color: var(--color-accent); text-decoration-color: currentColor; }
+  [data-c="task-list"] .tasks-check { accent-color: var(--color-accent); }
+  [data-c="task-list"] .tasks-title {
+    overflow-wrap: anywhere;
+    background: linear-gradient(currentColor, currentColor) 0 55% / 0 1px no-repeat;
+    transition: background-size 0.28s var(--ease-out), color 0.2s var(--ease-out);
+  }
+  [data-c="task-list"] .done .tasks-title { color: var(--color-faint); background-size: 100% 1px; }
+  @media (prefers-reduced-motion: reduce) {
+    [data-c="task-list"] .tasks-title { transition: none; }
+  }
+</style>

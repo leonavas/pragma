@@ -1,0 +1,51 @@
+<script>
+  const meterId = 'meter-' + crypto.randomUUID()
+  const beatGapMs = 400
+  const timedWindowMs = 1000
+  const interactions = ['pointerdown', 'click', 'keydown', 'input', 'change', 'submit']
+
+  let patches = ''
+  let beat = ''
+
+  function formatMs(elapsedMs) {
+    if (elapsedMs < 0.1) return '<0.1 ms'
+    return (elapsedMs < 10 ? elapsedMs.toFixed(1) : Math.round(elapsedMs)) + ' ms'
+  }
+
+  function describePatch(count, elapsedMs) {
+    const updated = count === 1 ? '1 update' : count + ' updates'
+    return elapsedMs === null ? updated : updated + ' · ' + formatMs(elapsedMs)
+  }
+
+  function mount() {
+    const stage = document.getElementById(meterId)?.closest('[data-c="showcase"]')?.querySelector('.showcase-stage')
+    if (!stage || stage.querySelector('[data-c="frame"]')) return
+    let interactedAt = 0
+    let beatAt = 0
+    const noteInteraction = event => {
+      if (stage.contains(event.target)) interactedAt = event.timeStamp
+    }
+    const observer = new MutationObserver(records => {
+      if (!beatAt && !interactedAt) return
+      const touched = new Set(records.map(record => record.target.nodeType === Node.ELEMENT_NODE ? record.target : record.target.parentElement))
+      touched.delete(null)
+      const now = performance.now()
+      const timed = interactedAt > 0 && now - interactedAt < timedWindowMs
+      const next = describePatch(touched.size, timed ? now - interactedAt : null)
+      const pulse = now - beatAt > beatGapMs
+      interactedAt = 0
+      if (pulse) beatAt = now
+      if (!pulse && next === patches) return
+      patches = next
+      if (pulse) beat = beat === 'a' ? 'b' : 'a'
+    })
+    observer.observe(stage, { subtree: true, childList: true, attributes: true, characterData: true })
+    for (const type of interactions) document.addEventListener(type, noteInteraction, true)
+    return () => {
+      observer.disconnect()
+      for (const type of interactions) document.removeEventListener(type, noteInteraction, true)
+    }
+  }
+</script>
+
+<p class="flex min-h-11 items-center gap-2 whitespace-nowrap border-b border-line bg-ground px-4 font-mono text-xs uppercase tracking-wider text-faint" :id="$meterId"><span class="showcase-dot size-1.5 flex-none bg-accent" aria-hidden="true" :data-beat="$beat"></span>Live result<span class="ml-auto min-w-0 truncate normal-case tracking-normal tabular-nums text-muted" aria-hidden="true">{$patches}</span></p>

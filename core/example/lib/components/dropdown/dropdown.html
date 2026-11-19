@@ -1,9 +1,39 @@
 <div class="inline-flex">
   <button type="button" class="btn" :data-open="$id" :popovertarget="$id">
-    <span :text="$label"></span>
+    <span>{$label}</span>
     <svg class="size-4 text-muted" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
   </button>
   <div popover :id="$id" class="min-w-48 rounded-xl border border-line bg-surface p-1 text-sm text-ink shadow-lg">
     <slot></slot>
   </div>
 </div>
+
+<style>
+  [data-c="dropdown"] [popover] > :is(a, button) {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.5rem;
+    text-align: start;
+    cursor: pointer;
+  }
+  [data-c="dropdown"] [popover] > :is(a, button):is(:hover, :focus-visible) {
+    background: color-mix(in oklab, var(--color-ink) 6%, var(--color-surface));
+    outline: none;
+  }
+  [data-c="dropdown"] [popover] > hr {
+    margin: 0.25rem 0;
+    border-top: 1px solid var(--color-line);
+  }
+  [data-c="dropdown"] [popover]:popover-open {
+    animation: dropdown-in 0.12s ease-out;
+  }
+  @keyframes dropdown-in {
+    from { opacity: 0; translate: 0 -0.25rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    [data-c="dropdown"] [popover]:popover-open { animation: none; }
+  }
+</style>

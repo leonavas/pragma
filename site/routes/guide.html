@@ -15,6 +15,7 @@
     <c-page-contents class="lg:col-span-3">
       <li><a href="#install">Install</a></li>
       <li><a href="#create">Create an app</a></li>
+      <li><a href="#first-component">Your first component</a></li>
       <li><a href="#structure">Project structure</a></li>
       <li><a href="#develop">Develop</a></li>
       <li><a href="#check">Check</a></li>
@@ -66,13 +67,37 @@ options:
         </div>
         <c-terminal title="~/projects">
           <pre tabindex="0" aria-label="Creating an app"><code><span class="term-cmd">pragma new my-app</span>
-app created in my-app (43 files)
+app created in my-app (41 files)
 
   cd my-app
   pragma dev</code></pre>
         </c-terminal>
         <div class="prose">
-          <p>The app ships an <code>AGENTS.md</code> (and a <code>CLAUDE.md</code> that includes it) with the syntax in six lines, the rules the compiler enforces and a table that maps each task to one file in <code>core/docs/</code>. A coding agent reads that first; you can too. The docs are short on purpose: every page fits in a context window.</p>
+          <p>The app ships an <code>AGENTS.md</code> (and a <code>CLAUDE.md</code> that includes it) with the syntax in a dozen lines, the rules the compiler enforces and a table that maps each task to one file in <code>core/docs/</code>. A coding agent reads that first; you can too. The docs are short on purpose: every page fits in a context window.</p>
+        </div>
+      </section>
+
+      <section class="doc-section" aria-labelledby="first-component">
+        <h2 id="first-component">Your first component</h2>
+        <div class="prose">
+          <p>A component is a folder with one <code>.html</code> file: an optional <code>&lt;script&gt;</code>, the markup, an optional <code>&lt;style&gt;</code>. In the script, a top-level <code>let</code> is state, a function is an action when an event calls it and a derived value when the markup reads it, and <code>export let</code> declares a prop. In the markup, <code>{$count}</code> puts a value in the text, <code>@click</code> calls a function and <code>:disabled</code> binds an attribute. Assigning a variable is all it takes to update the page.</p>
+        </div>
+        <c-showcase :source="data.examples.counter" caption="In your app this file is lib/components/counter/counter.html and the tag is c-counter. Here it sits next to the guide as p-counter.">
+          <p-counter label="Cups of coffee" start="1"></p-counter>
+        </c-showcase>
+        <div class="prose">
+          <p>Use it on any page. The build expands it in place, so its markup is in the prebuilt HTML, and its script loads only on pages that use it: a page with just this counter loads 8.9 kB of JS, runtime included.</p>
+        </div>
+        <c-terminal title="routes/index.html">
+          <pre tabindex="0" aria-label="Using the counter component"><code>&lt;c-counter label="Cups of coffee" start="1"&gt;&lt;/c-counter&gt;</code></pre>
+        </c-terminal>
+        <div class="prose">
+          <ul>
+            <li>The default sets the prop's type: <code>start="1"</code> arrives as the number 1 because the default is <code>0</code>; a bare attribute is <code>true</code>.</li>
+            <li>Props are read-only and live. <code>let count = start</code> copies one into state that the component can change.</li>
+            <li>The <code>&lt;style&gt;</code> is scoped with <code>[data-c="counter"]</code>; utilities from <code>classes.md</code> cover the rest.</li>
+            <li><code>pragma check</code> reads the script: a name the markup uses but the script lacks is <code>html/unknown-name</code>, an attribute the component does not declare is <code>html/unknown-prop</code>, a write to a prop is <code>js/prop-write</code>.</li>
+          </ul>
         </div>
       </section>
 
@@ -87,10 +112,10 @@ app created in my-app (43 files)
 <span class="term-ink">routes/</span>
   _layout.html            header, footer, site-wide &lt;head&gt;; &lt;slot&gt; is the page
   _404.html               unknown URLs
-  index.html              /         (index.js: its state and actions)
+  index.html              /         (markup, its &lt;script&gt; and &lt;style&gt;)
 <span class="term-ink">lib/</span>
   components/&lt;name&gt;/      &lt;c-name&gt; for every page: modal, alert, dropdown
-  state/&lt;name&gt;.js         stores, read as shared.&lt;name&gt;
+  state/&lt;name&gt;.js         stores, reached as shared.&lt;name&gt;
   theme.css               tokens and the few custom classes
 <span class="term-ink">utils/</span>                    plain JS modules
 <span class="term-ink">public/</span>                   copied as is: favicon.svg, images, fonts
@@ -99,7 +124,7 @@ app created in my-app (43 files)
         <div class="prose">
           <ul>
             <li>Only <code>routes/</code>, <code>lib/</code>, <code>utils/</code>, <code>core/</code> and <code>public/</code> are read. Other top-level files, like a README, are ignored.</li>
-            <li>A page is <code>routes/x.html</code>, with optional <code>x.js</code> (state, actions) and <code>x.server.js</code> (<code>load</code>, server actions, <code>ssr</code>). A <code>.js</code> without its <code>.html</code> is an error.</li>
+            <li>A page is <code>routes/x.html</code>, with an optional <code>&lt;script&gt;</code> and <code>&lt;style&gt;</code> at its top level and an optional <code>x.server.js</code> (<code>load</code>, server actions, <code>ssr</code>). A large script can live in <code>x.js</code> beside it instead, never both (<code>html/duplicate-module</code>).</li>
             <li>Anything else in <code>routes/</code> must be private, with a leading underscore: <code>_components/</code>, <code>_products.json</code>, <code>_catalog.server.js</code>.</li>
             <li><code>pragma.json</code> takes exactly <code>name</code> (required: fallback title, log service name, Worker name), <code>lang</code> (default <code>en</code>) and <code>budgets</code>. Unknown keys are errors.</li>
           </ul>

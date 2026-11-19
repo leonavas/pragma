@@ -11,9 +11,9 @@
   <script type="module" src="/core/boot.js"></script>
 </head>
 <body>
-  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="shared.cart.items.length"></span></header>
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
   <main data-page>
-    <h1 id="name" data-text="state.name"></h1>
+    <h1 id="name" data-text="{state.name}"></h1>
     <a id="link" data-attr-href="state.link" data-attr-aria-disabled="state.disabled" data-attr-title="state.title" data-attr-data-x="state.active">link</a>
     <p id="cls" class="base" data-class-active="state.active" data-class-inactive="!state.active">class</p>
     <p id="show" data-show="state.active">show</p>
@@ -22,36 +22,36 @@
     <template data-else><p id="no">no</p></template>
     <ul id="list">
       <template data-for="item in state.items" data-key="item.id" data-tid="t2"><li>
-        <span class="n" data-text="item.name"></span>
+        <span class="n" data-text="{item.name}"></span>
         <template data-if="item.ok" data-tid="t3"><b class="ok">ok</b></template>
-        <template data-for="tag in item.tags" data-key="tag.t" data-tid="t4"><i class="tag" data-text="tag.t"></i></template>
+        <template data-for="tag in item.tags" data-key="tag.t" data-tid="t4"><i class="tag" data-text="{tag.t}"></i></template>
         <template data-empty><i class="none">no tags</i></template>
-        <div data-c="counter"><button class="inc" data-on-click="inc">+</button><span class="count" data-text="state.n"></span><span class="owner" data-text="item.name"></span></div>
-        <button class="rm" data-on-click="remove">x</button>
+        <div data-c="counter"><button class="inc" data-on-click="inc">+</button><span class="count" data-text="{state.n}"></span><span class="owner" data-text="{item.name}"></span></div>
+        <button class="rm" data-on-click="remove(item)">x</button>
       </li></template>
       <template data-empty><li id="empty">empty</li></template>
     </ul>
-    <div data-with-p="state.person"><span id="w" data-text="p.name"></span></div>
+    <div data-with-p="state.person"><span id="w" data-text="{p.name}"></span></div>
     <input id="m-text" data-model="state.name">
     <input id="m-check" type="checkbox" data-model="state.accepted">
     <input id="m-num" type="number" data-model="state.qty">
-    <select id="m-sel" data-model="state.color"><template data-for="c in state.colors" data-key="c" data-tid="t5"><option data-attr-value="c" data-text="c"></option></template></select>
+    <select id="m-sel" data-model="state.color"><template data-for="c in state.colors" data-key="c" data-tid="t5"><option data-attr-value="c" data-text="{c}"></option></template></select>
     <input id="r-p" type="radio" name="size" value="p" data-model="state.size">
     <input id="r-g" type="radio" name="size" value="g" data-model="state.size">
-    <span id="echo-qty" data-text="state.qty"></span>
-    <span id="echo-accepted" data-text="state.accepted"></span>
-    <span id="echo-size" data-text="state.size"></span>
-    <span id="echo-color" data-text="state.color"></span>
+    <span id="echo-qty" data-text="{state.qty}"></span>
+    <span id="echo-accepted" data-text="{state.accepted}"></span>
+    <span id="echo-size" data-text="{state.size}"></span>
+    <span id="echo-color" data-text="{state.color}"></span>
     <button id="toggle" data-on-click="toggle">toggle</button>
     <button id="save" data-on-click="save">save</button>
     <button id="fail" data-on-click="fail">fail</button>
     <span id="saving" data-show="state.saving">saving</span>
-    <template data-if="state.response" data-tid="t6"><span id="response" data-text="state.response.input.name"></span></template>
-    <p id="error" data-text="state.error"></p>
+    <template data-if="state.response" data-tid="t6"><span id="response" data-text="{state.response.input.name}"></span></template>
+    <p id="error" data-text="{state.error}"></p>
     <button id="buy" data-on-click="buy">buy</button>
-    <span id="tick" data-text="state.tick"></span>
-    <form data-on-submit="submit"><button id="submit">submit</button></form>
-    <span id="sent" data-text="state.sent"></span>
+    <span id="tick" data-text="{state.tick}"></span>
+    <form data-on-submit="submit(event)"><button id="submit">submit</button></form>
+    <span id="sent" data-text="{state.sent}"></span>
   </main>
 </body>
 </html>

@@ -9,19 +9,19 @@
   <script type="module" src="/core/boot.js"></script>
 </head>
 <body>
-  <header><nav><a id="nav-a" href="/a">A</a> <a id="nav-slot" href="/slot">Slot</a></nav> <span id="qty" data-text="shared.account.total"></span></header>
+  <header><nav><a id="nav-a" href="/a">A</a> <a id="nav-slot" href="/slot">Slot</a></nav> <span id="qty" data-text="{shared.account.total}"></span></header>
   <main data-page>
-    <section data-c="box" data-initial="5" data-on-click="box">
-      <h2 id="box-title" data-text="state.title"></h2>
+    <section data-c="box" data-prop-initial="5" data-on-click="box">
+      <h2 id="box-title" data-text="{state.title}"></h2>
       <button id="box-inc" data-on-click="inc">+</button>
-      <output id="box-n" data-text="state.n"></output>
+      <output id="box-n" data-text="{state.n}"></output>
       <div class="body">
         <button id="page-btn" data-slot="1" data-on-click="page">page</button>
-        <p id="page-title" data-slot="1" data-text="state.title"></p>
+        <p id="page-title" data-slot="1" data-text="{state.title}"></p>
         <input id="page-field" data-slot="1" data-model="state.field">
-        <template data-slot="1" data-if="state.visible" data-tid="s1"><b id="page-if" data-text="state.title"></b></template>
+        <template data-slot="1" data-if="state.visible" data-tid="s1"><b id="page-if" data-text="{state.title}"></b></template>
         <div data-c="counter">
-          <button class="inc" data-on-click="inc">+</button><span class="count" data-text="state.n"></span>
+          <button class="inc" data-on-click="inc">+</button><span class="count" data-text="{state.n}"></span>
           <button id="deep-btn" data-slot="2" data-on-click="page">deep</button>
           <button id="middle-btn" data-slot="1" data-on-click="inc">middle</button>
         </div>
@@ -29,15 +29,15 @@
     </section>
     <ul>
       <template data-for="item in state.items" data-key="item.id" data-tid="s2"><li>
-        <div data-c="box" data-initial="1" data-attr-data-max="item.max">
-          <output class="n" data-text="state.n"></output><span class="max" data-text="state.max"></span>
-          <button class="item-btn" data-slot="1" data-on-click="pick" data-text="item.name"></button>
+        <div data-c="box" data-prop-initial="1" data-with-max="item.max">
+          <output class="n" data-text="{state.n}"></output><span class="max" data-text="{state.max}"></span>
+          <button class="item-btn" data-slot="1" data-on-click="pick(item)" data-text="{item.name}"></button>
         </div>
       </li></template>
     </ul>
-    <span id="field" data-text="state.field"></span>
-    <span id="picked" data-text="state.picked"></span>
-    <span id="double" data-text="state.double"></span>
+    <span id="field" data-text="{state.field}"></span>
+    <span id="picked" data-text="{state.picked}"></span>
+    <span id="double" data-text="{state.double}"></span>
     <a id="link-slot" href="/slot">here</a>
     <a id="link-filter" href="/slot?f=1">filter</a>
     <input id="chk" type="checkbox" data-attr-checked="state.marked">

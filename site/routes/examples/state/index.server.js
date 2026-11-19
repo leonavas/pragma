@@ -4,12 +4,13 @@ export const ssr = true
 
 export async function load() {
   const examples = await readExamples('routes/examples/state', {
-    page: ['_snippets/page/usage.html', 'index.js'],
-    split: ['_components/split/split.html', '_components/split/split.js', '_components/split/split.css'],
-    queue: ['_components/queue/queue.html', '_components/queue/queue.js'],
-    clock: ['_components/clock/clock.js', '_components/clock/clock.html'],
-    stopwatch: ['_components/stopwatch/stopwatch.js', '_components/stopwatch/stopwatch.html'],
-    probe: ['_components/probe/probe.js', '_components/probe/probe.html'],
+    page: ['index.js', '_snippets/page/usage.html'],
+    split: ['_components/split/split.html'],
+    queue: ['_components/queue/queue.html'],
+    props: ['_components/usage/usage.html', '_snippets/usage/usage.html'],
+    clock: ['_components/clock/clock.html'],
+    stopwatch: ['_components/stopwatch/stopwatch.html'],
+    probe: ['_components/probe/probe.html'],
   })
   return { examples }
 }

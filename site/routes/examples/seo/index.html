@@ -20,7 +20,7 @@
   <section class="doc-section" aria-labelledby="ssr-head">
     <h2 id="ssr-head">Tags from server data with <code>ssr = true</code></h2>
     <div class="prose">
-      <p>Bind <code>:text</code> on <code>&lt;title&gt;</code> and <code>:content</code> or <code>:href</code> on <code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> to <code>data</code>, <code>params</code> or <code>query</code>, and add <code>export const ssr = true</code> to the route's <code>.server.js</code>. The server fills them before it sends the page, so a link-preview bot, which never runs JavaScript, sees the article instead of the site defaults.</p>
+      <p>Write <code>{data.post.title}</code> inside <code>&lt;title&gt;</code>, and <code>:content</code>, <code>:href</code> or <code>{}</code> in an attribute of <code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code>, reading <code>data</code>, <code>params</code> or <code>query</code>; then add <code>export const ssr = true</code> to the route's <code>.server.js</code>. The server fills them before it sends the page, so a link-preview bot, which never runs JavaScript, sees the article instead of the site defaults.</p>
       <p>Build absolute URLs in <code>load</code> from a fixed origin, never from the request's <code>Host</code> header. A missing value keeps the static fallback, such as the <code>&lt;title&gt;</code> text; a <code>&lt;meta&gt;</code> left without <code>content</code> or a <code>&lt;link&gt;</code> without <code>href</code> is dropped. On client navigation the router replaces <code>&lt;title&gt;</code>, <code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> with the next page's.</p>
     </div>
     <c-showcase :source="data.examples.dynamic" caption="Each tab is a separate request to the SSR route. The preview card is drawn only from the served tags; it loads the local /og.png because pragma.dev is a placeholder domain.">
@@ -85,7 +85,7 @@
       <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
         <div class="flex min-w-0 flex-col gap-2">
           <p class="font-mono text-xs text-faint">routes/post.html, with no ssr in post.server.js</p>
-          <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;title :text="data.title"&gt;Post&lt;/title&gt;</code></pre>
+          <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;title&gt;{data.title}&lt;/title&gt;</code></pre>
         </div>
         <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/head] bound head tags are rendered by the server so crawlers see them: add export const ssr = true to routes/post.server.js</p>
       </li>
@@ -101,11 +101,11 @@
           <p class="font-mono text-xs text-faint">routes/post.html</p>
           <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;script type="application/ld+json"&gt;...&lt;/script&gt;</code></pre>
         </div>
-        <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/script] &lt;script&gt; is not allowed in routes/ and lib/; behavior goes in the page or component .js</p>
+        <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/script] &lt;script&gt; takes no attributes: it is always an ES module</p>
       </li>
     </ul>
     <div class="prose">
-      <p>The last one means JSON-LD structured data cannot be written in v0: there is no tag for it in a page or the layout.</p>
+      <p>The last one means JSON-LD structured data cannot be written in v0: a page's one <code>&lt;script&gt;</code> is always its ES module, and the layout has none.</p>
     </div>
   </section>
 </c-doc>

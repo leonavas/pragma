@@ -8,7 +8,8 @@ Status: **[firm]** · **[firm v0]** v0 contract, revisable later · **[likely]**
 
 ## Summary: the pragma contract
 
-1. Plain JavaScript (ES modules). Never TypeScript or JSDoc types.
+1. Plain JavaScript (ES modules). Never TypeScript or JSDoc types. The top level of a page,
+   component or store script is compiled (top-level `let` = state); the rest is the JS you wrote.
 2. Fixed folder structure. Every page is a `.html` in `routes/`; its path is the route.
 3. Never HTML in JS, not even on the server. Markup lives in `.html`.
 4. Closed, boring, deterministic directives: one way to do each thing.
@@ -57,7 +58,27 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - **[firm v0]** Each block keeps exactly 1 root element.
 - **[firm v0]** No `:class` (bypassed the class check, CSS generation and overwrote `.x`
   toggles): static `class` plus `.name="path"` per class. `{{ }}`/`${ }` in text or attributes
-  are `html/interpolation` errors (allowed as text inside `<code>`/`<pre>`).
+  are `html/interpolation` errors (allowed as text directly inside `<code>`/`<pre>`).
+- **[firm]** Text interpolation `{path}` is the only way to put a value in text, and it also
+  works inside attribute strings (`alt="Photo of {p.name}"`); `:text` was removed
+  (`html/text-removed`), `:attr` stays for whole and boolean values (2026-11-19, proposal
+  `single-file-components.md`). Only paths (and derived functions, called on each render), no
+  expressions; always escaped; literal in text directly inside `<code>`/`<pre>`, `\{` elsewhere. *Why:*
+  `<p :text="$count"></p>` hid the text from the reader and split a sentence into many spans;
+  `{}` keeps the sentence readable and is what agents already write. It stays HTML because the
+  value is a path, never an expression (the reason `{#if}` was discarded still holds).
+  *How:* an element with only text gets a `data-text` template; text next to child elements
+  gets invisible comment markers (`<!--{path}-->…<!--}-->`), so no wrapper element changes the
+  DOM or the CSS; SSR fills both; the prebuilt HTML never shows a raw `{…}`.
+- **[firm]** Inside `<pre>`/`<code>` everything is processed (directives, blocks, components);
+  only text whose nearest parent element is `<pre>` or `<code>` keeps `{}` literal, so
+  `<code>{x}</code>` shows code and `<pre><span>{$path}</span></pre>` shows a value
+  (2026-11-19, site BUGS.md BUG-S-16). *Why:* skipping the whole subtree sent `<for>`, `:attr`
+  and `@event` raw to the browser and `check` stayed silent; dynamic code and terminal output
+  (highlighted lines, a requested path) had no syntax at all.
+- **[firm]** Events call with arguments: `@change="toggle(task)"`, `@input="search(event, $q)"`.
+  Arguments are paths, simple literals or `event`; no expressions. *Why:* replaces
+  `ctx.scope.task`, which made the agent guess the `<for>` variable name inside the action.
 - **[firm v0]** Prop truthiness is the same in HTML and JS: missing, `""`, `"false"` are falsy;
   bare attribute and other values truthy. In `ctx.$`, `"true"`/bare → `true`, `"false"` →
   `false`, other values stay strings.
@@ -86,7 +107,7 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   without rebuilding the DOM.
 - **[firm]** Never HTML in JS, not even in SSR: the server renders from the same `.html`,
   compiled to ops (`templates/<route>.json`).
-- **[firm v0]** Server writes via `.server.js` `actions` and `ctx.call` →
+- **[firm v0]** Server writes via `.server.js` `actions` and `call` (from `pragma`) →
   `POST /_action/<path>/<name>`.
 - **[firm v0]** Per-page head (SEO, link previews): a page writes `<title>`, `<meta>` and
   `<link>` at its top level; the build moves them to `<head>`, where they replace the layout tag
@@ -118,10 +139,46 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 
 ## Reactivity and state
 
-- **[likely]** v0: actions mutate state and the runtime reapplies directives. No exposed
-  signals (SPEC §4). Global state in stores (`lib/state/`), optional `persist`. Derived values
-  are getters in `state(ctx)` or the store, recomputed each render (not copied by actions or
-  persisted).
+- **[firm]** Single-file components (2026-11-19, proposal `single-file-components.md`): a page
+  or component `.html` holds one `<script>` (always an ES module; no `src`, no classic script)
+  and one `<style>` (handled like the component `.css`). Separate `x.js` / `x.css` stay valid;
+  both for the same file is `html/duplicate-module`. `.server.js` stays separate. *Why:* one
+  file per component is what agents open and edit; the markup and its behavior stay together.
+- **[firm]** The top-level script is the component; no `export default`, `this` or `ctx`.
+  Top-level `let` = reactive state; a top-level function used in `@event` is an action, used in
+  `{}` or a value binding a derived value (called on each render; in JS you call it: `total()`);
+  `function mount() { …; return cleanup }` runs after mount; imports are hoisted out of the
+  per-instance factory. State is a deep Proxy (`items.push()` works) and every change schedules
+  one render per microtask, so assigning a `let` from a timer just works (no `ctx.update`).
+  *Why:* the old API split one idea into `export const state`, `export const actions` and
+  `ctx.$.x`, and agents kept guessing `ctx` members (`ctx.state`, `ctx.props`, `ctx.scope`);
+  plain declarations are the JS every model already writes, and it is the Svelte 4 model they
+  know.
+- **[firm]** This changes the rule "plain JS, no compile magic" (until now the build shipped app
+  JS as written and only rewrote import URLs). The build now rewrites the top level of page,
+  component and store scripts: reads and writes of a top-level `let` become `$.x`, `export let`
+  becomes a prop, names imported from `pragma` become services, and the module becomes a
+  per-instance factory. *Why it is acceptable:* the rewrite is mechanical and scope-resolved
+  (oxc semantic: a shadowing parameter is left alone), it keeps every line in place (diagnostics
+  and DevTools lines match the source), it touches only top-level declarations, and anything it
+  cannot rewrite is a `check` error (`js/component-script`) instead of a silent difference. All
+  other JS (utils, `.server.js`, inner functions) is exactly what was written.
+- **[firm]** Props, Svelte 4 style: `export let step = 1`. The default's type drives coercion of
+  attribute text (`"5"` → 5; bare/`"true"`/`"false"` → boolean); props are read-only
+  (`js/prop-write`) and live (`:items="$visible"` passes the caller's value, not text). An
+  undeclared prop at a call site is `html/unknown-prop`. `export` means "prop" and nothing else.
+- **[firm]** Services come from the virtual module `pragma`: `shared`, `data`, `params`, `query`,
+  `page`, `log`, `call`, `navigate`, `open`, `close`, `confirm`. They are live (`data` is the
+  current page's once the loader is done). Only page, component and store scripts import it.
+- **[firm]** Stores follow the same rule (`lib/state/x.js`): top-level `let` = state, functions =
+  actions or derived, all reached as `shared.x.*`; `export const persist = ['items']` keeps those
+  fields in `localStorage['pragma:x']`. A direct `import` of a store is `js/store-import`: one way
+  to reach it, and the build knows which pages load it.
+- **[firm]** Old API (`export const state`/`actions`, `ctx.$`, `ctx.update`, `store()`) is a
+  `check` error (`js/legacy-api`) with the migration hint; there is no compatibility layer.
+- **[superseded]** v0 `state(ctx)` + `actions` + `ctx.$` and `store(initial, { persist })`:
+  actions mutated state and the runtime reapplied directives; derived values were getters in
+  `state(ctx)` or the store.
 - `tests_1` finding: signals vs store + `dispatch` barely matters (1.5 kB gzip difference;
   3 to 10 ms without throttling and 20 to 40 ms at 4× CPU over 500 tasks, wins on both
   sides). In fable, "writing a signal inside an effect throws" caught a real bug: a sync

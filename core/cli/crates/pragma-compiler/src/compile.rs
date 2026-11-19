@@ -3,6 +3,7 @@ use crate::directive::{self, Dir};
 use crate::html::{Element, Node, VOID, open_tag, push_attr};
 use crate::validate::BLOCKS;
 use serde_json::{Value, json};
+use std::collections::BTreeSet;
 
 /// Serializes nodes; `<template>` is emitted with only its root element. `compact` collapses whitespace between tags.
 pub fn write_nodes(nodes: &[Node], out: &mut String, compact: bool) {
@@ -21,7 +22,19 @@ pub fn write_nodes(nodes: &[Node], out: &mut String, compact: bool) {
     }
 }
 
+/// `#interp` → `<!--{path}-->` (`<!--n{path}-->` for slot content n components up); `<!--}-->` closes it.
+fn interp_open(e: &Element) -> String {
+    format!("<!--{}{}-->", e.value("data-slot").unwrap_or(""), e.value("data-text").unwrap_or(""))
+}
+
+const INTERP_CLOSE: &str = "<!--}-->";
+
 pub fn write_element(e: &Element, out: &mut String, compact: bool) {
+    if e.name == directive::INTERP {
+        out.push_str(&interp_open(e));
+        out.push_str(INTERP_CLOSE);
+        return;
+    }
     open_tag(out, e);
     let lname = e.name.to_ascii_lowercase();
     if VOID.contains(&lname.as_str()) {
@@ -40,21 +53,24 @@ pub fn write_element(e: &Element, out: &mut String, compact: bool) {
     out.push('>');
 }
 
-/// Roots the server knows; the others (state, shared) are left to the client.
+/// Roots the server can render; `shared` is left to the client. `state` gets ops too: the server
+/// renders them when it runs the page or component script (`comp` op), else leaves them.
 fn server_path(p: &str, vars: &[String]) -> bool {
     let r = directive::root(p);
-    matches!(r, "data" | "params" | "query" | "page") || vars.iter().any(|v| v == r)
+    matches!(r, "data" | "params" | "query" | "page" | "state") || vars.iter().any(|v| v == r)
 }
 
-struct Ops {
+struct Ops<'s> {
     ops: Vec<Value>,
     /// Ops up to this index cannot receive concatenated html.
     sealed: usize,
+    /// `data-c` ids of components with a script.
+    scripted: &'s BTreeSet<String>,
 }
 
-impl Ops {
-    fn new() -> Self {
-        Ops { ops: Vec::new(), sealed: 0 }
+impl<'s> Ops<'s> {
+    fn new(scripted: &'s BTreeSet<String>) -> Self {
+        Ops { ops: Vec::new(), sealed: 0, scripted }
     }
 
     fn html(&mut self, s: &str) {
@@ -76,19 +92,33 @@ impl Ops {
     }
 }
 
-pub fn ops(nodes: &[Node]) -> Value {
-    let mut o = Ops::new();
+/// SSR ops of the page content. `scripted`: `data-c` ids of components with a script, whose root
+/// becomes a `comp` op (the server renders it in its own instance scope when it can run it).
+pub fn ops(nodes: &[Node], scripted: &BTreeSet<String>) -> Value {
+    let mut o = Ops::new(scripted);
     let mut vars = Vec::new();
     nodes_ops(nodes, &mut o, &mut vars, false);
     Value::Array(o.ops)
 }
 
-fn block(e: &Element, vars: &mut Vec<String>) -> Value {
-    let mut o = Ops::new();
+fn block(e: &Element, vars: &mut Vec<String>, scripted: &BTreeSet<String>) -> Value {
+    let mut o = Ops::new(scripted);
     if let Some(root) = e.element_children().next() {
         element_ops(root, &mut o, vars, true);
     }
     Value::Array(o.ops)
+}
+
+/// `data-slot="n"`: slot content evaluated in the scope n components up (`slot` op).
+fn slot_of(e: &Element) -> Option<u32> {
+    e.value("data-slot").and_then(|v| v.parse().ok())
+}
+
+fn push_slotted(o: &mut Ops, slot: Option<u32>, op: Value) {
+    match slot {
+        Some(n) => o.op(json!(["slot", n, [op]])),
+        None => o.op(op),
+    }
 }
 
 fn nodes_ops(nodes: &[Node], o: &mut Ops, vars: &mut Vec<String>, compact: bool) {
@@ -109,17 +139,18 @@ fn nodes_ops(nodes: &[Node], o: &mut Ops, vars: &mut Vec<String>, compact: bool)
                 write_element(e, &mut s, false);
                 o.html(&s);
                 let tid = e.value("data-tid").unwrap_or("").to_string();
+                let (slot, scripted) = (slot_of(e), o.scripted);
                 if let Some(v) = e.value("data-if") {
                     let (neg, p) = directive::split_neg(v);
                     chain = server_path(p, vars).then(|| tid.clone());
                     if chain.is_some() {
-                        o.op(json!(["if", tid, p, neg, block(e, vars)]));
+                        push_slotted(o, slot, json!(["if", tid, p, neg, block(e, vars, scripted)]));
                     }
                 } else if let Some(v) = e.value("data-else-if") {
                     let (neg, p) = directive::split_neg(v);
                     chain = chain.take().filter(|_| server_path(p, vars));
                     if let Some(id) = &chain {
-                        o.op(json!(["elif", id, p, neg, block(e, vars)]));
+                        push_slotted(o, slot, json!(["elif", id, p, neg, block(e, vars, scripted)]));
                     }
                 } else if let Some(v) = e.value("data-for") {
                     chain = None;
@@ -128,14 +159,14 @@ fn nodes_ops(nodes: &[Node], o: &mut Ops, vars: &mut Vec<String>, compact: bool)
                     {
                         let key = e.value("data-key").unwrap_or("").to_string();
                         vars.push(var.to_string());
-                        let body = block(e, vars);
+                        let body = block(e, vars, scripted);
                         vars.pop();
-                        o.op(json!(["for", tid, var, path, key, body]));
+                        push_slotted(o, slot, json!(["for", tid, var, path, key, body]));
                         chain = Some(tid);
                     }
                 } else if let Some(id) = chain.take() {
                     let kind = if e.has("data-else") { "else" } else { "empty" };
-                    o.op(json!([kind, id, block(e, vars)]));
+                    push_slotted(o, slot, json!([kind, id, block(e, vars, scripted)]));
                 }
             }
             Node::Element(e) => {
@@ -146,7 +177,45 @@ fn nodes_ops(nodes: &[Node], o: &mut Ops, vars: &mut Vec<String>, compact: bool)
     }
 }
 
+/// Slot content (`slot` op) is evaluated outside; inside it, the root of a component with a
+/// script opens its instance scope (`comp` op, with its props: text or a path outside).
 fn element_ops(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
+    let Some(n) = slot_of(e) else { return component_ops(e, o, vars, seal) };
+    let mut inner = Ops::new(o.scripted);
+    component_ops(e, &mut inner, vars, true);
+    o.op(json!(["slot", n, inner.ops]));
+}
+
+fn component_ops(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
+    let Some(id) = e.value("data-c").filter(|id| o.scripted.contains(*id)) else { return element_body(e, o, vars, seal) };
+    let props: Vec<Value> = e
+        .attrs
+        .iter()
+        .filter_map(|a| {
+            let name = a.name.to_ascii_lowercase();
+            let value = a.value.clone().unwrap_or_default();
+            if let Some(k) = name.strip_prefix("data-prop-") {
+                Some(json!([k, "text", value]))
+            } else {
+                name.strip_prefix("data-with-").map(|k| json!([k, "path", value]))
+            }
+        })
+        .collect();
+    let mut inner = Ops::new(o.scripted);
+    element_body(e, &mut inner, vars, true);
+    o.op(json!(["comp", id, props, inner.ops]));
+}
+
+fn element_body(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
+    if e.name == directive::INTERP {
+        o.html(&interp_open(e));
+        let v = e.value("data-text").unwrap_or("");
+        if directive::template_paths(v).iter().all(|p| server_path(p, vars)) {
+            o.op(json!(["text", v]));
+        }
+        o.html(INTERP_CLOSE);
+        return;
+    }
     o.html(&format!("<{}", e.name));
     if seal {
         o.sealed = o.ops.len();
@@ -160,7 +229,7 @@ fn element_ops(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
         let Some(Some(d)) = directive::parse(&lname) else { continue };
         let v = a.value.as_deref().unwrap_or("");
         let (neg, p) = directive::split_neg(v);
-        if !server_path(p, vars) {
+        if !crate::validate::values(d, p).iter().all(|p| server_path(p, vars)) {
             continue;
         }
         match d {
@@ -216,19 +285,71 @@ mod tests {
 
     #[test]
     fn compiles_ops() {
-        let src = r#"<ul class="a" data-class-on="data.on"><template data-for="x in data.xs" data-key="x.id" data-tid="t1"><li data-text="x.name">-</li></template><template data-empty data-tid="t2"><li>empty</li></template></ul><p data-show="!state.ok" data-attr-title="data.t" title="y">z</p>"#;
+        let src = r#"<ul class="a" data-class-on="data.on"><template data-for="x in data.xs" data-key="x.id" data-tid="t1"><li data-text="{x.name}"></li></template><template data-empty data-tid="t2"><li>empty</li></template></ul><p data-show="!state.ok" data-attr-title="data.t" title="y">z</p>"#;
         let (nodes, _) = parse(src, 0);
-        let v = ops(&nodes);
+        let v = ops(&nodes, &BTreeSet::new());
         let expected = json!([
             ["html", "<ul data-class-on=\"data.on\""],
             ["class", "a", [["on", "data.on", false]]],
-            ["html", "><template data-for=\"x in data.xs\" data-key=\"x.id\" data-tid=\"t1\"><li data-text=\"x.name\">-</li></template>"],
-            ["for", "t1", "x", "data.xs", "x.id", [["html", "<li"], ["html", " data-text=\"x.name\">"], ["text", "x.name"], ["html", "</li>"]]],
+            ["html", "><template data-for=\"x in data.xs\" data-key=\"x.id\" data-tid=\"t1\"><li data-text=\"{x.name}\"></li></template>"],
+            ["for", "t1", "x", "data.xs", "x.id", [["html", "<li"], ["html", " data-text=\"{x.name}\">"], ["text", "{x.name}"], ["html", "</li>"]]],
             ["html", "<template data-empty data-tid=\"t2\"><li>empty</li></template>"],
             ["empty", "t1", [["html", "<li"], ["html", ">empty</li>"]]],
             ["html", "</ul><p data-show=\"!state.ok\" data-attr-title=\"data.t\""],
             ["attr", "title", "data.t"],
+            ["show", "state.ok", true],
             ["html", ">z</p>"]
+        ]);
+        assert_eq!(v, expected);
+    }
+
+    #[test]
+    fn templates_and_markers() {
+        let mut p = Element { name: "p".into(), attrs: Vec::new(), children: Vec::new(), pos: Default::default() };
+        let interp = |v: &str| Element { name: directive::INTERP.into(), attrs: vec![crate::html::Attr { name: "data-text".into(), value: Some(v.into()), pos: Default::default() }], children: Vec::new(), pos: Default::default() };
+        p.children = vec![Node::Text("Hi ".into(), Default::default()), Node::Element(interp("{data.name}")), Node::Text(", ".into(), Default::default()), Node::Element(interp("{state.n}"))];
+        p.attrs.push(crate::html::Attr { name: "data-attr-href".into(), value: Some("/p/{data.id}".into()), pos: Default::default() });
+        p.attrs.push(crate::html::Attr { name: "data-attr-title".into(), value: Some("{state.t}".into()), pos: Default::default() });
+        let mut html = String::new();
+        write_element(&p, &mut html, false);
+        assert_eq!(html, "<p data-attr-href=\"/p/{data.id}\" data-attr-title=\"{state.t}\">Hi <!--{data.name}--><!--}-->, <!--{state.n}--><!--}--></p>");
+        let v = ops(&[Node::Element(p)], &BTreeSet::new());
+        let expected = json!([
+            ["html", "<p data-attr-href=\"/p/{data.id}\" data-attr-title=\"{state.t}\""],
+            ["attr", "href", "/p/{data.id}"],
+            ["attr", "title", "{state.t}"],
+            ["html", ">Hi <!--{data.name}-->"],
+            ["text", "{data.name}"],
+            ["html", "<!--}-->, <!--{state.n}-->"],
+            ["text", "{state.n}"],
+            ["html", "<!--}--></p>"]
+        ]);
+        assert_eq!(v, expected);
+    }
+
+    #[test]
+    fn script_component_root_and_slot_content() {
+        let src = r#"<section data-c="box" data-prop-step="2" data-with-items="data.items" data-text="{state.n}"></section><div data-c="plain"><p data-slot="1" data-text="{state.title}"></p></div><div data-c="box"><b data-slot="1" data-text="{state.open}"></b><template data-slot="1" data-if="state.open" data-tid="t9"><i>on</i></template></div>"#;
+        let (nodes, _) = parse(src, 0);
+        let v = ops(&nodes, &BTreeSet::from(["box".to_string()]));
+        let expected = json!([
+            ["comp", "box", [["step", "text", "2"], ["items", "path", "data.items"]], [
+                ["html", "<section"],
+                ["html", " data-c=\"box\" data-prop-step=\"2\" data-with-items=\"data.items\" data-text=\"{state.n}\">"],
+                ["text", "{state.n}"],
+                ["html", "</section>"]
+            ]],
+            ["html", "<div data-c=\"plain\">"],
+            ["slot", 1, [["html", "<p"], ["html", " data-slot=\"1\" data-text=\"{state.title}\">"], ["text", "{state.title}"], ["html", "</p>"]]],
+            ["html", "</div>"],
+            ["comp", "box", [], [
+                ["html", "<div"],
+                ["html", " data-c=\"box\">"],
+                ["slot", 1, [["html", "<b"], ["html", " data-slot=\"1\" data-text=\"{state.open}\">"], ["text", "{state.open}"], ["html", "</b>"]]],
+                ["html", "<template data-slot=\"1\" data-if=\"state.open\" data-tid=\"t9\"><i>on</i></template>"],
+                ["slot", 1, [["if", "t9", "state.open", false, [["html", "<i"], ["html", ">on</i>"]]]]],
+                ["html", "</div>"]
+            ]]
         ]);
         assert_eq!(v, expected);
     }

@@ -15,12 +15,44 @@ export function resolve(scope, path) {
   return value
 }
 
+// Template "a {path} b" → [literal, path, literal, …]; `\{` is a literal brace. Literals are HTML source.
+const TPL = /\\\{|\{([^{}]*)\}/g
+export function template(value) {
+  const parts = ['']
+  let at = 0
+  for (const m of value.matchAll(TPL)) {
+    parts[parts.length - 1] += value.slice(at, m.index)
+    if (m[1] == null) parts[parts.length - 1] += '{'
+    else parts.push(m[1], '')
+    at = m.index + m[0].length
+  }
+  parts[parts.length - 1] += value.slice(at)
+  return parts
+}
+
+const isTemplate = (value) => value.includes('{')
+const pathsOf = (value) => (isTemplate(value) ? template(value).filter((_, i) => i % 2) : [value])
+
+function fill(scope, value, literal = (text) => text) {
+  const parts = template(value)
+  let out = literal(parts[0])
+  for (let i = 1; i < parts.length; i += 2) {
+    const v = resolve(scope, parts[i])
+    out += (v == null ? '' : escape(v)) + literal(parts[i + 1])
+  }
+  return out
+}
+
+const quoted = (text) => text.replace(/"/g, '&quot;')
+
 const PATH_AT = { text: 1, attr: 2, show: 1, if: 2, elif: 2, for: 3 }
 const CLIENT_ROOTS = new Set(['state', 'shared'])
 
-export function clientOnly(scope, path) {
-  const root = path.split('.', 1)[0]
-  return CLIENT_ROOTS.has(root) && !Object.hasOwn(scope, root)
+export function clientOnly(scope, value) {
+  return pathsOf(value).some((path) => {
+    const root = path.split('.', 1)[0]
+    return CLIENT_ROOTS.has(root) && !Object.hasOwn(scope, root)
+  })
 }
 
 const test = (scope, path, neg) => Boolean(resolve(scope, path)) !== Boolean(neg)
@@ -38,12 +70,14 @@ export function render(ops, scope) {
       case 'html':
         out += op[1]
         break
-      case 'text': {
-        const v = resolve(scope, op[1])
-        out += v == null ? '' : escape(v)
+      case 'text':
+        out += fill(scope, op[1])
         break
-      }
       case 'attr': {
+        if (isTemplate(op[2])) {
+          out += ` ${op[1]}="${fill(scope, op[2], quoted)}"`
+          break
+        }
         const v = resolve(scope, op[2])
         if (v === true) out += ` ${op[1]}=""`
         else if (v !== false && v != null) out += ` ${op[1]}="${escape(v)}"`
@@ -107,9 +141,12 @@ const HEAD_TAG = /<(title|meta|link)\b([^>]*)>(?:([^<]*)<\/title>)?(\n?)/g
 const ATTR = /\s([^\s=]+)(?:="([^"]*)")?/g
 const BOUND = /^data-(?:attr-(.+)|(text))$/
 
-function lookup(scope, path) {
+// Escaped value of a bound head attribute or title: a template, or a path (`true` = empty attribute).
+function lookup(scope, value) {
   try {
-    return resolve(scope, path)
+    if (isTemplate(value)) return fill(scope, value)
+    const v = resolve(scope, value)
+    return v == null || v === false ? null : v === true ? true : escape(v)
   } catch {
     return null
   }
@@ -127,11 +164,11 @@ export function renderHead(html, scope) {
       else attrs.set(k, v)
     }
     if (!bound.length) return tag
-    for (const [attr, path] of bound) {
-      const v = lookup(scope, path)
-      if (v == null || v === false) continue
-      if (attr === 'text') text = escape(v)
-      else attrs.set(attr, v === true ? undefined : escape(v))
+    for (const [attr, value] of bound) {
+      const v = lookup(scope, value)
+      if (v == null) continue
+      if (attr === 'text') text = v === true ? '' : v
+      else attrs.set(attr, v === true ? undefined : v)
     }
     if ((name === 'meta' && !attrs.has('content')) || (name === 'link' && !attrs.has('href'))) return ''
     const out = [...attrs].map(([k, v]) => (v === undefined ? ` ${k}` : ` ${k}="${v}"`)).join('')

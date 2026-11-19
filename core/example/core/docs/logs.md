@@ -1,19 +1,22 @@
 # Logs
 
-OpenTelemetry on client and server, zero config. Use `ctx.log` in actions and `mount`; `log`
-in `load` and server actions; `import { log } from '../core/log.js'` in `utils/`.
+OpenTelemetry on client and server, zero config. In page, component and store scripts use
+`log` from `pragma`; in `load` and server actions the `log` argument; in `utils/`
+`import { log } from '../core/log.js'`.
 
 ```js
-export const actions = {
-  async save(ctx) {
-    try {
-      await ctx.call('save', { id: ctx.params.id })
-      ctx.log.info('order saved', { 'order.id': ctx.params.id })
-    } catch (failure) {
-      ctx.log.error('order save failed', { 'order.id': ctx.params.id, 'exception.message': failure.message })
-      ctx.$.error = 'Could not save.'
-    }
-  },
+import { call, params, log } from 'pragma'
+
+let error = ''
+
+async function save() {
+  try {
+    await call('save', { id: params.id })
+    log.info('order saved', { 'order.id': params.id })
+  } catch (failure) {
+    log.error('order save failed', { 'order.id': params.id, 'exception.message': failure.message })
+    error = 'Could not save.'
+  }
 }
 ```
 

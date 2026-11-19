@@ -12,6 +12,7 @@ mod sugar;
 mod validate;
 
 use pragma_diag::{Diagnostic, Severity};
+use pragma_jslint::script::{self, ScriptInfo, ScriptKind};
 use project::{Component, Page, Project, rel_str};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
@@ -198,6 +199,12 @@ fn module_graph(
             let dir = path.parent().unwrap_or(Path::new(""));
             let pos = lines.pos(&src, imp.start, 0);
             let mut ok = None;
+            if imp.spec == "pragma" {
+                // page, component and store scripts lose this import when they become factories
+                diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", "'pragma' is only for page, component and store scripts; pass what a helper needs as arguments"));
+                imports.push((imp, None));
+                continue;
+            }
             if pragma_jslint::is_package(&imp.spec) {
                 let resolved = match deps.check_listed(&imp.spec, client) {
                     Err(e) => Err(e),
@@ -226,7 +233,10 @@ fn module_graph(
             let target = if is_rel { normalize(dir, &imp.spec) } else { None };
             match target {
                 Some(t) if root.join(&t).is_file() => {
-                    if client && rel_str(&t).ends_with(".server.js") {
+                    let store = rel_str(&t).strip_prefix("lib/state/").and_then(|n| n.strip_suffix(".js")).map(str::to_string);
+                    if let Some(name) = store {
+                        diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/store-import", format!("stores are reached through `shared`: `import {{ shared }} from 'pragma'`, then `shared.{name}`")));
+                    } else if client && rel_str(&t).ends_with(".server.js") {
                         diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", format!("client module cannot import {} (server code)", imp.spec)));
                     } else {
                         queue.push_back(t.clone());
@@ -298,6 +308,13 @@ fn closure(mods: &BTreeMap<PathBuf, Module>, entries: &[PathBuf], dynamic: bool)
     order
 }
 
+/// Scripts the SSR of a route runs: the page's and its components' (`data-c` id -> module).
+#[derive(Default)]
+struct SsrScripts {
+    page: Option<PathBuf>,
+    components: Vec<(String, PathBuf)>,
+}
+
 struct PageOut<'a> {
     page: &'a Page,
     exp: expand::Expanded,
@@ -344,6 +361,30 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             sources.insert(f.clone(), s);
         }
     }
+    // a <script> in an .html is linted like a file (diagnostics move to the .html at the end)
+    for (path, (code, _)) in &p.embedded {
+        if rel_str(path).ends_with(".js") {
+            diags.extend(pragma_jslint::lint(path, code, &pragma_jslint::LintContext { is_core: false }));
+            sources.insert(path.clone(), code.clone());
+        }
+    }
+    // page, component and store scripts become per-instance factories (SPEC §4)
+    let mut scripts: HashMap<PathBuf, ScriptInfo> = HashMap::new();
+    let script_kinds: Vec<(PathBuf, ScriptKind)> = p
+        .pages
+        .iter()
+        .chain(p.not_found.iter())
+        .filter_map(|pg| pg.module.clone().map(|m| (m, ScriptKind::Page)))
+        .chain(p.all_components().filter_map(|c| c.module.clone().map(|m| (m, ScriptKind::Component))))
+        .chain(p.stores.values().map(|f| (f.clone(), ScriptKind::Store)))
+        .collect();
+    for (path, kind) in script_kinds {
+        let Some(src) = sources.get(&path).cloned() else { continue };
+        let s = script::transform(&path, &src, kind);
+        diags.extend(s.diags);
+        sources.insert(path.clone(), s.code);
+        scripts.insert(path, s.info);
+    }
 
     let theme_src = p.theme_css.clone().unwrap_or_default();
     let css_comment = |path: &Path, src: &str, diags: &mut Vec<Diagnostic>| {
@@ -363,6 +404,15 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             comp_css.insert(c.dir.clone(), scope_component_css(&css, &c.name, &c.id));
         }
     }
+    // a page <style> goes into the global CSS like a component's (in @layer components)
+    let mut page_css: Vec<(PathBuf, String)> = Vec::new();
+    for f in p.pages.iter().chain(p.not_found.iter()).filter_map(|pg| pg.css.as_ref()) {
+        if let Some(css) = p.read(f) {
+            css_comment(f, &css, &mut diags);
+            validate::css_classes(&css, &mut project_classes);
+            page_css.push((f.clone(), css));
+        }
+    }
     let mut classes = validate::ClassCheck::new(project_classes, theme);
 
     let comp_ids: HashSet<u32> = p.all_components().map(|c| c.html).collect();
@@ -379,17 +429,12 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         diags.extend(fc.diags);
     }
 
-    let mut actions_cache: HashMap<PathBuf, Vec<String>> = HashMap::new();
-    let mut actions_of = |f: &Path| -> Vec<String> {
-        actions_cache.entry(f.to_path_buf()).or_insert_with(|| sources.get(f).map(|s| pragma_jslint::exported_actions(s)).unwrap_or_default()).clone()
-    };
-
     let mut outs: Vec<PageOut> = Vec::new();
     let mut used_classes: BTreeSet<String> = BTreeSet::new();
     let mut used_components: BTreeMap<PathBuf, Component> = BTreeMap::new();
     let all_pages: Vec<(&Page, bool)> = p.pages.iter().map(|pg| (pg, false)).chain(p.not_found.iter().map(|pg| (pg, true))).collect();
     for (page, is_404) in all_pages {
-        let (mut exp, d) = expand::Expander::new(&p).page(page);
+        let (mut exp, d) = expand::Expander::new(&p, &scripts).page(page);
         diags.extend(d);
         if !is_404 && !page.pattern.contains(':') {
             mark_current(&mut exp.body, &page.pattern);
@@ -405,19 +450,20 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             }
             None => (false, false),
         };
-        let page_actions = page.module.as_ref().map(|m| actions_of(m));
-        let comp_actions_owned: Vec<(String, String, Vec<String>)> = exp
-            .components
-            .values()
-            .filter_map(|c| c.module.as_ref().map(|m| (c.id.clone(), format!("<{}-{}>", if c.id == c.name { "c" } else { "p" }, c.name), actions_of(m))))
-            .collect();
+        let owner = |m: &PathBuf| scripts.get_key_value(m).map(|(k, info)| expand::OwnerScript { file: p.origin(k), info });
+        let comp_tags: Vec<(String, String)> = exp.components.values().map(|c| (c.id.clone(), format!("<{}-{}>", if c.id == c.name { "c" } else { "p" }, c.name))).collect();
         let ctx = expand::PageCtx {
             loader,
             ssr,
             params: page.pattern.split('/').filter_map(|s| s.strip_prefix(':')).map(str::to_string).collect(),
-            page_actions: page_actions.as_deref(),
+            page_script: page.module.as_ref().and_then(owner),
             page_file: &p.files[page.html as usize],
-            comp_actions: comp_actions_owned.iter().map(|(id, tag, a)| (id.clone(), (tag.as_str(), a.as_slice()))).collect(),
+            comp_scripts: exp
+                .components
+                .values()
+                .zip(&comp_tags)
+                .filter_map(|(c, (id, tag))| c.module.as_ref().and_then(owner).map(|s| (id.clone(), (tag.as_str(), s))))
+                .collect(),
         };
         let mut sc = expand::Scoped { p: &p, ctx: &ctx, diags: Vec::new(), stores: BTreeSet::new(), classes: BTreeSet::new(), outer: Vec::new() };
         sc.run(&exp.body);
@@ -425,10 +471,25 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             sc.run(&exp.page);
         }
         sc.head(&exp.head);
-        for m in page.module.iter().chain(exp.components.values().filter_map(|c| c.module.as_ref())) {
-            if let Some(src) = p.read(m) {
-                sc.stores.extend(shared_refs(&src).filter(|s| p.stores.contains_key(*s)).map(str::to_string));
+        // stores used from scripts, and the stores those stores use
+        let mut queue: Vec<String> = page
+            .module
+            .iter()
+            .chain(exp.components.values().filter_map(|c| c.module.as_ref()))
+            .filter_map(|m| sources.get(m))
+            .flat_map(|src| shared_refs(src).map(str::to_string).collect::<Vec<_>>())
+            .chain(sc.stores.iter().cloned())
+            .collect();
+        let mut seen = BTreeSet::new();
+        while let Some(s) = queue.pop() {
+            let Some(f) = p.stores.get(&s) else { continue };
+            if !seen.insert(s.clone()) {
+                continue;
             }
+            if let Some(src) = sources.get(f) {
+                queue.extend(shared_refs(src).map(str::to_string));
+            }
+            sc.stores.insert(s);
         }
         diags.extend(sc.diags);
         used_classes.extend(sc.classes);
@@ -520,8 +581,11 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     css.push('\n');
     for c in used_components.values() {
         if let Some(s) = comp_css.get(&c.dir) {
-            css.push_str(&format!("/* {} */\n@layer components {{\n{s}\n}}\n", rel_str(c.css.as_ref().unwrap())));
+            css.push_str(&format!("/* {} */\n@layer components {{\n{}\n}}\n", rel_str(p.origin(c.css.as_ref().unwrap())), s.trim()));
         }
+    }
+    for (f, s) in &page_css {
+        css.push_str(&format!("/* {} */\n@layer components {{\n{}\n}}\n", rel_str(p.origin(f)), s.trim()));
     }
     css.push_str(&generated.css);
     if prod {
@@ -610,14 +674,23 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             budget(&p, "routeJsKb", p.config.budgets.route_js_kb, route_only, &o.page.pattern, &mut diags);
         }
         if let Some(server) = &o.page.server {
+            let mut ssr_scripts = SsrScripts::default();
             let (template, shell) = if o.ssr {
-                let ops = compile::ops(&o.exp.page);
+                let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
+                let ops = compile::ops(&o.exp.page, &scripted);
                 w.write(&format!("templates/{}.json", o.page.out_name), serde_json::to_string(&ops).unwrap().as_bytes());
+                // the server runs a script only when everything it imports is app code (no npm
+                // package, no browser runtime from core/); the others stay client-rendered
+                let runs_on_server = |m: &PathBuf| {
+                    closure(&mods, std::slice::from_ref(m), true).iter().all(|f| ["routes/", "lib/", "utils/"].iter().any(|d| rel_str(f).starts_with(d)))
+                };
+                ssr_scripts.page = o.page.module.clone().filter(|m| runs_on_server(m));
+                ssr_scripts.components = o.exp.components.values().filter_map(|c| c.module.clone().filter(|m| runs_on_server(m)).map(|m| (c.id.clone(), m))).collect();
                 (ops, Value::String(doc.clone()))
             } else {
                 (Value::Null, Value::Null)
             };
-            server_routes.push((o.page.pattern.clone(), server.clone(), o.ssr, template, shell));
+            server_routes.push((o.page.pattern.clone(), server.clone(), o.ssr, template, shell, ssr_scripts));
         }
     }
     budget(&p, "cssKb", p.config.budgets.css_kb, report.css_gzip_bytes, "global CSS", &mut diags);
@@ -640,9 +713,18 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     // no *.server.js: static-only app, no server bundle and no node (BUG-S-1); `pragma dev` and
     // `serve` answer `/_otel` themselves
     if report.has_server && opts.root.join(&handler).is_file() {
+        // page and component scripts the SSR renders with (each imported once)
+        let mut script_ids: BTreeMap<PathBuf, usize> = BTreeMap::new();
+        for r in &server_routes {
+            for m in r.5.page.iter().chain(r.5.components.iter().map(|(_, m)| m)) {
+                let next = script_ids.len();
+                script_ids.entry(m.clone()).or_insert(next);
+            }
+        }
         let mut entries = vec![handler.clone(), PathBuf::from("core/server/node.mjs")];
         entries.extend(server_routes.iter().map(|r| r.1.clone()));
-        entries.retain(|e| opts.root.join(e).is_file());
+        entries.extend(script_ids.keys().cloned());
+        entries.retain(|e| opts.root.join(e).is_file() || sources.contains_key(e));
         let smods = module_graph(&opts.root, &entries, false, &sources, &deps, &mut BTreeMap::new(), &mut diags);
         for (path, m) in &smods {
             w.write(&format!("server/{}", rel_str(path)), m.src.as_bytes());
@@ -651,10 +733,21 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         for (i, r) in server_routes.iter().enumerate() {
             worker.push_str(&format!("import * as s{i} from {}\n", json!(format!("./{}", rel_str(&r.1)))));
         }
+        for (m, i) in &script_ids {
+            worker.push_str(&format!("import * as m{i} from {}\n", json!(format!("./{}", rel_str(m)))));
+        }
         worker.push_str("\nexport default createHandler({\n");
         worker.push_str(&format!("  service: {},\n  routes: [\n", json!(p.config.name)));
-        for (i, (pattern, _, ssr, template, shell)) in server_routes.iter().enumerate() {
-            worker.push_str(&format!("    {{ pattern: {}, server: s{i}, ssr: {ssr}, template: {template}, shell: {shell} }},\n", json!(pattern)));
+        for (i, (pattern, _, ssr, template, shell, scripts)) in server_routes.iter().enumerate() {
+            let mut extra = String::new();
+            if let Some(m) = &scripts.page {
+                extra.push_str(&format!(", page: m{}", script_ids[m]));
+            }
+            if !scripts.components.is_empty() {
+                let list: Vec<String> = scripts.components.iter().map(|(id, m)| format!("{}: m{}", json!(id), script_ids[m])).collect();
+                extra.push_str(&format!(", components: {{ {} }}", list.join(", ")));
+            }
+            worker.push_str(&format!("    {{ pattern: {}, server: s{i}, ssr: {ssr}, template: {template}, shell: {shell}{extra} }},\n", json!(pattern)));
         }
         worker.push_str("  ],\n})\n");
         w.write("server/worker.js", worker.as_bytes());
@@ -682,6 +775,9 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         for d in diags.iter_mut().filter(|d| d.rule == "app/budget") {
             d.severity = Severity::Warning;
         }
+    }
+    for d in &mut diags {
+        d.file = p.origin(&d.file).to_path_buf();
     }
     (sort_diags(diags), report)
 }

@@ -28,7 +28,10 @@ pub struct Page {
     pub out_name: String,
     /// Folder (relative to the root) where component resolution starts.
     pub dir: PathBuf,
+    /// `x.js` or the `<script>` of `x.html` (see `Project::embedded`).
     pub module: Option<PathBuf>,
+    /// The `<style>` of `x.html`.
+    pub css: Option<PathBuf>,
     pub server: Option<PathBuf>,
 }
 
@@ -62,6 +65,10 @@ pub struct Project {
     pub theme_css: Option<String>,
     /// All app .js/.mjs files (including core/), relative.
     pub js_files: Vec<PathBuf>,
+    /// `<script>` / `<style>` of a page or component `.html`, under the path the separate file would
+    /// have (`routes/x.js`, `lib/components/x/x.css`) -> (code padded with blank lines so lines and
+    /// columns match the `.html`, the `.html`).
+    pub embedded: HashMap<PathBuf, (String, PathBuf)>,
     pub public_files: Vec<PathBuf>,
     pub diags: Vec<Diagnostic>,
 }
@@ -123,7 +130,67 @@ impl Project {
     }
 
     pub fn read(&self, rel: &Path) -> Option<String> {
+        if let Some((code, _)) = self.embedded.get(rel) {
+            return Some(code.clone());
+        }
         fs::read_to_string(self.root.join(rel)).ok()
+    }
+
+    /// The file a diagnostic about `rel` belongs to: the `.html` for an embedded script or style.
+    pub fn origin<'a>(&'a self, rel: &'a Path) -> &'a Path {
+        self.embedded.get(rel).map_or(rel, |(_, html)| html.as_path())
+    }
+
+    /// Takes the top-level `<script>` and `<style>` out of a page or component `.html`. Returns the
+    /// module and CSS paths (the separate files or the embedded code).
+    fn extract(&mut self, id: u32, js: PathBuf, css: PathBuf, all: &[PathBuf]) -> (Option<PathBuf>, Option<PathBuf>) {
+        let html = self.files[id as usize].clone();
+        let (mut scripts, mut styles, mut kept) = (Vec::new(), Vec::new(), Vec::new());
+        for n in std::mem::take(&mut self.trees[id as usize]) {
+            match n {
+                Node::Element(e) if e.is("script") => scripts.push(e),
+                Node::Element(e) if e.is("style") => styles.push(e),
+                n => kept.push(n),
+            }
+        }
+        self.trees[id as usize] = kept;
+        (self.embed(&html, scripts, js, all, "script"), self.embed(&html, styles, css, all, "style"))
+    }
+
+    fn embed(&mut self, html: &Path, found: Vec<html::Element>, path: PathBuf, all: &[PathBuf], tag: &str) -> Option<PathBuf> {
+        let rule = if tag == "script" { "html/script" } else { "html/style-inline" };
+        let on_disk = all.contains(&path);
+        let mut found = found.into_iter();
+        let Some(first) = found.next() else { return on_disk.then_some(path) };
+        for extra in found {
+            self.err_at(extra.pos, rule, format!("one <{tag}> per file"));
+        }
+        for a in &first.attrs {
+            let module = tag == "script" && a.name.eq_ignore_ascii_case("type") && a.value.as_deref() == Some("module");
+            if module {
+                continue;
+            }
+            let msg = if tag == "script" && a.name.eq_ignore_ascii_case("src") {
+                format!("no src: write the code inside <script> or in {}", rel_str(&path))
+            } else if tag == "script" {
+                "<script> takes no attributes: it is always an ES module".to_string()
+            } else {
+                "<style> takes no attributes".to_string()
+            };
+            self.err_at(a.pos, rule, msg);
+        }
+        if on_disk {
+            let msg = format!("{} and the <{tag}> in {} both define it; keep one", rel_str(&path), rel_str(html));
+            self.err_at(first.pos, "html/duplicate-module", msg);
+            return Some(path);
+        }
+        let (text, pos) = match first.children.first() {
+            Some(Node::Text(t, p)) => (t.clone(), *p),
+            _ => (String::new(), first.pos),
+        };
+        let padded = format!("{}{}{text}", "\n".repeat(pos.line.saturating_sub(1) as usize), " ".repeat(pos.col.saturating_sub(1) as usize));
+        self.embedded.insert(path.clone(), (padded, html.to_path_buf()));
+        Some(path)
     }
 
     fn add_html(&mut self, rel: PathBuf) -> u32 {
@@ -161,6 +228,7 @@ impl Project {
             stores: BTreeMap::new(),
             theme_css: None,
             js_files: Vec::new(),
+            embedded: HashMap::new(),
             public_files: Vec::new(),
             diags: Vec::new(),
         };
@@ -286,8 +354,7 @@ impl Project {
                 continue;
             }
             let id = self.add_html(html);
-            let module = Some(dir.join(format!("{name}.js"))).filter(|m| all.contains(m));
-            let css = Some(dir.join(format!("{name}.css"))).filter(|m| all.contains(m));
+            let (module, css) = self.extract(id, dir.join(format!("{name}.js")), dir.join(format!("{name}.css")), all);
             if all.contains(&dir.join(format!("{name}.server.js"))) {
                 self.err(dir.join(format!("{name}.server.js")), 1, 1, "app/structure", "components cannot have .server.js; data lives in the page .server.js");
             }
@@ -320,11 +387,11 @@ impl Project {
             }
             if s == "routes/_404.html" {
                 let id = self.add_html(f.clone());
-                let module = Some(PathBuf::from("routes/_404.js")).filter(|m| all.contains(m));
+                let (module, css) = self.extract(id, PathBuf::from("routes/_404.js"), PathBuf::from("routes/_404.css"), all);
                 if all.contains(&PathBuf::from("routes/_404.server.js")) {
                     self.err("routes/_404.server.js", 1, 1, "app/structure", "_404 cannot have a loader in v0");
                 }
-                self.not_found = Some(Page { html: id, pattern: "*".into(), out_name: "_404".into(), dir: "routes".into(), module, server: None });
+                self.not_found = Some(Page { html: id, pattern: "*".into(), out_name: "_404".into(), dir: "routes".into(), module, css, server: None });
                 continue;
             }
             if s == "routes/_404.js" || s == "routes/_404.server.js" {
@@ -393,10 +460,10 @@ impl Project {
             }
             seen.insert(shape, f.clone());
             let id = self.add_html(f.clone());
-            let module = Some(f.with_file_name(format!("{stem}.js"))).filter(|m| all.contains(m));
+            let (module, css) = self.extract(id, f.with_file_name(format!("{stem}.js")), f.with_file_name(format!("{stem}.css")), all);
             let server = Some(f.with_file_name(format!("{stem}.server.js"))).filter(|m| all.contains(m));
             let out_name = rel_str(&rel.with_extension(""));
-            self.pages.push(Page { html: id, pattern, out_name, dir: f.parent().unwrap().to_path_buf(), module, server });
+            self.pages.push(Page { html: id, pattern, out_name, dir: f.parent().unwrap().to_path_buf(), module, css, server });
         }
         if self.layout.is_none() && self.root.join("routes").is_dir() {
             self.err("routes/_layout.html", 1, 1, "app/structure", "missing routes/_layout.html with <main data-page><slot></slot></main>");

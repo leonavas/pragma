@@ -2,10 +2,10 @@
 <if page.loading><div class="skeleton h-8"></div></if>
 <else>
   <article>
-    <h1 :text="data.product.name">…</h1>
+    <h1>{data.product.name}</h1>
     <p-price :p="data.product"></p-price>
     <a :href="data.product.url" .hidden="!data.product.url" href="#">view</a>
-    <span :text="params.id"></span>
+    <span>Product {params.id}</span>
     <input :model="$qty" aria-label="Quantity">
   </article>
 </else>

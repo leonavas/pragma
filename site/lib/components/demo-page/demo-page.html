@@ -1,3 +1,23 @@
 <div>
   <slot></slot>
 </div>
+
+<style>
+  body:has([data-c="demo-page"]) > header,
+  body:has([data-c="demo-page"]) > footer {
+    display: none;
+  }
+  [data-c="demo-page"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 56rem;
+    margin-inline: auto;
+    padding: 1.5rem 1.25rem 2.5rem;
+  }
+  @media (min-width: 40rem) {
+    [data-c="demo-page"] { padding: 2rem 2rem 3rem; }
+  }
+</style>

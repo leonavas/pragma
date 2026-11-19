@@ -1,1 +1,15 @@
-<button type="button" class="btn" @click="toggle" :aria-pressed="$pressed" :text="$label">Dark theme</button>
+<script>
+  import { theme, setTheme } from '../../../core/theme.js'
+
+  let dark = theme() === 'dark'
+
+  const label = () => (dark ? 'Light theme' : 'Dark theme')
+  const pressed = () => String(dark)
+
+  function toggle() {
+    dark = !dark
+    setTheme(dark ? 'dark' : 'light')
+  }
+</script>
+
+<button type="button" class="btn" @click="toggle" :aria-pressed="$pressed">{$label}</button>

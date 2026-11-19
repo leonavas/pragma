@@ -1,24 +1,66 @@
-const persisted = []
-const key = k => 'pragma:' + k
+// Reactive values: a deep Proxy over plain objects and arrays. Every change calls `notify`, which
+// page.js turns into one render per microtask. Functions, DOM nodes and class instances are not wrapped.
+const proxies = new WeakMap(), raws = new WeakMap(), persisted = []
 let notify = () => {}
 
-export const onStoreChange = fn => { notify = fn }
+export const onChange = fn => { notify = fn }
+export const raw = v => raws.get(v) ?? v
 
-// Getters are derived values: never written to or overwritten from localStorage.
-const plain = s => JSON.stringify(s, function (k, v) { return this === s && Object.getOwnPropertyDescriptor(s, k)?.get ? undefined : v })
-const restore = (s, v) => { for (const k in v) if (!Object.getOwnPropertyDescriptor(s, k)?.get) s[k] = v[k] }
+function wrappable(v) {
+  if (v === null || typeof v !== 'object' || raws.has(v)) return false
+  const proto = Object.getPrototypeOf(v)
+  return proto === Object.prototype || proto === null || Array.isArray(v)
+}
 
-export function store(initial, { persist } = {}) {
-  if (persist) {
-    try { restore(initial, JSON.parse(localStorage.getItem(key(persist)))) } catch {}
-    persisted.push({ s: initial, k: key(persist), j: plain(initial) })
+const handler = {
+  get(target, key, receiver) {
+    const v = Reflect.get(target, key, receiver)
+    return typeof key === 'symbol' ? v : reactive(v)
+  },
+  set(target, key, v) {
+    const value = raw(v), had = Object.hasOwn(target, key), old = target[key]
+    const desc = Object.getOwnPropertyDescriptor(target, key)
+    if (desc?.get && !desc.set) throw new TypeError(`pragma: "${String(key)}" is a prop and props are read-only`)
+    target[key] = value
+    if (!had || old !== value || (Array.isArray(target) && key === 'length')) notify()
+    return true
+  },
+  deleteProperty(target, key) {
+    const had = Object.hasOwn(target, key)
+    delete target[key]
+    if (had) notify()
+    return true
+  },
+}
+
+export function reactive(v) {
+  if (!wrappable(v)) return v
+  let p = proxies.get(v)
+  if (!p) {
+    p = new Proxy(v, handler)
+    proxies.set(v, p)
+    raws.set(p, v)
   }
-  return initial
+  return p
+}
+
+// Store fields listed in `export const persist = [...]` live in localStorage['pragma:<store>'].
+const key = name => 'pragma:' + name
+const pick = (target, keys) => JSON.stringify(Object.fromEntries(keys.filter(k => k in target).map(k => [k, target[k]])))
+
+function restore(target, keys, saved) {
+  if (saved && typeof saved === 'object') for (const k of keys) if (k in saved) target[k] = saved[k]
+}
+
+export function persist(target, name, keys) {
+  if (!keys?.length) return
+  try { restore(target, keys, JSON.parse(localStorage.getItem(key(name)))) } catch {}
+  persisted.push({ target, keys, k: key(name), j: pick(target, keys) })
 }
 
 export function persistStores() {
   for (const p of persisted) {
-    const j = plain(p.s)
+    const j = pick(p.target, p.keys)
     if (j === p.j) continue
     p.j = j
     try { localStorage.setItem(p.k, j) } catch {}
@@ -28,7 +70,7 @@ export function persistStores() {
 addEventListener('storage', e => {
   const p = persisted.find(p => p.k === e.key)
   if (!p || e.newValue == null) return
-  restore(p.s, JSON.parse(e.newValue))
+  try { restore(p.target, p.keys, JSON.parse(e.newValue)) } catch { return }
   p.j = e.newValue
   notify()
 })

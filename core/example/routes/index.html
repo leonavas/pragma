@@ -1,3 +1,10 @@
+<script>
+  import { shared } from 'pragma'
+
+  const taskTone = () => (shared.tasks.pending() ? 'neutral' : 'warning')
+  const cartTone = () => (shared.cart.empty() ? 'warning' : 'ok')
+</script>
+
 <title>Dashboard · Minimart</title>
 
 <div class="flex flex-col gap-10">
@@ -31,19 +38,19 @@
 
   <section class="flex flex-col gap-4" aria-labelledby="more">
     <h2 id="more" class="text-lg font-semibold">More</h2>
-    <c-tabs label="Details" a="About" b="Shortcuts" c="Counter">
-      <p slot="a" class="text-muted">Dashboard, tasks and a shop in one app of native HTML, CSS and JS. Your data stays in your browser.</p>
-      <ul slot="b" class="list-disc pl-5 text-muted">
+    <c-tabs label="Details" first="About" second="Shortcuts" third="Counter">
+      <p slot="first" class="text-muted">Dashboard, tasks and a shop in one app of native HTML, CSS and JS. Your data stays in your browser.</p>
+      <ul slot="second" class="list-disc pl-5 text-muted">
         <li>← and → switch tabs.</li>
         <li>Esc or Back closes the modal.</li>
         <li>Double-click edits a task.</li>
       </ul>
-      <div slot="c"><c-counter label="In tab" start="3" step="3"></c-counter></div>
+      <div slot="third"><c-counter label="In tab" start="3" step="3"></c-counter></div>
     </c-tabs>
   </section>
 </div>
 
 <c-modal id="about" title="About Minimart">
-  <p>The pragma example app: every page is ready-made HTML, JS only wires up behavior, and the cart and tasks survive a refresh.</p>
+  <p>The pragma example app: every page is ready-made HTML, each file's script holds its state and behavior, and the cart and tasks survive a refresh.</p>
   <button slot="actions" type="button" class="btn btn-primary" @close value="ok">Close</button>
 </c-modal>

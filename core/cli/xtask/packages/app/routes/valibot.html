@@ -1,6 +1,19 @@
+<script>
+  import { email as validEmail, object, pipe, safeParse, string } from 'valibot'
+
+  const contact = object({ email: pipe(string(), validEmail()) })
+
+  let email = 'ana@example.com'
+
+  const emailStatus = () => {
+    const validation = safeParse(contact, { email })
+    return validation.success ? 'Valid email' : validation.issues[0].message
+  }
+</script>
+
 <title>valibot</title>
 
 <h1>valibot</h1>
 <label for="email">Email</label>
 <input id="email" type="email" class="rounded-lg border border-line px-3 py-2" :model="$email">
-<p id="email-status" role="status" :text="$emailStatus"></p>
+<p id="email-status" role="status">{$emailStatus}</p>

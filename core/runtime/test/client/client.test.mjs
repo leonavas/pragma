@@ -112,6 +112,9 @@ test('nested data-for/data-empty and keyed diff preserving nodes', async () => {
 test('components: per-instance state, owner action and cleanup on removal', async () => {
   const p = await open('/directives')
   assert.equal(await p.evaluate(() => self.__mounted), 2)
+  // mount(el) receives the component root; the page's mount gets <main data-page>
+  assert.deepEqual(await p.evaluate(() => self.__mountRoots), ['counter', 'counter'])
+  assert.equal(await p.evaluate(() => self.__pageRoot), 'MAIN')
   await p.locator('#list li[data-key="1"] .inc').click()
   await p.locator('#list li[data-key="1"] .inc').click()
   await p.locator('#list li[data-key="2"] .inc').click()
@@ -196,11 +199,18 @@ test('slot content belongs to whoever wrote it (lexical owner)', async () => {
   assert.deepEqual(p.errors, [])
 })
 
-test('state(ctx) gets the root props, including the caller data-attr-data-*', async () => {
+test('props: data-prop-* coerced by the default type, data-with-* live from the caller', async () => {
   const p = await open('/slot')
   assert.deepEqual(await p.$$eval('li .n', e => e.map(x => x.textContent)), ['1', '1'])
   assert.deepEqual(await p.$$eval('li .max', e => e.map(x => x.textContent)), ['3', '7'])
   assert.equal(await text(p, '#box-n'), '5')
+  // `export let initial = 0`: the text "5" becomes the number 5, so +1 gives 6, not "51"
+  await p.click('#box-inc')
+  assert.equal(await text(p, '#box-n'), '6')
+  // a data-with prop follows the caller's value on the next render
+  await p.evaluate(() => __slot.update(s => { s.items[1].max = 9 }))
+  await p.waitForFunction(() => [...document.querySelectorAll('li .max')].map(x => x.textContent).join() === '3,9')
+  assert.deepEqual(p.errors, [])
 })
 
 test('store getters are derived: recomputed and kept out of localStorage', async () => {
@@ -241,6 +251,35 @@ test('data-attr-checked sets the property and a new block with autofocus gets fo
   assert.equal(await p.isChecked('#chk'), false)
   await p.evaluate(() => __slot.update(s => { s.editing = true }))
   assert.equal(await p.evaluate(() => document.activeElement.id), 'edit')
+})
+
+test('script state is reactive: deep writes, array methods, one render per microtask, read-only props', async () => {
+  const p = await open('/directives')
+  await p.evaluate(() => { __ctx.$.person.name = 'Zé' })
+  await p.waitForFunction(() => document.querySelector('#w').textContent === 'Zé')
+  await p.evaluate(() => { __ctx.$.items.push({ id: 3, name: 'three', ok: true, tags: [] }) })
+  await p.waitForFunction(() => document.querySelectorAll('#list li .n').length === 3)
+  await p.evaluate(() => { __ctx.$.items[0].tags.splice(0, 1) })
+  await p.waitForFunction(() => document.querySelectorAll('#list li:first-of-type .tag').length === 1)
+  const batch = await p.evaluate(async () => {
+    let records = 0
+    const mo = new MutationObserver(rs => { records += rs.length })
+    mo.observe(document.getElementById('name'), { childList: true, characterData: true, subtree: true })
+    __ctx.$.name = 'a'
+    __ctx.$.name = 'b'
+    __ctx.$.name = 'c'
+    await new Promise(r => setTimeout(r))
+    mo.disconnect()
+    return [records, document.getElementById('name').textContent]
+  })
+  assert.deepEqual(batch, [1, 'c'])
+  const slot = await open('/slot')
+  const error = await slot.evaluate(() => {
+    try { __boxes[0].initial = 9; return 'written' } catch (e) { return e.message }
+  })
+  assert.match(error, /"initial" is a prop and props are read-only/)
+  assert.equal(await slot.evaluate(() => __boxes[0].initial), 5)
+  assert.deepEqual(p.errors, [])
 })
 
 test('unknown path throws in dev', async () => {
@@ -423,4 +462,58 @@ test('performance: 1000 items with keyed diff', async () => {
   assert.equal(r.n, 999)
   assert.equal(r.text, 'changed 19')
   console.log(`performance (ms): create 1000 = ${r.create1000.toFixed(2)}, change 1 of 1000 (median) = ${r.change1.toFixed(2)}, swap 2 = ${r.swap2.toFixed(2)}, remove 1 = ${r.remove1.toFixed(2)}, clear = ${r.empty.toFixed(2)}`)
+})
+
+test('{} text: element templates, comment markers, attribute templates and derived functions', async () => {
+  const p = await open('/template')
+  assert.equal(await text(p, '#hello'), 'Hello Ana, you have 2 items {literal} & more')
+  assert.deepEqual([await p.getAttribute('#link', 'href'), await p.getAttribute('#link', 'title')], ['/u/7?tab=1', 'Open Ana'])
+  assert.equal(await text(p, '#mixed'), 'Total: 2 tasks, Ana!')
+  assert.equal(await text(p, '#pending'), '1 pending')
+  assert.deepEqual(await p.$$eval('#tasks label', ls => ls.map(l => l.textContent)), [' Buy <milk>', ' Walk'])
+  assert.equal(await p.locator('#tasks milk').count(), 0)
+  const adopted = await p.evaluate(() => {
+    const el = document.querySelector('#adopt')
+    return [el.textContent, el.childNodes.length]
+  })
+  assert.deepEqual(adopted, ['Hi Ana!', 5])
+  assert.equal(await text(p, '#code'), '{literal}: Buy <milk>;Walk;')
+  assert.deepEqual(await p.$$eval('#code span', s => s.map(x => x.dataset.n)), ['1', '2'])
+  assert.equal(await text(p, '[data-c="inner"] .own'), 'Inner')
+  assert.equal(await p.evaluate(() => document.querySelector('[data-c="inner"]').textContent), 'Inner Ana')
+
+  const writes = await p.evaluate(async () => {
+    const seen = []
+    const mo = new MutationObserver(rs => seen.push(...rs))
+    mo.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true })
+    __page.count = 2
+    await new Promise(r => setTimeout(r))
+    mo.disconnect()
+    return seen.length
+  })
+  assert.equal(writes, 0)
+
+  await p.evaluate(() => {
+    __page.name = 'Bo'
+    __page.tasks.push({ id: 3, title: 'Read', done: false })
+  })
+  await tick(p)
+  assert.equal(await text(p, '#hello'), 'Hello Bo, you have 2 items {literal} & more')
+  assert.equal(await text(p, '#mixed'), 'Total: 3 tasks, Bo!')
+  assert.equal(await text(p, '#pending'), '2 pending')
+  assert.equal(await p.getAttribute('#link', 'title'), 'Open Bo')
+  assert.equal(await p.evaluate(() => document.querySelector('[data-c="inner"]').textContent), 'Inner Bo')
+  assert.deepEqual(p.errors, [])
+})
+
+test('events call functions with arguments: paths, literals and event', async () => {
+  const p = await open('/template')
+  await p.locator('#tasks li[data-key="1"] input').click()
+  assert.equal(await text(p, '#pending'), '0 pending')
+  assert.equal(await p.getAttribute('#tasks li[data-key="1"]', 'class'), 'done')
+  await p.locator('#tasks li[data-key="2"] .rename').click()
+  assert.deepEqual(await p.$$eval('#tasks label', ls => ls.map(l => l.textContent)), [' Buy <milk>', ' Renamed'])
+  await p.click('#record')
+  assert.equal(await text(p, '#log'), 'click|a, b|-2.5|true||Ana')
+  assert.deepEqual(p.errors, [])
 })

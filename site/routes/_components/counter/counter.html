@@ -1,0 +1,27 @@
+<script>
+  export let label = 'Count'
+  export let start = 0
+  export let step = 1
+
+  let count = start
+
+  const atStart = () => count === start
+
+  function decrease() { count -= step }
+  function increase() { count += step }
+  function reset() { count = start }
+</script>
+
+<div role="group" :aria-label="$label">
+  <span class="counter-label">{$label}</span>
+  <button type="button" class="btn btn-small" aria-label="Decrease" @click="decrease">−</button>
+  <output class="counter-value">{$count}</output>
+  <button type="button" class="btn btn-small" aria-label="Increase" @click="increase">+</button>
+  <button type="button" class="btn btn-small" @click="reset" :disabled="$atStart">Reset</button>
+</div>
+
+<style>
+  [data-c="counter"] { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+  [data-c="counter"] .counter-label { color: var(--color-muted); font-size: 0.875rem; }
+  [data-c="counter"] .counter-value { min-width: 2rem; font-family: var(--font-mono); text-align: center; font-variant-numeric: tabular-nums; }
+</style>

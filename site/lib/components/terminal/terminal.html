@@ -1,7 +1,46 @@
+<script>
+  import { log } from 'pragma'
+
+  export let title = ''
+  export let copy = ''
+
+  const resetDelayMs = 1800
+  const labels = { idle: 'Copy', copied: 'Copied', failed: 'Copy failed' }
+  const announcements = {
+    idle: '',
+    copied: 'Commands copied to the clipboard.',
+    failed: 'Copy failed. Select the commands and copy them by hand.',
+  }
+
+  let copyStatus = 'idle'
+  let resetTimer = 0
+
+  const copied = () => copyStatus === 'copied'
+  const copyText = () => labels[copyStatus]
+  const copyLabel = () => (copyStatus === 'idle' ? 'Copy the commands' : labels[copyStatus])
+  const announcement = () => announcements[copyStatus]
+
+  async function copyCommands() {
+    clearTimeout(resetTimer)
+    try {
+      await navigator.clipboard.writeText(copy)
+      copyStatus = 'copied'
+    } catch (failure) {
+      log.warn('command copy failed', { 'exception.message': failure.message })
+      copyStatus = 'failed'
+    }
+    resetTimer = setTimeout(() => { copyStatus = 'idle' }, resetDelayMs)
+  }
+
+  function mount() {
+    return () => clearTimeout(resetTimer)
+  }
+</script>
+
 <figure>
   <figcaption class="term-bar min-h-10">
     <span class="term-dot" aria-hidden="true"></span>
-    <span class="min-w-0 flex-1 truncate" :text="$title"></span>
+    <span class="min-w-0 flex-1 truncate">{$title}</span>
     <if $copy>
       <button type="button" class="term-copy inline-flex shrink-0 cursor-pointer items-center gap-2 font-mono text-xs hover:text-ink" @click="copyCommands" .text-accent="$copied" :aria-label="$copyLabel">
         <if $copied>
@@ -10,10 +49,61 @@
         <else>
           <svg class="size-3.5" viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" fill="none" stroke="currentColor"></rect><path d="M10.5 3.5v-1h-8v8h1" fill="none" stroke="currentColor"></path></svg>
         </else>
-        <span :text="$copyText"></span>
+        <span>{$copyText}</span>
       </button>
     </if>
   </figcaption>
   <slot></slot>
-  <p class="sr-only" role="status" :text="$announcement"></p>
+  <p class="sr-only" role="status">{$announcement}</p>
 </figure>
+
+<style>
+  [data-c="terminal"] {
+    min-width: 0;
+    border: 1px solid var(--color-line);
+    background: var(--color-sunken);
+  }
+  [data-c="terminal"] .term-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.625rem 1rem;
+    border-bottom: 1px solid var(--color-line);
+    color: var(--color-faint);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  [data-c="terminal"] .term-dot {
+    flex: none;
+    width: 0.4375rem;
+    height: 0.4375rem;
+    background: var(--color-line-strong);
+  }
+  [data-c="terminal"] pre {
+    margin: 0;
+    padding: 1rem;
+    overflow-x: auto;
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    line-height: 1.8;
+    white-space: pre;
+    tab-size: 2;
+  }
+  [data-c="terminal"] pre:focus-visible { outline-offset: -2px; }
+  [data-c="terminal"] .term-cmd { color: var(--color-ink); }
+  [data-c="terminal"] .term-cmd::before { content: "$ "; color: var(--color-accent); }
+  [data-c="terminal"] .term-ok { color: var(--color-accent); }
+  [data-c="terminal"] .term-err { color: var(--color-danger-300); }
+  [data-c="terminal"] .term-warn { color: var(--color-warning-300); }
+  [data-c="terminal"] .term-dim { color: var(--color-faint); }
+  [data-c="terminal"] .term-ink { color: var(--color-ink); }
+  [data-c="terminal"] .term-link { color: var(--color-ink); text-decoration: underline; text-decoration-color: var(--color-line-strong); }
+  @media (min-width: 40rem) {
+    [data-c="terminal"] pre { padding: 1.125rem 1.25rem; font-size: 0.8125rem; }
+  }
+  [data-c="terminal"] .term-copy { margin: -0.5rem -0.625rem; padding: 0.5rem 0.625rem; color: var(--color-muted); }
+  @media (prefers-reduced-motion: no-preference) {
+    [data-c="terminal"] .term-check { stroke-dasharray: 16; animation: term-check 0.32s var(--ease-out) both; }
+  }
+  @keyframes term-check { from { stroke-dashoffset: 16; } }
+</style>

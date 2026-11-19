@@ -7,5 +7,5 @@
     <span class="text-accent" :show="shared.scratchpad.pinned">pinned</span>
   </p>
   <textarea class="w-full border border-line-strong bg-sunken px-3 py-2.5 text-base" rows="4" maxlength="280" aria-label="Draft on the second page" :model="shared.scratchpad.draft"></textarea>
-  <p class="font-mono text-xs text-faint tabular-nums" :text="shared.scratchpad.characters"></p>
+  <p class="font-mono text-xs text-faint tabular-nums">{shared.scratchpad.draft.length} / 280</p>
 </c-demo-page>

@@ -1,12 +1,47 @@
+<script>
+  import { query } from 'pragma'
+
+  const sections = [
+    { id: 'overview', label: 'Overview', body: 'A ten-key keyboard with hot-swap switches.' },
+    { id: 'specs', label: 'Specs', body: '87 keys, USB-C, 1.2 kg, aluminium case.' },
+    { id: 'reviews', label: 'Reviews', body: '4.8 out of 5 from 312 reviews.' },
+  ]
+
+  let clicks = 0
+
+  const active = () => sections.find(section => section.id === query.tab) ?? sections[0]
+  const tabs = () => sections.map(section => ({ ...section, current: section === active() && 'true' }))
+  const queryTab = () => query.tab ?? 'undefined'
+
+  function bump() {
+    clicks += 1
+  }
+</script>
+
 <div>
   <nav class="query-tabs-list" aria-label="Product sections">
     <for tab in $tabs key=tab.id>
-      <a class="query-tabs-link" :href="tab.href" :aria-current="tab.current" :text="tab.label"></a>
+      <a class="query-tabs-link" href="?tab={tab.id}" :aria-current="tab.current">{tab.label}</a>
     </for>
   </nav>
-  <p class="query-tabs-panel" :text="$body"></p>
-  <p class="text-sm text-faint">
-    <span>query.tab = </span><code class="text-ink" :text="$queryText"></code>
-  </p>
-  <button type="button" class="btn btn-small" @click="bump" :text="$bumpLabel">Clicked 0 times</button>
+  <p class="query-tabs-panel">{$active.body}</p>
+  <p class="text-sm text-faint">query.tab = <span class="font-mono text-ink">{$queryTab}</span></p>
+  <button type="button" class="btn btn-small" @click="bump">Clicked {$clicks} times</button>
 </div>
+
+<style>
+  [data-c="query-tabs"] { display: grid; justify-items: start; gap: 1rem; }
+  [data-c="query-tabs"] .query-tabs-list { display: flex; flex-wrap: wrap; width: 100%; border-bottom: 1px solid var(--color-line); }
+  [data-c="query-tabs"] .query-tabs-link {
+    margin-bottom: -1px;
+    padding: 0.5rem 0.875rem;
+    border-bottom: 1px solid transparent;
+    color: var(--color-muted);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-decoration: none;
+  }
+  [data-c="query-tabs"] .query-tabs-link:hover { color: var(--color-ink); }
+  [data-c="query-tabs"] .query-tabs-link[aria-current="true"] { border-bottom-color: var(--color-accent); color: var(--color-ink); }
+  [data-c="query-tabs"] .query-tabs-panel { min-height: 3rem; }
+</style>

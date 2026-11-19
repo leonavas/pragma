@@ -486,10 +486,10 @@ describe('dev: pragma dev', () => {
       .replace('format(new Date(2024, 0, 15),', 'format(addDays(new Date(2024, 0, 15), 7),')
     const withMs = withAddDays
       .replace("from 'date-fns'\n", `from 'date-fns'\nimport ms from '${LATE_PACKAGE.name}'\n`)
-      .replace("'yyyy-MM-dd') })", "'yyyy-MM-dd') + ' / ' + ms('2 days') })")
+      .replace("'yyyy-MM-dd')\n", "'yyyy-MM-dd') + ' / ' + ms('2 days')\n")
     const withUnlisted = withMs
       .replace(`import ms from '${LATE_PACKAGE.name}'\n`, `import ms from '${LATE_PACKAGE.name}'\nimport { rgbString } from '@kurkle/color'\n`)
-      .replace("ms('2 days') })", "ms('2 days') + rgbString({ r: 0, g: 0, b: 0, a: 255 }) })")
+      .replace("ms('2 days')\n", "ms('2 days') + rgbString({ r: 0, g: 0, b: 0, a: 255 })\n")
 
     const overlayText = () => page.evaluate(() => [...document.documentElement.children].find(e => e.textContent.includes('pragma: build error'))?.textContent ?? null)
 
@@ -584,8 +584,7 @@ describe('rejected packages (pragma check)', () => {
   }
 
   const page = (binding, importLine) => ({
-    'routes/rejected.html': '<title>Rejected</title>\n\n<h1>Rejected</h1>\n<p :text="$label"></p>\n',
-    'routes/rejected.js': `${importLine}\n\nexport const state = () => ({ label: String(${binding}) })\n`,
+    'routes/rejected.html': `<script>\n  ${importLine}\n\n  const label = String(${binding})\n</script>\n\n<title>Rejected</title>\n\n<h1>Rejected</h1>\n<p>{$label}</p>\n`,
   })
 
   const fakePackage = (name, manifest, files) => Object.fromEntries([

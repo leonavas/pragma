@@ -1,5 +1,5 @@
 <title>Logs · pragma examples</title>
-<meta name="description" content="OpenTelemetry logs in pragma: ctx.log in actions, log in load and server actions, automatic error and request records, and export to any OTLP collector.">
+<meta name="description" content="OpenTelemetry logs in pragma: log from 'pragma' in scripts, log in load and server actions, automatic error and request records, and export to any OTLP collector.">
 <link rel="canonical" href="https://pragma.dev/examples/logs">
 <meta property="og:url" content="https://pragma.dev/examples/logs">
 <meta property="og:title" content="pragma logs: OpenTelemetry on client and server">
@@ -7,9 +7,9 @@
 
 <c-doc heading="Logs" lede="OpenTelemetry logs on client and server with zero configuration. Errors, navigations, failed loaders and every server request are logged without a line of code; you add the business events.">
   <section class="doc-section" aria-labelledby="client-log">
-    <h2 id="client-log"><code>ctx.log</code> in actions and mount</h2>
+    <h2 id="client-log"><code>log</code> in page and component scripts</h2>
     <div class="prose">
-      <p>Every action and <code>mount</code> gets <code>ctx.log</code> with <code>debug</code>, <code>info</code>, <code>warn</code> and <code>error</code>. Keep the message short and fixed and put the variable parts in attributes named like OpenTelemetry's (<code>order.id</code>, <code>exception.message</code>), so records group and filter cleanly.</p>
+      <p>Import <code>log</code> from <code>'pragma'</code> in any page, component or store script and call <code>debug</code>, <code>info</code>, <code>warn</code> or <code>error</code> from an action or <code>mount()</code>. Keep the message short and fixed and put the variable parts in attributes named like OpenTelemetry's (<code>order.id</code>, <code>exception.message</code>), so records group and filter cleanly.</p>
       <p>The runtime adds <code>url.path</code>, a timestamp and the page's <code>traceId</code>, queues the record and posts batches to <code>/_otel</code>. In <code>pragma dev</code> every call also prints to the browser console, and the dev server prints each received record as a JSON line in the terminal. <code>debug</code> stays in the console: the client sends <code>info</code> and above.</p>
     </div>
     <c-showcase :source="data.examples.orderLog" caption="The list shows the last calls this component made; open the network panel to see the batched POST /_otel, or press Send now.">
@@ -36,7 +36,7 @@
   <section class="doc-section" aria-labelledby="server-log">
     <h2 id="server-log"><code>log</code> in load and server actions</h2>
     <div class="prose">
-      <p><code>load</code> and every server action receive <code>log</code> in their argument. Its records carry the request's <code>traceId</code> and <code>spanId</code>, taken from the client's <code>traceparent</code>. A server action that throws is logged with its stack, answers 500, and <code>ctx.call</code> rejects with the message on the client. <code>pragma dev</code> also prints server <code>log.debug</code>; in production it is off unless <code>PRAGMA_LOG_LEVEL=debug</code>.</p>
+      <p><code>load</code> and every server action receive <code>log</code> in their argument. Its records carry the request's <code>traceId</code> and <code>spanId</code>, taken from the client's <code>traceparent</code>. A server action that throws is logged with its stack, answers 500, and <code>call()</code> rejects with the message on the client. <code>pragma dev</code> also prints server <code>log.debug</code>; in production it is off unless <code>PRAGMA_LOG_LEVEL=debug</code>.</p>
     </div>
     <c-showcase :source="data.examples.refund" caption="A real route with load and three server actions. Approve logs info, Escalate logs a warning and then throws.">
       <c-frame src="/examples/logs/demo/refund" title="Refund demo route with server logs"></c-frame>
@@ -61,7 +61,7 @@
   <section class="doc-section" aria-labelledby="utils-log">
     <h2 id="utils-log">Logging from <code>utils/</code></h2>
     <div class="prose">
-      <p>Plain modules have no <code>ctx</code>. Import the same client logger from <code>core/log.js</code>; its records join the same batches and the same trace.</p>
+      <p>The services from <code>'pragma'</code> belong to page, component and store scripts. A plain module in <code>utils/</code> imports the same client logger from <code>core/log.js</code>; its records join the same batches and the same trace.</p>
     </div>
     <c-terminal title="utils/currency.js">
       <pre tabindex="0" aria-label="A utils module that logs"><code>import { log } from '../core/log.js'

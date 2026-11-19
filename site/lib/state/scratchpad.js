@@ -1,10 +1,13 @@
-import { store } from '../../core/state.js'
+let draft = ''
+let pinned = false
+export const persist = ['draft', 'pinned']
 
-export default store({
-  draft: '',
-  pinned: false,
-  get characters() { return `${this.draft.length} / 280` },
-  get pinText() { return this.pinned ? 'Unpin' : 'Pin' },
-  togglePin() { this.pinned = !this.pinned },
-  wipe() { this.draft = '' },
-}, { persist: 'scratchpad' })
+const pinText = () => pinned ? 'Unpin' : 'Pin'
+
+function togglePin() {
+  pinned = !pinned
+}
+
+function wipe() {
+  draft = ''
+}

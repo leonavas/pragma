@@ -1,4 +1,3 @@
-import { store } from '../../core/state.js'
+let total = 0
 
-export const cart = store({ total: 0 })
-export default cart
+const isEmpty = () => total === 0

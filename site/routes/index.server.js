@@ -4,7 +4,7 @@ export const ssr = true
 
 export async function load() {
   const examples = await readExamples('routes', {
-    tasks: ['_components/task-list/task-list.html', '_components/task-list/task-list.js'],
+    tasks: ['_components/task-list/task-list.html'],
   })
   return { examples }
 }

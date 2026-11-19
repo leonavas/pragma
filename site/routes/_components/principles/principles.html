@@ -4,28 +4,29 @@
     <div class="mt-12 border-t border-line">
       <article class="principle">
         <h3 class="text-sm font-medium text-accent">Native</h3>
-        <p class="max-w-md leading-relaxed text-muted">A page is an .html file. Its behavior is the .js file with the same name, its data the .server.js. No JSX, no virtual DOM, no framework between you and the platform.</p>
+        <p class="max-w-md leading-relaxed text-muted">A page or a component is one .html file: the markup, its &lt;script&gt; and its &lt;style&gt;. Its data comes from the .server.js with the same name. No JSX, no virtual DOM, no framework between you and the platform.</p>
         <pre class="principle-code"><code>routes/
   index.html
-  shop/[id].html
-  shop/[id].js
-  shop/[id].server.js</code></pre>
+  shop/[id].html          markup, &lt;script&gt;, &lt;style&gt;
+  shop/[id].server.js     load, server actions
+  shop/_components/
+    cart-button/cart-button.html</code></pre>
       </article>
       <article class="principle">
         <h3 class="text-sm font-medium text-accent">Closed</h3>
-        <p class="max-w-md leading-relaxed text-muted">A colon binds a value, a dot a class, an at sign an event, a dollar sign reads state. Conditions and loops are tags. Anything outside that list is a build error, not a convention.</p>
+        <p class="max-w-md leading-relaxed text-muted">Braces put a value in text, a colon binds an attribute, a dot a class, an at sign an event, a dollar sign names the script's state. Conditions and loops are tags. Anything outside that list is a build error, not a convention.</p>
         <pre class="principle-code"><code><span class="text-accent">&lt;for</span> task in $visible key=task.id<span class="text-accent">&gt;</span>
   &lt;li <span class="text-accent">.done</span>="task.done"&gt;
-    &lt;input type="checkbox" <span class="text-accent">@change</span>="toggle"&gt;
-    &lt;span <span class="text-accent">:text</span>="task.title"&gt;&lt;/span&gt;
+    &lt;input type="checkbox" <span class="text-accent">@change</span>="toggle(task)"&gt;
+    <span class="text-accent">&#123;task.title&#125;</span>
   &lt;/li&gt;
 <span class="text-accent">&lt;/for&gt;</span></code></pre>
       </article>
       <article class="principle">
         <h3 class="text-sm font-medium text-accent">Small</h3>
-        <p class="max-w-md leading-relaxed text-muted">The starter page loads 8.8 kB of JavaScript, gzip, router and runtime included. Each page preloads only the modules it imports, and budgets in pragma.json fail the build when a page grows.</p>
+        <p class="max-w-md leading-relaxed text-muted">The starter page loads 10.0 kB of JavaScript, gzip, router and runtime included. Each page preloads only the modules it imports, and budgets in pragma.json fail the build when a page grows.</p>
         <pre class="principle-code"><code>page     JS gzip
-/         <span class="text-ink">8.8 KB</span>
+/        <span class="text-ink">10.0 KB</span>
 CSS       <span class="text-ink">4.1 KB</span>
 1 page(s)
 dist/ built in 6 ms</code></pre>
@@ -33,9 +34,10 @@ dist/ built in 6 ms</code></pre>
       <article class="principle">
         <h3 class="text-sm font-medium text-accent">Agent-first</h3>
         <p class="max-w-md leading-relaxed text-muted">Every app ships with AGENTS.md and its docs. pragma check answers with file, line, column, rule and fix, so an agent corrects itself in one pass instead of guessing.</p>
-        <pre class="principle-code"><code>routes/index.html:3:19 error [html/on-inline]
-  inline onclick is not allowed;
-  use @&lt;event&gt;="action"</code></pre>
+        <pre class="principle-code"><code>routes/index.html:8:4 error [html/unknown-name]
+  $count is not declared in the script of routes/index.html:
+  add `let count = …` (state), `export let count = …` (prop)
+  or `function count() { … }`</code></pre>
       </article>
     </div>
   </div>

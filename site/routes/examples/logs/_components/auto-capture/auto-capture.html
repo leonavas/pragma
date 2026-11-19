@@ -1,3 +1,33 @@
+<script>
+  let failures = []
+  let nextFailureId = 1
+
+  function remember(kind, message) {
+    failures = [{ id: nextFailureId, kind, message }, ...failures].slice(0, 4)
+    nextFailureId += 1
+  }
+
+  function throwNow() {
+    throw new Error('inventory sync crashed')
+  }
+
+  async function rejectLater() {
+    await new Promise(resolve => setTimeout(resolve, 150))
+    throw new Error('price refresh timed out')
+  }
+
+  function mount() {
+    const onError = event => remember('error', event.message)
+    const onRejection = event => remember('unhandledrejection', event.reason?.message ?? String(event.reason))
+    addEventListener('error', onError)
+    addEventListener('unhandledrejection', onRejection)
+    return () => {
+      removeEventListener('error', onError)
+      removeEventListener('unhandledrejection', onRejection)
+    }
+  }
+</script>
+
 <div>
   <div class="auto-capture-actions" role="group" aria-label="Failures">
     <button type="button" class="btn btn-small" @click="throwNow">Throw in an action</button>
@@ -6,8 +36,8 @@
   <ol class="auto-capture-events" aria-label="Uncaught errors, each one logged by the runtime">
     <for failure in $failures key=failure.id>
       <li class="auto-capture-event">
-        <span class="auto-capture-kind" :text="failure.kind"></span>
-        <span class="auto-capture-message" :text="failure.message"></span>
+        <span class="auto-capture-kind">{failure.kind}</span>
+        <span class="auto-capture-message">{failure.message}</span>
       </li>
     </for>
     <empty>
@@ -15,3 +45,24 @@
     </empty>
   </ol>
 </div>
+
+<style>
+  [data-c="auto-capture"] { display: grid; gap: 1rem; width: min(100%, 34rem); }
+  [data-c="auto-capture"] .auto-capture-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  [data-c="auto-capture"] .auto-capture-events { display: grid; min-height: 9rem; align-content: start; border-top: 1px solid var(--color-line); }
+  [data-c="auto-capture"] .auto-capture-event {
+    display: grid;
+    grid-template-columns: 9.5rem 1fr;
+    gap: 0.75rem;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--color-line);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+  [data-c="auto-capture"] .auto-capture-kind { color: var(--color-danger-300); }
+  [data-c="auto-capture"] .auto-capture-message { color: var(--color-ink); overflow-wrap: anywhere; }
+  [data-c="auto-capture"] .auto-capture-empty { padding: 0.75rem 0; color: var(--color-faint); font-size: 0.875rem; }
+  @media (max-width: 30rem) {
+    [data-c="auto-capture"] .auto-capture-event { grid-template-columns: 1fr; gap: 0.125rem; }
+  }
+</style>

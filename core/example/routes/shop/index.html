@@ -1,3 +1,15 @@
+<script>
+  import { data, query } from 'pragma'
+  import { contains, markCurrent } from '../../utils/text.js'
+
+  const CATEGORIES = ['all', 'pantry', 'cleaning', 'produce']
+
+  let search = ''
+
+  const category = () => markCurrent(CATEGORIES, CATEGORIES.includes(query.category) ? query.category : 'all')
+  const products = () => data.products.filter(product => contains(product.name, search))
+</script>
+
 <title>Shop · Minimart</title>
 
 <div class="grid items-start gap-8 lg:grid-cols-3">
@@ -23,7 +35,7 @@
     </if>
     <else-if page.error>
       <div class="card flex flex-col items-start gap-3" role="alert">
-        <p class="text-danger-600" :text="page.error.message"></p>
+        <p class="text-danger-600">{page.error.message}</p>
         <a href="/shop" class="btn">Try again</a>
       </div>
     </else-if>

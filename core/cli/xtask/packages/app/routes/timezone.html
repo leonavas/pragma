@@ -1,6 +1,18 @@
+<script>
+  import { TZDate } from '@date-fns/tz'
+  import { format } from 'date-fns/format'
+  import { ptBR } from 'date-fns/locale'
+
+  const noonUtc = Date.UTC(2024, 0, 15, 12)
+
+  const tokyoTime = format(new TZDate(noonUtc, 'Asia/Tokyo'), 'HH:mm')
+  const saoPauloTime = format(new TZDate(noonUtc, 'America/Sao_Paulo'), "EEEE, d 'de' MMMM 'de' yyyy, HH:mm", { locale: ptBR })
+  const convertedTime = format(new TZDate(2024, 0, 15, 9, 0, 'America/Sao_Paulo').withTimeZone('Asia/Tokyo'), 'yyyy-MM-dd HH:mm')
+</script>
+
 <title>Time zone</title>
 
 <h1>@date-fns/tz</h1>
-<p>Noon UTC in Tokyo: <span id="tokyo-time" :text="$tokyoTime"></span></p>
-<p>Noon UTC in São Paulo: <span id="sao-paulo-time" :text="$saoPauloTime"></span></p>
-<p>9:00 in São Paulo, in Tokyo: <span id="converted-time" :text="$convertedTime"></span></p>
+<p>Noon UTC in Tokyo: <span id="tokyo-time">{$tokyoTime}</span></p>
+<p>Noon UTC in São Paulo: <span id="sao-paulo-time">{$saoPauloTime}</span></p>
+<p>9:00 in São Paulo, in Tokyo: <span id="converted-time">{$convertedTime}</span></p>

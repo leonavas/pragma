@@ -268,7 +268,7 @@ fn same_named_route_components_are_scoped_by_folder() {
         ("routes/two/index.html", Some("<title>Two</title>\n<p-badge></p-badge>")),
         ("routes/two/_components/badge/badge.html", Some("<button class=\"badge-icon\" @click=\"ping\">b</button>")),
         ("routes/two/_components/badge/badge.css", Some("[data-c=badge] .badge-icon { width: 2px; }\n")),
-        ("routes/two/_components/badge/badge.js", Some("export const actions = {\n  ping() {},\n}\n")),
+        ("routes/two/_components/badge/badge.js", Some("function ping() {}\n")),
     ]);
     let out = t.0.join("dev");
     build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap_or_else(|d| panic!("{d:#?}"));
@@ -289,10 +289,10 @@ fn same_named_route_components_are_scoped_by_folder() {
 }
 
 #[test]
-fn optional_prop_of_stateful_component_is_a_falsy_prop() {
+fn optional_prop_of_script_component() {
     let t = app_with(&[
-        ("lib/components/flagged/flagged.html", Some("<p><span :text=\"$label\"></span><if $flag><strong>flag on</strong></if><span :text=\"$clicks\"></span></p>")),
-        ("lib/components/flagged/flagged.js", Some("export const state = () => ({ clicks: 0 })\n")),
+        ("lib/components/flagged/flagged.html", Some("<p><span>{$label}</span><if $flag><strong>flag on</strong></if><span>{$clicks}</span></p>")),
+        ("lib/components/flagged/flagged.js", Some("export let label = ''\nexport let flag = false\n\nlet clicks = 0\n")),
         ("routes/flag.html", Some("<title>Flag</title>\n<c-flagged label=\"no flag passed\"></c-flagged>")),
     ]);
     let app = t.0.join("app");
@@ -301,9 +301,35 @@ fn optional_prop_of_stateful_component_is_a_falsy_prop() {
     let out = t.0.join("dev");
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
     let html = fs::read_to_string(out.join("client/flag.html")).unwrap();
-    // no caller passes `flag`: it is a missing (falsy) prop, not `state.flag`; `clicks` is state
-    assert!(!html.contains("state.flag") && !html.contains("flag on"), "{html}");
-    assert!(html.contains("state.clicks") && html.contains("no flag passed"), "{html}");
+    // props are live: the instance reads them (`state.flag`, default false when not passed)
+    assert!(html.contains("data-if=\"state.flag\"") && html.contains("state.clicks"), "{html}");
+    assert!(html.contains("data-prop-label=\"no flag passed\"") && !html.contains("data-prop-flag"), "{html}");
+}
+
+#[test]
+fn script_component_props_and_names() {
+    let comp = |js: &str, html: &str, call: &str| {
+        check_with(&[
+            ("lib/components/stepper/stepper.js", Some(js)),
+            ("lib/components/stepper/stepper.html", Some(html)),
+            ("routes/shop/index.html", Some(call)),
+        ])
+    };
+    let js = "export let step = 1\nlet count = 0\nconst atZero = () => count === 0\nfunction add() { count += step }\n";
+    let ok = comp(js, "<button @click=\"add\" :disabled=\"$atZero\">{$count}</button>", "<c-stepper step=\"2\"></c-stepper>");
+    assert!(ok.is_empty(), "{ok:#?}");
+    let d = comp(js, "<button @click=\"add\">{$count}</button>", "<c-stepper stepp=\"2\" :step=\"query.n\"></c-stepper>");
+    expect(&d, "html/unknown-prop", "routes/shop/index.html", 1);
+    assert!(message(&d, "html/unknown-prop").contains("`stepp`") && message(&d, "html/unknown-prop").contains("its props: step"), "{d:#?}");
+    assert_eq!(d.iter().filter(|x| x.rule == "html/unknown-prop").count(), 1, "{d:#?}");
+    let d = comp(js, "<button @click=\"reset\">{$total}</button>", "<c-stepper></c-stepper>");
+    expect(&d, "html/unknown-name", "lib/components/stepper/stepper.html", 1);
+    assert!(d.iter().any(|x| x.message.contains("\"reset\" is not declared")), "{d:#?}");
+    assert!(d.iter().any(|x| x.message.contains("$total is not declared")), "{d:#?}");
+    let d = comp(js, "<div><button @click=\"atZero\">x</button><input aria-label=\"s\" :model=\"$step\"></div>", "<c-stepper></c-stepper>");
+    assert!(d.iter().any(|x| x.rule == "js/prop-write"), "{d:#?}");
+    let d = comp("const items = []\nfunction add() { items.push(1) }\n", "<p @click=\"add\">{$items.length}</p>", "<c-stepper></c-stepper>");
+    expect(&d, "js/const-state", "lib/components/stepper/stepper.js", 1);
 }
 
 #[test]
@@ -334,7 +360,7 @@ fn message(d: &[Diagnostic], rule: &str) -> String {
 #[test]
 fn reserved_data_attribute_names_short_form() {
     let cases = [
-        ("<p data-text=\"$heading\"></p>", "`data-text` is internal; write `:text=\"...\"`"),
+        ("<p data-text=\"$heading\"></p>", "`data-text` is internal; write `{path} inside the element`"),
         ("<button data-on-click=\"save\">s</button>", "write `@click=\"...\"`"),
         ("<p data-class-active=\"$on\"></p>", "write `.active=\"...\"`"),
         ("<a data-attr-href=\"$url\">a</a>", "write `:href=\"...\"`"),
@@ -371,44 +397,45 @@ fn bound_data_attribute_passes() {
 
 #[test]
 fn invalid_path() {
-    expect(&page("<p :text=\"$items[0]\"></p>"), "html/invalid-path", PAGE, 1);
+    expect(&page("<p>{$items[0]}</p>"), "html/invalid-path", PAGE, 1);
 }
 
 #[test]
 fn negation_only_where_allowed() {
-    expect(&page("<p :text=\"!$open\"></p>"), "html/invalid-path", PAGE, 1);
+    expect(&page("<p>{!$open}</p>"), "html/invalid-path", PAGE, 1);
 }
 
 #[test]
 fn unknown_root() {
-    expect(&page("<p :text=\"user.name\"></p>"), "html/invalid-root", PAGE, 1);
+    expect(&page("<p>{user.name}</p>"), "html/invalid-root", PAGE, 1);
 }
 
 #[test]
 fn for_variable_out_of_scope() {
-    let src = "<ul><for x in $items key=x.id><li :text=\"x.name\"></li></for></ul>\n<p :text=\"x.name\"></p>";
+    let src = "<ul><for x in $items key=x.id><li>{x.name}</li></for></ul>\n<p>{x.name}</p>";
     expect(&page(src), "html/invalid-root", PAGE, 2);
 }
 
 #[test]
 fn data_without_loader() {
-    expect(&page("<p :text=\"data.x\"></p>"), "html/invalid-root", PAGE, 1);
+    expect(&page("<p>{data.x}</p>"), "html/invalid-root", PAGE, 1);
 }
 
 #[test]
 fn state_without_module() {
-    let d = check_with(&[("routes/shop/index.html", Some("<p :text=\"$x\"></p>"))]);
-    expect(&d, "html/invalid-root", "routes/shop/index.html", 1);
+    let d = check_with(&[("routes/shop/index.html", Some("<p>{$x}</p>"))]);
+    expect(&d, "html/unknown-name", "routes/shop/index.html", 1);
+    assert!(message(&d, "html/unknown-name").contains("has no <script>"), "{d:#?}");
 }
 
 #[test]
 fn unknown_store() {
-    expect(&page("<p :text=\"shared.bag.total\"></p>"), "html/invalid-root", PAGE, 1);
+    expect(&page("<p>{shared.bag.total}</p>"), "html/invalid-root", PAGE, 1);
 }
 
 #[test]
 fn unknown_param() {
-    let d = check_with(&[("routes/shop/[id].html", Some("<p :text=\"params.slug\"></p>"))]);
+    let d = check_with(&[("routes/shop/[id].html", Some("<p>{params.slug}</p>"))]);
     expect(&d, "html/invalid-root", "routes/shop/[id].html", 1);
 }
 
@@ -472,34 +499,37 @@ fn block_needs_single_root() {
 
 #[test]
 fn unknown_page_action() {
-    expect(&page("<button @click=\"vanish\">x</button>"), "html/unknown-action", PAGE, 1);
+    let d = page("<button @click=\"vanish\">x</button>\n<button @click=\"open\">y</button>");
+    expect(&d, "html/unknown-name", PAGE, 1);
+    expect(&d, "html/unknown-name", PAGE, 2);
+    assert!(d.iter().any(|x| x.message.contains("\"open\" is not a function")), "{d:#?}");
 }
 
 const BOX: [(&str, Option<&str>); 2] = [
     ("lib/components/box/box.html", Some("<section><button @click=\"dismiss\">x</button><slot></slot></section>")),
-    ("lib/components/box/box.js", Some("export const actions = { dismiss() {} }")),
+    ("lib/components/box/box.js", Some("export let step = 1\n\nfunction dismiss() {}\n")),
 ];
 
 #[test]
 fn slot_content_belongs_to_writer() {
     let src = "<c-box><button @click=\"dismiss\">x</button></c-box>";
-    expect(&check_with(&[BOX[0], BOX[1], (PAGE, Some(src))]), "html/unknown-action", PAGE, 1);
-    let ok = "<c-card heading=\"x\"><c-box><button @click=\"toggle\" :text=\"$open\">x</button></c-box></c-card>";
+    expect(&check_with(&[BOX[0], BOX[1], (PAGE, Some(src))]), "html/unknown-name", PAGE, 1);
+    let ok = "<c-card heading=\"x\"><c-box><button @click=\"toggle\">{$open}</button></c-box></c-card>";
     let d = check_with(&[BOX[0], BOX[1], (PAGE, Some(ok))]);
     assert!(d.is_empty(), "{d:?}");
 }
 
 #[test]
 fn slot_marks_lexical_owner_and_module_props() {
-    let src = "<c-card heading=\"x\"><p>fixed</p><div><c-box step=\"2\" class=\"p-4\"><b :text=\"$open\"></b></c-box></div></c-card>";
+    let src = "<c-card heading=\"x\"><p>fixed</p><div><c-box step=\"2\" class=\"p-4\"><b>{$open}</b> and {$open}</c-box></div></c-card>";
     let t = app_with(&[BOX[0], BOX[1], (PAGE, Some(src))]);
     let out = t.0.join("out");
     build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
     let html = fs::read_to_string(out.join("client/index.html")).unwrap();
     assert!(html.contains("<p>fixed</p>"), "{html}");
-    assert!(html.contains("<div data-slot=\"1\"><section data-c=\"box\" data-step=\"2\" class=\"p-4\">"), "{html}");
-    assert!(html.contains("<b data-text=\"state.open\" data-slot=\"1\">"), "{html}");
-    assert!(html.contains("<div data-c=\"card\" class=\"card p-4\" data-heading=\"x\">"), "{html}");
+    assert!(html.contains("<div data-slot=\"1\"><section data-c=\"box\" data-prop-step=\"2\" class=\"p-4\">"), "{html}");
+    assert!(html.contains("<b data-text=\"{state.open}\" data-slot=\"1\"></b> and <!--1{state.open}--><!--}-->"), "{html}");
+    assert!(html.contains("<div data-c=\"card\" class=\"card p-4\" data-class-featured=\"state.featured\" data-prop-heading=\"x\">"), "{html}");
 }
 
 #[test]
@@ -510,7 +540,9 @@ fn data_slot_is_generated() {
 #[test]
 fn layout_action_without_owner() {
     let layout = "<button @click=\"expand\">x</button>\n<main data-page><slot></slot></main>";
-    expect(&check_with(&[("routes/_layout.html", Some(layout))]), "html/unknown-action", "routes/_layout.html", 1);
+    let d = check_with(&[("routes/_layout.html", Some(layout))]);
+    expect(&d, "html/unknown-name", "routes/_layout.html", 1);
+    assert!(message(&d, "html/unknown-name").contains("the layout has no script"), "{d:#?}");
 }
 
 #[test]
@@ -552,7 +584,67 @@ fn inline_handler() {
 
 #[test]
 fn script_tag() {
-    expect(&page("<script>alert(1)</script>"), "html/script", PAGE, 1);
+    // routes/index.js exists: a top-level <script> would be a second module
+    expect(&page("<script>alert(1)</script>"), "html/duplicate-module", PAGE, 1);
+    let shop = |src: &str| check_with(&[("routes/shop/index.html", Some(src))]);
+    expect(&shop("<p>\n  <script>let n = 1</script>\n</p>"), "html/script", "routes/shop/index.html", 2);
+    expect(&shop("<script src=\"/x.js\"></script>"), "html/script", "routes/shop/index.html", 1);
+    expect(&shop("<script type=\"text/javascript\">let total = 1</script>"), "html/script", "routes/shop/index.html", 1);
+    expect(&shop("<script>let total = 1</script>\n<script>let other = 2</script>"), "html/script", "routes/shop/index.html", 2);
+    expect(&shop("<style>p { color: red }</style>\n<style>b {}</style>"), "html/style-inline", "routes/shop/index.html", 2);
+    expect(&check_with(&[("routes/_layout.html", Some("<script>let n = 1</script>\n<main data-page><slot></slot></main>"))]), "html/script", "routes/_layout.html", 1);
+}
+
+#[test]
+fn script_and_style_inside_the_html() {
+    let page = "<title>Shop</title>\n<script>\n  import { log } from 'pragma'\n\n  let count = 0\n  function add() {\n    count += 1\n    log.info('added')\n  }\n</script>\n\n<button class=\"shop-btn\" @click=\"add\">{$count}</button>\n\n<style>\n  .shop-btn { padding: 1rem }\n</style>\n";
+    let comp_html = "<script type=\"module\">\n  export let step = 1\n  let total = 0\n  function bump() { total += step }\n</script>\n<p class=\"meter\" @click=\"bump\">{$total}</p>\n<style>\n  [data-c=\"meter\"] .x, .meter { margin: 0 }\n</style>\n";
+    let t = app_with(&[("routes/shop/index.html", Some(page)), ("lib/components/meter/meter.html", Some(comp_html)), (PAGE, Some("<c-meter step=\"3\"></c-meter>"))]);
+    let app = t.0.join("app");
+    let d = check(&app);
+    assert!(d.iter().all(|x| x.severity == pragma_diag::Severity::Warning), "{d:#?}");
+    let out = t.0.join("dev");
+    build(&BuildOptions { root: app.clone(), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let html = fs::read_to_string(out.join("client/shop/index.html")).unwrap();
+    assert!(!html.contains("<script>\n") && !html.contains("<style>"), "{html}");
+    assert!(html.contains("\"page\":\"/assets/routes/shop/index.js\""), "{html}");
+    let js = fs::read_to_string(out.join("client/assets/routes/shop/index.js")).unwrap();
+    assert!(js.contains("export default function ($, $pragma) {") && js.contains("$.count += 1") && js.contains("$pragma.log.info('added')"), "{js}");
+    let meter = fs::read_to_string(out.join("client/assets/lib/components/meter/meter.js")).unwrap();
+    assert!(meter.contains("$pragma.prop(\"step\", 1)"), "{meter}");
+    let css = fs::read_to_string(out.join("client/assets/app.css")).unwrap();
+    assert!(css.contains("/* routes/shop/index.html */") && css.contains(".shop-btn { padding: 1rem }"), "{css}");
+    assert!(css.contains("/* lib/components/meter/meter.html */") && css.contains("[data-c=\"meter\"] .x, .meter { margin: 0 }"), "{css}");
+    // diagnostics in an embedded script point at the .html line
+    let bad = page.replace("count += 1", "count += 1\n    console.log(count)");
+    let d = check_with(&[("routes/shop/index.html", Some(&bad))]);
+    expect(&d, "js/console", "routes/shop/index.html", 8);
+    // a .js next to a <script> defines the module twice
+    let d = check_with(&[("routes/shop/index.html", Some(page)), ("routes/shop/index.js", Some("let count = 0\n"))]);
+    expect(&d, "html/duplicate-module", "routes/shop/index.html", 2);
+    let d = check_with(&[("lib/components/meter/meter.html", Some(comp_html)), ("lib/components/meter/meter.css", Some(".meter {}\n")), (PAGE, Some("<c-meter></c-meter>"))]);
+    expect(&d, "html/duplicate-module", "lib/components/meter/meter.html", 7);
+}
+
+#[test]
+fn stores_are_reached_through_shared() {
+    let d = page("<p>{shared.cart.total}</p>");
+    assert!(d.is_empty(), "{d:#?}");
+    let d = check_with(&[("routes/index.js", Some("import { format } from '../utils/fmt.js'\nimport { total } from '../lib/state/cart.js'\n\nlet open = false\nlet items = []\nfunction toggle() { open = format(total) }\n"))]);
+    expect(&d, "js/store-import", "routes/index.js", 2);
+    let d = check_with(&[("lib/state/cart.js", Some("import { store } from '../../core/state.js'\nexport default store({ total: 0 })\n"))]);
+    expect(&d, "js/legacy-api", "lib/state/cart.js", 2);
+    let d = check_with(&[("utils/fmt.js", Some("import { log } from 'pragma'\nexport const format = (n) => { log.info('x'); return String(n) }\n"))]);
+    expect(&d, "js/import", "utils/fmt.js", 1);
+    // a store used only by another store is loaded with it
+    let t = app_with(&[
+        ("lib/state/prefs.js", Some("let currency = 'BRL'\n")),
+        ("lib/state/cart.js", Some("import { shared } from 'pragma'\n\nlet total = 0\nconst label = () => shared.prefs.currency + total\n")),
+    ]);
+    let out = t.0.join("dev");
+    build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    assert!(html.contains("\"prefs\":\"/assets/lib/state/prefs.js\""), "{html}");
 }
 
 #[test]
@@ -584,13 +676,13 @@ fn js_lint_runs_on_app_code() {
 
 #[test]
 fn missing_import() {
-    let d = check_with(&[("routes/index.js", Some("import { x } from './missing.js'\nexport const actions = { toggle() { return x } }\n"))]);
+    let d = check_with(&[("routes/index.js", Some("import { x } from './missing.js'\nlet open = false\nlet items = []\nfunction toggle() { return x }\n"))]);
     expect(&d, "js/import", "routes/index.js", 1);
 }
 
 #[test]
 fn client_cannot_import_server_module() {
-    let src = "import { load } from './shop/[id].server.js'\nexport const actions = { toggle() { return load } }\n";
+    let src = "import { load } from './shop/[id].server.js'\nlet open = false\nlet items = []\nfunction toggle() { return load }\n";
     expect(&check_with(&[("routes/index.js", Some(src))]), "js/import", "routes/index.js", 1);
 }
 
@@ -641,7 +733,7 @@ fn preload_only_what_first_paint_uses() {
 fn theme_script_only_when_used() {
     let t = app_with(&[
         ("core/theme.js", Some("export const setTheme = () => {}")),
-        ("routes/index.js", Some("import { setTheme } from '../core/theme.js'\nexport const state = () => ({ open: false, items: [] })\nexport const actions = { toggle() { setTheme('dark') } }\n")),
+        ("routes/index.js", Some("import { setTheme } from '../core/theme.js'\n\nlet open = false\nlet items = []\nfunction toggle() { setTheme('dark') }\n")),
     ]);
     let out = t.0.join("out");
     build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
@@ -681,7 +773,7 @@ fn a11y_img_alt() {
 fn a11y_accessible_name() {
     warns("<p>x</p>\n<button><svg aria-hidden=\"true\"></svg></button>", "a11y/accessible-name", 2);
     warns("<a href=\"/\"></a>", "a11y/accessible-name", 1);
-    let ok = "<button :text=\"$open\"></button><button aria-label=\"Close\">×</button><a href=\"/\"><span class=\"sr-only\">Home</span></a>";
+    let ok = "<button>{$open}</button><button aria-label=\"Close\">×</button><a href=\"/\"><span class=\"sr-only\">Home</span></a><label><input type=\"checkbox\"> {$open}</label>";
     assert!(page(ok).is_empty(), "{:?}", page(ok));
 }
 
@@ -752,16 +844,23 @@ fn alias_in_component_model() {
 }
 
 #[test]
-fn state_alias_into_module_component() {
-    expect(&page("<c-counter :n=\"$open\"></c-counter>"), "html/component", PAGE, 1);
+fn state_passed_to_script_component_prop() {
+    let tally = [("lib/components/tally/tally.html", Some("<p>{$total}</p>")), ("lib/components/tally/tally.js", Some("export let total = 0\n"))];
+    let t = app_with(&[tally[0], tally[1], (PAGE, Some("<c-tally :total=\"$items.length\"></c-tally>\n<c-tally total=\"3\"></c-tally>"))]);
+    let out = t.0.join("out");
+    build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap_or_else(|d| panic!("{d:#?}"));
+    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    // the caller's state goes in live as data-with-<prop>; a literal as data-prop-<prop>
+    assert!(html.contains("data-with-total=\"state.items.length\""), "{html}");
+    assert!(html.contains("data-prop-total=\"3\""), "{html}");
 }
 
-const PAGE_WITH_PACKAGE: &str = "import { cart } from '../lib/state/cart.js'\n\
-import { format } from '../utils/fmt.js'\n\
+const PAGE_WITH_PACKAGE: &str = "import { format } from '../utils/fmt.js'\n\
+import { shared, log } from 'pragma'\n\
 import { time, mode } from 'clock'\n\
 import { extra } from 'clock/sub'\n\n\
-export const state = () => ({ open: false, items: [], now: time(), mode, extra })\n\
-export const actions = {\n  toggle(ctx) {\n    ctx.$.open = !ctx.$.open\n    ctx.log.info(format(cart.total))\n  },\n}\n";
+let open = false\nlet items = []\nconst used = { now: time(), mode, extra }\n\n\
+function toggle() {\n  open = !open\n  log.info(format(shared.cart.total))\n}\n";
 
 const CLOCK_PACKAGE: [(&str, Option<&str>); 8] = [
     ("package.json", Some("{ \"name\": \"shop\", \"dependencies\": { \"clock\": \"1.0.0\" } }")),
@@ -881,7 +980,7 @@ fn npm_package_commonjs() {
 fn npm_package_conflicting_names() {
     let t = app_with(&with_clock(&[
         ("node_modules/clock/lib/sub.js", Some("export const extra = 'subpath'\nexport const mode = 'other'\n")),
-        ("routes/index.js", Some("import { mode } from 'clock'\nimport { mode as other } from 'clock/sub'\n\nexport const state = () => ({ open: false, items: [], mode, other })\nexport const actions = { toggle(ctx) {} }\n")),
+        ("routes/index.js", Some("import { mode } from 'clock'\nimport { mode as other } from 'clock/sub'\n\nlet open = false\nlet items = []\nconst used = { mode, other }\nfunction toggle() {}\n")),
     ]));
     let client = build_prod(&t);
     let url = asset_with_prefix(&client, "/assets/npm/clock-");
@@ -893,8 +992,8 @@ fn npm_package_conflicting_names() {
     let out = t.0.join("dev");
     build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
     let page_js = fs::read_to_string(out.join("client/assets/routes/index.js")).unwrap();
-    assert!(page_js.contains("import { $1$mode as other } from '/assets/npm/clock.js';\n"), "{page_js}");
-    assert_eq!(page_js.lines().count(), 5, "{page_js}");
+    // the aliased import keeps its line (the script factory opens after the last import)
+    assert!(page_js.lines().nth(1).is_some_and(|l| l.starts_with("import { $1$mode as other } from '/assets/npm/clock.js'")), "{page_js}");
 }
 
 #[test]
@@ -919,7 +1018,7 @@ fn npm_package_not_installed() {
 fn npm_package_missing_export() {
     let d = check_with(&with_clock(&[(
         "routes/index.js",
-        Some("import { missing } from 'clock'\n\nexport const state = () => ({ open: false, items: [], x: missing })\nexport const actions = { toggle(ctx) {} }\n"),
+        Some("import { missing } from 'clock'\n\nlet open = false\nlet items = []\nconst used = missing\nfunction toggle() {}\n"),
     )]));
     expect(&d, "js/import", "routes/index.js", 1);
     assert!(d.iter().any(|x| x.message == "`missing` is not exported by clock"), "{d:?}");
@@ -943,7 +1042,7 @@ fn npm_package_not_pure_js() {
             ("node_modules/clock/package.json", Some(manifest)),
             ("node_modules/clock/data.json", Some("{}")),
             ("node_modules/clock/index.ts", Some("export const time = (): number => 1\n")),
-            ("routes/index.js", Some("import { time } from 'clock'\n\nexport const state = () => ({ open: false, items: [], now: time() })\nexport const actions = { toggle(ctx) {} }\n")),
+            ("routes/index.js", Some("import { time } from 'clock'\n\nlet open = false\nlet items = []\nconst now = time()\nfunction toggle() {}\n")),
         ]));
         expect(&d, "app/package", "routes/index.js", 1);
     }
@@ -961,7 +1060,7 @@ fn npm_ui_framework_denied() {
         ("package.json", Some("{ \"dependencies\": { \"clock\": \"1.0.0\", \"react\": \"18.0.0\" } }")),
         ("node_modules/react/package.json", Some("{ \"name\": \"react\", \"type\": \"module\", \"main\": \"index.js\" }")),
         ("node_modules/react/index.js", Some("export const createElement = () => null\n")),
-        ("routes/index.js", Some("import { createElement } from 'react'\n\nexport const state = () => ({ open: false, items: [], blank: createElement() })\nexport const actions = { toggle(ctx) {} }\n")),
+        ("routes/index.js", Some("import { createElement } from 'react'\n\nlet open = false\nlet items = []\nconst blank = createElement()\nfunction toggle() {}\n")),
     ]));
     expect(&d, "js/import", "routes/index.js", 1);
 }
@@ -982,4 +1081,144 @@ fn npm_package_on_server_only_needs_listing() {
     assert!(fs::read_to_string(out.join("server/routes/shop/[id].server.js")).unwrap().contains("from 'postgres'"));
     let d = check_with(&[("routes/shop/[id].server.js", Some(server))]);
     expect(&d, "js/import", "routes/shop/[id].server.js", 1);
+}
+
+/// App with the real runtime in `core/`, a bare layout and `files` (independent of the fixture app).
+fn scratch(files: &[(&str, &str)]) -> Tmp {
+    let t = tmp();
+    let app = t.0.join("app");
+    copy_dir(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../runtime"), &app.join("core"));
+    let base = [("pragma.json", "{ \"name\": \"tpl\" }"), ("routes/_layout.html", "<main data-page><slot></slot></main>")];
+    for (f, c) in base.iter().chain(files) {
+        let path = app.join(f);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, c).unwrap();
+    }
+    t
+}
+
+const TPL_PAGE: &str = "<title>{data.product.name} | Shop</title>
+<link rel=\"canonical\" href=\"https://shop.example/tpl/{params.id}\">
+<h1>{data.product.name}</h1>
+<p><b>Price:</b> {data.product.price} USD \\{net}</p>
+<a href=\"/tpl/{params.id}/reviews\" title=\"Reviews of {data.product.name}\">Reviews</a>
+<c-tag label=\"New\"></c-tag>
+<c-tag :label=\"data.product.name\"></c-tag>
+<code>{literal}</code>
+<ul><for p in data.product.parts key=p.id><li>{p.name}</li></for></ul>";
+
+const TPL_SERVER: &str = "export const ssr = true\n\nexport async function load({ params }) {\n  return { product: { id: params.id, name: 'Mug', price: 5, parts: [{ id: 1, name: 'Lid' }] } }\n}\n";
+
+#[test]
+fn text_interpolation_builds_markers_templates_and_ops() {
+    let t = scratch(&[("routes/tpl/[id].html", TPL_PAGE), ("routes/tpl/[id].server.js", TPL_SERVER), ("lib/components/tag/tag.html", "<span class=\"text-sm\">{$label} item</span>")]);
+    let app = t.0.join("app");
+    let d = check(&app);
+    assert!(d.is_empty(), "{d:#?}");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let html = fs::read_to_string(out.join("client/tpl/[id].html")).unwrap();
+    for want in [
+        "<h1 data-text=\"{data.product.name}\"></h1>",
+        "<p><b>Price:</b> <!--{data.product.price}--><!--}--> USD {net}</p>",
+        "<a data-attr-href=\"/tpl/{params.id}/reviews\" data-attr-title=\"Reviews of {data.product.name}\">Reviews</a>",
+        "<span data-c=\"tag\" class=\"text-sm\">New item</span>",
+        "<span data-c=\"tag\" class=\"text-sm\" data-text=\"{data.product.name} item\"></span>",
+        "<code>{literal}</code>",
+        "<li data-text=\"{p.name}\"></li>",
+        "<title data-text=\"{data.product.name} | Shop\"></title>",
+        "<link rel=\"canonical\" data-attr-href=\"https://shop.example/tpl/{params.id}\">",
+    ] {
+        assert!(html.contains(want), "missing {want}:\n{html}");
+    }
+    assert!(!html.contains("{$") && !html.contains(":text"), "{html}");
+    let ops = fs::read_to_string(out.join("templates/tpl/[id].json")).unwrap();
+    for want in [
+        "[\"text\",\"{data.product.name}\"]",
+        "<!--{data.product.price}-->\"],[\"text\",\"{data.product.price}\"],[\"html\",\"<!--}-->",
+        "[\"attr\",\"href\",\"/tpl/{params.id}/reviews\"]",
+        "[\"text\",\"{data.product.name} item\"]",
+        "[\"text\",\"{p.name}\"]",
+    ] {
+        assert!(ops.contains(want), "missing {want}:\n{ops}");
+    }
+}
+
+#[test]
+fn text_interpolation_errors() {
+    let page = "<p>{a + b}</p>\n<p>{$open</p>\n<p :text=\"$x\"></p>\n<p class=\"text-sm {data.c}\">x</p>\n<p>{{ data.x }}</p>\n<c-tag title=\"Hi {data.x}\"></c-tag>\n<p>{!data.x}</p>\n<p>{data.x[0]}</p>";
+    let t = scratch(&[(PAGE, page), ("lib/components/tag/tag.html", "<span>{$title}</span>")]);
+    let d = check(&t.0.join("app"));
+    expect(&d, "html/invalid-path", PAGE, 1);
+    expect(&d, "html/invalid-path", PAGE, 2);
+    expect(&d, "html/text-removed", PAGE, 3);
+    expect(&d, "html/class", PAGE, 4);
+    expect(&d, "html/interpolation", PAGE, 5);
+    expect(&d, "html/component", PAGE, 6);
+    expect(&d, "html/invalid-path", PAGE, 7);
+    expect(&d, "html/invalid-path", PAGE, 8);
+    assert!(message(&d, "html/text-removed").contains("write {$x} inside the element"), "{d:#?}");
+    assert!(message(&d, "html/interpolation").contains("write {path}"), "{d:#?}");
+    let t = scratch(&[(PAGE, "<ul><for x in params.all key=x><li>a</li>{x}</for></ul>\n<c-solo></c-solo>"), ("lib/components/solo/solo.html", "{$label}")]);
+    let d = check(&t.0.join("app"));
+    expect(&d, "html/block-single-root", PAGE, 1);
+    expect(&d, "html/component", "lib/components/solo/solo.html", 1);
+    let t = scratch(&[(PAGE, "<p>Price: ${data.price}</p>")]);
+    assert!(message(&check(&t.0.join("app")), "html/interpolation").contains("&#36;{path}"));
+    let t = scratch(&[(PAGE, "<p>Price: &#36;{params.x} and {query.y}</p>")]);
+    let d = check(&t.0.join("app"));
+    assert!(!d.iter().any(|x| x.rule == "html/interpolation" || x.rule == "html/invalid-path"), "{d:#?}");
+}
+
+#[test]
+fn head_templates_need_ssr() {
+    let server = "export async function load() {\n  return { product: { name: 'Mug' } }\n}\n";
+    let t = scratch(&[("routes/tpl/[id].html", "<title>{data.product.name} | Shop</title>\n<h1>Shop</h1>"), ("routes/tpl/[id].server.js", server)]);
+    expect(&check(&t.0.join("app")), "html/head", "routes/tpl/[id].html", 1);
+    let t = scratch(&[("routes/tpl/[id].html", "<title>{$name} | Shop</title>\n<h1>Shop</h1>"), ("routes/tpl/[id].server.js", TPL_SERVER)]);
+    expect(&check(&t.0.join("app")), "html/head", "routes/tpl/[id].html", 1);
+}
+
+#[test]
+fn event_call_arguments_are_checked_and_resolved() {
+    let row = "<button class=\"text-sm\" @click=\"pick($item, $label, event, 2, 'x')\">{$label}</button>";
+    let page = "<ul><for p in data.items key=p.id><li><c-row :item=\"p\" label=\"One\"></c-row></li></for></ul>\n<button @click=\"pick(a + 1)\">bad</button>\n<button @click=\"pick(nope.x)\">root</button>";
+    let server = "export async function load() {\n  return { items: [{ id: 1 }] }\n}\n";
+    let t = scratch(&[(PAGE, page), ("routes/index.server.js", server), ("lib/components/row/row.html", row)]);
+    let d = check(&t.0.join("app"));
+    expect(&d, "html/invalid-path", PAGE, 2);
+    expect(&d, "html/invalid-root", PAGE, 3);
+    let ok = format!("<script>\n  function pick(item, label) {{}}\n</script>\n{}", page.lines().next().unwrap());
+    let t = scratch(&[(PAGE, &ok), ("routes/index.server.js", server), ("lib/components/row/row.html", row)]);
+    let app = t.0.join("app");
+    let d = check(&app);
+    assert!(d.is_empty(), "{d:#?}");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    assert!(html.contains("data-on-click=\"pick(p, 'One', event, 2, 'x')\">One</button>"), "{html}");
+}
+
+#[test]
+fn directives_and_blocks_work_inside_pre_and_code() {
+    let page = "<script>\n  let lines = [{ n: 1, text: 'one' }]\n  let path = '/x'\n</script>\n<title>Pre</title>\n<h1>Pre</h1>\n<pre :aria-label=\"$path\"><code><for line in $lines key=line.n><span :data-n=\"line.n\">{line.text}</span></for></code></pre>\n<pre>$ curl {url} <span>{$path}</span><c-tag label=\"A\"></c-tag></pre>\n<p><code>{literal}</code></p>";
+    let t = scratch(&[(PAGE, page), ("lib/components/tag/tag.html", "<b>{$label}</b>")]);
+    let app = t.0.join("app");
+    let d = check(&app);
+    assert!(d.is_empty(), "{d:#?}");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    for want in [
+        "<pre data-attr-aria-label=\"state.path\"><code><template data-for=\"line in state.lines\" data-key=\"line.n\"",
+        "<span data-attr-data-n=\"line.n\" data-text=\"{line.text}\"></span></template></code></pre>",
+        "<pre>$ curl {url} <span data-text=\"{state.path}\"></span><b data-c=\"tag\">A</b></pre>",
+        "<code>{literal}</code>",
+    ] {
+        assert!(html.contains(want), "missing {want}:\n{html}");
+    }
+    assert!(!html.contains("<for") && !html.contains(":data-n") && !html.contains("<c-tag"), "{html}");
+    let bad = scratch(&[(PAGE, "<pre><span @click=\"nope\">{$missing}</span></pre>")]);
+    let d = check(&bad.0.join("app"));
+    assert!(d.iter().any(|x| x.rule == "html/unknown-name"), "{d:#?}");
 }

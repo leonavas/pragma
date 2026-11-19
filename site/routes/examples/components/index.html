@@ -1,21 +1,26 @@
 <title>Components · pragma examples</title>
-<meta name="description" content="pragma components, live: a folder with one .html, an optional .js and scoped .css, with props, slots and per-instance state, expanded at build time.">
+<meta name="description" content="pragma components, live: one .html with a script, the markup and a scoped style. Typed props, slots and per-instance state, expanded at build time.">
 <link rel="canonical" href="https://pragma.dev/examples/components">
 <meta property="og:url" content="https://pragma.dev/examples/components">
-<meta property="og:title" content="pragma components: props, slots and per-instance state">
-<meta property="og:description" content="Components expanded at build time, with their JavaScript loaded only on pages that use them.">
+<meta property="og:title" content="pragma components: one file, typed props, slots">
+<meta property="og:description" content="A component is one .html: script, markup and style. Its JavaScript loads only on pages that use it.">
 
-<c-doc heading="Components" lede="A component is a folder: one .html with a single root, an optional .js for state and actions, an optional .css scoped to it. The build expands it in place, so the markup arrives prebuilt and the .js loads only on pages that use it.">
+<c-doc heading="Components" lede="A component is one .html file: an optional &lt;script&gt; for state and behavior, one root element, an optional &lt;style&gt; scoped to it. The build expands it in place, so the markup arrives prebuilt and the script loads only on pages that use it.">
   <section class="doc-section" aria-labelledby="counter">
-    <h2 id="counter">A counter with props and per-instance state</h2>
+    <h2 id="counter">One file: script, markup and style</h2>
     <div class="prose">
-      <p>Props are attributes on the tag; state lives in the component's <code>.js</code>, one copy per instance.</p>
+      <p>A top-level <code>let</code> is state, <code>export let</code> is a prop, a function is an action or a derived value, and <code>&#123;$count&#125;</code> puts a value in the text.</p>
     </div>
-    <c-showcase :source="data.examples.counter" caption="Each click runs an action; the runtime reapplies only the bindings, it never rebuilds the DOM.">
+    <c-showcase :source="data.examples.counter" caption="Each click runs a function that assigns count; the runtime reapplies only the bindings, it never rebuilds the DOM.">
       <p-counter label="Steps of 5" start="10" step="5"></p-counter>
     </c-showcase>
     <div class="prose">
-      <p>Static props like <code>start="10"</code> are build-time literals, read as <code>$start</code> in HTML and <code>ctx.$.start</code> in JS. In JS they arrive as strings, except a bare attribute or <code>"true"</code> (<code>true</code>) and <code>"false"</code> (<code>false</code>), so the counter converts with <code>Number()</code>. <code>state(ctx)</code> runs once per instance; derived values such as <code>atMinimum</code> are getters, recomputed on every render.</p>
+      <ul>
+        <li><code>export let start = 0</code> declares a prop with a default. The default's type converts the attribute: <code>start="10"</code> arrives as the number <code>10</code>, so no <code>Number()</code> anywhere. Props are read-only: <code>let count = start</code> copies one into state.</li>
+        <li><code>const atMinimum = () =&gt; …</code> is a derived value: used in a binding (<code>:disabled="$atMinimum"</code>), it runs on every render. In JS you call it: <code>atMinimum()</code>.</li>
+        <li><code>function increase()</code> is an action when an event names it (<code>@click="increase"</code>). Assigning <code>count</code> schedules one render per microtask; there is no <code>setState</code> and no <code>this</code>.</li>
+        <li><code>&lt;style&gt;</code> is scoped with <code>[data-c="counter"]</code>, like a separate <code>counter.css</code>. Both a <code>&lt;script&gt;</code> and a <code>counter.js</code> for the same component is a check error (<code>html/duplicate-module</code>).</li>
+      </ul>
       <p>The component lives in <code>_components/counter/</code> next to this page, so it is used as <code>&lt;p-counter&gt;</code>. Moving the folder to <code>lib/components/</code> would make it <code>&lt;c-counter&gt;</code> for every route.</p>
     </div>
   </section>
@@ -30,14 +35,14 @@
         <p-panel heading="Release notes">
           <p>npm packages are bundled with rolldown and tree-shaken per route.</p>
           <button slot="actions" type="button" class="btn btn-small" @click="like">Like</button>
-          <span slot="actions" :text="$likesText"></span>
+          <span slot="actions">{$likesText}</span>
         </p-panel>
         <p-panel heading="Empty panel"></p-panel>
       </div>
     </c-showcase>
     <div class="prose">
       <p><code>&lt;slot&gt;</code> receives the children and <code>&lt;slot name="actions"&gt;</code> receives the children marked <code>slot="actions"</code>. Children of a <code>&lt;slot&gt;</code> are fallback content, rendered only when the caller passes nothing: the second panel shows it.</p>
-      <p>The <strong>Like</strong> button sits inside <code>&lt;p-panel&gt;</code>, yet <code>@click="like"</code> and <code>$likesText</code> resolve in the page module, while <strong>Hide</strong> calls the panel's own <code>toggle</code>, with separate state per instance.</p>
+      <p>The <strong>Like</strong> button sits inside <code>&lt;p-panel&gt;</code>, yet <code>@click="like"</code> and <code>&#123;$likesText&#125;</code> resolve in the page script (<code>index.js</code>), while <strong>Hide</strong> calls the panel's own <code>toggle</code>, with separate state per instance.</p>
     </div>
   </section>
 
@@ -46,7 +51,7 @@
     <div class="prose">
       <p><code>:plugin="plugin"</code> passes a value that updates on every render.</p>
     </div>
-    <c-showcase :source="data.examples.dynamicProps" caption="The list comes from load() in _plugins.server.js; the filter is a page getter over ctx.data.">
+    <c-showcase :source="data.examples.dynamicProps" caption="The list comes from load() in _plugins.server.js; the filter is a function of the page script over data.">
       <div class="w-full max-w-sm">
         <p-search-field label="Filter packages" placeholder="Filter by name or kind" :value="$query"></p-search-field>
         <ul class="mt-3 border-t border-line">
@@ -60,15 +65,15 @@
       </div>
     </c-showcase>
     <div class="prose">
-      <p>In a component <strong>without</strong> <code>.js</code>, <code>$plugin.name</code> is an alias to the caller's path at any depth, and <code>:model="$value"</code> writes straight back into the page's <code>$query</code>, so the search field needs no code at all.</p>
-      <p>In a component <strong>with</strong> <code>.js</code>, <code>$plugin</code> still works in HTML, but <code>ctx.$.plugin</code> is the attribute string (<code>"[object Object]"</code>). Objects only travel in HTML: to use one in JS, pass an id or scalar (<code>:id="plugin.id"</code>) and look it up in <code>ctx.data</code> or a store. A component with <code>.js</code> also cannot receive the caller's <code>$x</code>; pass <code>data.</code>, <code>shared.</code> or a <code>&lt;for&gt;</code> item.</p>
+      <p>Neither component has a script. In a component <strong>without</strong> a script, <code>&#123;$plugin.name&#125;</code> is an alias to the caller's path, resolved at build time, and <code>:model="$value"</code> writes straight back into the page's <code>query</code>, so the search field needs no code at all.</p>
+      <p>In a component <strong>with</strong> a script, <code>export let plugin = null</code> receives the object itself, live on every render, in HTML (<code>$plugin.name</code>) and in JS (<code>plugin.name</code>). The page script reads the loader's result with <code>import &#123; data &#125; from 'pragma'</code>.</p>
     </div>
   </section>
 
   <section class="doc-section" aria-labelledby="boolean-props">
-    <h2 id="boolean-props">Bare boolean props, <code>class</code> and slot fallback</h2>
+    <h2 id="boolean-props">No script: build-time props, <code>class</code> and slot fallback</h2>
     <div class="prose">
-      <p>A component without <code>.js</code> is fully expanded at build and ships zero JavaScript.</p>
+      <p>A component without a script is fully expanded at build and ships zero JavaScript.</p>
     </div>
     <c-showcase :source="data.examples.badge" caption="The first badge falls back to the slot's default text; the second passes its own.">
       <div class="flex flex-wrap justify-center gap-2">
@@ -77,25 +82,28 @@
       </div>
     </c-showcase>
     <div class="prose">
-      <p>A bare attribute like <code>active</code> is truthy; <code>"false"</code> and <code>""</code> are falsy. <code>class</code> on the tag is appended to the root's classes; <code>id</code> is an ordinary prop that you apply with <code>:id="$id"</code>.</p>
+      <p>Without a script, <code>&#123;$label&#125;</code> is replaced by the caller's text at build time. A bare attribute like <code>active</code> is truthy; a missing one, <code>""</code> and <code>"false"</code> are falsy. <code>class</code> on the tag is appended to the root's classes.</p>
     </div>
   </section>
 
-  <section class="doc-section" aria-labelledby="boolean-props-js">
-    <h2 id="boolean-props-js">The same prop, read from HTML and from JS</h2>
+  <section class="doc-section" aria-labelledby="typed-props">
+    <h2 id="typed-props">Typed props: the default decides the type</h2>
     <div class="prose">
-      <p>A prop has the same truthiness in HTML and in JS.</p>
+      <p>An attribute is always text; <code>export let</code> converts it with the type of its default.</p>
     </div>
-    <c-showcase :source="data.examples.propProbe" caption="Each probe reads one attribute twice: with &lt;if $locked&gt; in HTML and with ctx.$.locked in a getter.">
+    <c-showcase :source="data.examples.propProbe" caption="Each probe declares the same three props and prints what its script receives: the value and its typeof.">
       <div class="grid w-full justify-items-center gap-3">
-        <p-prop-probe call="locked" locked></p-prop-probe>
-        <p-prop-probe call="locked=&quot;false&quot;" locked="false"></p-prop-probe>
-        <p-prop-probe call="locked=&quot;&quot;" locked=""></p-prop-probe>
+        <p-prop-probe call='step="5" locked' step="5" locked></p-prop-probe>
+        <p-prop-probe call='locked="false" label="Hi"' locked="false" label="Hi"></p-prop-probe>
+        <p-prop-probe call="no attributes"></p-prop-probe>
       </div>
     </c-showcase>
     <div class="prose">
-      <p>A missing prop, <code>""</code> and <code>"false"</code> are falsy; a bare attribute and any other value are truthy. In JS a bare attribute or <code>"true"</code> arrives as <code>true</code> and <code>"false"</code> as <code>false</code>; every other prop is a string, so convert numbers yourself (<code>Number(ctx.$.step)</code>).</p>
-      <p>In a component with <code>.js</code>, <code>$x</code> is state when <code>x</code> is a key of the object <code>state()</code> returns, and a prop otherwise. Write <code>state</code> as <code>() =&gt; ({ … })</code> with plain keys and no spread, so the build can tell the two apart. Do not name a state key or getter after a prop: the key hides the prop, and a getter that reads <code>ctx.$.&lt;same name&gt;</code> recurses forever.</p>
+      <ul>
+        <li>A number default turns <code>"5"</code> into <code>5</code>. A boolean default turns a bare attribute or <code>"true"</code> into <code>true</code> and <code>"false"</code> into <code>false</code>. A string default keeps the text. Any other default (an object, <code>null</code>) takes the value as passed with <code>:prop="path"</code>.</li>
+        <li>A missing attribute gives the default. HTML (<code>&lt;if $locked&gt;</code>) and JS (<code>locked</code>) read the same converted value.</li>
+        <li>An attribute the script does not declare is an error at the call site (<code>html/unknown-prop</code>), and assigning a prop is <code>js/prop-write</code>.</li>
+      </ul>
     </div>
   </section>
 
@@ -104,11 +112,11 @@
     <div class="prose">
       <p>Every component on this page sits in <code>routes/examples/components/_components/</code>, so it is a <code>&lt;p-…&gt;</code> visible to this folder and the folders below it. The lookup walks up from the page folder to <code>routes/</code>, so <code>routes/_components/x/</code> is visible to every route. <code>lib/components/x/</code> makes it <code>&lt;c-x&gt;</code> everywhere; promoting one is a move plus a rename from <code>p-</code> to <code>c-</code>.</p>
       <ul>
-        <li><code>p-</code> names are private to their folder, styles included. This page and the <a href="/examples/syntax#static-if">syntax page</a> each have their own <code>&lt;p-badge&gt;</code>; the build gives each one its own <code>data-c</code>, so both write <code>[data-c="badge"]</code> in their <code>.css</code> and never share a rule.</li>
+        <li><code>p-</code> names are private to their folder, styles included. This page and the <a href="/examples/syntax#static-if">syntax page</a> each have their own <code>&lt;p-badge&gt;</code>; the build gives each one its own <code>data-c</code>, so both write <code>[data-c="badge"]</code> in their <code>&lt;style&gt;</code> and never share a rule.</li>
         <li>A <code>&lt;p-x&gt;</code> used outside <code>routes/</code> is an error, and so are two components with the same folder name on one page (<code>&lt;c-card&gt;</code> plus <code>&lt;p-card&gt;</code>).</li>
         <li>A component cannot have a <code>.server.js</code>: its data comes from the page's <code>load</code>, as in the list above.</li>
         <li>A component cannot use itself, and its root cannot be <code>&lt;template&gt;</code>, <code>&lt;slot&gt;</code> or another component.</li>
-        <li>A component's <code>.js</code> loads only on pages that use it. Its <code>.css</code> goes into the single app stylesheet, scoped by its <code>data-c</code>.</li>
+        <li>A component's script loads only on pages that use it. Its <code>&lt;style&gt;</code> goes into the single app stylesheet, scoped by its <code>data-c</code>.</li>
       </ul>
     </div>
   </section>

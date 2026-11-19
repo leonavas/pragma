@@ -1,12 +1,52 @@
+<script>
+  import { groupBy } from 'es-toolkit'
+  import { debounce } from 'es-toolkit/function'
+
+  const products = [
+    { name: 'Roasted coffee', category: 'drinks' },
+    { name: 'Green tea', category: 'drinks' },
+    { name: 'Oat milk', category: 'drinks' },
+    { name: 'Sourdough bread', category: 'bakery' },
+    { name: 'Butter croissant', category: 'bakery' },
+    { name: 'Brown sugar', category: 'pantry' },
+    { name: 'Black tea leaves', category: 'pantry' },
+  ]
+
+  let term = ''
+  let applied = ''
+  let keystrokes = 0
+  let runs = 0
+
+  const applyLater = debounce(() => {
+    applied = term.trim().toLowerCase()
+    runs += 1
+  }, 300)
+
+  function groups() {
+    const matching = products.filter(product => product.name.toLowerCase().includes(applied))
+    return Object.entries(groupBy(matching, product => product.category))
+      .map(([category, inCategory]) => ({ category, names: inCategory.map(product => product.name).join(', ') }))
+  }
+
+  function scheduleFilter() {
+    keystrokes += 1
+    applyLater()
+  }
+
+  function mount() {
+    return () => applyLater.cancel()
+  }
+</script>
+
 <div>
   <label for="stock-term" class="stock-filter-label">Filter products</label>
   <input id="stock-term" type="search" class="stock-filter-input" placeholder="tea, bread, oat..." autocomplete="off" :model="$term" @input="scheduleFilter">
-  <p class="stock-filter-counts"><span :text="$keystrokesText"></span><span :text="$runsText"></span></p>
+  <p class="stock-filter-counts"><span>{$keystrokes} keystrokes</span><span>{$runs} filter runs</span></p>
   <ul class="stock-filter-groups">
     <for group in $groups key=group.category>
       <li class="stock-filter-group">
-        <span class="stock-filter-category" :text="group.category"></span>
-        <span class="stock-filter-names" :text="group.names"></span>
+        <span class="stock-filter-category">{group.category}</span>
+        <span class="stock-filter-names">{group.names}</span>
       </li>
     </for>
     <empty>
@@ -14,3 +54,32 @@
     </empty>
   </ul>
 </div>
+
+<style>
+  [data-c="stock-filter"] { display: grid; gap: 0.75rem; width: min(100%, 28rem); }
+  [data-c="stock-filter"] .stock-filter-label { color: var(--color-muted); font-family: var(--font-mono); font-size: 0.75rem; }
+  [data-c="stock-filter"] .stock-filter-input {
+    height: 2.25rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    caret-color: var(--color-accent);
+  }
+  [data-c="stock-filter"] .stock-filter-input::placeholder { color: var(--color-faint); }
+  [data-c="stock-filter"] .stock-filter-counts { display: flex; justify-content: space-between; color: var(--color-faint); font-family: var(--font-mono); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+  [data-c="stock-filter"] .stock-filter-groups { display: grid; border-top: 1px solid var(--color-line); }
+  [data-c="stock-filter"] :is(.stock-filter-group, .stock-filter-empty) {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr;
+    gap: 1rem;
+    padding: 0.625rem 0;
+    border-bottom: 1px solid var(--color-line);
+    font-size: 0.875rem;
+  }
+  [data-c="stock-filter"] .stock-filter-empty { display: block; color: var(--color-faint); }
+  [data-c="stock-filter"] .stock-filter-category { color: var(--color-accent); font-family: var(--font-mono); font-size: 0.75rem; line-height: 1.6rem; }
+  [data-c="stock-filter"] .stock-filter-names { color: var(--color-ink); line-height: 1.6rem; }
+</style>

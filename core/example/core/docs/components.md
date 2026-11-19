@@ -11,10 +11,14 @@ To promote: move the folder to `lib/components/` and rename `p-` to `c-`.
 
 ```
 name/
-  name.html   required; 1 root element (not <template>, <slot> or a component)
-  name.js     optional: state, actions, mount
-  name.css    optional; scope selectors with [data-c="name"]
+  name.html   required: optional <script> and <style> at the top level, then 1 root element
+              (not <template>, <slot> or a component)
+  name.js     optional, instead of the <script>
+  name.css    optional, instead of the <style>; scope selectors with [data-c="name"]
 ```
+
+The `<script>` is the component's state and behavior (state.md); `<style>` (or `name.css`) is
+its CSS, scoped with `[data-c="name"]`. Both inline and as a file = `html/duplicate-module`.
 
 `p-` names are private to their folder, styles included: two `<p-badge>` in different folders
 never share CSS (the build gives each its own `data-c` and rewrites `[data-c="badge"]` in its own
@@ -23,44 +27,44 @@ class, role or label.
 
 ## Props
 
-| Caller writes | Inside the component |
-|---|---|
-| `label="Hi"` (static) | `$label` in HTML, `ctx.$.label` in JS |
-| `:product="p"` (dynamic, updates on each render) | `$product` in HTML; in JS `ctx.$.product` is the attribute string |
-| `locked` (bare) / `locked="false"` | `<if $locked>` true / false; in JS `ctx.$.locked` is `true` / `false` |
+A component with a script declares its props with `export let name = default`:
 
-- Props are read-only. A missing prop, `""` and `"false"` are falsy; a bare attribute and any other value are truthy, in HTML and JS alike.
+| Caller writes | Script declares | Inside (`$x` in HTML, `x` in JS) |
+|---|---|---|
+| `label="Hi"` | `export let label = ''` | `'Hi'` |
+| `start="10"` | `export let start = 0` | the number `10`: the default's type converts the text |
+| `locked` / `locked="false"` | `export let locked = false` | `true` / `false` |
+| `:product="p"` | `export let product = null` | the object itself, updated on each render |
+| nothing | `export let step = 1` | the default, `1` |
+
+- Props are read-only (`js/prop-write`, also via `:model`): copy one into a `let` to change it (`let count = start`).
+- A prop the script does not declare is an error at the call site (`html/unknown-prop`). `class` is not a prop: it is appended to the root's classes. `id` is a prop like any other (`export let id = ''`, then `:id="$id"`).
 - Name props in one lowercase word (`label`, `step`): HTML attributes are case-insensitive.
-- Never give a state key or getter the same name as a prop: the state key hides the prop, and a getter reading `ctx.$.<same name>` recurses forever.
-- With a `.js`, `$x` is state when `x` is a key of the object `state()` returns; any other `$x` is a prop. Write `state` as `() => ({ ... })` with plain keys (no spread) so the build can tell them apart.
-- In JS every prop is a string, except a bare attribute or `"true"` (`true`) and `"false"` (`false`). Use objects only in HTML; to use one in JS, pass an id and look it up in `ctx.data` or a store.
-- A component with a `.js` does not accept the caller's `$`: pass `data`, `shared` or a `<for>` item, or use a store.
-- `class` is appended to the root's classes. `id` is a prop: apply it with `:id="$id"`.
+- A component **without** a script has build-time props: `$label` is replaced by the caller's text, `:x="path"` by the caller's path; missing, `""` and `"false"` are falsy.
 
 ## Example
 
 `lib/components/counter/counter.html`:
 ```html
+<script>
+  export let label = ''
+  export let start = 0
+  export let step = 1
+
+  let count = start
+
+  const atMinimum = () => count - step < 0
+
+  function decrease() { count -= step }
+  function increase() { count += step }
+</script>
+
 <div class="inline-flex items-center gap-2" role="group" :aria-label="$label">
-  <span class="text-sm text-muted" :text="$label"></span>
+  <span class="text-sm text-muted">{$label}</span>
   <button type="button" class="btn" aria-label="Decrease" @click="decrease" :disabled="$atMinimum">−</button>
-  <output class="w-8 text-center tabular-nums" :text="$count"></output>
+  <output class="w-8 text-center tabular-nums">{$count}</output>
   <button type="button" class="btn" aria-label="Increase" @click="increase">+</button>
 </div>
-```
-
-`counter.js`:
-```js
-export const state = ctx => ({
-  count: Number(ctx.$.start || 0),
-  get increment() { return Number(ctx.$.step || 1) },
-  get atMinimum() { return this.count - this.increment < 0 },
-})
-
-export const actions = {
-  decrease(ctx) { ctx.$.count -= ctx.$.increment },
-  increase(ctx) { ctx.$.count += ctx.$.increment },
-}
 ```
 
 Usage:
@@ -85,9 +89,8 @@ Usage:
 
 ## Rules
 
-- In a component without `.js`, `@` calls the caller's action.
-- A page cannot use two components with the same folder name (`<c-card>` and `<p-card>`).
-- State is per instance. A component's `.js` loads only on pages that use it.
+- In a component without a script, `@` calls the caller's function.
+- State is per instance. A component's script loads only on pages that use it.
 - No `.server.js` in components: data comes from the page's `load`.
 - Never read or change a child's state: pass props; the child changes a store or calls its own action.
 - No `customElements.define`, no shadow DOM. Overlays: use `c-modal`, `c-alert`, `c-dropdown` (overlays.md).

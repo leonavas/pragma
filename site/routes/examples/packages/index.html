@@ -44,7 +44,7 @@ found 0 vulnerabilities
   <section class="doc-section" aria-labelledby="named-imports">
     <h2 id="named-imports">Named imports: only what you use ships</h2>
     <div class="prose">
-      <p>valibot is pure ESM with one module per function, the best case for tree shaking. This form imports eight names and ships <strong>1.35 kB gzip</strong> of valibot. The schema is a module constant; validation is a getter, so it reruns on every keystroke without any wiring.</p>
+      <p>valibot is pure ESM with one module per function, the best case for tree shaking. This form imports eight names and ships <strong>1.35 kB gzip</strong> of valibot. The schema is a constant in the <code>&lt;script&gt;</code>; validation is a derived function, so <code>{$status}</code> reruns it on every keystroke without any wiring.</p>
     </div>
     <c-showcase :source="data.examples.emailCheck" caption="Type to validate. Messages come from the schema; the button stays disabled until it passes.">
       <p-email-check></p-email-check>
@@ -55,7 +55,7 @@ found 0 vulnerabilities
     <h2 id="subpaths">Subpath imports share one chunk</h2>
     <div class="prose">
       <p><code>groupBy</code> comes from the <code>es-toolkit</code> index and <code>debounce</code> from <code>es-toolkit/function</code>. Both end up in a single <code>es-toolkit-*.js</code> of <strong>0.43 kB gzip</strong>. The same two helpers from <code>lodash</code> cost 6.49 kB, because CommonJS cannot be shaken.</p>
-      <p>The debounced call gets <code>ctx</code> and writes through <code>ctx.update()</code>, which schedules a render when it runs outside an action. <code>mount</code> returns a cleanup that cancels a pending call when the component leaves the page.</p>
+      <p>The debounced function just assigns two <code>let</code> variables: a timer firing outside an action still renders, because state is a reactive Proxy. <code>mount()</code> returns a cleanup that cancels a pending call when the component leaves the page.</p>
     </div>
     <c-showcase :source="data.examples.stockFilter" caption="Type quickly: keystrokes climb, filter runs only count once you pause for 300 ms.">
       <p-stock-filter></p-stock-filter>

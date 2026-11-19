@@ -11,13 +11,13 @@
   <script type="module" src="/core/boot.js"></script>
 </head>
 <body>
-  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="shared.cart.items.length"></span></header>
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
   <main data-page>
-    <h1 id="t" data-text="data.title">Hello SSR</h1>
-    <ul id="l"><template data-for="x in data.items" data-key="x.id" data-tid="s1"><li data-text="x.name"></li></template><li data-of="s1" data-key="1" data-text="x.name">one</li><li data-of="s1" data-key="2" data-text="x.name">two</li><template data-empty><li>nothing</li></template></ul>
+    <h1 id="t" data-text="{data.title}">Hello SSR</h1>
+    <ul id="l"><template data-for="x in data.items" data-key="x.id" data-tid="s1"><li data-text="{x.name}"></li></template><li data-of="s1" data-key="1" data-text="{x.name}">one</li><li data-of="s1" data-key="2" data-text="{x.name}">two</li><template data-empty><li>nothing</li></template></ul>
     <template data-if="data.featured" data-tid="s2"><p id="d">featured</p></template><p data-of="s2" id="d">featured</p><template data-else><p id="none">not featured</p></template>
     <template data-if="!data.featured" data-tid="s4"><p id="nd">without</p></template><template data-else><p id="cd">with</p></template><p data-of="s4" id="cd">with</p>
-    <span id="c" data-text="state.n"></span>
+    <span id="c" data-text="{state.n}"></span>
     <button id="inc" data-on-click="inc">+</button>
     <template data-if="state.open" data-tid="s3"><p id="open">open</p></template>
   </main>

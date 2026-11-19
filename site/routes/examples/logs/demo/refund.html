@@ -1,28 +1,48 @@
 <title>Refund demo · pragma examples</title>
 <meta name="robots" content="noindex">
 
+<script>
+  import { data, call, log } from 'pragma'
+
+  let sending = false
+  let error = ''
+
+  async function send(actionName) {
+    sending = true
+    error = ''
+    try {
+      data.refund.status = (await call(actionName, { id: data.refund.id })).status
+    } catch (failure) {
+      log.error('refund action failed', { 'refund.action': actionName, 'exception.message': failure.message })
+      error = failure.message
+    } finally {
+      sending = false
+    }
+  }
+</script>
+
 <c-demo-page>
   <h1 class="font-mono text-sm text-muted">Refund queue</h1>
   <if page.loading>
     <div class="skeleton h-28" aria-busy="true" aria-label="Loading refund"></div>
   </if>
   <else-if page.error>
-    <p class="font-mono text-sm text-danger-300" role="alert" :text="page.error.message"></p>
+    <p class="font-mono text-sm text-danger-300" role="alert">{page.error.message}</p>
   </else-if>
   <else>
     <article class="grid gap-4 border border-line bg-surface p-5" aria-labelledby="refund-title">
       <div class="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 id="refund-title" class="font-mono text-base" :text="data.refund.customer"></h2>
-        <p class="font-mono text-xs uppercase tracking-wide text-faint" :text="data.refund.status"></p>
+        <h2 id="refund-title" class="font-mono text-base">{data.refund.customer}</h2>
+        <p class="font-mono text-xs uppercase tracking-wide text-faint">{data.refund.status}</p>
       </div>
-      <p class="font-mono text-2xl tabular-nums" :text="data.refund.amount"></p>
+      <p class="font-mono text-2xl tabular-nums">{data.refund.amount}</p>
       <div class="flex flex-wrap gap-2">
-        <button type="button" class="btn btn-small btn-primary" @click="approve" :disabled="$sending">Approve</button>
-        <button type="button" class="btn btn-small" @click="escalate" :disabled="$sending">Escalate</button>
-        <button type="button" class="btn btn-small" @click="reopen" :disabled="$sending">Reopen</button>
+        <button type="button" class="btn btn-small btn-primary" @click="send('approve')" :disabled="$sending">Approve</button>
+        <button type="button" class="btn btn-small" @click="send('escalate')" :disabled="$sending">Escalate</button>
+        <button type="button" class="btn btn-small" @click="send('reopen')" :disabled="$sending">Reopen</button>
       </div>
       <if $error>
-        <p class="font-mono text-xs text-danger-300" role="alert" :text="$error"></p>
+        <p class="font-mono text-xs text-danger-300" role="alert">{$error}</p>
       </if>
     </article>
   </else>

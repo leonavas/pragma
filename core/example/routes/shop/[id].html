@@ -1,18 +1,38 @@
+<script>
+  import { data, params, call, log } from 'pragma'
+
+  let sending = false
+  let error = ''
+
+  async function like() {
+    sending = true
+    error = ''
+    try {
+      data.product.likes = (await call('like')).likes
+    } catch (failure) {
+      log.error('failed to like product', { 'product.id': params.id, 'exception.message': failure.message })
+      error = 'Could not save your like right now.'
+    } finally {
+      sending = false
+    }
+  }
+</script>
+
 <title>Product · Minimart</title>
 
 <div class="flex flex-col gap-6">
   <a href="/shop" class="text-sm text-muted hover:text-ink">← Back to the shop</a>
   <if data.product>
     <article class="card flex max-w-xl flex-col gap-4">
-      <p class="text-sm text-muted" :text="data.product.categoryName"></p>
-      <h1 class="text-3xl font-semibold tracking-tight" :text="data.product.name"></h1>
-      <p class="text-2xl font-semibold tabular-nums" :text="data.product.priceLabel"></p>
-      <p class="text-sm text-muted"><span :text="data.product.stock"></span> in stock</p>
-      <p-add-to-cart :id="data.product.id" :name="data.product.name" :price="data.product.price" :stock="data.product.stock"></p-add-to-cart>
+      <p class="text-sm text-muted">{data.product.categoryName}</p>
+      <h1 class="text-3xl font-semibold tracking-tight">{data.product.name}</h1>
+      <p class="text-2xl font-semibold tabular-nums">{data.product.priceLabel}</p>
+      <p class="text-sm text-muted">{data.product.stock} in stock</p>
+      <p-add-to-cart :product="data.product"></p-add-to-cart>
       <div class="flex items-center gap-3 border-t border-line pt-4 text-sm">
         <button type="button" class="btn" @click="like" :disabled="$sending">Like</button>
-        <span><span class="tabular-nums" :text="data.product.likes"></span> like(s)</span>
-        <span class="text-danger-600" role="status" :text="$error"></span>
+        <span><span id="likes" class="tabular-nums">{data.product.likes}</span> like(s)</span>
+        <span class="text-danger-600" role="status">{$error}</span>
       </div>
     </article>
   </if>

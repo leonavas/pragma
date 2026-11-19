@@ -1,3 +1,13 @@
+<script>
+  import { confirm } from 'pragma'
+
+  let deleted = false
+
+  async function deleteDraft() {
+    if (await confirm('delete-draft') === 'ok') deleted = true
+  }
+</script>
+
 <title>Home</title>
 
 <section class="flex flex-col items-start gap-6">
@@ -18,7 +28,7 @@
 <section class="mt-16 grid gap-4 sm:grid-cols-3">
   <article class="card">
     <h2 class="font-semibold">Pages</h2>
-    <p class="mt-2 text-sm text-muted">Each file in routes/ becomes a route. Behavior lives in the .js file with the same name.</p>
+    <p class="mt-2 text-sm text-muted">Each file in routes/ becomes a route. Its state and behavior go in the &lt;script&gt; at the top of the file.</p>
   </article>
   <article class="card">
     <h2 class="font-semibold">Components</h2>
@@ -31,7 +41,7 @@
 </section>
 
 <c-modal id="how-it-works" title="How it works">
-  <p>Every page's HTML comes ready from the build. JS only handles behavior, wired up through data-* attributes.</p>
+  <p>Every page's HTML comes ready from the build. A top-level let in the &lt;script&gt; is state: change it and the page updates.</p>
   <button slot="actions" type="button" class="btn btn-primary" @close value="ok">Got it</button>
 </c-modal>
 

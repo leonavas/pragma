@@ -1,8 +1,56 @@
+<script>
+  import { email, maxLength, nonEmpty, object, pipe, safeParse, string, trim } from 'valibot'
+
+  const signup = object({
+    email: pipe(string(), trim(), nonEmpty('Type an email.'), email('That is not an email address.'), maxLength(64, 'Keep it under 64 characters.')),
+  })
+
+  let address = 'ana@example'
+  let joined = ''
+
+  const validation = () => safeParse(signup, { email: address })
+  const valid = () => validation().success
+  const invalid = () => !valid()
+  const ariaInvalid = () => (valid() ? 'false' : 'true')
+
+  function status() {
+    const result = validation()
+    if (!result.success) return result.issues[0].message
+    return joined === result.output.email ? 'Joined as ' + joined : 'Looks good.'
+  }
+
+  function submit() {
+    const result = validation()
+    if (result.success) joined = result.output.email
+  }
+</script>
+
 <form @submit="submit" novalidate>
   <label for="signup-email" class="email-check-label">Work email</label>
   <div class="email-check-row">
-    <input id="signup-email" type="email" class="email-check-input" autocomplete="off" spellcheck="false" :model="$email" :aria-invalid="$ariaInvalid" aria-describedby="signup-email-status">
+    <input id="signup-email" type="email" class="email-check-input" autocomplete="off" spellcheck="false" :model="$address" :aria-invalid="$ariaInvalid" aria-describedby="signup-email-status">
     <button type="submit" class="btn btn-small" :disabled="$invalid">Join</button>
   </div>
-  <p id="signup-email-status" class="email-check-status" role="status" .is-valid="$valid" :text="$status"></p>
+  <p id="signup-email-status" class="email-check-status" role="status" .is-valid="$valid">{$status}</p>
 </form>
+
+<style>
+  [data-c="email-check"] { display: grid; gap: 0.625rem; width: min(100%, 24rem); }
+  [data-c="email-check"] .email-check-label { color: var(--color-muted); font-family: var(--font-mono); font-size: 0.75rem; }
+  [data-c="email-check"] .email-check-row { display: flex; gap: 0.5rem; }
+  [data-c="email-check"] .email-check-input {
+    flex: 1;
+    min-width: 0;
+    height: 2rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    caret-color: var(--color-accent);
+  }
+  [data-c="email-check"] .email-check-input[aria-invalid="true"] { border-color: var(--color-warning-500); }
+  [data-c="email-check"] .email-check-status { min-height: 1.5em; color: var(--color-warning-300); font-family: var(--font-mono); font-size: 0.75rem; }
+  [data-c="email-check"] .email-check-status.is-valid { color: var(--color-accent); }
+</style>

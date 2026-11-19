@@ -108,9 +108,15 @@ impl App {
     }
 }
 
+/// Page script that uses each imported name. A direct store import is an error now
+/// (js/store-import), so the extra import line some tests need comes from utils/fmt.js.
 fn page_src(imports: &str, fields: &str) -> String {
-    format!("{imports}\n\nexport const state = () => ({{ open: false, items: [], {fields} }})\nexport const actions = {{\n  toggle(ctx) {{\n    ctx.$.open = !ctx.$.open\n  }},\n}}\n")
+    let imports = imports.replace("import { cart } from '../lib/state/cart.js'", "import { format } from '../utils/fmt.js'");
+    let fields = fields.replace("cart.total", "format(0)");
+    format!("{imports}\n\nlet open = false\nlet items = []\nconst used = {{ {fields} }}\n\nfunction toggle() {{\n  open = !open\n}}\n")
 }
+
+const CARD: &str = "export let heading = ''\nexport let featured = false\n";
 
 struct Out {
     client: PathBuf,
@@ -392,7 +398,7 @@ fn dynamic_import_ships_whole_package_without_preload() {
     let app = App::new();
     app.deps(&["lazy"]).esm("lazy", RICH.replace("RICH_", "LAZY_").as_str()).write(
         PAGE,
-        "export const state = () => ({ open: false, items: [] })\nexport const actions = {\n  async toggle(ctx) {\n    const lazyModule = await import('lazy')\n    ctx.$.open = lazyModule.used\n  },\n}\n",
+        "let open = false\nlet items = []\n\nasync function toggle() {\n  const lazyModule = await import('lazy')\n  open = lazyModule.used\n}\n",
     );
     app.clean();
     let out = app.prod();
@@ -408,7 +414,7 @@ fn dynamic_and_static_imports_of_same_package() {
     let app = App::new();
     app.deps(&["rich"]).esm("rich", RICH).write(
         PAGE,
-        "import { used } from 'rich'\n\nexport const state = () => ({ open: false, items: [], used })\nexport const actions = {\n  async toggle(ctx) {\n    const richModule = await import('rich')\n    ctx.$.open = richModule.other\n  },\n}\n",
+        "import { used } from 'rich'\n\nlet open = false\nlet items = []\nconst label = used\n\nasync function toggle() {\n  const richModule = await import('rich')\n  open = richModule.other\n}\n",
     );
     app.clean();
     let out = app.prod();
@@ -473,8 +479,8 @@ fn same_package_from_pages_and_components_is_one_entry() {
     app.deps(&["rich"])
         .esm("rich", RICH)
         .page("import { used } from 'rich'", "used")
-        .write("routes/shop/index.js", "import { other } from 'rich'\n\nexport const state = () => ({ label: other })\n")
-        .write("lib/components/card/card.js", "import richDefault from 'rich'\n\nexport const actions = {\n  buy(ctx) {\n    ctx.shared.cart.total += richDefault().length\n  },\n}\n");
+        .write("routes/shop/index.js", "import { other } from 'rich'\n\nlet label = other\n")
+        .write("lib/components/card/card.js", &format!("import richDefault from 'rich'\nimport {{ shared }} from 'pragma'\n\n{CARD}\nfunction buy() {{\n  shared.cart.total += richDefault().length\n}}\n"));
     app.clean();
     let out = app.prod();
     let url = out.url("npm/rich");
@@ -496,7 +502,7 @@ fn shared_dependency_becomes_shared_chunk() {
         .esm("left", "import { shout } from 'shared'\nexport const leftWord = shout('LEFT_MARK')\n")
         .esm("right", "import { shout } from 'shared'\nexport const rightWord = shout('RIGHT_MARK')\n")
         .page("import { leftWord } from 'left'", "leftWord")
-        .write("routes/shop/index.js", "import { rightWord } from 'right'\n\nexport const state = () => ({ label: rightWord })\n");
+        .write("routes/shop/index.js", "import { rightWord } from 'right'\n\nlet label = rightWord\n");
     app.clean();
     let out = app.prod();
     let left = out.url("npm/left");
@@ -650,7 +656,7 @@ fn error_not_installed_points_at_import() {
 #[test]
 fn error_missing_export_points_at_import() {
     let app = App::new();
-    app.deps(&["rich"]).esm("rich", RICH).write("lib/components/card/card.js", "import { missingName } from 'rich'\n\nexport const actions = {\n  buy(ctx) {\n    ctx.shared.cart.total += missingName\n  },\n}\n");
+    app.deps(&["rich"]).esm("rich", RICH).write("lib/components/card/card.js", &format!("import {{ missingName }} from 'rich'\nimport {{ shared }} from 'pragma'\n\n{CARD}\nfunction buy() {{\n  shared.cart.total += missingName\n}}\n"));
     let d = app.check();
     expect_only(&d, "js/import", "lib/components/card/card.js", 1);
     assert!(d[0].message.contains("missingName"), "{}", d[0].message);
@@ -806,7 +812,7 @@ fn error_package_imported_in_several_files_points_at_first() {
     app.deps(&["rich"])
         .esm("rich", RICH)
         .page("import { missingName } from 'rich'", "missingName")
-        .write("routes/shop/index.js", "import { used } from 'rich'\n\nexport const state = () => ({ label: used })\n");
+        .write("routes/shop/index.js", "import { used } from 'rich'\n\nlet label = used\n");
     let d = app.check();
     expect(&d, "js/import", PAGE, 1);
     assert!(d.iter().all(|x| x.rule == "js/import"), "{}", show(&d));

@@ -1,7 +1,17 @@
 <article class="card flex flex-col gap-1" :data-tone="$tone">
-  <h3 class="text-sm text-muted" :text="$title"></h3>
-  <p class="text-2xl font-semibold tabular-nums" :text="$value"></p>
+  <h3 class="text-sm text-muted">{$title}</h3>
+  <p class="text-2xl font-semibold tabular-nums">{$value}</p>
   <if $hint>
-    <p class="text-xs text-muted" :text="$hint"></p>
+    <p class="text-xs text-muted">{$hint}</p>
   </if>
 </article>
+
+<style>
+  [data-c="indicator"][data-tone="ok"] {
+    border-color: var(--color-success-500);
+  }
+  [data-c="indicator"][data-tone="warning"] {
+    border-color: var(--color-warning-500);
+    background: color-mix(in oklab, var(--color-warning-500) 8%, var(--color-surface));
+  }
+</style>
