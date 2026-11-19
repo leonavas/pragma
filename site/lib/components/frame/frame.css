@@ -1,0 +1,33 @@
+[data-c="frame"] .frame-control:focus-visible { outline-offset: -4px; }
+[data-c="frame"] .is-busy .frame-reload { animation: frame-spin 0.7s linear infinite; }
+[data-c="frame"] .frame-address {
+  line-height: calc(2rem - 2px);
+  direction: rtl;
+}
+[data-c="frame"] .frame-path {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+[data-c="frame"] .frame-path[data-beat="a"] { animation: frame-beat-a 1.2s var(--ease-out); }
+[data-c="frame"] .frame-path[data-beat="b"] { animation: frame-beat-b 1.2s var(--ease-out); }
+[data-c="frame"] [data-kind="router"] .frame-kind { color: var(--color-accent); }
+[data-c="frame"] .frame-view { height: 26rem; }
+[data-c="frame"][data-height="sm"] .frame-view { height: 18rem; }
+[data-c="frame"][data-height="lg"] .frame-view { height: 34rem; }
+@media (max-width: 29.99rem) {
+  [data-c="frame"] .frame-view { height: 24rem; }
+  [data-c="frame"][data-height="lg"] .frame-view { height: 30rem; }
+}
+@keyframes frame-spin {
+  to { rotate: 360deg; }
+}
+@keyframes frame-beat-a {
+  from { color: var(--color-accent); }
+}
+@keyframes frame-beat-b {
+  from { color: var(--color-accent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-c="frame"] .is-busy .frame-reload { animation: none; opacity: 0.4; }
+  [data-c="frame"] .frame-path[data-beat] { animation: none; }
+}

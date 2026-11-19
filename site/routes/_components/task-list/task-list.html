@@ -1,0 +1,21 @@
+<div class="grid w-full max-w-sm gap-3.5">
+  <div class="flex items-center justify-between gap-4 font-mono text-xs">
+    <p class="text-faint tabular-nums" role="status" :text="$summary">2 of 3 pending</p>
+    <button type="button" class="tasks-filter cursor-pointer py-1.5 underline hover:text-ink" @click="toggleFilter" :aria-pressed="$filterPressed" :text="$filterText">Hide done</button>
+  </div>
+  <form class="flex gap-2" @submit="add">
+    <input class="h-8 min-w-0 flex-1 border border-line-strong bg-sunken px-3 text-sm text-ink focus-visible:border-accent" type="text" maxlength="48" placeholder="Add a task" aria-label="New task" :model="$draft">
+    <button type="submit" class="btn btn-small">Add</button>
+  </form>
+  <ul class="border-t border-line">
+    <for task in $visible key=task.id>
+      <li class="flex min-h-11 items-center gap-3 border-b border-line" .done="task.done">
+        <input type="checkbox" class="tasks-check size-4 shrink-0 cursor-pointer" :checked="task.done" :aria-label="task.title" @change="toggle">
+        <span class="tasks-title min-w-0" :text="task.title"></span>
+      </li>
+    </for>
+    <empty>
+      <li class="border-b border-line py-3.5 text-sm text-muted">Nothing pending. Ship it.</li>
+    </empty>
+  </ul>
+</div>

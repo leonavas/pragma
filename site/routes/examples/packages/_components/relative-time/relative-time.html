@@ -1,0 +1,15 @@
+<div>
+  <ul class="relative-time-list">
+    <for release in $releases key=release.version>
+      <li class="relative-time-row">
+        <span class="relative-time-version" :text="release.version"></span>
+        <span class="relative-time-date" :text="release.date"></span>
+        <span class="relative-time-ago" :text="release.ago"></span>
+      </li>
+    </for>
+  </ul>
+  <div class="relative-time-footer">
+    <button type="button" class="btn btn-small" @click="loadRelativeTimes" :disabled="$busy" :text="$buttonText"></button>
+    <p class="relative-time-status" role="status" :text="$status"></p>
+  </div>
+</div>

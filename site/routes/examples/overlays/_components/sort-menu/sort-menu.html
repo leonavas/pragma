@@ -1,0 +1,13 @@
+<div>
+  <c-dropdown id="sort-menu" :label="$menuLabel">
+    <button type="button" @close @click="sortBy" value="name">By name</button>
+    <button type="button" @close @click="sortBy" value="size">By size</button>
+    <hr>
+    <button type="button" @close @click="reverse">Reverse order</button>
+  </c-dropdown>
+  <ol class="sort-list">
+    <for file in $sorted key=file.name>
+      <li class="sort-row"><span :text="file.name"></span><span class="sort-size" :text="file.label"></span></li>
+    </for>
+  </ol>
+</div>

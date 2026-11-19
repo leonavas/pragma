@@ -215,6 +215,10 @@ impl FileCheck<'_> {
                 self.err(a.pos, "html/style-inline", "the style attribute is not allowed; use classes");
                 continue;
             }
+            if let Some(m) = foreign_directive(&an) {
+                self.err(a.pos, "html/unknown-directive", m);
+                continue;
+            }
             if an.starts_with("on") {
                 self.err(a.pos, "html/on-inline", format!("inline {an} is not allowed; use @<event>=\"action\""));
                 continue;
@@ -346,8 +350,10 @@ impl FileCheck<'_> {
                 self.classes.check(self.files, pos, c, &mut self.diags);
             }
             Dir::Attr(n) => {
-                if n.starts_with("on") || n == "style" {
-                    self.err(pos, "html/on-inline", format!(":{n} is not allowed"));
+                if n == "style" {
+                    self.err(pos, "html/style-inline", ":style is not allowed: toggle a class with .name=\"path\" (e.g. .hidden=\"$closed\"); for a value with many options bind :data-x=\"path\" and style [data-x=value] in CSS");
+                } else if let Some(ev) = n.strip_prefix("on") {
+                    self.err(pos, "html/on-inline", format!(":{n} is not allowed; use @{ev}=\"action\""));
                 } else if n == "class" {
                     self.err(pos, "html/class", ":class is not allowed: write static classes in class=\"…\" and toggle each one with .name=\"path\" (e.g. .text-warning-700=\"$warn\")");
                 }
@@ -427,6 +433,78 @@ impl FileCheck<'_> {
     }
 }
 
+const ALPINE: &[&str] = &[
+    "data", "init", "show", "bind", "on", "text", "html", "model", "modelable", "for", "if", "transition", "effect", "ignore",
+    "ref", "cloak", "teleport", "id", "intersect", "mask", "trap", "collapse", "anchor", "sort", "resize",
+];
+const SVELTE: &[&str] = &["bind", "on", "class", "style", "use", "transition", "in", "out", "animate", "let"];
+
+/// Directive syntax of other frameworks (Vue, Alpine, Svelte, Angular, React). In pragma it stays a
+/// plain attribute that does nothing, so it is an error that names the pragma form. `name` is lowercase.
+fn foreign_directive(name: &str) -> Option<String> {
+    // `on:click.prevent` → ("on", "click"); modifiers (`.x`, Svelte `|x`) are dropped
+    fn dir_arg(rest: &str) -> (&str, &str) {
+        let end = rest.find([':', '.']).unwrap_or(rest.len());
+        let arg = rest[end..].strip_prefix(':').unwrap_or("");
+        (&rest[..end], &arg[..arg.find(['.', '|']).unwrap_or(arg.len())])
+    }
+    let (framework, dir, arg) = if let Some(rest) = name.strip_prefix("v-") {
+        let (d, a) = dir_arg(rest);
+        ("Vue", d, a)
+    } else if let Some(rest) = name.strip_prefix("x-")
+        && ALPINE.contains(&dir_arg(rest).0)
+    {
+        let (d, a) = dir_arg(rest);
+        ("Alpine", d, a)
+    } else if let Some((d, a)) = name.split_once(':')
+        && SVELTE.contains(&d)
+    {
+        let a = &a[..a.find(['.', '|']).unwrap_or(a.len())];
+        // `bind:value` is two-way
+        ("Svelte", if d == "bind" && matches!(a, "value" | "checked" | "group") { "model" } else { d }, a)
+    } else if let Some(inner) = name.strip_prefix("[(").and_then(|n| n.strip_suffix(")]")) {
+        ("Angular", "model", inner)
+    } else if let Some(inner) = name.strip_prefix('[').and_then(|n| n.strip_suffix(']')) {
+        match inner.split_once('.') {
+            Some(("class", c)) => ("Angular", "class", c),
+            Some(("style", _)) => ("Angular", "style", ""),
+            Some(("attr", a)) => ("Angular", "bind", a),
+            _ => ("Angular", "bind", inner),
+        }
+    } else if let Some(ev) = name.strip_prefix('(').and_then(|n| n.strip_suffix(')')) {
+        ("Angular", "on", ev)
+    } else if let Some(d) = name.strip_prefix("*ng") {
+        ("Angular", d, "")
+    } else if name.starts_with('#') {
+        ("Vue/Angular", "#", "")
+    } else if name == "classname" || name == "htmlfor" {
+        ("React", if name == "classname" { "class" } else { "for-attr" }, "")
+    } else {
+        return None;
+    };
+    let hint = match (dir, arg) {
+        ("if", _) => "wrap the element in `<if path>…</if>`".to_string(),
+        ("else-if", _) => "wrap the element in `<else-if path>…</else-if>`, right after `</if>`".into(),
+        ("else", _) => "wrap the element in `<else>…</else>`, right after `</if>`".into(),
+        ("for" | "each", _) => "wrap the element in `<for x in path key=x.id>…</for>`".into(),
+        ("show", _) => "use `:show=\"path\"`".into(),
+        ("text", _) => "use `:text=\"path\"`".into(),
+        ("html", _) => "use `:text=\"path\"` (pragma does not render raw HTML)".into(),
+        ("model" | "modelable", _) => "use `:model=\"$path\"` on input, select or textarea".into(),
+        ("bind", "") => "use `:<attribute>=\"path\"`".into(),
+        ("bind", "class") | ("class", "") => "use `class=\"…\"` for static classes and `.<class>=\"path\"` to toggle one".into(),
+        ("bind", "style") | ("style", _) => "use classes; toggle one with `.<class>=\"path\"`".into(),
+        ("bind", a) => format!("use `:{a}=\"path\"`"),
+        ("on", "") => "use `@<event>=\"action\"`".into(),
+        ("on", ev) => format!("use `@{ev}=\"action\"`"),
+        ("class", c) => format!("use `.{c}=\"path\"`"),
+        ("for-attr", _) => "use `for=\"…\"`".into(),
+        ("data" | "init" | "setup", _) => "put state and actions in the page or component .js".into(),
+        _ => "see the closed list in core/docs/syntax.md".into(),
+    };
+    Some(format!("`{name}` is {framework} syntax and does nothing in pragma; {hint}"))
+}
+
 fn find_mains<'a>(nodes: &'a [Node], out: &mut Vec<&'a Element>) {
     for n in nodes {
         if let Node::Element(e) = n {
@@ -449,5 +527,37 @@ mod tests {
         let mut v: Vec<_> = s.into_iter().collect();
         v.sort();
         assert_eq!(v, ["b-c", "btn", "link", "md:a", "title"]);
+    }
+
+    #[test]
+    fn foreign_directives() {
+        let cases = [
+            ("v-if", "Vue", "<if path>"),
+            ("v-else-if", "Vue", "<else-if path>"),
+            ("v-for", "Vue", "<for x in path key=x.id>"),
+            ("v-bind:href.prop", "Vue", ":href=\"path\""),
+            ("v-bind:class", "Vue", ".<class>=\"path\""),
+            ("v-on:click.prevent", "Vue", "@click=\"action\""),
+            ("v-model.trim", "Vue", ":model=\"$path\""),
+            ("x-show", "Alpine", ":show=\"path\""),
+            ("x-data", "Alpine", "page or component .js"),
+            ("x-on:keydown.enter", "Alpine", "@keydown=\"action\""),
+            ("on:click|preventdefault", "Svelte", "@click=\"action\""),
+            ("bind:value", "Svelte", ":model=\"$path\""),
+            ("class:active", "Svelte", ".active=\"path\""),
+            ("*ngif", "Angular", "<if path>"),
+            ("[disabled]", "Angular", ":disabled=\"path\""),
+            ("[class.active]", "Angular", ".active=\"path\""),
+            ("(click)", "Angular", "@click=\"action\""),
+            ("[(ngmodel)]", "Angular", ":model=\"$path\""),
+            ("classname", "React", "class=\"…\""),
+        ];
+        for (name, framework, want) in cases {
+            let m = foreign_directive(name).unwrap_or_else(|| panic!("{name} passed"));
+            assert!(m.contains(&format!("{framework} syntax")) && m.contains(want), "{name}: {m}");
+        }
+        for name in ["x-foo", "xlink:href", "xml:lang", "xmlns:xlink", "aria-label", "role", "for", "class", "data-x", "hidden"] {
+            assert_eq!(foreign_directive(name), None, "{name}");
+        }
     }
 }

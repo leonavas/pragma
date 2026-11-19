@@ -55,6 +55,12 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - **[discarded]** Svelte-style `{#if}`/`{:else}` and `<if test="p">`: the first is no longer
   HTML; the second is noise.
 - **[firm v0]** Each block keeps exactly 1 root element.
+- **[firm v0]** No `:class` (bypassed the class check, CSS generation and overwrote `.x`
+  toggles): static `class` plus `.name="path"` per class. `{{ }}`/`${ }` in text or attributes
+  are `html/interpolation` errors (allowed as text inside `<code>`/`<pre>`).
+- **[firm v0]** Prop truthiness is the same in HTML and JS: missing, `""`, `"false"` are falsy;
+  bare attribute and other values truthy. In `ctx.$`, `"true"`/bare → `true`, `"false"` →
+  `false`, other values stay strings.
 - **[firm]** Overlays (modal, alert, popup, dropdown) are always HTML + JS. Back (browser or
   Android) closes the overlay instead of leaving the page. Modal and alert lock scroll (SPEC §6).
 - **[superseded]** "Component syntax" and "how JS finds nodes" (previously open): solved by
@@ -82,6 +88,19 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   compiled to ops (`templates/<route>.json`).
 - **[firm v0]** Server writes via `.server.js` `actions` and `ctx.call` →
   `POST /_action/<path>/<name>`.
+- **[firm v0]** Per-page head (SEO, link previews): a page writes `<title>`, `<meta>` and
+  `<link>` at its top level; the build moves them to `<head>`, where they replace the layout tag
+  with the same key (`name`/`property`/`http-equiv`, `rel`+`hreflang`). Values from the server
+  use the existing bindings (`:text`, `:content`, `:href`) on `data`, `params`, `query`, and
+  require `ssr = true`: the handler fills them in the shell, so bots without JS see them. The
+  layout `<head>` is static (directives = error); head tags elsewhere = error; `<title :text>`
+  no longer silently drops the binding. The router swaps head tags on navigation. *Why:* no new
+  syntax (head tags are HTML in the page, bindings are the closed list); a fixed "canonical in
+  the layout" pointed every page at `/`; client-only head updates are invisible to Facebook, X,
+  Slack and LinkedIn previews, so a binding that cannot reach the first HTML is rejected
+  instead of shipping half-working. Discarded: an exported `head()`/`meta` object in
+  `.server.js` (HTML in JS, a second way to write tags), a page `<head>` block (one more
+  structure rule for the same thing), evaluating head bindings on the client.
 - **[superseded]** SSR via `HTMLRewriter` on Workers and `lol_html` in `pragma serve`: replaced
   by compiled ops rendered by the JS handler.
 - **[superseded]** "No SSR (SPA + API)".
@@ -162,8 +181,9 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   `/_otel`.
 - **[firm]** OTLP/HTTP (JSON) export if `OTEL_EXPORTER_OTLP_ENDPOINT` is set, else OTel JSON
   on stdout. No gRPC.
-- **[firm]** Configurable sampling and minimum level; `DEBUG` off in production. `pragma dev`
-  shows readable logs grouped by trace.
+- **[firm]** Configurable sampling and minimum level; `DEBUG` off in production, on in
+  `pragma dev` (`PRAGMA_LOG_LEVEL=debug` unless set). `pragma dev` shows readable logs grouped
+  by trace. The client stops posting after a 404/405 from `/_otel` (static hosting).
 - **[firm]** The app uses `log.*`, not `console.*`; `pragma check` enforces it.
 - **[superseded]** `/api/otel` endpoint: now `/_otel`.
 
@@ -174,9 +194,16 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   the CLI.
 - **[likely]** `pragma dev` runs Node (≥ 22) for loaders and proxies `/_data`, `/_action`,
   `/_otel` and SSR pages (SPEC §11, §15). Replaces workerd in dev.
+- **[firm v0]** Workers without `not_found_handling`: the handler (`run_worker_first`) serves
+  assets, then resolves non-ssr param routes via `/_pragma/manifest.json`, then `_404.html` with
+  404, like the Node adapter. Replaces the SPA fallback that sent every unknown URL to
+  `index.html`.
 - **[likely]** Cloudflare Workers is the preferred target (`dist/server/worker.js` +
   `wrangler.jsonc`); Node via `dist/server/node.mjs`; static-only hosting when there's no
   `*.server.js`.
+- **[firm v0]** No `*.server.js` → no `server/` bundle and no Node child in `dev`/`serve`
+  (BUG-S-1). `/_otel` alone does not justify a server: `pragma dev` prints client logs itself,
+  `serve` answers 204 and static hosts get the 404 that stops the client.
 - **[likely]** No host lock-in: small interfaces (`db`, `kv`, `files`) over `env`. v0 exposes
   `env` directly to `load`.
 - **[superseded]** `/api/*` prefix and `pragma serve` forwarding to Node/Deno/Bun: now
@@ -185,7 +212,7 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 ## Tool (Rust CLI)
 
 - **[firm]** Rust app to run locally, build and check: `pragma new`, `dev`, `build`, `check`,
-  `serve`, single binary. *Why:* best JS/CSS ecosystem (oxc, lightningcss), memory safety and
+  `serve`, `upgrade`, single binary. *Why:* best JS/CSS ecosystem (oxc, lightningcss), memory safety and
   single binary; Go and C++ discarded.
 - **[firm]** `pragma check` validates everything: JS, HTML, directives, CSS and budgets (SPEC
   §10). Confirmed by the author (2026-11-18).
@@ -193,6 +220,12 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   img without alt, control without accessible name, input without label, dialog without name,
   `data-on-click` on a non-interactive element, skipped heading levels, more than one h1,
   `tabindex` > 0, duplicate id, iframe without title, `<a>` without href.
+- **[firm]** `core/` is vendored in the app (copied by `pragma new`) and updated only by
+  `pragma upgrade`, which makes it equal to the binary's embedded runtime, docs and `base.css`
+  and touches nothing outside `core/`. `check` warns (`app/core-outdated`) when `core/`
+  differs. *Why:* after a framework change, apps kept the old runtime and agents kept reading
+  the old docs (site BUGS.md BUG-S-4). Byte comparison, no version file: nothing to keep in sync,
+  and a hand edit in `core/` is also detected.
 - **[firm v0]** `hyper` + `tokio`, no framework; `oxc`; `lightningcss`; `pragma-css`.
 - **[firm v0]** Own strict HTML parser in the compiler: every non-void tag closes explicitly;
   errors with line and column. Replaces the open `lol_html` vs `html5ever`.
@@ -226,8 +259,6 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - [ ] Better test app (replaces the removed `meu-app`): a todo app exercising every concept
       (routes and params, components and slots, state and stores, loader and SSR, server
       actions, overlays, npm packages, a11y, budgets).
-- [ ] Workers and param routes: with SPA `not_found_handling`, `/shop/123` gets `index.html`;
-      needs resolving to `shop/[id].html` (on Node, the manifest does it).
 - [ ] `db`, `kv` and `files` interfaces over `env`.
 - [ ] Default budget values in `pragma.json`.
 - [ ] Publishing: release pipeline (cargo-dist), per-platform npm packages,

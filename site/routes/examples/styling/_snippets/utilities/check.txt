@@ -1,0 +1,7 @@
+$ pragma check --strict
+routes/index.html:2:5 error [css/arbitrary-value] arbitrary value "w-[37px]" is not supported; use a utility from core/docs/classes.md or add a class in lib/theme.css
+routes/index.html:2:5 error [css/unknown-class] class "-mt-2" is not a supported utility nor defined in the project CSS
+routes/index.html:2:5 error [css/unknown-class] class "shadow-inner" is not a supported utility nor defined in the project CSS
+routes/index.html:2:5 error [css/unknown-class] class "text-fuchsia-500" is not a supported utility nor defined in the project CSS
+routes/index.html:2:58 error [html/style-inline] the style attribute is not allowed; use classes
+5 error(s), 0 warning(s)

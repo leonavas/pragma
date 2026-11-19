@@ -1,0 +1,7 @@
+<span .badge-active="$active" :title="$label">
+  <if $icon>
+    <svg class="badge-icon" viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="3"></circle></svg>
+  </if>
+  <span :text="$label"></span>
+  <span class="badge-note"><slot>default text</slot></span>
+</span>

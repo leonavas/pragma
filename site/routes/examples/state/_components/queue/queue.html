@@ -1,0 +1,25 @@
+<div class="grid w-full max-w-sm gap-3">
+  <form class="flex gap-2" @submit="add">
+    <input class="queue-input" aria-label="New job" placeholder="New job" :model="$draft">
+    <button class="btn btn-small" :disabled="$blank">Add</button>
+  </form>
+  <ul class="grid gap-1">
+    <for job in $jobs key=job.id>
+      <li class="queue-row" .is-done="job.done">
+        <input type="checkbox" class="queue-check" :checked="job.done" :aria-label="job.title" @change="toggle">
+        <span class="queue-title" :text="job.title"></span>
+        <button type="button" class="queue-remove" @click="remove" aria-label="Remove job">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" fill="none"></path></svg>
+        </button>
+      </li>
+    </for>
+    <empty>
+      <li class="queue-empty">Queue is empty.</li>
+    </empty>
+  </ul>
+  <div class="flex items-center justify-between gap-3">
+    <p class="font-mono text-xs text-faint" :text="$summary"></p>
+    <button type="button" class="btn btn-small btn-primary" @click="save" :disabled="$saving" :text="$saveText"></button>
+  </div>
+  <p class="font-mono text-xs text-faint" role="status" :show="$savedAt">saved at <span :text="$savedAt"></span></p>
+</div>

@@ -1,0 +1,13 @@
+<title>Go to · routing demo</title>
+<meta name="robots" content="noindex">
+
+<c-demo-page>
+  <p-demo-nav></p-demo-nav>
+  <form class="flex max-w-sm flex-col items-start gap-3" @submit="open">
+    <label class="grid w-full gap-2 text-sm">
+      <span class="text-muted">Post slug</span>
+      <input class="border border-line-strong bg-sunken px-3 py-2 text-ink" :model="$slug" required>
+    </label>
+    <button class="btn btn-primary">Open post</button>
+  </form>
+</c-demo-page>

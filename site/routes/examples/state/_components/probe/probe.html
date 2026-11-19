@@ -1,0 +1,16 @@
+<div class="grid w-full max-w-sm gap-4">
+  <div class="flex flex-wrap gap-2">
+    <for target in $targets key=target.id>
+      <button type="button" class="btn btn-small" @click="inspect" :aria-label="target.name" :text="target.name"></button>
+    </for>
+    <input class="probe-input" aria-label="Type a key" placeholder="type a key" @keydown="inspectKey">
+  </div>
+  <dl class="probe-reading">
+    <for row in $reading key=row.id>
+      <div class="probe-row">
+        <dt :text="row.field"></dt>
+        <dd :text="row.value"></dd>
+      </div>
+    </for>
+  </dl>
+</div>

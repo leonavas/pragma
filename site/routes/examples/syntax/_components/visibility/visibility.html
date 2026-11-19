@@ -1,0 +1,22 @@
+<div>
+  <button type="button" class="btn btn-small" :aria-expanded="$openText" aria-controls="visibility-note" @click="toggle" :text="$buttonLabel">Show both</button>
+  <div class="visibility-panes">
+    <div class="visibility-pane">
+      <p class="label">:show</p>
+      <p id="visibility-note" class="visibility-box" :show="$open">Toggled by the hidden attribute; this node never leaves the DOM.</p>
+      <p class="visibility-empty" :show="!$open">nothing visible</p>
+    </div>
+    <div class="visibility-pane">
+      <p class="label">&lt;if&gt; + autofocus</p>
+      <if $open>
+        <label class="visibility-box">
+          <span>Created on open, focused:</span>
+          <input class="visibility-input" autofocus placeholder="Type here">
+        </label>
+      </if>
+      <else>
+        <p class="visibility-empty">not in the DOM</p>
+      </else>
+    </div>
+  </div>
+</div>

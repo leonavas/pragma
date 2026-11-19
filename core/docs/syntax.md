@@ -90,4 +90,4 @@ Compute every derived value (total, label, filter, flag) in a getter on the stat
 - In dev, a path that does not exist throws (except under `query`).
 - Markers: `data-page` (layout `<main>`), `data-reload` (`<a>` that does a full page load). Never write `data-c`, `data-tid`, `data-of`, `data-slot`: the build generates them.
 - Never write `data-*` by hand (`html/data-attribute`): `data-*` is the compiled form of the short syntax (`data-text` is `:text`, `data-on-click` is `@click`). For a dynamic style hook with many values, bind `:data-x="path"` and select it in CSS with `[data-x=value]`; for on/off, use `.name="path"`; for tests, select by role, label or id.
-- Forbidden: inline `style` and `on*`, `:class` (use `.name`), `{{ }}` and `${ }` outside `<code>`/`<pre>` (`html/interpolation`), and the legacy syntax `state.`, `props.`.
+- Forbidden: inline `style` and `on*`, `:class` (use `.name`), `{{ }}` and `${ }` outside `<code>`/`<pre>` (`html/interpolation`), the legacy syntax `state.`, `props.`, and attributes of other frameworks (`v-if`, `x-show`, `on:click`, `*ngIf`, `[disabled]`: `html/unknown-directive`).

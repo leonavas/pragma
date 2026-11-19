@@ -1,0 +1,18 @@
+<section aria-label="Cart">
+  <header class="store-panel-head">
+    <span class="font-mono text-xs text-faint">p-basket</span>
+    <button type="button" class="font-mono text-xs text-muted underline hover:text-accent" @click="clear" :disabled="shared.cart.empty">Clear</button>
+  </header>
+  <ul class="grid">
+    <for line in shared.cart.lines key=line.id>
+      <li class="store-row">
+        <span class="text-sm"><span :text="line.name"></span> <span class="font-mono text-xs text-faint">× <span :text="line.quantity"></span></span></span>
+        <button type="button" class="font-mono text-xs text-muted hover:text-accent" @click="remove" :aria-label="line.removeLabel">Remove</button>
+      </li>
+    </for>
+    <empty>
+      <li class="store-row text-sm text-faint">Nothing yet. Add from the shelf.</li>
+    </empty>
+  </ul>
+  <p class="store-row font-mono text-sm"><span class="text-faint">total</span><span class="tabular-nums" :text="shared.cart.totalLabel"></span></p>
+</section>

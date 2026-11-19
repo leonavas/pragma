@@ -171,7 +171,8 @@ async fn dev_disables_cache_and_injects_client() {
     let js = get(addr, "/_pragma/dev.js").await;
     assert_eq!(js.status, 200);
     assert_eq!(js.header("content-type"), "text/javascript; charset=utf-8");
-    assert!(js.text().contains("EventSource('/_pragma/reload')"));
+    assert!(js.text().contains("new WebSocket("));
+    assert!(js.text().contains("/_pragma/reload"));
 
     let logs = r#"{"logs":[{"severityText":"INFO","body":"hi"}]}"#;
     let len = logs.len().to_string();
@@ -186,40 +187,81 @@ async fn dev_disables_cache_and_injects_client() {
     assert_eq!(get(serve_addr, "/_pragma/dev.js").await.status, 404);
 }
 
-async fn read_until(stream: &mut TcpStream, buf: &mut String, needle: &str) {
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
-    while !buf.contains(needle) {
-        let mut chunk = [0u8; 1024];
-        let n = tokio::time::timeout_at(deadline, stream.read(&mut chunk))
-            .await
-            .unwrap_or_else(|_| panic!("expected {needle:?}, got {buf:?}"))
-            .unwrap();
-        assert!(n > 0, "connection closed; got {buf:?}");
-        buf.push_str(&String::from_utf8_lossy(&chunk[..n]));
+const WS_HANDSHAKE: &[u8] = b"GET /_pragma/reload HTTP/1.1\r\nhost: localhost\r\nupgrade: websocket\r\nconnection: Upgrade\r\nsec-websocket-version: 13\r\nsec-websocket-key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n";
+
+async fn ws_connect(addr: SocketAddr) -> TcpStream {
+    let mut stream = TcpStream::connect(addr).await.unwrap();
+    stream.write_all(WS_HANDSHAKE).await.unwrap();
+    let mut head = Vec::new();
+    while !head.ends_with(b"\r\n\r\n") {
+        head.push(stream.read_u8().await.unwrap());
     }
+    let head = String::from_utf8_lossy(&head).to_ascii_lowercase();
+    assert!(head.starts_with("http/1.1 101"), "{head}");
+    assert!(head.contains("sec-websocket-accept: s3pplmbitxaq9kygzzhzrbk+xoo="), "{head}");
+    stream
+}
+
+/// Next text frame (unmasked, from the server) as `serde_json::Value`.
+async fn ws_message(stream: &mut TcpStream) -> serde_json::Value {
+    let read = async {
+        let op = stream.read_u8().await.unwrap();
+        assert_eq!(op, 0x81, "text frame");
+        let len = match stream.read_u8().await.unwrap() {
+            126 => stream.read_u16().await.unwrap() as usize,
+            127 => stream.read_u64().await.unwrap() as usize,
+            n => n as usize,
+        };
+        let mut payload = vec![0; len];
+        stream.read_exact(&mut payload).await.unwrap();
+        serde_json::from_slice(&payload).unwrap()
+    };
+    tokio::time::timeout(Duration::from_secs(5), read).await.expect("no WebSocket message")
 }
 
 #[tokio::test]
-async fn sse_emits_reload_events() {
+async fn websocket_emits_reload_events() {
     let (addr, site) = start(Mode::Dev).await;
-    let mut stream = TcpStream::connect(addr).await.unwrap();
-    stream.write_all(b"GET /_pragma/reload HTTP/1.1\r\nhost: localhost\r\n\r\n").await.unwrap();
-    let mut buf = String::new();
-    read_until(&mut stream, &mut buf, "event: hello\n").await;
-    assert!(buf.contains("content-type: text/event-stream"));
+    let mut stream = ws_connect(addr).await;
+    assert_eq!(ws_message(&mut stream).await["type"], "hello");
 
     site.send(Event::Css("/assets/app-new.css".into()));
-    read_until(&mut stream, &mut buf, "event: css\ndata: /assets/app-new.css\n\n").await;
+    assert_eq!(ws_message(&mut stream).await, serde_json::json!({ "type": "css", "data": "/assets/app-new.css" }));
     site.send(Event::Reload);
-    read_until(&mut stream, &mut buf, "event: reload\ndata: 1\n\n").await;
-    site.send(Event::Error(r#"[{"file":"routes/index.html","line":1}]"#.into()));
-    read_until(&mut stream, &mut buf, "event: error\ndata: [{\"file\":\"routes/index.html\",\"line\":1}]\n\n").await;
+    assert_eq!(ws_message(&mut stream).await["type"], "reload");
+    let errors = r#"[{"file":"routes/index.html","line":1}]"#;
+    site.send(Event::Error(errors.into()));
+    assert_eq!(ws_message(&mut stream).await, serde_json::json!({ "type": "error", "data": errors }));
 
     // a client connecting after a failed build gets the error right away
-    let mut late = TcpStream::connect(addr).await.unwrap();
-    late.write_all(b"GET /_pragma/reload HTTP/1.1\r\nhost: localhost\r\n\r\n").await.unwrap();
-    let mut buf = String::new();
-    read_until(&mut late, &mut buf, "event: error\n").await;
+    let mut late = ws_connect(addr).await;
+    assert_eq!(ws_message(&mut late).await["type"], "hello");
+    assert_eq!(ws_message(&mut late).await["type"], "error");
+
+    // close frame from the client (masked, empty) gets a close frame back
+    late.write_all(&[0x88, 0x80, 1, 2, 3, 4]).await.unwrap();
+    let mut reply = [0u8; 2];
+    late.read_exact(&mut reply).await.unwrap();
+    assert_eq!(reply, [0x88, 0]);
+
+    // plain GET (old EventSource client): no stream that would hold a connection
+    assert_eq!(get(addr, "/_pragma/reload").await.status, 426);
+}
+
+#[tokio::test]
+async fn many_reload_sockets_leave_http_working() {
+    let (addr, site) = start(Mode::Dev).await;
+    let mut sockets = Vec::new();
+    for _ in 0..12 {
+        let mut s = ws_connect(addr).await;
+        ws_message(&mut s).await;
+        sockets.push(s);
+    }
+    assert_eq!(get(addr, "/_pragma/dev.js").await.status, 200);
+    site.send(Event::Reload);
+    for s in &mut sockets {
+        assert_eq!(ws_message(s).await["type"], "reload");
+    }
 }
 
 async fn fake_node() -> u16 {

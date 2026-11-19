@@ -1,0 +1,2 @@
+$ pragma check --strict
+error [html/class] :class is not allowed: write static classes in class="…" and toggle each one with .name="path" (e.g. .text-warning-700="$warn")

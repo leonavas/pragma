@@ -3,6 +3,7 @@ pub mod new;
 pub mod node;
 pub mod report;
 pub mod server;
+pub mod upgrade;
 
 use report::{dim, print_diagnostics, print_summary, red};
 use std::collections::HashMap;
@@ -17,6 +18,7 @@ usage:
   pragma build                                  build dist/ for production
   pragma check [--strict]                       check HTML, CSS, JS and budgets (--strict: warnings become errors)
   pragma serve [--port 3000] [--host 127.0.0.1] serve dist/ as in production
+  pragma upgrade                                update core/ (runtime, docs, base.css) to this version
 
 options:
   -h, --help      show this help
@@ -49,6 +51,7 @@ pub fn run(args: Vec<String>) -> i32 {
             parse(&rest, &[]).and_then(|a| no_positional(&a)).and_then(|_| cmd_check(strict))
         }
         "serve" => cmd_serve(rest),
+        "upgrade" => parse(rest, &[]).and_then(|a| no_positional(&a)).and_then(|_| cmd_upgrade()),
         other => Err(format!("unknown command '{other}'; see `pragma --help`")),
     };
     result.unwrap_or_else(|message| {
@@ -145,13 +148,31 @@ fn cmd_build() -> Result<i32, String> {
 
 fn cmd_check(strict: bool) -> Result<i32, String> {
     let root = app_root()?;
-    let mut diagnostics = pragma_compiler::check(&root);
+    let mut diagnostics: Vec<_> = upgrade::outdated(&root).into_iter().collect();
+    diagnostics.extend(pragma_compiler::check(&root));
     let status = check_status(&mut diagnostics, strict);
     print_diagnostics(&root, &diagnostics);
     if diagnostics.is_empty() {
         println!("no problems found");
     }
     Ok(status)
+}
+
+fn cmd_upgrade() -> Result<i32, String> {
+    let root = app_root()?;
+    let version = env!("CARGO_PKG_VERSION");
+    let changes = upgrade::upgrade(&root)?;
+    if changes.is_empty() {
+        println!("core/ is already at pragma {version}");
+        return Ok(0);
+    }
+    for (label, paths) in [("updated", &changes.updated), ("added", &changes.added), ("removed", &changes.removed)] {
+        for path in paths {
+            println!("  {label:<8} {path}");
+        }
+    }
+    println!("core/ upgraded to pragma {version} ({} file(s) changed); files outside core/ were not touched", changes.len());
+    Ok(0)
 }
 
 /// Warnings do not fail the check, except with `--strict`.
@@ -207,7 +228,7 @@ fn cmd_serve(args: &[String]) -> Result<i32, String> {
         let site = tokio::task::spawn_blocking(move || server::Site::new(client, server::Mode::Serve)).await.map_err(|e| e.to_string())?;
         println!("{}", dim(&format!("files compressed in {} ms", started.elapsed().as_millis())));
         let listener = tokio::net::TcpListener::bind((host.as_str(), port)).await.map_err(|e| format!("cannot listen on {host}:{port}: {e}"))?;
-        let mut node = node::Node::new(root.join("dist/server/node.mjs"), root.clone());
+        let mut node = node::Node::new(root.join("dist/server/node.mjs"), root.clone(), false);
         node.sync(&site).await;
         tokio::spawn(server::serve(listener, site));
         println!("pragma serve at http://{}:{port}", dev::display_host(&host));

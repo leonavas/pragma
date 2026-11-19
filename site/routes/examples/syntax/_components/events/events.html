@@ -1,0 +1,15 @@
+<div>
+  <form class="events-form" @submit="save">
+    <input class="events-input" aria-label="Task title" placeholder="Type, press Esc or Enter" :model="$draft" @input="typed" @keydown="pressed" @focusout="left">
+    <button class="btn btn-small">Save</button>
+  </form>
+  <p class="events-target" @dblclick="doubled">Double-click this line</p>
+  <ol class="events-log" aria-label="Event log" aria-live="polite">
+    <for entry in $entries key=entry.id>
+      <li class="events-entry"><span class="events-name" :text="entry.name"></span><span :text="entry.detail"></span></li>
+    </for>
+    <empty>
+      <li class="events-entry events-idle">No events yet</li>
+    </empty>
+  </ol>
+</div>

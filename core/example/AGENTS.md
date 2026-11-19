@@ -18,7 +18,7 @@ Blocks are tags: `<if v>`, `<else-if v>`, `<else>`, `<for x in v key=x.id>`, `<e
 - Never write comments. The code is the documentation.
 - Names say what a thing is or does. No vague (`tmp`, `data`, `info`) or short (`t`, `e`) names,
   except `i`, `j`, `k`, `id`, `ok`, `el`, `ctx`, `url`, `log` and parameters of one-expression arrows.
-- Fixed structure; never edit `core/`. Reuse components before creating new ones.
+- Fixed structure; never edit `core/` (`pragma upgrade` updates it). Reuse components before creating new ones.
 - Overlays only with `c-modal`, `c-alert`, `c-dropdown`.
 - Data comes from `load` in `.server.js`, with a skeleton.
 - CSS: utilities from `classes.md`; a custom class only when a combination repeats 3+ times. No inline `style`.

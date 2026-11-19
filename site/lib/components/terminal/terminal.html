@@ -1,0 +1,19 @@
+<figure>
+  <figcaption class="term-bar min-h-10">
+    <span class="term-dot" aria-hidden="true"></span>
+    <span class="min-w-0 flex-1 truncate" :text="$title"></span>
+    <if $copy>
+      <button type="button" class="term-copy inline-flex shrink-0 cursor-pointer items-center gap-2 font-mono text-xs hover:text-ink" @click="copyCommands" .text-accent="$copied" :aria-label="$copyLabel">
+        <if $copied>
+          <svg class="term-check size-3.5" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"></path></svg>
+        </if>
+        <else>
+          <svg class="size-3.5" viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" fill="none" stroke="currentColor"></rect><path d="M10.5 3.5v-1h-8v8h1" fill="none" stroke="currentColor"></path></svg>
+        </else>
+        <span :text="$copyText"></span>
+      </button>
+    </if>
+  </figcaption>
+  <slot></slot>
+  <p class="sr-only" role="status" :text="$announcement"></p>
+</figure>

@@ -178,6 +178,12 @@ const GRID_TPL: &str = "repeat(#, minmax(0, 1fr))";
 
 #[rustfmt::skip]
 pub static RULES: &[Rule] = &[
+    // Accessibility, first as in Tailwind v4: the skip link `sr-only focus:not-sr-only focus:fixed
+    // focus:p-2` needs position, inset and spacing utilities to come after not-sr-only (BUG-S-14).
+    r(7, &[("", "$")], &[List(&[
+        ("sr-only", "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border-width:0"),
+        ("not-sr-only", "position:static;width:auto;height:auto;padding:0;margin:0;overflow:visible;clip-path:none;white-space:normal"),
+    ])]),
     // Layout
     r(0, &[("", "display:$")], &[List(&[
         ("block", "block"), ("inline-block", "inline-block"), ("inline", "inline"),
@@ -377,10 +383,6 @@ pub static RULES: &[Rule] = &[
     r(7, &[("pointer-events", "pointer-events:$")], &[List(&[("none", "none"), ("auto", "auto")])]),
     r(7, &[("select", "-webkit-user-select:$;user-select:$")], &[List(&[
         ("none", "none"), ("text", "text"), ("all", "all"), ("auto", "auto"),
-    ])]),
-    r(7, &[("", "$")], &[List(&[
-        ("sr-only", "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border-width:0"),
-        ("not-sr-only", "position:static;width:auto;height:auto;padding:0;margin:0;overflow:visible;clip-path:none;white-space:normal"),
     ])]),
     // Transition and media
     r(8, &[("transition", "transition-property:$;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:var(--tw-duration, 150ms)")], &[List(&[

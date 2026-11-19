@@ -1,33 +1,42 @@
-const source = new EventSource('/_pragma/reload')
+// WebSocket, not EventSource: an EventSource per tab uses up the 6 HTTP/1.1 connections per host.
 let boot = null
 let overlay = null
 
-source.addEventListener('hello', (event) => {
-  if (boot && boot !== event.data) location.reload()
-  boot = event.data
-})
+connect()
 
-source.addEventListener('reload', () => location.reload())
+function connect() {
+  const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/_pragma/reload`)
+  socket.addEventListener('message', (event) => {
+    const { type, data } = JSON.parse(event.data)
+    if (type === 'hello') {
+      if (boot && boot !== data) location.reload()
+      boot = data
+    } else if (type === 'reload') {
+      location.reload()
+    } else if (type === 'css') {
+      swapCss(data)
+    } else if (type === 'error') {
+      showOverlay(JSON.parse(data))
+    }
+  })
+  // the dev server restarted or is down: retry, and `hello` reloads if it is a new process
+  socket.addEventListener('close', () => setTimeout(connect, 1000), { once: true })
+}
 
-source.addEventListener('css', (event) => {
+function swapCss(href) {
   hideOverlay()
   for (const link of document.querySelectorAll('link[rel="stylesheet"]')) {
     const url = new URL(link.href, location.href)
     if (url.origin !== location.origin || !url.pathname.endsWith('.css')) continue
     const next = link.cloneNode()
     // In dev the CSS name does not change (/assets/app.css): without ?t= the browser does not refetch.
-    next.href = (event.data && url.pathname.startsWith('/assets/') ? event.data : url.pathname) + '?t=' + Date.now()
+    next.href = (href && url.pathname.startsWith('/assets/') ? href : url.pathname) + '?t=' + Date.now()
     // the old sheet is removed only after the new one loads, to avoid a flash of unstyled content
     next.addEventListener('load', () => link.remove(), { once: true })
     next.addEventListener('error', () => next.remove(), { once: true })
     link.after(next)
   }
-})
-
-// a dropped connection also fires 'error', but as a plain Event without data
-source.addEventListener('error', (event) => {
-  if (event instanceof MessageEvent) showOverlay(JSON.parse(event.data))
-})
+}
 
 function showOverlay(diagnostics) {
   hideOverlay()

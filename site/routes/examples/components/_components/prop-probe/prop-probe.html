@@ -1,0 +1,12 @@
+<dl>
+  <dt class="probe-call" :text="$call"></dt>
+  <dd class="probe-row">
+    <span>HTML <code>$locked</code></span>
+    <if $locked><strong class="probe-yes">truthy</strong></if>
+    <else><strong class="probe-no">falsy</strong></else>
+  </dd>
+  <dd class="probe-row">
+    <span>JS <code>ctx.$.locked</code></span>
+    <strong .probe-yes="$jsTruthy" .probe-no="$jsFalsy" :text="$jsReading"></strong>
+  </dd>
+</dl>

@@ -204,6 +204,26 @@ fn responsive_and_order() {
 }
 
 #[test]
+fn skip_link_not_sr_only_before_layout() {
+    let g = run(&[
+        "sr-only",
+        "focus:not-sr-only",
+        "focus:fixed",
+        "focus:left-4",
+        "focus:top-3",
+        "focus:z-50",
+        "focus:p-2",
+    ]);
+    assert!(g.unknown.is_empty(), "{:?}", g.unknown);
+    let css = &g.css;
+    let pos = |s: &str| css.find(s).unwrap_or_else(|| panic!("missing {s} in\n{css}"));
+    assert!(pos(".sr-only ") < pos(r".focus\:not-sr-only"));
+    for later in [r".focus\:fixed", r".focus\:left-4", r".focus\:top-3", r".focus\:z-50", r".focus\:p-2"] {
+        assert!(pos(r".focus\:not-sr-only") < pos(later), "{later} must come after not-sr-only:\n{css}");
+    }
+}
+
+#[test]
 fn children_selectors() {
     let g = run(&[
         "space-y-4",

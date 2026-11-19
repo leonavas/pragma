@@ -1,0 +1,17 @@
+<section aria-label="Shelf">
+  <header class="store-panel-head">
+    <span class="font-mono text-xs text-faint">p-shelf</span>
+    <span class="font-mono text-xs text-muted">in cart: <span class="text-accent tabular-nums" :text="shared.cart.count"></span></span>
+  </header>
+  <ul class="grid">
+    <for product in $products key=product.id>
+      <li class="store-row">
+        <span class="text-sm" :text="product.name"></span>
+        <span class="flex items-center gap-3">
+          <span class="font-mono text-xs text-faint tabular-nums" :text="product.priceLabel"></span>
+          <button type="button" class="btn btn-small" @click="add" :aria-label="product.addLabel">Add</button>
+        </span>
+      </li>
+    </for>
+  </ul>
+</section>

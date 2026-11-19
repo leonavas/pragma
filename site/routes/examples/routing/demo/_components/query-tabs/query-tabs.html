@@ -1,0 +1,12 @@
+<div>
+  <nav class="query-tabs-list" aria-label="Product sections">
+    <for tab in $tabs key=tab.id>
+      <a class="query-tabs-link" :href="tab.href" :aria-current="tab.current" :text="tab.label"></a>
+    </for>
+  </nav>
+  <p class="query-tabs-panel" :text="$body"></p>
+  <p class="text-sm text-faint">
+    <span>query.tab = </span><code class="text-ink" :text="$queryText"></code>
+  </p>
+  <button type="button" class="btn btn-small" @click="bump" :text="$bumpLabel">Clicked 0 times</button>
+</div>

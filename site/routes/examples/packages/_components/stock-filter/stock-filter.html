@@ -1,0 +1,16 @@
+<div>
+  <label for="stock-term" class="stock-filter-label">Filter products</label>
+  <input id="stock-term" type="search" class="stock-filter-input" placeholder="tea, bread, oat..." autocomplete="off" :model="$term" @input="scheduleFilter">
+  <p class="stock-filter-counts"><span :text="$keystrokesText"></span><span :text="$runsText"></span></p>
+  <ul class="stock-filter-groups">
+    <for group in $groups key=group.category>
+      <li class="stock-filter-group">
+        <span class="stock-filter-category" :text="group.category"></span>
+        <span class="stock-filter-names" :text="group.names"></span>
+      </li>
+    </for>
+    <empty>
+      <li class="stock-filter-empty">No product matches.</li>
+    </empty>
+  </ul>
+</div>

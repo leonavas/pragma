@@ -1,0 +1,26 @@
+<dl>
+  <div class="env-vars-row">
+    <dt><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></dt>
+    <dd>Base URL of an OTLP/HTTP collector. Records go to <code>/v1/logs</code> as OTLP JSON. Unset: one JSON line per record on stdout.</dd>
+  </div>
+  <div class="env-vars-row">
+    <dt><code>OTEL_EXPORTER_OTLP_LOGS_ENDPOINT</code></dt>
+    <dd>Full logs URL; wins over the base endpoint.</dd>
+  </div>
+  <div class="env-vars-row">
+    <dt><code>OTEL_EXPORTER_OTLP_HEADERS</code></dt>
+    <dd>Comma-separated <code>key=value</code> pairs sent to the collector, for an API key.</dd>
+  </div>
+  <div class="env-vars-row">
+    <dt><code>OTEL_SERVICE_NAME</code></dt>
+    <dd>Server <code>service.name</code>. Default: <code>name</code> from <code>pragma.json</code>. Client batches use the page hostname.</dd>
+  </div>
+  <div class="env-vars-row">
+    <dt><code>OTEL_RESOURCE_ATTRIBUTES</code></dt>
+    <dd>Extra resource attributes, <code>deployment.environment=prod,service.version=1.4.0</code>.</dd>
+  </div>
+  <div class="env-vars-row">
+    <dt><code>PRAGMA_LOG_LEVEL</code></dt>
+    <dd>Server minimum level: <code>debug</code>, <code>info</code>, <code>warn</code> or <code>error</code>. Default <code>info</code> in production; <code>pragma dev</code> sets <code>debug</code>, so server <code>log.debug</code> shows up while developing.</dd>
+  </div>
+</dl>

@@ -1,0 +1,7 @@
+[
+  { "pattern": "/", "html": "/index.html", "modules": [], "loader": false, "ssr": false },
+  { "pattern": "/shop", "html": "/shop/index.html", "modules": [], "loader": false, "ssr": false },
+  { "pattern": "/shop/:id", "html": "/shop/[id].html", "modules": [], "loader": true, "ssr": true },
+  { "pattern": "/shop/new", "html": "/shop/new.html", "modules": [], "loader": false, "ssr": false },
+  { "pattern": "/about", "html": "/about/index.html", "modules": [], "loader": true, "ssr": true }
+]

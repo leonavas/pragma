@@ -220,12 +220,36 @@ fn describe(kind: &str, text: &str, id: &str, fallback: &'static str) -> (&'stat
                 (crate::deps::RULE_PACKAGE, format!("package \"{importer}\" imports \"{spec}\", which cannot be resolved; run `npm install` or `bun install`"))
             }
         }
-        "MISSING_EXPORT" => match text.split('"').nth(3).filter(|f| !is_pure_js(f)) {
-            Some(f) => (crate::deps::RULE_PACKAGE, not_js(f)),
-            None => (crate::deps::RULE_IMPORT, format!("package: {}", text.trim())),
-        },
-        _ => (fallback, format!("package: {}", text.trim())),
+        "MISSING_EXPORT" => {
+            let quoted: Vec<&str> = text.split('"').skip(1).step_by(2).collect();
+            let (name, exporter, importer) = (quoted.first().copied().unwrap_or("?"), quoted.get(1).copied(), quoted.get(2).copied());
+            if let Some(file) = exporter.filter(|f| !is_pure_js(f)) {
+                return (crate::deps::RULE_PACKAGE, not_js(file));
+            }
+            let exporter = exporter.and_then(package_of).unwrap_or_else(|| "the package".into());
+            match importer.and_then(package_of).filter(|pkg| *pkg != exporter) {
+                Some(pkg) => (crate::deps::RULE_PACKAGE, format!("package \"{pkg}\" imports `{name}` from \"{exporter}\", which does not export it")),
+                None => (crate::deps::RULE_IMPORT, format!("`{name}` is not exported by {exporter}")),
+            }
+        }
+        _ => (fallback, format!("package: {}", tidy(text.trim()))),
     }
+}
+
+/// Rolldown names its inputs by path: keep package paths from `node_modules/`, and hide the
+/// synthetic entry files in the build's temp cache (they are the app's own imports).
+fn tidy(text: &str) -> String {
+    let parts: Vec<String> = text
+        .split('"')
+        .enumerate()
+        .map(|(i, part)| match part.rfind("node_modules/") {
+            _ if i % 2 == 0 => part.to_owned(),
+            Some(at) => part[at..].to_owned(),
+            None if part.contains("npm/entries/") => "the app's imports".to_owned(),
+            None => part.to_owned(),
+        })
+        .collect();
+    parts.join("\"")
 }
 
 fn push_once(diags: &mut Vec<Diagnostic>, d: Diagnostic) {

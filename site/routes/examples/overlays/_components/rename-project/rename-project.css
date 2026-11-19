@@ -1,0 +1,27 @@
+[data-c="rename-project"] {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+}
+[data-c="rename-project"] .rename-current {
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+}
+[data-c="rename-project"] .rename-current strong { color: var(--color-ink); font-weight: 500; }
+[data-c="rename-project"] .rename-field {
+  display: grid;
+  gap: 0.5rem;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+[data-c="rename-project"] .rename-field input {
+  height: 2.5rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-sunken);
+  color: var(--color-ink);
+  font-size: 0.875rem;
+}
+[data-c="rename-project"] .rename-field input:focus-visible { outline-offset: 0; border-color: var(--color-accent); }

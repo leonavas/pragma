@@ -1,0 +1,14 @@
+<title>Wrong</title>
+<p data-text="$name">x</p>
+<p :text="$items.length > 0">x</p>
+<p :text="$user.name.toUpperCase()">x</p>
+<p style="color: red">x</p>
+<button onclick="save()">Save</button>
+<p :style="$css">x</p>
+<p :class="$tone">x</p>
+<p>{{ $name }}</p>
+<if test="$open"><p>x</p></if>
+<for item in $items><p :text="item.name"></p></for>
+<p :text="state.name">x</p>
+<p v-if="$open">x</p>
+<p data-tone="ok">x</p>

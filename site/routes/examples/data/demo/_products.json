@@ -1,0 +1,8 @@
+[
+  { "id": "kbd-60", "name": "60% keyboard", "category": "hardware", "price": 89 },
+  { "id": "usb-hub", "name": "USB-C hub, 7 ports", "category": "hardware", "price": 42 },
+  { "id": "desk-mat", "name": "Felt desk mat", "category": "hardware", "price": 24 },
+  { "id": "sicp", "name": "Structure and Interpretation", "category": "books", "price": 55 },
+  { "id": "tao", "name": "The Art of Unix Programming", "category": "books", "price": 38 },
+  { "id": "ostep", "name": "Operating Systems: Three Easy Pieces", "category": "books", "price": 0 }
+]

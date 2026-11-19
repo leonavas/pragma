@@ -1,0 +1,8 @@
+<form @submit="submit" novalidate>
+  <label for="signup-email" class="email-check-label">Work email</label>
+  <div class="email-check-row">
+    <input id="signup-email" type="email" class="email-check-input" autocomplete="off" spellcheck="false" :model="$email" :aria-invalid="$ariaInvalid" aria-describedby="signup-email-status">
+    <button type="submit" class="btn btn-small" :disabled="$invalid">Join</button>
+  </div>
+  <p id="signup-email-status" class="email-check-status" role="status" .is-valid="$valid" :text="$status"></p>
+</form>

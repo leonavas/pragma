@@ -1,0 +1,264 @@
+@font-face {
+  font-family: "Martian Mono";
+  src: url("/fonts/martian-mono.woff2") format("woff2-variations");
+  font-weight: 100 800;
+  font-stretch: 75% 112.5%;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Hanken Grotesk";
+  src: url("/fonts/hanken-grotesk.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@layer tokens {
+  :root {
+    color-scheme: dark;
+
+    --font-mono: "Martian Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+
+    --color-ground: oklch(0.158 0.006 255);
+    --color-sunken: oklch(0.132 0.006 255);
+    --color-surface: oklch(0.192 0.007 255);
+    --color-raised: oklch(0.225 0.008 255);
+    --color-line: oklch(0.285 0.008 255);
+    --color-line-strong: oklch(0.38 0.01 255);
+    --color-ink: oklch(0.945 0.004 255);
+    --color-muted: oklch(0.74 0.008 255);
+    --color-faint: oklch(0.6 0.008 255);
+    --color-accent: oklch(0.9 0.185 127);
+    --color-accent-ink: oklch(0.2 0.04 127);
+
+    --color-primary-300: oklch(0.92 0.17 127);
+    --color-primary-500: oklch(0.84 0.18 127);
+    --color-primary-600: oklch(0.74 0.16 127);
+    --color-primary-800: oklch(0.45 0.1 127);
+
+    --code-keyword: oklch(0.8 0.1 295);
+    --code-string: oklch(0.84 0.085 78);
+    --code-number: oklch(0.8 0.11 45);
+    --code-tag: oklch(0.8 0.075 230);
+    --code-attribute: oklch(0.8 0.06 185);
+    --code-property: oklch(0.86 0.03 255);
+    --code-comment: oklch(0.58 0.01 255);
+    --code-punctuation: oklch(0.64 0.012 255);
+    --skeleton-bg: var(--color-raised);
+
+    --measure: 68ch;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --header-height: 3.5rem;
+    --switcher-height: 3rem;
+    --gutter: 1.25rem;
+  }
+  @media (max-width: 19.99rem) {
+    :root { --gutter: 0.75rem; }
+  }
+  @media (min-width: 48rem) {
+    :root { --gutter: 2rem; }
+  }
+}
+
+@layer base {
+  html {
+    background: var(--color-ground);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    scrollbar-color: var(--color-line-strong) var(--color-ground);
+    scroll-padding-top: calc(var(--header-height) + 1.5rem);
+  }
+  @media (max-width: 63.99rem) {
+    html:has([data-c="doc"]),
+    html:has([data-c="page-contents"]) { scroll-padding-top: calc(var(--header-height) + var(--switcher-height) + 1.5rem); }
+  }
+  body {
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  ::selection {
+    background: oklch(0.9 0.185 127 / 0.28);
+    color: var(--color-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  a {
+    text-underline-offset: 0.22em;
+    text-decoration-thickness: 1px;
+  }
+  code, kbd, samp, pre {
+    font-family: var(--font-mono);
+    font-size: 0.86em;
+    font-variant-ligatures: none;
+  }
+  pre code, pre kbd, pre samp {
+    font-size: inherit;
+  }
+  h1, h2, h3 {
+    font-family: var(--font-mono);
+    font-stretch: 80%;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+}
+
+@layer components {
+  .wrap {
+    width: 100%;
+    max-width: 76rem;
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+
+  .skip-link { position: fixed; top: -3rem; left: var(--gutter); z-index: 50; }
+  .skip-link:focus { top: 0.625rem; }
+
+  .site-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: var(--header-height);
+    border-bottom: 1px solid transparent;
+    color: var(--color-muted);
+    text-decoration: none;
+  }
+  .site-link:hover { color: var(--color-ink); }
+  .site-link:focus-visible { outline-offset: -2px; }
+  .site-link[aria-current="page"],
+  body:has([data-c="doc"]) .site-link[href="/examples"] { border-color: var(--color-accent); color: var(--color-accent); }
+  .label {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-faint);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    height: 2.75rem;
+    padding: 0 1.125rem;
+    border: 1px solid var(--color-line-strong);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.18s var(--ease-out), border-color 0.18s var(--ease-out), color 0.18s var(--ease-out);
+  }
+  .btn:hover { border-color: var(--color-muted); background: var(--color-surface); }
+  .btn:disabled { opacity: 0.45; pointer-events: none; }
+  .btn-primary { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-accent-ink); }
+  .btn-primary:hover { border-color: var(--color-primary-300); background: var(--color-primary-300); }
+  .btn-primary:focus-visible { outline-color: var(--color-ink); }
+  .btn-danger { border-color: transparent; background: var(--color-danger-500); color: var(--color-white); }
+  .btn-danger:hover { background: var(--color-danger-600); }
+  .btn-small { height: 2rem; padding: 0 0.75rem; font-size: 0.75rem; }
+
+  .dialog {
+    width: min(100% - 2rem, 30rem);
+    margin: auto;
+    padding: 1.5rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: 0 24px 48px -12px oklch(0 0 0 / 0.6);
+  }
+  .dialog[open] { animation: dialog-in 0.22s var(--ease-out); }
+  .dialog::backdrop { background: oklch(0.1 0.006 255 / 0.7); }
+  @keyframes dialog-in {
+    from { opacity: 0; translate: 0 0.5rem; }
+  }
+
+  .nav-link {
+    color: var(--color-muted);
+    text-decoration: none;
+    transition: color 0.15s var(--ease-out);
+  }
+  .nav-link:hover { color: var(--color-ink); }
+  .nav-link[aria-current="page"] { color: var(--color-accent); }
+
+  .prose {
+    max-width: var(--measure);
+    color: var(--color-muted);
+    font-size: 1.0625rem;
+    line-height: 1.7;
+  }
+  .prose > * + * { margin-top: 1.1em; }
+  .prose strong { color: var(--color-ink); font-weight: 600; }
+  .prose a { color: var(--color-ink); text-decoration: underline; text-decoration-color: var(--color-line-strong); }
+  .prose a:hover { text-decoration-color: var(--color-accent); }
+  .prose code {
+    padding: 0.15em 0.4em;
+    background: var(--color-raised);
+    color: var(--color-ink);
+    font-size: 0.78em;
+    overflow-wrap: anywhere;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+  }
+  @media (min-width: 48rem) {
+    .prose code { white-space: nowrap; }
+  }
+  .prose pre code {
+    padding: 0;
+    background: none;
+    font-size: inherit;
+    white-space: inherit;
+  }
+  .prose ul { padding-left: 1.1em; list-style: square; }
+  .prose li::marker { color: var(--color-faint); }
+
+
+  [data-hl="hl-string"] { color: var(--code-string); }
+  [data-hl="hl-name"] { color: var(--code-tag); }
+  [data-hl="hl-attr"] { color: var(--code-attribute); }
+  [data-hl="hl-comment"], [data-hl="hl-meta"] { color: var(--code-comment); }
+  [data-hl="hl-tag"] { color: var(--code-punctuation); }
+  [data-hl="hl-directive"], [data-hl="hl-block"] { color: var(--color-accent); }
+  [data-hl="hl-component"] { color: var(--code-number); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dialog[open] { animation: none; }
+    .btn, .nav-link { transition: none; }
+  }
+}
+
+@layer components {
+  .doc-section {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
+    padding-block: 3.5rem;
+    border-bottom: 1px solid var(--color-line);
+  }
+  .doc-section > h2 {
+    font-size: 1.625rem;
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: -0.025em;
+  }
+  .doc-section > h2 code {
+    font-size: 0.85em;
+    color: var(--color-accent);
+  }
+  .doc-section code { overflow-wrap: anywhere; }
+}

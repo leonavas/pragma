@@ -1,0 +1,43 @@
+<div>
+  <if $hasChoice>
+    <div class="response-tabs" role="group" aria-label="Requested address">
+      <for tab in $tabs key=tab.path>
+        <button type="button" class="response-tab" :aria-pressed="tab.pressed" @click="select" :text="tab.label"></button>
+      </for>
+    </div>
+  </if>
+  <if page.loading>
+    <div class="response-skeleton" aria-busy="true" aria-label="Requesting the page">
+      <span class="skeleton"></span>
+      <span class="skeleton"></span>
+      <span class="skeleton"></span>
+    </div>
+  </if>
+  <else-if page.error>
+    <p class="response-error" role="alert" :text="page.error.message"></p>
+  </else-if>
+  <else>
+    <div class="response-body">
+      <div>
+        <div class="response-request">
+          <p class="response-path"><span class="response-method">GET</span><span :text="$active.path"></span></p>
+          <p class="response-status" :data-tone="$active.tone"><span class="tabular-nums" :text="$statusText"></span><span class="response-type" :text="$active.type"></span></p>
+        </div>
+        <if $hasLines>
+          <pre class="response-code" tabindex="0" :aria-label="$codeLabel"><code><for line in $lines key=line.id><span class="response-line" :data-origin="line.origin"><span class="response-origin" :data-origin="line.origin" :text="line.origin"></span><span class="response-text"><for token in line.tokens key=token.id><span :data-hl="token.kind" :text="token.text"></span></for></span></span></for></code></pre>
+        </if>
+      </div>
+      <p class="response-note" :data-tone="$active.tone" :text="$active.note"></p>
+      <if $card>
+        <figure class="preview">
+          <img class="preview-image" :src="$card.imagePath" :alt="$card.imageAlt" width="1200" height="630" loading="lazy">
+          <figcaption class="preview-body">
+            <span class="preview-host" :text="$card.host"></span>
+            <strong class="preview-title" :text="$card.title"></strong>
+            <span class="preview-description" :text="$card.description"></span>
+          </figcaption>
+        </figure>
+      </if>
+    </div>
+  </else>
+</div>

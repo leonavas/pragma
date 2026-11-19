@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full, combinators::BoxBody};
-use hyper::body::{Frame, Incoming};
+use hyper::body::Incoming;
 use hyper::header::{self, HeaderMap, HeaderValue};
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::client::legacy::{Client, connect::HttpConnector};
@@ -9,12 +9,11 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::pin::Pin;
 use std::sync::{Arc, Mutex, RwLock};
-use std::task::{Context, Poll};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::broadcast;
 
 pub type Body = BoxBody<Bytes, std::io::Error>;
 
@@ -136,6 +135,7 @@ pub async fn serve(listener: TcpListener, site: Arc<Site>) {
             let service = hyper::service::service_fn(move |req| handle(site.clone(), req));
             let _ = hyper::server::conn::http1::Builder::new()
                 .serve_connection(TokioIo::new(stream), service)
+                .with_upgrades()
                 .await;
         });
     }
@@ -145,7 +145,7 @@ async fn handle(site: Arc<Site>, req: Request<Incoming>) -> Result<Response<Body
     let raw = req.uri().path().to_owned();
     if site.mode == Mode::Dev {
         match raw.as_str() {
-            "/_pragma/reload" => return Ok(sse(&site)),
+            "/_pragma/reload" => return Ok(reload_socket(&site, req)),
             "/_pragma/dev.js" => {
                 return Ok(response(StatusCode::OK, "text/javascript; charset=utf-8", "no-store", Bytes::from_static(DEV_JS.as_bytes())));
             }
@@ -161,8 +161,10 @@ async fn handle(site: Arc<Site>, req: Request<Incoming>) -> Result<Response<Body
     {
         return Ok(proxy(&site, port, req).await);
     }
-    if site.mode == Mode::Dev && path == "/_otel" && req.method() == Method::POST {
-        if let Ok(body) = req.into_body().collect().await {
+    if path == "/_otel" && req.method() == Method::POST {
+        if let Ok(body) = req.into_body().collect().await
+            && site.mode == Mode::Dev
+        {
             crate::node::print_client_logs(&body.to_bytes());
         }
         let mut res = Response::new(empty());
@@ -434,60 +436,170 @@ fn brotli(data: &[u8]) -> Option<Bytes> {
     (out.len() < data.len()).then(|| Bytes::from(out))
 }
 
-struct ChannelBody(mpsc::Receiver<Bytes>);
+/// Live reload message: `{"type":"hello"|"css"|"reload"|"error","data":"…"}` (`error` data is the diagnostics JSON).
+fn reload_message(kind: &str, data: &str) -> String {
+    serde_json::json!({ "type": kind, "data": data }).to_string()
+}
 
-impl hyper::body::Body for ChannelBody {
-    type Data = Bytes;
-    type Error = std::io::Error;
-
-    fn poll_frame(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Result<Frame<Bytes>, std::io::Error>>> {
-        self.0.poll_recv(cx).map(|chunk| chunk.map(|b| Ok(Frame::data(b))))
+fn event_message(event: &Event) -> String {
+    match event {
+        Event::Css(href) => reload_message("css", href),
+        Event::Reload => reload_message("reload", ""),
+        Event::Error(json) => reload_message("error", json),
     }
 }
 
-fn sse_frame(event: &Event) -> Bytes {
-    // the browser does not fire an SSE event without `data`
-    let (name, data) = match event {
-        Event::Css(href) => ("css", href.as_str()),
-        Event::Reload => ("reload", "1"),
-        Event::Error(json) => ("error", json.as_str()),
+/// Live reload over a WebSocket: browsers count an `EventSource` against the 6 HTTP/1.1
+/// connections per host, so a few open tabs stalled every other request (BUG-S-9).
+fn reload_socket(site: &Site, mut req: Request<Incoming>) -> Response<Body> {
+    let wants_ws = req.headers().get(header::UPGRADE).and_then(|v| v.to_str().ok()).is_some_and(|v| v.eq_ignore_ascii_case("websocket"));
+    let key = req.headers().get(header::SEC_WEBSOCKET_KEY).and_then(|v| v.to_str().ok()).filter(|_| wants_ws);
+    let Some(key) = key else {
+        let mut res = response(StatusCode::UPGRADE_REQUIRED, "text/plain; charset=utf-8", "no-store", Bytes::from_static(b"WebSocket only"));
+        res.headers_mut().insert(header::UPGRADE, HeaderValue::from_static("websocket"));
+        return res;
     };
-    Bytes::from(format!("event: {name}\ndata: {data}\n\n"))
-}
-
-fn sse(site: &Site) -> Response<Body> {
-    let (tx, rx) = mpsc::channel(16);
+    let accept = ws::accept(key);
+    let upgrade = hyper::upgrade::on(&mut req);
+    // subscribed before the handshake, so no event between the response and the upgrade is lost
     let mut events = site.events.subscribe();
-    let mut first = format!("retry: 1000\nevent: hello\ndata: {}\n\n", site.boot_id);
+    let mut first = vec![reload_message("hello", &site.boot_id)];
     if let Some(json) = site.last_error.lock().unwrap().clone() {
-        first.push_str(&String::from_utf8_lossy(&sse_frame(&Event::Error(json))));
+        first.push(reload_message("error", &json));
     }
     tokio::spawn(async move {
-        if tx.send(Bytes::from(first)).await.is_err() {
-            return;
-        }
-        let mut ping = tokio::time::interval(Duration::from_secs(15));
-        ping.tick().await;
-        loop {
-            let chunk = tokio::select! {
-                event = events.recv() => match event {
-                    Ok(event) => sse_frame(&event),
-                    Err(broadcast::error::RecvError::Lagged(_)) => sse_frame(&Event::Reload),
-                    Err(broadcast::error::RecvError::Closed) => return,
-                },
-                _ = ping.tick() => Bytes::from_static(b": ping\n\n"),
-            };
-            if tx.send(chunk).await.is_err() {
+        let Ok(upgraded) = upgrade.await else { return };
+        let (mut rd, mut wr) = tokio::io::split(TokioIo::new(upgraded));
+        for message in &first {
+            if ws::send(&mut wr, message).await.is_err() {
                 return;
             }
         }
+        let mut buf = [0u8; 512];
+        loop {
+            tokio::select! {
+                event = events.recv() => {
+                    let message = match event {
+                        Ok(event) => event_message(&event),
+                        Err(broadcast::error::RecvError::Lagged(_)) => event_message(&Event::Reload),
+                        Err(broadcast::error::RecvError::Closed) => return,
+                    };
+                    if ws::send(&mut wr, &message).await.is_err() {
+                        return;
+                    }
+                }
+                // the client sends nothing but a close frame (the tab is closing or navigating)
+                read = rd.read(&mut buf) => match read {
+                    Ok(n) if n > 0 && buf[0] & 0x0f != ws::CLOSE => {}
+                    Ok(n) => {
+                        if n > 0 {
+                            let _ = wr.write_all(&[0x80 | ws::CLOSE, 0]).await;
+                        }
+                        return;
+                    }
+                    Err(_) => return,
+                },
+            }
+        }
     });
-    let mut res = Response::new(ChannelBody(rx).boxed());
+    let mut res = Response::new(empty());
+    *res.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
     let h = res.headers_mut();
-    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/event-stream"));
-    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    h.insert("x-accel-buffering", HeaderValue::from_static("no"));
+    h.insert(header::UPGRADE, HeaderValue::from_static("websocket"));
+    h.insert(header::CONNECTION, HeaderValue::from_static("upgrade"));
+    h.insert(header::SEC_WEBSOCKET_ACCEPT, HeaderValue::from_str(&accept).unwrap());
     res
+}
+
+/// The server half of RFC 6455 that live reload needs: handshake and unmasked text frames.
+mod ws {
+    use tokio::io::{AsyncWrite, AsyncWriteExt};
+
+    pub const CLOSE: u8 = 0x8;
+    const TEXT: u8 = 0x1;
+    const GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+    pub fn accept(key: &str) -> String {
+        base64(&sha1(format!("{}{GUID}", key.trim()).as_bytes()))
+    }
+
+    pub fn frame(text: &str) -> Vec<u8> {
+        let len = text.len();
+        let mut out = Vec::with_capacity(len + 10);
+        out.push(0x80 | TEXT);
+        match len {
+            0..=125 => out.push(len as u8),
+            126..=0xffff => {
+                out.push(126);
+                out.extend_from_slice(&(len as u16).to_be_bytes());
+            }
+            _ => {
+                out.push(127);
+                out.extend_from_slice(&(len as u64).to_be_bytes());
+            }
+        }
+        out.extend_from_slice(text.as_bytes());
+        out
+    }
+
+    pub async fn send(w: &mut (impl AsyncWrite + Unpin), text: &str) -> std::io::Result<()> {
+        w.write_all(&frame(text)).await?;
+        w.flush().await
+    }
+
+    pub fn sha1(data: &[u8]) -> [u8; 20] {
+        let mut h: [u32; 5] = [0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0];
+        let mut msg = data.to_vec();
+        msg.push(0x80);
+        while msg.len() % 64 != 56 {
+            msg.push(0);
+        }
+        msg.extend_from_slice(&((data.len() as u64) * 8).to_be_bytes());
+        for chunk in msg.chunks(64) {
+            let mut w = [0u32; 80];
+            for (i, word) in chunk.chunks(4).enumerate() {
+                w[i] = u32::from_be_bytes([word[0], word[1], word[2], word[3]]);
+            }
+            for i in 16..80 {
+                w[i] = (w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]).rotate_left(1);
+            }
+            let [mut a, mut b, mut c, mut d, mut e] = h;
+            for (i, wi) in w.iter().enumerate() {
+                let (f, k) = match i {
+                    0..=19 => ((b & c) | (!b & d), 0x5A827999),
+                    20..=39 => (b ^ c ^ d, 0x6ED9EBA1),
+                    40..=59 => ((b & c) | (b & d) | (c & d), 0x8F1BBCDC),
+                    _ => (b ^ c ^ d, 0xCA62C1D6),
+                };
+                let t = a.rotate_left(5).wrapping_add(f).wrapping_add(e).wrapping_add(k).wrapping_add(*wi);
+                e = d;
+                d = c;
+                c = b.rotate_left(30);
+                b = a;
+                a = t;
+            }
+            for (x, y) in h.iter_mut().zip([a, b, c, d, e]) {
+                *x = x.wrapping_add(y);
+            }
+        }
+        let mut out = [0u8; 20];
+        for (i, x) in h.iter().enumerate() {
+            out[i * 4..i * 4 + 4].copy_from_slice(&x.to_be_bytes());
+        }
+        out
+    }
+
+    pub fn base64(data: &[u8]) -> String {
+        const ABC: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
+        for chunk in data.chunks(3) {
+            let n = (chunk[0] as u32) << 16 | (*chunk.get(1).unwrap_or(&0) as u32) << 8 | *chunk.get(2).unwrap_or(&0) as u32;
+            for i in 0..4 {
+                out.push(if i <= chunk.len() { ABC[(n >> (18 - 6 * i) & 63) as usize] as char } else { '=' });
+            }
+        }
+        out
+    }
 }
 
 const HOP_BY_HOP: [&str; 7] = ["connection", "keep-alive", "proxy-connection", "transfer-encoding", "te", "trailer", "upgrade"];
@@ -553,6 +665,18 @@ mod tests {
         assert!(accepts("gzip, deflate, br", "br"));
         assert!(!accepts("gzip, br;q=0", "br"));
         assert!(accepts("gzip;q=0.5", "gzip"));
+    }
+
+    #[test]
+    fn websocket_handshake_and_frames() {
+        // RFC 6455 §1.3 example
+        assert_eq!(ws::accept("dGhlIHNhbXBsZSBub25jZQ=="), "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
+        assert_eq!(ws::base64(&ws::sha1(b"abc")), "qZk+NkcGgWq6PiVxeFDCbJzQ2J0=");
+        assert_eq!(ws::base64(b"ab"), "YWI=");
+        assert_eq!(ws::frame("hi"), [0x81, 2, b'h', b'i']);
+        let long = "x".repeat(300);
+        assert_eq!(&ws::frame(&long)[..4], &[0x81, 126, 1, 44]);
+        assert_eq!(ws::frame(&"x".repeat(70_000))[1], 127);
     }
 
     #[test]

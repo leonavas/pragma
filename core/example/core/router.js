@@ -53,6 +53,16 @@ const link = el => {
   return a && !a.target && !a.hasAttribute('download') && !a.hasAttribute('data-reload') && a.origin === location.origin ? a : null
 }
 
+// modulepreload downloads and compiles without running: a route module runs only on navigation
+function preload(m) {
+  const href = new URL(m, location.href).href
+  if ([...document.querySelectorAll('link[rel=modulepreload]')].some(el => el.href === href)) return
+  const el = document.createElement('link')
+  el.rel = 'modulepreload'
+  el.href = href
+  document.head.append(el)
+}
+
 async function prefetch(href) {
   const url = new URL(href)
   if (seen.has(where(url)) || where(url) === here) return
@@ -60,7 +70,7 @@ async function prefetch(href) {
   const e = await entry(url).catch(noop)
   if (!e) return
   if (!e.ssr) text(e.html).catch(noop)
-  for (const m of e.modules ?? []) import(m).catch(noop)
+  for (const m of e.modules ?? []) preload(m)
 }
 
 function mark() {
@@ -122,7 +132,7 @@ export async function navigate(to, pop) {
     main.focus({ preventScroll: true })
     mark()
   }
-  if (document.startViewTransition) await document.startViewTransition(swap).updateCallbackDone
+  if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) await document.startViewTransition(swap).updateCallbackDone
   else swap()
   log.info('navigation', { 'url.path': url.pathname, 'pragma.route': route.pattern, 'pragma.navigation': pop ? 'pop' : 'push', 'duration_ms': Math.round(performance.now() - t0) })
   observe()

@@ -1,0 +1,132 @@
+<title>npm packages · pragma examples</title>
+<meta name="description" content="npm packages in pragma: prebundled with rolldown, tree-shaken to the names you import, loaded with import() after a click and measured against the budget.">
+<link rel="canonical" href="https://pragma.dev/examples/packages">
+<meta property="og:url" content="https://pragma.dev/examples/packages">
+<meta property="og:title" content="npm packages in pragma: tree-shaken and measured">
+<meta property="og:description" content="What valibot, es-toolkit, dayjs and highlight.js cost on a real page, and how to keep it small.">
+
+<c-doc heading="npm packages" lede="Client packages are prebundled with rolldown, tree-shaken to the names you import, and preloaded like app modules. Every byte counts toward the page budget, so the sizes below are the ones that matter.">
+  <section class="doc-section" aria-labelledby="install">
+    <h2 id="install">Install, list, import</h2>
+    <div class="prose">
+      <p>Any package manager works: pragma reads <code>package.json</code> and <code>node_modules/</code>. A client import must be listed under <code>dependencies</code>, use a quoted specifier and name what it takes. These are the three packages this page runs.</p>
+    </div>
+    <c-terminal title="~/pragma/site">
+      <pre tabindex="0" aria-label="Installing the packages used on this page"><code><span class="term-cmd">npm i valibot es-toolkit dayjs --ignore-scripts</span>
+
+added 3 packages, and audited 5 packages in 999ms
+
+found 0 vulnerabilities
+<span class="term-cmd">grep -A6 dependencies package.json</span>
+  "dependencies": {
+    <span class="term-ink">"dayjs": "^1.11.23",</span>
+    <span class="term-ink">"es-toolkit": "^1.53.2",</span>
+    "highlight.js": "^11.12.0",
+    <span class="term-ink">"valibot": "^1.5.0"</span>
+  }</code></pre>
+    </c-terminal>
+    <div class="prose">
+      <p>Each package becomes one file, <code>/assets/npm/&lt;package&gt;-&lt;hash&gt;.js</code> (<code>@date-fns/tz</code> turns into <code>date-fns__tz</code>), and code shared between packages goes to <code>/assets/npm/_*.js</code>. Pages that import it get a <code>modulepreload</code> for it. <code>process.env.NODE_ENV</code> is replaced with <code>"production"</code> in builds and <code>"development"</code> in dev.</p>
+    </div>
+  </section>
+
+  <section class="doc-section" aria-labelledby="tree-shaking">
+    <h2 id="tree-shaking">Tree shaking, measured: highlight.js on this site</h2>
+    <div class="prose">
+      <p>The code blocks on this site are colored by highlight.js. Importing the package index pulls in all 193 languages. Importing <code>highlight.js/lib/core</code> plus the three grammars the site needs is <strong>95% less gzip</strong>: the 190 unused language modules are dropped. The core itself is not shaken: its ESM entry re-exports CommonJS, and CommonJS ships whole.</p>
+      <p>The smallest chunk is the one the browser never loads. Every showcase tokenizes in <code>load</code>: <code>_source.server.js</code> runs highlight.js on Node and sends each line with its color ranges, the section pages use <code>ssr = true</code>, and <code>showcase.js</code> paints the ranges with the CSS Custom Highlight API. The code is in the first HTML and gets its colors when the component mounts, with no extra download. The client chunk exists only for the <a href="/examples/seo">SEO page</a>'s response view, which loads it with <code>import()</code>; lazy chunks are not preloaded and do not count toward the page budget.</p>
+    </div>
+    <c-showcase :source="data.examples.highlighter" caption="Sizes of dist/client/assets/npm/highlight.js-*.js after pragma build. The tabs show the server-side tokenizer and the client-side painter.">
+      <p-size-table set="highlighter" label="highlight.js bundle size by import style"></p-size-table>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="named-imports">
+    <h2 id="named-imports">Named imports: only what you use ships</h2>
+    <div class="prose">
+      <p>valibot is pure ESM with one module per function, the best case for tree shaking. This form imports eight names and ships <strong>1.35 kB gzip</strong> of valibot. The schema is a module constant; validation is a getter, so it reruns on every keystroke without any wiring.</p>
+    </div>
+    <c-showcase :source="data.examples.emailCheck" caption="Type to validate. Messages come from the schema; the button stays disabled until it passes.">
+      <p-email-check></p-email-check>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="subpaths">
+    <h2 id="subpaths">Subpath imports share one chunk</h2>
+    <div class="prose">
+      <p><code>groupBy</code> comes from the <code>es-toolkit</code> index and <code>debounce</code> from <code>es-toolkit/function</code>. Both end up in a single <code>es-toolkit-*.js</code> of <strong>0.43 kB gzip</strong>. The same two helpers from <code>lodash</code> cost 6.49 kB, because CommonJS cannot be shaken.</p>
+      <p>The debounced call gets <code>ctx</code> and writes through <code>ctx.update()</code>, which schedules a render when it runs outside an action. <code>mount</code> returns a cleanup that cancels a pending call when the component leaves the page.</p>
+    </div>
+    <c-showcase :source="data.examples.stockFilter" caption="Type quickly: keystrokes climb, filter runs only count once you pause for 300 ms.">
+      <p-stock-filter></p-stock-filter>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="lazy-import">
+    <h2 id="lazy-import">CommonJS, loaded with <code>import()</code> after a click</h2>
+    <div class="prose">
+      <p>dayjs is CommonJS, so the core and the <code>relativeTime</code> plugin ship whole: 3.69 kB gzip. When a package is only needed after an interaction, <code>await import()</code> it inside the action. The chunk is left out of the modulepreload list and the page budget, and the first paint does not wait for it.</p>
+      <p><code>import('pkg')</code> always brings the whole package, so keep it for code you need all of anyway. The default export of a CommonJS module arrives as <code>default</code>.</p>
+    </div>
+    <c-showcase :source="data.examples.relativeTime" caption="Open the network panel, then click: dayjs-*.js is requested only now.">
+      <p-relative-time></p-relative-time>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="sizes">
+    <h2 id="sizes">What common packages cost</h2>
+    <div class="prose">
+      <p>Gzip size of the <code>/assets/npm/</code> file for each import, measured with <code>pragma build</code> on the packages test app in <code>core/cli/xtask/packages/app</code>. The runtime alone is 7.6 kB gzip per page, and the starter budgets allow 15 kB of initial JS and 10 kB per route, so chart.js only fits behind an <code>import()</code>.</p>
+    </div>
+    <p-size-table set="packages" label="Gzip size per npm package import"></p-size-table>
+    <div class="prose">
+      <p>Prefer the platform first: <code>Intl</code> for dates, numbers and plurals, <code>fetch</code>, <code>crypto.randomUUID()</code>, <code>structuredClone</code>. Avoid <code>moment</code>, <code>lodash</code>, <code>axios</code>, <code>uuid</code>, <code>nanoid</code> and anything that builds HTML.</p>
+    </div>
+  </section>
+
+  <section class="doc-section" aria-labelledby="errors">
+    <h2 id="errors">Packages that fail the check</h2>
+    <div class="prose">
+      <p>The error points at the import in your file. UI frameworks are rejected because the runtime owns the DOM; Node built-ins only run in <code>.server.js</code>; remote URLs and unlisted packages have to be installed. This is real <code>pragma check</code> output.</p>
+    </div>
+    <c-terminal title="~/my-app">
+      <pre tabindex="0" aria-label="pragma check output for rejected package imports"><code><span class="term-cmd">pragma check</span>
+routes/err.js:1:27 <span class="term-err">error</span> <span class="term-ink">[js/import]</span> package "react" is a UI framework; in pragma markup lives in .html and the runtime owns the DOM
+ 1 | import { useState } from 'react'
+   |                           ^
+routes/err.js:2:27 <span class="term-err">error</span> <span class="term-ink">[js/import]</span> `groupByy` is not exported by es-toolkit
+ 2 | import { groupByy } from 'es-toolkit'
+   |                           ^
+routes/err.js:3:26 <span class="term-err">error</span> <span class="term-ink">[app/package]</span> `node:fs/promises` is a Node module and doesn't run in the browser; use it in a .server.js
+ 3 | import { readFile } from 'node:fs/promises'
+   |                          ^
+routes/err.js:4:25 <span class="term-err">error</span> <span class="term-ink">[js/import]</span> package "nanoid" is not in package.json dependencies; install with `npm i nanoid` or `bun add nanoid`
+ 4 | import { nanoid } from 'nanoid'
+   |                         ^
+<span class="term-err">4 error(s)</span>, 0 warning(s)
+<span class="term-cmd">pragma check</span>
+routes/err.js:1:24 <span class="term-err">error</span> <span class="term-ink">[js/import]</span> remote import `https://esm.sh/date-fns` is not allowed; install the package (npm i, bun add) or copy the code into the project
+ 1 | import { format } from 'https://esm.sh/date-fns'
+   |                        ^
+<span class="term-err">1 error(s)</span>, 0 warning(s)
+<span class="term-cmd">pragma check</span>
+routes/err.js:3:18 <span class="term-err">error</span> <span class="term-ink">[js/import]</span> package import `dayjs` must use quotes, not a template literal
+ 3 |     await import(`dayjs`)
+   |                  ^
+routes/err.js:5:18 <span class="term-err">error</span> <span class="term-ink">[js/import]</span> `import()` needs a quoted path or package name (`import('./chart.js')`, `import('dayjs')`); the build cannot follow a computed specifier
+ 5 |     await import(name)
+   |                  ^
+<span class="term-err">2 error(s)</span>, 0 warning(s)</code></pre>
+    </c-terminal>
+    <div class="prose">
+      <p>Also rejected, with <code>app/package</code>: TypeScript, JSX, <code>.vue</code> and <code>.svelte</code> files, and packages that import CSS or other assets. The same list covers Preact, Vue, Svelte, Solid, lit, jQuery and Alpine. A misspelled name is caught at check time, not in the browser, and so is an <code>import()</code> whose specifier is a variable.</p>
+    </div>
+  </section>
+
+  <section class="doc-section" aria-labelledby="server">
+    <h2 id="server">Packages on the server</h2>
+    <div class="prose">
+      <p>A <code>.server.js</code> file can import any package from <code>package.json</code> plus Node built-ins (<code>node:fs</code>, <code>node:crypto</code>) without listing them. Server code is not bundled: <code>dist/server/</code> keeps your imports and Node resolves <code>node_modules</code> by walking up from it. A built-in name listed in <code>package.json</code>, such as the <code>buffer</code> polyfill, is bundled for the client like any other package.</p>
+    </div>
+  </section>
+</c-doc>

@@ -16,19 +16,26 @@ pub fn create(dir: &Path) -> Result<usize, String> {
         .ok()
         .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
         .unwrap_or_else(|| "app".into());
-    let mut count = 0;
-    for (base, files) in [(dir.to_path_buf(), embedded::STARTER), (dir.join("core"), embedded::RUNTIME), (dir.join("core/docs"), embedded::DOCS)] {
-        for (rel, bytes) in files {
-            let content = if base == dir && *rel == "pragma.json" { rename(bytes, &name) } else { bytes.to_vec() };
-            write(&base.join(rel), &content)?;
-            count += 1;
-        }
+    for (rel, bytes) in embedded::STARTER {
+        let content = if *rel == "pragma.json" { rename(bytes, &name) } else { bytes.to_vec() };
+        write(&dir.join(rel), &content)?;
     }
-    write(&dir.join("core/base.css"), pragma_css::base_css().as_bytes())?;
-    Ok(count + 1)
+    let core = core_files();
+    for (rel, content) in &core {
+        write(&dir.join(rel), content)?;
+    }
+    Ok(embedded::STARTER.len() + core.len())
 }
 
-fn write(path: &Path, content: &[u8]) -> Result<(), String> {
+/// Everything this binary writes under `core/`: (path relative to the app, content).
+pub fn core_files() -> Vec<(String, &'static [u8])> {
+    let runtime = embedded::RUNTIME.iter().map(|(rel, bytes)| (format!("core/{rel}"), *bytes));
+    let docs = embedded::DOCS.iter().map(|(rel, bytes)| (format!("core/docs/{rel}"), *bytes));
+    let base = std::iter::once(("core/base.css".to_owned(), pragma_css::base_css().as_bytes()));
+    runtime.chain(docs).chain(base).collect()
+}
+
+pub(crate) fn write(path: &Path, content: &[u8]) -> Result<(), String> {
     let fail = |e: std::io::Error| format!("cannot write '{}': {e}", path.display());
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(fail)?;

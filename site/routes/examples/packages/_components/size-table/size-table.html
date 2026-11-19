@@ -1,0 +1,27 @@
+<div>
+  <table>
+    <caption class="sr-only" :text="$label"></caption>
+    <thead>
+      <tr>
+        <th scope="col">Import</th>
+        <th scope="col" class="size-table-number size-table-raw">Raw</th>
+        <th scope="col" class="size-table-number">Gzip</th>
+      </tr>
+    </thead>
+    <tbody>
+      <for row in $rows key=row.name>
+        <tr .is-shipped="row.shipped">
+          <th scope="row">
+            <span class="size-table-cell">
+              <code class="size-table-name" :text="row.name"></code>
+              <span class="size-table-note" :text="row.note"></span>
+              <meter class="size-table-bar" min="0" :max="$max" :value="row.gzip" aria-hidden="true"></meter>
+            </span>
+          </th>
+          <td class="size-table-number size-table-raw" :text="row.rawText"></td>
+          <td class="size-table-number size-table-gzip" :text="row.gzipText"></td>
+        </tr>
+      </for>
+    </tbody>
+  </table>
+</div>

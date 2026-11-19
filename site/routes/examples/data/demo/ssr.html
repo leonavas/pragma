@@ -1,0 +1,26 @@
+<title :text="data.title">SSR demo · pragma examples</title>
+<meta property="og:title" :content="data.title">
+<meta name="robots" content="noindex">
+
+<c-demo-page>
+  <dl class="grid grid-cols-2 gap-px border border-line bg-line font-mono text-xs">
+    <div class="grid gap-1 bg-ground p-3">
+      <dt class="text-faint">server rendered at</dt>
+      <dd class="tabular-nums" :text="data.renderedAt">--</dd>
+    </div>
+    <div class="grid gap-1 bg-ground p-3">
+      <dt class="text-faint">client bound at</dt>
+      <dd class="tabular-nums text-accent" :text="$hydratedAt">waiting for JS</dd>
+    </div>
+  </dl>
+  <ul class="grid gap-2" aria-label="Rendering strategies">
+    <for option in data.options key=option.id>
+      <li class="flex items-center justify-between gap-4 border border-line px-4 py-3">
+        <span class="text-sm" :text="option.label"></span>
+        <button type="button" class="btn btn-small tabular-nums" @click="vote" :aria-label="option.voteLabel" :text="option.total"></button>
+      </li>
+    </for>
+  </ul>
+  <p class="font-mono text-xs text-danger-300" role="status" :text="$error"></p>
+  <p class="font-mono text-xs text-faint">first request by <span :text="data.agent"></span></p>
+</c-demo-page>

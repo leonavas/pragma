@@ -328,12 +328,38 @@ test('router: prefetch on hover and by viewport', async () => {
   const b = await open('/b')
   await b.waitForFunction(() => performance.getEntriesByType('resource').some(e => e.name.endsWith('/assets/ssr.js')))
   await b.waitForFunction(() => performance.getEntriesByType('resource').some(e => e.name.endsWith('/directives.html')))
+  // a link in view downloads the route module but does not run it until navigation
+  assert.equal(await b.evaluate(() => !!document.querySelector('link[rel=modulepreload][href$="/assets/ssr.js"]')), true)
+  assert.equal(await b.evaluate(() => self.__ssrModuleRan), undefined)
   assert.equal(b.requests.includes('/ssr'), false)
   assert.equal(b.requests.includes('/back'), false)
   const before = b.requests.filter(r => r === '/directives.html').length
   await b.evaluate(() => document.querySelector('#d').click())
   await b.waitForSelector('#list li')
   assert.equal(b.requests.filter(r => r === '/directives.html').length, before)
+  await b.goBack()
+  await b.waitForFunction(() => document.title === 'Page B')
+  await b.evaluate(() => document.querySelector('#s').click())
+  await b.waitForFunction(() => self.__ssrModuleRan === true && document.querySelector('#c'))
+  assert.deepEqual(b.errors, [])
+})
+
+test('router: view transition only without prefers-reduced-motion', async () => {
+  const p = await open('/b')
+  await p.evaluate(() => {
+    self.__transitions = 0
+    const start = document.startViewTransition.bind(document)
+    document.startViewTransition = swap => (self.__transitions++, start(swap))
+  })
+  await p.emulateMedia({ reducedMotion: 'reduce' })
+  await p.evaluate(() => document.querySelector('#back').click())
+  await p.waitForFunction(() => document.title === 'Page A')
+  assert.equal(await p.evaluate(() => self.__transitions), 0)
+  await p.emulateMedia({ reducedMotion: 'no-preference' })
+  await p.evaluate(() => document.querySelector('#go-b').click())
+  await p.waitForFunction(() => document.title === 'Page B')
+  assert.equal(await p.evaluate(() => self.__transitions), 1)
+  assert.deepEqual(p.errors, [])
 })
 
 test('router: back and forward restore scroll', async () => {

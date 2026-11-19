@@ -1,0 +1,17 @@
+<div>
+  <div class="draft-file">
+    <span class="draft-name" .is-gone="$deleted">draft-notes.md</span>
+    <if $deleted>
+      <button type="button" class="btn btn-small" @click="restore">Restore</button>
+    </if>
+    <else>
+      <button type="button" class="btn btn-small btn-danger" @click="remove">Delete</button>
+    </else>
+  </div>
+  <p class="draft-answer" role="status" :text="$answerText"></p>
+  <c-alert id="delete-draft" title="Delete draft-notes.md?">
+    <p>The file is removed for good. There is no trash to restore it from.</p>
+    <button slot="actions" type="button" class="btn" @close value="cancel" autofocus>Keep it</button>
+    <button slot="actions" type="button" class="btn btn-danger" @close value="ok">Delete</button>
+  </c-alert>
+</div>

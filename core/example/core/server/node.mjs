@@ -5,7 +5,7 @@ import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
 import { compileRoutes, matchRoute } from './handler.js'
-import { log } from './log.js'
+import { createLogger, minSeverity, resourceFrom, writeLine } from './log.js'
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -145,7 +145,8 @@ async function send(res, response, method) {
   await pipeline(Readable.fromWeb(response.body), res)
 }
 
-export function serve(handler, { root, port = 3000 } = {}) {
+export function serve(handler, { root, port = 3000, service } = {}) {
+  const log = createLogger({ resource: resourceFrom(process.env, service), min: minSeverity(process.env), sink: writeLine })
   const assets = createStatic(root)
   const env = { ...process.env, ASSETS: assets }
   const ctx = {

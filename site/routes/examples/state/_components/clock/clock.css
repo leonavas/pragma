@@ -1,0 +1,21 @@
+[data-c="clock"] {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  max-width: 24rem;
+  border: 1px solid var(--color-line);
+  background: var(--color-line);
+}
+[data-c="clock"] .clock-cell {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+  background: var(--color-surface);
+}
+[data-c="clock"] .clock-value {
+  font-family: var(--font-mono);
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+}

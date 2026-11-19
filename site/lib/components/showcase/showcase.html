@@ -1,0 +1,41 @@
+<figure class="border border-line bg-sunken" .is-expanded="$expanded">
+  <if page.error>
+    <p class="px-4 py-5 font-mono text-xs text-danger-300" role="alert" :text="page.error.message"></p>
+  </if>
+  <else>
+    <div class="flex min-w-0 flex-col">
+      <div class="flex flex-wrap border-b border-line" role="group" aria-label="Source files">
+        <for file in $source.files key=file.id>
+          <button type="button" class="showcase-tab relative flex-none cursor-pointer border-r border-b border-line px-3.5 py-3 font-mono text-xs transition-colors hover:text-ink" :aria-pressed="file.pressed" :aria-controls="file.id" @click="select" :text="file.name"></button>
+        </for>
+      </div>
+      <div class="flex min-h-0 flex-1 flex-col">
+        <for file in $source.files key=file.id>
+          <div class="showcase-file min-h-0 min-w-0 flex-1 flex-col" .is-active="file.active" .is-long="file.long">
+            <div class="flex items-center justify-between gap-4 pt-1 pr-1 pl-4">
+              <p class="showcase-path min-w-0 truncate text-left font-mono text-xs text-faint"><span class="showcase-path-text"><span :text="file.dir"></span><span class="text-muted" :text="file.name"></span></span></p>
+              <button type="button" class="showcase-copy inline-flex min-h-9 flex-none cursor-pointer items-center gap-2 px-2.5 font-mono text-xs" @click="copy" .is-done="file.copied" .is-blocked="file.blocked">
+                <svg class="showcase-copy-icon size-3.5" viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" fill="none" stroke="currentColor"></rect><path d="M10.5 3.5v-1h-8v8h1" fill="none" stroke="currentColor"></path></svg>
+                <svg class="showcase-check-icon size-3.5" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"></path></svg>
+                <span class="showcase-copy-idle">Copy <span class="sr-only" :text="file.name"></span></span>
+                <span class="showcase-copy-done">Copied <span :text="file.lines.length"></span> lines</span>
+                <span class="showcase-copy-blocked">Code selected</span>
+              </button>
+            </div>
+            <pre class="showcase-code" :id="file.id" tabindex="0" :aria-label="file.path"><code><for line in file.lines key=line.n><span class="code-line" :data-indent="line.indent" :text="line.text"></span></for></code></pre>
+            <button type="button" class="showcase-expand h-11 w-full cursor-pointer items-center justify-center border-t border-line font-mono text-xs text-muted hover:text-ink" @click="toggleExpanded" :aria-expanded="$expandedText" :aria-controls="file.id">
+              <span class="showcase-expand-more">Show all <span :text="file.lines.length"></span> lines</span>
+              <span class="showcase-expand-less">Show fewer lines</span>
+            </button>
+          </div>
+        </for>
+      </div>
+      <p class="sr-only" role="status" :text="$announcement"></p>
+    </div>
+  </else>
+  <div class="showcase-live flex min-w-0 flex-col">
+    <p class="flex min-h-11 items-center gap-2 whitespace-nowrap border-b border-line bg-ground px-4 font-mono text-xs uppercase tracking-wider text-faint"><span class="showcase-dot size-1.5 flex-none bg-accent" aria-hidden="true" :data-beat="$beat"></span>Live result<span class="ml-auto min-w-0 truncate normal-case tracking-normal tabular-nums text-muted" aria-hidden="true" :text="$patches"></span></p>
+    <div class="showcase-stage"><slot></slot></div>
+  </div>
+  <figcaption class="col-span-full border-t border-line px-4 py-3 text-sm text-muted" :text="$caption"></figcaption>
+</figure>

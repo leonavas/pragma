@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://pragma.dev/</loc></url>
+  <url><loc>https://pragma.dev/guide</loc></url>
+  <url><loc>https://pragma.dev/examples</loc></url>
+  <url><loc>https://pragma.dev/examples/syntax</loc></url>
+  <url><loc>https://pragma.dev/examples/components</loc></url>
+  <url><loc>https://pragma.dev/examples/state</loc></url>
+  <url><loc>https://pragma.dev/examples/stores</loc></url>
+  <url><loc>https://pragma.dev/examples/routing</loc></url>
+  <url><loc>https://pragma.dev/examples/data</loc></url>
+  <url><loc>https://pragma.dev/examples/overlays</loc></url>
+  <url><loc>https://pragma.dev/examples/styling</loc></url>
+  <url><loc>https://pragma.dev/examples/packages</loc></url>
+  <url><loc>https://pragma.dev/examples/logs</loc></url>
+  <url><loc>https://pragma.dev/examples/seo</loc></url>
+  <url><loc>https://pragma.dev/examples/seo/demo/prebuilt-html</loc></url>
+  <url><loc>https://pragma.dev/examples/seo/demo/head-tags-from-data</loc></url>
+</urlset>

@@ -1,0 +1,338 @@
+<title>Guide · pragma</title>
+<meta name="description" content="From an empty folder to a deployed pragma app: install the CLI, create, develop, check, build and serve.">
+<link rel="canonical" href="https://pragma.dev/guide">
+<meta property="og:url" content="https://pragma.dev/guide">
+<meta property="og:title" content="pragma guide: from an empty folder to a deployed app">
+<meta property="og:description" content="Install the CLI, create an app, then develop, check, build and serve it.">
+
+<div class="wrap pt-16 lg:pt-24">
+  <header class="max-w-3xl border-b border-line pb-10">
+    <h1 class="text-4xl font-medium tracking-tighter sm:text-5xl">Guide</h1>
+    <p class="mt-6 text-lg leading-relaxed text-muted">From an empty folder to a deployed app: install, create, develop, check, build and deploy. Every terminal block on this page is real output from pragma 0.1.0, run in a fresh app.</p>
+  </header>
+
+  <div class="lg:grid lg:grid-cols-12 lg:gap-12">
+    <c-page-contents class="lg:col-span-3">
+      <li><a href="#install">Install</a></li>
+      <li><a href="#create">Create an app</a></li>
+      <li><a href="#structure">Project structure</a></li>
+      <li><a href="#develop">Develop</a></li>
+      <li><a href="#check">Check</a></li>
+      <li><a href="#budgets">Performance budgets</a></li>
+      <li><a href="#build">Build</a></li>
+      <li><a href="#deploy">Serve and deploy</a></li>
+      <li><a href="#internals">Under the hood</a></li>
+    </c-page-contents>
+
+    <div class="min-w-0 max-w-3xl lg:col-span-9">
+      <section class="doc-section" aria-labelledby="install">
+        <h2 id="install">Install</h2>
+        <div class="prose">
+          <p>pragma is one Rust binary. It compiles, checks, serves and bundles npm packages by itself: no Vite, no esbuild, no config. You need a Rust toolchain (<code>cargo</code>, from rustup) to build it. Node 22 or newer is needed only when an app has <code>.server.js</code> files, because <code>pragma dev</code>, <code>pragma serve</code> and the Node adapter run them.</p>
+        </div>
+        <c-terminal title="~" copy="git clone https://github.com/leonavas/pragma && cd pragma && cargo install --path core/cli/crates/pragma-cli">
+          <pre tabindex="0" aria-label="Cloning the repository and installing pragma"><code><span class="term-cmd">git clone https://github.com/leonavas/pragma</span>
+<span class="term-cmd">cd pragma</span>
+<span class="term-cmd">cargo install --path core/cli/crates/pragma-cli</span></code></pre>
+        </c-terminal>
+        <c-terminal title="~/pragma">
+          <pre tabindex="0" aria-label="Printing the pragma version and help"><code><span class="term-cmd">pragma -V</span>
+pragma 0.1.0
+<span class="term-cmd">pragma --help</span>
+pragma — HTML, CSS and JS without a framework
+
+usage:
+  pragma new &lt;dir&gt;                              create an app in &lt;dir&gt; (empty or missing)
+  pragma dev [--port 5180] [--host 127.0.0.1]   dev server with live reload
+  pragma build                                  build dist/ for production
+  pragma check [--strict]                       check HTML, CSS, JS and budgets (--strict: warnings become errors)
+  pragma serve [--port 3000] [--host 127.0.0.1] serve dist/ as in production
+  pragma upgrade                                update core/ (runtime, docs, base.css) to this version
+
+options:
+  -h, --help      show this help
+  -V, --version   show the version</code></pre>
+        </c-terminal>
+        <div class="prose">
+          <p>Options take either form, <code>--port 8080</code> or <code>--port=8080</code>. The <code>cargo install</code> output and the clone progress are left out above.</p>
+          <p>To update, run <code>git pull</code> and the same <code>cargo install</code>, then <code>pragma upgrade</code> inside each app. It makes the app's <code>core/</code> (runtime, docs, <code>base.css</code>) match the new binary, prints every file it updated, added or removed, and never touches anything outside <code>core/</code>. Until then <code>pragma check</code> warns with <code>app/core-outdated</code>.</p>
+        </div>
+      </section>
+
+      <section class="doc-section" aria-labelledby="create">
+        <h2 id="create">Create an app</h2>
+        <div class="prose">
+          <p><code>pragma new</code> writes a working app into an empty or missing folder: a layout, a home page with a modal, an alert and a dropdown, a 404 page, the theme, the runtime in <code>core/</code> and the docs in <code>core/docs/</code>.</p>
+        </div>
+        <c-terminal title="~/projects">
+          <pre tabindex="0" aria-label="Creating an app"><code><span class="term-cmd">pragma new my-app</span>
+app created in my-app (43 files)
+
+  cd my-app
+  pragma dev</code></pre>
+        </c-terminal>
+        <div class="prose">
+          <p>The app ships an <code>AGENTS.md</code> (and a <code>CLAUDE.md</code> that includes it) with the syntax in six lines, the rules the compiler enforces and a table that maps each task to one file in <code>core/docs/</code>. A coding agent reads that first; you can too. The docs are short on purpose: every page fits in a context window.</p>
+        </div>
+      </section>
+
+      <section class="doc-section" aria-labelledby="structure">
+        <h2 id="structure">Project structure</h2>
+        <div class="prose">
+          <p>The layout is fixed, so there is nothing to configure and only one place for each thing. The files below are exactly what <code>pragma new</code> creates, minus <code>core/</code>.</p>
+        </div>
+        <c-terminal title="my-app/">
+          <pre tabindex="0" aria-label="Files of a new app"><code><span class="term-ink">pragma.json</span>               name, lang and budgets
+<span class="term-ink">AGENTS.md</span>  CLAUDE.md      rules for coding agents
+<span class="term-ink">routes/</span>
+  _layout.html            header, footer, site-wide &lt;head&gt;; &lt;slot&gt; is the page
+  _404.html               unknown URLs
+  index.html              /         (index.js: its state and actions)
+<span class="term-ink">lib/</span>
+  components/&lt;name&gt;/      &lt;c-name&gt; for every page: modal, alert, dropdown
+  state/&lt;name&gt;.js         stores, read as shared.&lt;name&gt;
+  theme.css               tokens and the few custom classes
+<span class="term-ink">utils/</span>                    plain JS modules
+<span class="term-ink">public/</span>                   copied as is: favicon.svg, images, fonts
+<span class="term-ink">core/</span>                     runtime and docs; never edited</code></pre>
+        </c-terminal>
+        <div class="prose">
+          <ul>
+            <li>Only <code>routes/</code>, <code>lib/</code>, <code>utils/</code>, <code>core/</code> and <code>public/</code> are read. Other top-level files, like a README, are ignored.</li>
+            <li>A page is <code>routes/x.html</code>, with optional <code>x.js</code> (state, actions) and <code>x.server.js</code> (<code>load</code>, server actions, <code>ssr</code>). A <code>.js</code> without its <code>.html</code> is an error.</li>
+            <li>Anything else in <code>routes/</code> must be private, with a leading underscore: <code>_components/</code>, <code>_products.json</code>, <code>_catalog.server.js</code>.</li>
+            <li><code>pragma.json</code> takes exactly <code>name</code> (required: fallback title, log service name, Worker name), <code>lang</code> (default <code>en</code>) and <code>budgets</code>. Unknown keys are errors.</li>
+          </ul>
+        </div>
+        <c-terminal title="~/my-app">
+          <pre tabindex="0" aria-label="Structure errors"><code><span class="term-cmd">pragma check</span>
+routes/notes.md:1:1 <span class="term-err">error</span> <span class="term-ink">[app/structure]</span> unsupported file in routes/ (static files go in public/, CSS in lib/theme.css or the component)
+<span class="term-err">1 error(s)</span>, 0 warning(s)
+<span class="term-cmd">pragma check</span>
+pragma.json:1:1 <span class="term-err">error</span> <span class="term-ink">[app/pragma-json]</span> unknown key "budget" (use name, lang, budgets)
+ 1 | { "name": "guide-app", "budget": 3 }
+   | ^
+<span class="term-err">1 error(s)</span>, 0 warning(s)</code></pre>
+        </c-terminal>
+      </section>
+
+      <section class="doc-section" aria-labelledby="develop">
+        <h2 id="develop">Develop</h2>
+        <div class="prose">
+          <p><code>pragma dev</code> builds into <code>.pragma/dev/</code>, watches the folder and reloads every open tab on each save, over one WebSocket per tab. CSS changes swap in place without a reload. When a save breaks the build, the terminal prints the problem and the browser shows it in a full-screen overlay; pages without errors keep working, and the next good save clears it.</p>
+          <p>When the app has a <code>.server.js</code>, dev starts Node next to it, proxies <code>/_data</code>, <code>/_action</code> and <code>/_otel</code>, and restarts it when server code changes. Server logs, <code>debug</code> included, and every log record sent by the browser print in the same terminal.</p>
+        </div>
+        <c-terminal title="~/my-app">
+          <pre tabindex="0" aria-label="pragma dev output while editing"><code><span class="term-cmd">pragma dev --port 5296</span>
+compiled in 4 ms
+{"severityText":"INFO","body":"pragma serving at http://localhost:33227","resource":{"service.name":"my-app"}}
+node running on port 33227
+pragma dev at <span class="term-link">http://127.0.0.1:5296</span>
+<span class="term-dim">changed: routes/about.html</span>
+routes/about.html:4:4 <span class="term-err">error</span> <span class="term-ink">[html/on-inline]</span> inline onclick is not allowed; use @&lt;event&gt;="action"
+ 4 | &lt;p onclick="track()"&gt;Built with pragma.&lt;/p&gt;
+   |    ^
+<span class="term-err">1 error(s)</span>, 0 warning(s)
+<span class="term-dim">changed: routes/about.html</span>
+<span class="term-ok">compiled in 3 ms</span>
+<span class="term-dim">changed: routes/orders/index.server.js</span>
+compiled in 2 ms
+{"severityText":"INFO","body":"pragma serving at http://localhost:43459","resource":{"service.name":"my-app"}}
+node restarted on port 43459
+{"severityText":"DEBUG","body":"orders requested","traceId":"e02d1c33…","resource":{"service.name":"my-app"}}
+{"severityText":"INFO","body":"orders listed","attributes":{"orders.count":2},"traceId":"e02d1c33…"}
+{"severityText":"INFO","body":"GET /orders","attributes":{"http.request.method":"GET","url.path":"/_data/orders","http.response.status_code":200,"http.route":"/orders"}}</code></pre>
+        </c-terminal>
+        <div class="prose">
+          <p>Log lines are shortened here; the full records, with timestamps and span ids, are on the <a href="/examples/logs">logs page</a>. In dev, budgets only warn, and the browser throws on mistakes that production tolerates: an unknown action, a duplicate <code>&lt;for&gt;</code> key, a path that does not exist.</p>
+        </div>
+      </section>
+
+      <section class="doc-section" aria-labelledby="check">
+        <h2 id="check">Check</h2>
+        <div class="prose">
+          <p><code>pragma check</code> runs a full production build into a temporary folder and reports every problem as <code>file:line:column severity [rule] message</code>, with a code frame and the fix. Accessibility findings are warnings; <code>--strict</code> turns them into errors and fails on any warning. The bar for finishing is <code>pragma check --strict</code> with zero of both.</p>
+        </div>
+        <c-terminal title="~/my-app">
+          <pre tabindex="0" aria-label="pragma check output with errors and warnings"><code><span class="term-cmd">pragma check</span>
+routes/broken.html:4:1 <span class="term-warn">warning</span> <span class="term-ink">[a11y/img-alt]</span> &lt;img&gt; without alt; use alt="" if the image is decorative
+ 4 | &lt;img src="/chart.png"&gt;
+   | ^
+routes/broken.html:5:1 <span class="term-warn">warning</span> <span class="term-ink">[a11y/accessible-name]</span> &lt;button&gt; without an accessible name: add text, :text or aria-label
+ 5 | &lt;button @click="refresh"&gt;&lt;/button&gt;
+   | ^
+routes/broken.html:6:1 <span class="term-warn">warning</span> <span class="term-ink">[a11y/label]</span> &lt;input&gt; without label: use &lt;label for&gt;, wrap it in a &lt;label&gt; or add aria-label
+ 6 | &lt;input type="text" :model="$query"&gt;
+   | ^
+routes/broken.html:7:1 <span class="term-warn">warning</span> <span class="term-ink">[a11y/heading]</span> skipped heading level: &lt;h1&gt; followed by &lt;h3&gt;
+ 7 | &lt;h3 class="w-[37px]" :class="$tone"&gt;Recent&lt;/h3&gt;
+   | ^
+routes/broken.html:7:5 <span class="term-err">error</span> <span class="term-ink">[css/arbitrary-value]</span> arbitrary value "w-[37px]" is not supported; use a utility from core/docs/classes.md or add a class in lib/theme.css
+ 7 | &lt;h3 class="w-[37px]" :class="$tone"&gt;Recent&lt;/h3&gt;
+   |     ^
+routes/broken.html:7:22 <span class="term-err">error</span> <span class="term-ink">[html/class]</span> :class is not allowed: write static classes in class="…" and toggle each one with .name="path" (e.g. .text-warning-700="$warn")
+ 7 | &lt;h3 class="w-[37px]" :class="$tone"&gt;Recent&lt;/h3&gt;
+   |                      ^
+routes/broken.html:8:4 <span class="term-err">error</span> <span class="term-ink">[html/interpolation]</span> {{ }} is not pragma syntax: bind text with :text="path" and attributes with :name="path" (inside &lt;code&gt; or &lt;pre&gt; it is shown as text)
+ 8 | &lt;p&gt;{{ $query }}&lt;/p&gt;
+   |    ^
+routes/broken.html:10:3 <span class="term-err">error</span> <span class="term-ink">[html/head]</span> &lt;meta&gt; belongs in &lt;head&gt;: write it at the top level of the page fragment (or in the layout &lt;head&gt;)
+ 10 |   &lt;meta name="robots" content="noindex"&gt;
+    |   ^
+routes/broken.js:5:11 <span class="term-err">error</span> <span class="term-ink">[js/vague-name]</span> name `tmp` does not say what it is or does; use a self-explanatory name (e.g. `product`, `totalItems`, `addToCart`)
+ 5 |     const tmp = ctx.$.query
+   |           ^
+routes/broken.js:6:5 <span class="term-err">error</span> <span class="term-ink">[js/console]</span> `console` is not allowed; use `ctx.log` (or `log` from core/log.js)
+ 6 |     console.log(tmp)
+   |     ^
+<span class="term-err">6 error(s)</span>, 4 warning(s)
+<span class="term-cmd">pragma check --strict</span>
+<span class="term-dim">… the same ten findings, all reported as errors</span>
+<span class="term-err">10 error(s)</span>, 0 warning(s)</code></pre>
+        </c-terminal>
+        <div class="prose">
+          <p>The rules form a closed list. Anything outside the syntax is an error with a pointer to the fix, so an agent cannot quietly drift into another framework's habits.</p>
+          <ul>
+            <li><strong>JS</strong>: <code>js/syntax</code>, <code>js/comment</code>, <code>js/console</code>, <code>js/vague-name</code>, <code>js/html-in-js</code> (no <code>innerHTML</code> or <code>createElement</code>), <code>js/jsdoc-types</code>, <code>js/import</code>, <code>js/ctx</code>.</li>
+            <li><strong>HTML</strong>: <code>html/syntax</code> (close every non-void tag), <code>html/comment</code>, <code>html/script</code>, <code>html/style-inline</code>, <code>html/on-inline</code>, <code>html/legacy-syntax</code>, <code>html/unknown-directive</code>, <code>html/invalid-path</code>, <code>html/invalid-root</code>, the block rules (<code>html/block</code>, <code>html/for-without-key</code>, <code>html/misplaced-else</code>…), <code>html/unknown-action</code>, <code>html/component</code>, <code>html/unknown-component</code>, <code>html/layout</code>, <code>html/title</code>, <code>html/class</code> (no <code>:class</code>), <code>html/interpolation</code> (no <code>{{ }}</code> or <code>${ }</code> outside <code>&lt;code&gt;</code>/<code>&lt;pre&gt;</code>), <code>html/data-attribute</code> (no hand-written <code>data-*</code>) and <code>html/head</code> (<code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> only at the top of a page or in the layout head). <code>html/unknown-directive</code> also names the pragma form for Vue, Alpine, Svelte, Angular and React attributes.</li>
+            <li><strong>CSS</strong>: <code>css/syntax</code>, <code>css/comment</code>, <code>css/unknown-class</code> (only the utilities in <code>classes.md</code> and classes your CSS defines), <code>css/arbitrary-value</code>.</li>
+            <li><strong>App</strong>: <code>app/structure</code>, <code>app/route-conflict</code>, <code>app/package</code>, <code>app/pragma-json</code>, <code>app/budget</code>, and the warning <code>app/core-outdated</code> when <code>core/</code> differs from the installed binary.</li>
+            <li><strong>Accessibility</strong>, checked on the expanded page with components inlined: <code>img-alt</code>, <code>accessible-name</code>, <code>label</code>, <code>dialog-name</code>, <code>click-non-interactive</code>, <code>heading</code>, <code>single-h1</code>, <code>tabindex</code>, <code>duplicate-id</code>, <code>iframe-title</code>, <code>a-no-href</code>. A bound attribute counts: <code>:aria-label</code> satisfies <code>aria-label</code>.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="doc-section" aria-labelledby="budgets">
+        <h2 id="budgets">Performance budgets</h2>
+        <div class="prose">
+          <p>Budgets are gzip kilobytes in <code>pragma.json</code>, enforced by <code>check</code> and <code>build</code>: <code>initialJsKb</code> is all JS a page loads, runtime included; <code>routeJsKb</code> is the page's own JS outside <code>core/</code>, npm packages included; <code>cssKb</code> is the global stylesheet. An omitted key is not checked. Exceeding one is an error in production builds and a warning in dev.</p>
+        </div>
+        <c-terminal title="~/my-app">
+          <pre tabindex="0" aria-label="A budget error"><code><span class="term-cmd">cat pragma.json</span>
+{
+  "name": "my-app",
+  "lang": "en",
+  "budgets": { "initialJsKb": 8, "routeJsKb": 10, "cssKb": 15 }
+}
+<span class="term-cmd">pragma check --strict</span>
+pragma.json:4:1 <span class="term-err">error</span> <span class="term-ink">[app/budget]</span> initialJsKb exceeded in /: 8.8 kB gzip &gt; 8 kB
+ 4 |   "budgets": { "initialJsKb": 8, "routeJsKb": 10, "cssKb": 15 }
+   | ^
+<span class="term-err">1 error(s)</span>, 0 warning(s)</code></pre>
+        </c-terminal>
+        <div class="prose">
+          <p>The starter budgets are 15, 10 and 15. A page with no JS of its own costs 7.6 kB gzip, all of it runtime, so the budget is real room for your code. The fix for a budget error is smaller code, never a bigger number. What the build does so that you rarely hit one:</p>
+          <ul>
+            <li>Every route is prebuilt HTML, and a page with a <code>load</code> starts its data fetch from an inline script in <code>&lt;head&gt;</code>, before any module runs.</li>
+            <li>Exactly the modules a page imports get a <code>modulepreload</code>. Modules are minified and hashed one by one; there is no app bundle.</li>
+            <li>The CSS contains only the classes the app uses.</li>
+            <li>Links prefetch on hover, focus or when visible; navigations use view transitions.</li>
+            <li>HTML is served <code>no-cache</code>, <code>/assets/</code> as <code>immutable</code>, both brotli or gzip compressed.</li>
+            <li>Code needed only after a click goes behind <code>await import()</code> in the action: not preloaded, not in the budget. See <a href="/examples/packages#lazy-import">lazy packages</a>.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="doc-section" aria-labelledby="build">
+        <h2 id="build">Build</h2>
+        <div class="prose">
+          <p><code>pragma build</code> writes <code>dist/</code> and prints the JS each page loads and the CSS size, gzip. The same binary bundles npm packages with rolldown, so a build with dependencies needs nothing else either.</p>
+        </div>
+        <c-terminal title="~/my-app">
+          <pre tabindex="0" aria-label="pragma build output and the dist folder"><code><span class="term-cmd">pragma build</span>
+<span class="term-dim">page      JS gzip</span>
+/          <span class="term-ink">8.8 KB</span>
+/about     <span class="term-ink">7.6 KB</span>
+/orders    <span class="term-ink">7.6 KB</span>
+CSS        <span class="term-ink">4.1 KB</span>
+3 page(s), with server
+<span class="term-ok">dist/ built in 6 ms</span>
+<span class="term-cmd">find dist -type f -not -path "*/assets/*" -not -path "*/server/core/*"</span>
+dist/client/index.html
+dist/client/about.html
+dist/client/orders/index.html
+dist/client/_404.html
+dist/client/favicon.svg
+dist/client/_pragma/manifest.json
+dist/server/worker.js
+dist/server/node.mjs
+dist/server/wrangler.jsonc
+dist/server/package.json
+dist/server/routes/orders/index.server.js</code></pre>
+        </c-terminal>
+        <div class="prose">
+          <ul>
+            <li><code>dist/client/</code>: one HTML file per route (a param route keeps its name, <code>blog/[slug].html</code>), <code>_404.html</code>, hashed <code>assets/</code>, the files from <code>public/</code> and <code>_pragma/manifest.json</code>.</li>
+            <li><code>dist/server/</code>: <code>worker.js</code> (a fetch handler with the route table), <code>node.mjs</code> (a Node adapter around it), <code>wrangler.jsonc</code>, and your <code>.server.js</code> files copied unbundled with their relative imports.</li>
+            <li><code>dist/templates/&lt;route&gt;.json</code>: only for routes with <code>ssr = true</code>.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="doc-section" aria-labelledby="deploy">
+        <h2 id="deploy">Serve and deploy</h2>
+        <div class="prose">
+          <p><code>pragma serve</code> is a local preview of production: it serves <code>dist/</code> with precompressed brotli and gzip, ETags and the production cache headers, and starts <code>dist/server/node.mjs</code> when there is one.</p>
+        </div>
+        <c-terminal title="~/my-app">
+          <pre tabindex="0" aria-label="pragma serve output and response headers"><code><span class="term-cmd">pragma serve --port 5294</span>
+files compressed in 18 ms
+{"severityText":"INFO","body":"pragma serving at http://localhost:38487","resource":{"service.name":"my-app"}}
+node running on port 38487
+pragma serve at <span class="term-link">http://127.0.0.1:5294</span>
+<span class="term-cmd">curl -sD - -o /dev/null -H "accept-encoding: br" http://127.0.0.1:5294/orders</span>
+HTTP/1.1 200 OK
+content-type: text/html; charset=utf-8
+cache-control: no-cache
+content-length: 778
+etag: W/"8a3-18e95340ec2094a1"
+vary: accept-encoding
+content-encoding: br
+<span class="term-cmd">curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:5294/does-not-exist</span>
+404</code></pre>
+        </c-terminal>
+        <div class="prose">
+          <p>Then pick a target. All three ship the same <code>dist/client/</code>.</p>
+          <ul>
+            <li><strong>Static hosting</strong>, for apps without <code>.server.js</code>: upload <code>dist/client/</code>. The host must serve <code>/about</code> from <code>about.html</code>, a param route such as <code>/blog/x</code> from <code>blog/[slug].html</code>, and unknown paths from <code>_404.html</code> with status 404. Generic static hosts usually cannot do param routes, and without a <code>/_otel</code> endpoint the client stops sending logs after the first 404 or 405.</li>
+            <li><strong>Node</strong>: copy <code>dist/</code> and <code>node_modules</code>, then run the adapter. It serves the files with the right types and cache headers, resolves param routes through the manifest, renders SSR pages and the 404 page, and answers <code>/_data</code>, <code>/_action</code> and <code>/_otel</code>. Node finds <code>node_modules</code> by walking up from <code>dist/server/</code>.</li>
+            <li><strong>Cloudflare Workers</strong>: the generated <code>wrangler.jsonc</code> points <code>main</code> at <code>worker.js</code> and the assets binding at <code>../client</code>; wrangler bundles the server code on deploy. Workers have no filesystem, and <code>node:*</code> imports in <code>.server.js</code> need <code>"compatibility_flags": ["nodejs_compat"]</code> added to that file.</li>
+          </ul>
+        </div>
+        <c-terminal title="deploy">
+          <pre tabindex="0" aria-label="Deploy commands for Node and Cloudflare Workers"><code><span class="term-cmd">PORT=8080 node dist/server/node.mjs</span>
+{"severityText":"INFO","body":"pragma serving at http://localhost:8080","attributes":{"server.port":8080}}
+<span class="term-cmd">cat dist/server/wrangler.jsonc</span>
+{
+  "name": "my-app",
+  "main": "worker.js",
+  "compatibility_date": "2025-11-01",
+  "assets": {
+    "directory": "../client",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  }
+}
+<span class="term-cmd">npx wrangler deploy --config dist/server/wrangler.jsonc</span></code></pre>
+        </c-terminal>
+      </section>
+
+      <section class="doc-section" aria-labelledby="internals">
+        <h2 id="internals">Under the hood</h2>
+        <div class="prose">
+          <p>Nothing here needs configuring, but it helps when you read the built HTML or debug a deploy.</p>
+          <ul>
+            <li>The generated <code>&lt;head&gt;</code> comes in this order: charset, viewport, <code>&lt;title&gt;</code>, the layout's head tags (a page's own <code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> replace the layout's tag with the same name), the theme script when used, the stylesheet, the inline <code>/_data</code> fetch when the page has a <code>load</code>, the modulepreloads, the route JSON and the boot module.</li>
+            <li>The route JSON, a <code>&lt;script&gt;</code> with <code>id="pragma-route"</code>, tells the runtime what to start:
+              <pre class="mt-2 overflow-x-auto border border-line bg-sunken p-3 text-sm leading-relaxed text-ink" tabindex="0" aria-label="Route JSON of /orders"><code>{"pattern":"/orders","page":null,"components":{},"stores":{},"loader":true,"ssr":false}</code></pre>
+            </li>
+            <li><code>/_pragma/manifest.json</code> lists every route with its HTML file, modules, loader and SSR flag. The client router and the Node adapter both read it.</li>
+            <li>Data travels as <code>GET /_data/&lt;path&gt;</code> and server actions as <code>POST /_action/&lt;path&gt;/&lt;name&gt;</code>, both with a <code>traceparent</code> header.</li>
+            <li>Not in v0: static generation with data, nested layouts, catch-all routes (<code>[...rest]</code>), per-route CSS, i18n and Speculation Rules.</li>
+          </ul>
+          <p>Next: the <a href="/examples">examples</a> show every feature running, with its source.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>

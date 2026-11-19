@@ -35,6 +35,9 @@ pub struct Page {
 #[derive(Debug, Clone)]
 pub struct Component {
     pub name: String,
+    /// `data-c` value: the name for `lib/components` (global), `<name>-<folder hash>` for a
+    /// `routes/**/_components` one, so same-named private components never share CSS or state.
+    pub id: String,
     pub html: u32,
     pub dir: PathBuf,
     pub module: Option<PathBuf>,
@@ -288,8 +291,16 @@ impl Project {
             if all.contains(&dir.join(format!("{name}.server.js"))) {
                 self.err(dir.join(format!("{name}.server.js")), 1, 1, "app/structure", "components cannot have .server.js; data lives in the page .server.js");
             }
-            let scope = if base == Path::new("lib/components") { base.clone() } else { base.parent().unwrap().to_path_buf() };
-            let c = Component { name: name.clone(), html: id, dir: dir.clone(), module, css, scope };
+            let global = base == Path::new("lib/components");
+            let scope = if global { base.clone() } else { base.parent().unwrap().to_path_buf() };
+            let cid = if global {
+                name.clone()
+            } else {
+                let mut h = crate::Fnv::new();
+                h.write(rel_str(&dir).as_bytes());
+                format!("{name}-{}", &crate::short_hash(h.finish())[..6])
+            };
+            let c = Component { name: name.clone(), id: cid, html: id, dir: dir.clone(), module, css, scope };
             self.components.entry(base).or_default().insert(name, c);
         }
     }

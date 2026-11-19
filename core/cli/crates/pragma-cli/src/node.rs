@@ -15,11 +15,13 @@ pub struct Node {
     cwd: PathBuf,
     child: Option<Child>,
     fingerprint: u64,
+    dev: bool,
 }
 
 impl Node {
-    pub fn new(entry: PathBuf, cwd: PathBuf) -> Node {
-        Node { entry, cwd, child: None, fingerprint: 0 }
+    /// `dev`: shows `log.debug` (PRAGMA_LOG_LEVEL=debug) unless the environment sets a level.
+    pub fn new(entry: PathBuf, cwd: PathBuf, dev: bool) -> Node {
+        Node { entry, cwd, child: None, fingerprint: 0, dev }
     }
 
     /// Starts, restarts (if server code changed) or stops node according to the current build.
@@ -40,7 +42,11 @@ impl Node {
             Ok(addr) => addr.port(),
             Err(e) => return eprintln!("{} no free port for node: {e}", red("error")),
         };
-        let spawned = Command::new("node")
+        let mut cmd = Command::new("node");
+        if self.dev && std::env::var_os("PRAGMA_LOG_LEVEL").is_none() {
+            cmd.env("PRAGMA_LOG_LEVEL", "debug");
+        }
+        let spawned = cmd
             .arg(&self.entry)
             .env("PORT", port.to_string())
             .current_dir(&self.cwd)

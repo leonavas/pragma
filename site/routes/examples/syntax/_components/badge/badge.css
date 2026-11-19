@@ -1,0 +1,14 @@
+[data-c="badge"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border: 1px solid var(--color-line-strong);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+[data-c="badge"] .badge-icon {
+  width: 0.75rem;
+  height: 0.75rem;
+  color: var(--color-accent);
+}

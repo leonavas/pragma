@@ -101,10 +101,10 @@ tokens and dark mode: css.md.
 
 ## Interaction and accessibility
 
+- `sr-only not-sr-only`
 - `cursor-{auto,default,pointer,wait,text,move,not-allowed,grab,grabbing}`
 - `pointer-events-{none,auto}`
 - `select-{none,text,all,auto}`
-- `sr-only not-sr-only`
 
 ## Transitions and media
 

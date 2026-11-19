@@ -3,6 +3,7 @@ use oxc_allocator::Allocator;
 use oxc_ast::Comment;
 use oxc_ast::ast::{
     ArrowFunctionExpression, BindingIdentifier, ComputedMemberExpression, ExportAllDeclaration, ExportFromDeclaration, Expression, FormalParameters,
+    Function, FunctionBody,
     IdentifierReference, ImportDeclaration, ImportExpression, ObjectProperty, ObjectPropertyKind, Program,
     Statement, StaticMemberExpression, StringLiteral, TemplateLiteral,
 };
@@ -311,6 +312,11 @@ impl<'a> Visit<'a> for Linter<'_> {
             Expression::TemplateLiteral(t) if t.expressions.is_empty() => {
                 self.check_specifier(t.quasis[0].value.raw.as_str(), t.span, false);
             }
+            source if !self.ctx.is_core => self.report(
+                source.span(),
+                RULE_IMPORT,
+                "`import()` needs a quoted path or package name (`import('./chart.js')`, `import('dayjs')`); the build cannot follow a computed specifier".to_string(),
+            ),
             _ => {}
         }
         walk::walk_import_expression(self, it);
@@ -606,6 +612,64 @@ pub fn exported_actions(source: &str) -> Vec<String> {
             ObjectPropertyKind::SpreadProperty(_) => None,
         })
         .collect()
+}
+
+/// Keys (getters included) of the object that `export const state = (ctx) => ({ ... })` creates,
+/// also as a function (`export function state() { ...; return { ... } }`). `None` when they are
+/// not known statically (spread, computed key, a return that is not the last statement).
+pub fn exported_state_keys(source: &str) -> Option<Vec<String>> {
+    let allocator = Allocator::default();
+    let ret = parse(&allocator, source);
+    if ret.diagnostics.has_errors() {
+        return None;
+    }
+    let local = ret.module_record.local_export_entries.iter().find_map(|e| match &e.export_name {
+        ExportExportName::Name(n) if n.name.as_str() == "state" => e.local_name.name(),
+        _ => None,
+    })?;
+    let object = match top_level_init(&ret.program, local.as_str()).map(Expression::without_parentheses) {
+        Some(Expression::ArrowFunctionExpression(f)) => match f.body.as_expression() {
+            Some(e) => Some(e.without_parentheses()),
+            None => f.body.as_function_body().and_then(returned_value),
+        },
+        Some(Expression::FunctionExpression(f)) => f.body.as_deref().and_then(returned_value),
+        Some(_) => None,
+        None => top_level_function(&ret.program, local.as_str()).and_then(|f| f.body.as_deref()).and_then(returned_value),
+    };
+    let Some(Expression::ObjectExpression(obj)) = object else {
+        return None;
+    };
+    obj.properties
+        .iter()
+        .map(|p| match p {
+            ObjectPropertyKind::ObjectProperty(p) => p.key.static_name()?.as_str().map(str::to_string),
+            ObjectPropertyKind::SpreadProperty(_) => None,
+        })
+        .collect()
+}
+
+/// `return x` as the last statement of a body that has no other control flow.
+fn returned_value<'p, 'a>(body: &'p FunctionBody<'a>) -> Option<&'p Expression<'a>> {
+    let (last, rest) = body.statements.split_last()?;
+    let plain = rest.iter().all(|s| matches!(s, Statement::VariableDeclaration(_) | Statement::ExpressionStatement(_)));
+    match last {
+        Statement::ReturnStatement(r) if plain => r.argument.as_ref().map(Expression::without_parentheses),
+        _ => None,
+    }
+}
+
+fn top_level_function<'p, 'a>(program: &'p Program<'a>, name: &str) -> Option<&'p Function<'a>> {
+    program.body.iter().find_map(|stmt| {
+        let f = match stmt {
+            Statement::FunctionDeclaration(f) => f,
+            Statement::ExportDeclaration(e) => match &e.declaration {
+                oxc_ast::ast::Declaration::FunctionDeclaration(f) => f,
+                _ => return None,
+            },
+            _ => return None,
+        };
+        f.id.as_ref().is_some_and(|id| id.name.as_str() == name).then_some(&**f)
+    })
 }
 
 fn top_level_init<'p, 'a>(program: &'p Program<'a>, name: &str) -> Option<&'p Expression<'a>> {

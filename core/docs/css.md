@@ -6,7 +6,7 @@ Use utilities (classes.md) first. Write a custom class only when they are not en
 |---|---|
 | `core/base.css` | preflight, layers, `.skeleton`, `[hidden]`, scroll lock. Do not edit. |
 | `lib/theme.css` | tokens and global custom classes (`@layer components`) |
-| component `<name>.css` | that component only; scope selectors with `[data-c="<name>"]` |
+| component `<name>.css` | that component only; scope selectors with `[data-c="<name>"]` (for `p-` components the build makes it unique per folder) |
 
 The starter ships the theme-aware tokens `bg-surface`, `text-ink`, `text-muted`, `border-line`
 (they switch in dark mode) and the classes `.card`, `.btn`, `.btn-primary`, `.btn-danger`, `.dialog`.

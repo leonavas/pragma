@@ -1,0 +1,21 @@
+<div class="wrap">
+  <div class="doc-switcher sticky top-14 z-30 mb-10 flex h-12 items-center gap-2 border-b border-line bg-ground font-mono text-xs lg:hidden">
+    <a href="/examples" class="flex h-full items-center text-muted no-underline hover:text-ink">Examples</a>
+    <span class="text-faint" aria-hidden="true">/</span>
+    <c-dropdown id="doc-sections" :label="$heading">
+      <c-section-nav class="compact" label="Example sections"></c-section-nav>
+    </c-dropdown>
+  </div>
+  <aside class="hidden self-start lg:sticky lg:top-24 lg:block">
+    <a href="/examples" class="label nav-link">All examples</a>
+    <c-section-nav class="compact mt-4" label="Example sections"></c-section-nav>
+  </aside>
+  <article class="min-w-0">
+    <header class="border-b border-line pb-10">
+      <h1 class="doc-title" :text="$heading"></h1>
+      <p class="mt-5 max-w-2xl text-lg leading-relaxed text-muted" :text="$lede"></p>
+    </header>
+    <slot></slot>
+    <c-section-nav class="pager mt-12" label="Previous and next section"></c-section-nav>
+  </article>
+</div>

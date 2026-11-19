@@ -1,0 +1,5 @@
+{
+  "name": "pragma",
+  "lang": "en",
+  "budgets": { "initialJsKb": 15, "routeJsKb": 10, "cssKb": 15 }
+}

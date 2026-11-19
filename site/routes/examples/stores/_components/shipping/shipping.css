@@ -1,0 +1,8 @@
+[data-c="shipping"] {
+  padding: 0.75rem 1rem;
+  border: 1px dashed var(--color-line-strong);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+[data-c="shipping"].is-free { border-style: solid; border-color: var(--color-accent); color: var(--color-accent); }

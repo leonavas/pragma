@@ -1,5 +1,5 @@
 use pragma_jslint::{
-    LintContext, exported_actions, exported_names, lint, minify, minify_with_imports,
+    LintContext, exported_actions, exported_names, exported_state_keys, lint, minify, minify_with_imports,
 };
 use std::path::Path;
 
@@ -164,8 +164,17 @@ fn comments_are_forbidden() {
 #[test]
 fn allowed_imports() {
     let src = "import a from './a.js'\nimport b from '../b.js'\nimport { c } from '/core/state.js'\n\
-               export { d } from './d.js'\nexport * from '../e.js'\nimport('./f.js')\nimport(url)";
+               export { d } from './d.js'\nexport * from '../e.js'\nimport('./f.js')";
     assert_eq!(app(src), vec![]);
+    assert_eq!(diags("core/runtime/router.js", "import(url)", &CORE), vec![]);
+}
+
+#[test]
+fn computed_dynamic_import() {
+    assert_eq!(app("const pkg = 'date-fns'\nawait import(pkg)"), vec![(2, 14, "js/import")]);
+    assert_eq!(app("await import(`${name}`)"), vec![(1, 14, "js/import")]);
+    assert_eq!(app("await import(`./locales/${lang}.js`)"), vec![(1, 14, "js/import")]);
+    assert_eq!(diags("routes/shop/[id].server.js", "await import(driver)", &APP), vec![(1, 14, "js/import")]);
 }
 
 #[test]
@@ -244,6 +253,25 @@ fn diagnostic_has_file_and_message() {
     assert_eq!(d[0].file, Path::new("routes/x.js"));
     assert_eq!(d[0].severity, pragma_diag::Severity::Error);
     assert!(d[0].message.contains("console"));
+}
+
+#[test]
+fn exported_state_keys_when_static() {
+    let keys = |src: &str| exported_state_keys(src).map(|k| k.join(","));
+    assert_eq!(keys("export const state = () => ({ clicks: 0, draftText: '', get total() { return 1 } })").as_deref(), Some("clicks,draftText,total"));
+    assert_eq!(keys("export const state = (ctx) => {\n  const n = 1\n  return { n }\n}").as_deref(), Some("n"));
+    assert_eq!(keys("export function state() { return { a: 1 } }").as_deref(), Some("a"));
+    assert_eq!(keys("const make = function () { return { b: 2 } }\nexport { make as state }").as_deref(), Some("b"));
+    assert_eq!(keys("export const state = () => ({})").as_deref(), Some(""));
+    for unknown in [
+        "export const state = () => ({ ...defaults, a: 1 })",
+        "export const state = () => ({ [name]: 1 })",
+        "export const state = (ctx) => { if (ctx) return { a: 1 }\n  return { b: 1 } }",
+        "export const state = makeState",
+        "export const actions = {}",
+    ] {
+        assert_eq!(exported_state_keys(unknown), None, "{unknown}");
+    }
 }
 
 #[test]

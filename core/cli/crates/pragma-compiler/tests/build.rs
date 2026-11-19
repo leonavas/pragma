@@ -259,6 +259,72 @@ fn unknown_directive() {
     expect(&page("<p>a</p>\n<p data-label=\"data.x\">b</p>"), "html/data-attribute", PAGE, 2);
 }
 
+#[test]
+fn same_named_route_components_are_scoped_by_folder() {
+    let t = app_with(&[
+        ("routes/one/index.html", Some("<title>One</title>\n<p-badge></p-badge>")),
+        ("routes/one/_components/badge/badge.html", Some("<span><span class=\"badge-icon\"></span></span>")),
+        ("routes/one/_components/badge/badge.css", Some("[data-c=\"badge\"] .badge-icon { width: 1px; }\n")),
+        ("routes/two/index.html", Some("<title>Two</title>\n<p-badge></p-badge>")),
+        ("routes/two/_components/badge/badge.html", Some("<button class=\"badge-icon\" @click=\"ping\">b</button>")),
+        ("routes/two/_components/badge/badge.css", Some("[data-c=badge] .badge-icon { width: 2px; }\n")),
+        ("routes/two/_components/badge/badge.js", Some("export const actions = {\n  ping() {},\n}\n")),
+    ]);
+    let out = t.0.join("dev");
+    build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap_or_else(|d| panic!("{d:#?}"));
+    let page = |p: &str| fs::read_to_string(out.join("client").join(p).join("index.html")).unwrap();
+    let ids = |html: &str| -> Vec<String> { html.split("data-c=\"").skip(1).map(|s| s[..s.find('"').unwrap()].to_string()).collect() };
+    let (one, two) = (ids(&page("one")), ids(&page("two")));
+    // lib/components stay global: the layout's <c-counter> keeps data-c="counter"
+    assert!(one.contains(&"counter".to_string()) && two.contains(&"counter".to_string()), "{one:?} {two:?}");
+    let badge = |ids: &[String]| ids.iter().find(|id| id.starts_with("badge-")).cloned().unwrap_or_else(|| panic!("{ids:?}"));
+    let (one_badge, two_badge) = (badge(&one), badge(&two));
+    assert_ne!(one_badge, two_badge, "same-named components in different folders share a data-c");
+    let css = fs::read_to_string(out.join("client/assets/app.css")).unwrap();
+    assert!(css.contains(&format!("[data-c=\"{one_badge}\"] .badge-icon {{ width: 1px; }}")), "{css}");
+    assert!(css.contains(&format!("[data-c=\"{two_badge}\"] .badge-icon {{ width: 2px; }}")), "{css}");
+    assert!(!css.contains("[data-c=\"badge\"]") && !css.contains("[data-c=badge]"), "{css}");
+    // the runtime finds the component module by the same id
+    assert!(page("two").contains(&format!("\"{two_badge}\":\"/assets/routes/two/_components/badge/badge.js\"")), "{}", page("two"));
+}
+
+#[test]
+fn optional_prop_of_stateful_component_is_a_falsy_prop() {
+    let t = app_with(&[
+        ("lib/components/flagged/flagged.html", Some("<p><span :text=\"$label\"></span><if $flag><strong>flag on</strong></if><span :text=\"$clicks\"></span></p>")),
+        ("lib/components/flagged/flagged.js", Some("export const state = () => ({ clicks: 0 })\n")),
+        ("routes/flag.html", Some("<title>Flag</title>\n<c-flagged label=\"no flag passed\"></c-flagged>")),
+    ]);
+    let app = t.0.join("app");
+    let d = check(&app);
+    assert!(d.is_empty(), "{d:#?}");
+    let out = t.0.join("dev");
+    build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let html = fs::read_to_string(out.join("client/flag.html")).unwrap();
+    // no caller passes `flag`: it is a missing (falsy) prop, not `state.flag`; `clicks` is state
+    assert!(!html.contains("state.flag") && !html.contains("flag on"), "{html}");
+    assert!(html.contains("state.clicks") && html.contains("no flag passed"), "{html}");
+}
+
+#[test]
+fn bound_style_and_handler_rules() {
+    let d = page("<p :style=\"$css\">x</p>\n<button :onclick=\"$go\">b</button>");
+    expect(&d, "html/style-inline", PAGE, 1);
+    expect(&d, "html/on-inline", PAGE, 2);
+    assert!(message(&d, "html/style-inline").contains(".name=\"path\""), "{d:#?}");
+    assert!(message(&d, "html/on-inline").contains("@click=\"action\""), "{d:#?}");
+}
+
+#[test]
+fn foreign_framework_attributes() {
+    let d = page("<ul>\n  <li v-if=\"done\">Task</li>\n  <li x-show=\"open\">b</li>\n  <li on:click=\"go\">c</li>\n</ul>");
+    expect(&d, "html/unknown-directive", PAGE, 2);
+    expect(&d, "html/unknown-directive", PAGE, 3);
+    expect(&d, "html/unknown-directive", PAGE, 4);
+    assert!(message(&d, "html/unknown-directive").contains("`v-if` is Vue syntax"), "{d:#?}");
+    assert!(!d.iter().any(|x| x.rule == "html/on-inline"), "{d:#?}");
+}
+
 #[track_caller]
 fn message(d: &[Diagnostic], rule: &str) -> String {
     let list: Vec<String> = d.iter().map(|x| x.to_string()).collect();
@@ -548,9 +614,11 @@ fn real_starter_is_clean() {
     copy_dir(&runtime, &app.join("core"));
     assert!(check(&app).is_empty(), "{:#?}", check(&app));
     let out = t.0.join("dist");
-    build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Prod }).unwrap();
+    let r = build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Prod }).unwrap();
     let index = fs::read_to_string(out.join("client/index.html")).unwrap();
     assert!(index.contains("data-c=\"modal\"") && !index.contains("props."));
+    // no *.server.js: static-only, no server bundle (so no node in dev/serve)
+    assert!(!r.has_server && !out.join("server").exists(), "server bundle without *.server.js");
 }
 
 #[test]
@@ -854,6 +922,10 @@ fn npm_package_missing_export() {
         Some("import { missing } from 'clock'\n\nexport const state = () => ({ open: false, items: [], x: missing })\nexport const actions = { toggle(ctx) {} }\n"),
     )]));
     expect(&d, "js/import", "routes/index.js", 1);
+    assert!(d.iter().any(|x| x.message == "`missing` is not exported by clock"), "{d:?}");
+    let d = check_with(&with_clock(&[("node_modules/clock/index.js", Some("import { subtract } from 'calc'\nexport const mode = 1\nexport function time() {\n  return subtract(1, 2)\n}\n"))]));
+    assert!(d.iter().any(|x| x.rule == "app/package" && x.message == "package \"clock\" imports `subtract` from \"calc\", which does not export it"), "{d:?}");
+    assert!(!d.iter().any(|x| x.message.contains("entries/") || x.message.contains("pragma-check-")), "{d:?}");
 }
 
 #[test]

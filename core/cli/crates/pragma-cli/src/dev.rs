@@ -24,7 +24,7 @@ pub async fn run(root: PathBuf, host: &str, port: u16) -> i32 {
             return 1;
         }
     };
-    let mut node = Node::new(out.join("server/node.mjs"), root.clone());
+    let mut node = Node::new(out.join("server/node.mjs"), root.clone(), true);
     node.sync(&site).await;
     tokio::spawn(server::serve(listener, site.clone()));
     println!("pragma dev at http://{}:{port}", display_host(host));
@@ -47,11 +47,14 @@ pub async fn run(root: PathBuf, host: &str, port: u16) -> i32 {
                 let css_only = batch.iter().all(|p| p.extension().is_some_and(|e| e == "css"));
                 let names: Vec<_> = batch.iter().map(|p| p.strip_prefix(&root).unwrap_or(p).display().to_string()).collect();
                 println!("{}", dim(&format!("changed: {}", names.join(", "))));
-                if !rebuild(&root, &out, &site).await {
+                let ok = rebuild(&root, &out, &site).await;
+                // the build writes its outputs even with errors elsewhere: node must serve the same
+                // build as the client files, or a new page's `load` answers 404 (BUG-S-8)
+                node.sync(&site).await;
+                if !ok {
                     failed = true;
                     continue;
                 }
-                node.sync(&site).await;
                 // after an error the page may be stale beyond the CSS
                 if css_only && !failed {
                     site.send(Event::Css(newest_css(&out.join("client/assets"))));
@@ -79,11 +82,12 @@ async fn rebuild(root: &Path, out: &Path, site: &Site) -> bool {
         Ok(r) => r,
         Err(e) => Err(vec![Diagnostic::error(root, 0, 0, "internal", format!("compiler crashed: {e}"))]),
     };
+    // routes follow the files on disk, also after a build with errors
+    site.reload_manifest();
     match result {
         Ok(report) => {
             print_diagnostics(root, &report.warnings);
             println!("{}", dim(&format!("compiled in {} ms", started.elapsed().as_millis())));
-            site.reload_manifest();
             true
         }
         Err(diagnostics) => {

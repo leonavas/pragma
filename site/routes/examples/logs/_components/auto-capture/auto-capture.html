@@ -1,0 +1,17 @@
+<div>
+  <div class="auto-capture-actions" role="group" aria-label="Failures">
+    <button type="button" class="btn btn-small" @click="throwNow">Throw in an action</button>
+    <button type="button" class="btn btn-small" @click="rejectLater">Reject in an async action</button>
+  </div>
+  <ol class="auto-capture-events" aria-label="Uncaught errors, each one logged by the runtime">
+    <for failure in $failures key=failure.id>
+      <li class="auto-capture-event">
+        <span class="auto-capture-kind" :text="failure.kind"></span>
+        <span class="auto-capture-message" :text="failure.message"></span>
+      </li>
+    </for>
+    <empty>
+      <li class="auto-capture-empty">No uncaught errors yet. Neither action has a try/catch or a log call.</li>
+    </empty>
+  </ol>
+</div>

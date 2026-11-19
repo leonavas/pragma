@@ -1,0 +1,19 @@
+<div role="group" aria-label="pragma check --strict output">
+  <p class="check-command"><span class="check-prompt" aria-hidden="true">$</span> pragma check --strict</p>
+  <ul class="check-list">
+    <li><span class="check-line">wrong.html:2</span> <span class="check-rule">html/data-attribute</span> `data-text` is internal; write `:text="..."`</li>
+    <li><span class="check-line">wrong.html:3</span> <span class="check-rule">html/invalid-path</span> use only root.a.b (no expressions, calls or indexes)</li>
+    <li><span class="check-line">wrong.html:4</span> <span class="check-rule">html/invalid-path</span> use only root.a.b (no expressions, calls or indexes)</li>
+    <li><span class="check-line">wrong.html:5</span> <span class="check-rule">html/style-inline</span> the style attribute is not allowed; use classes</li>
+    <li><span class="check-line">wrong.html:6</span> <span class="check-rule">html/on-inline</span> inline onclick is not allowed; use @&lt;event&gt;="action"</li>
+    <li><span class="check-line">wrong.html:7</span> <span class="check-rule">html/on-inline</span> :style is not allowed</li>
+    <li><span class="check-line">wrong.html:8</span> <span class="check-rule">html/class</span> :class is not allowed: write static classes in class="…" and toggle each one with .name="path"</li>
+    <li><span class="check-line">wrong.html:9</span> <span class="check-rule">html/interpolation</span> <code>{{ }}</code> is not pragma syntax: bind text with :text="path"</li>
+    <li><span class="check-line">wrong.html:10</span> <span class="check-rule">html/block</span> use &lt;if path&gt;, with the path unquoted</li>
+    <li><span class="check-line">wrong.html:11</span> <span class="check-rule">html/for-without-key</span> &lt;for&gt; requires key=x.field</li>
+    <li><span class="check-line">wrong.html:12</span> <span class="check-rule">html/legacy-syntax</span> `state.name` is legacy syntax: use `$name`</li>
+    <li><span class="check-line">wrong.html:13</span> <span class="check-rule">html/unknown-directive</span> `v-if` is Vue syntax and does nothing in pragma; wrap the element in `&lt;if path&gt;…&lt;/if&gt;`</li>
+    <li><span class="check-line">wrong.html:14</span> <span class="check-rule">html/data-attribute</span> hand-written `data-tone` is not allowed; for state bind `:data-tone="$path"`</li>
+  </ul>
+  <p class="check-total">21 error(s), 0 warning(s)</p>
+</div>

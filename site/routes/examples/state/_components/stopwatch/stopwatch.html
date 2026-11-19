@@ -1,0 +1,12 @@
+<div class="grid w-full max-w-xs justify-items-center gap-4">
+  <output class="stopwatch-display" :text="$display"></output>
+  <div class="flex gap-2">
+    <button type="button" class="btn btn-small" @click="lap" :disabled="$untouched" :text="$lapText"></button>
+    <button type="button" class="btn btn-small btn-primary" @click="toggle" :text="$toggleText"></button>
+  </div>
+  <ol class="stopwatch-laps" aria-label="Laps">
+    <for lap in $laps key=lap.id>
+      <li class="flex justify-between gap-6"><span :text="lap.id"></span><span :text="lap.time"></span></li>
+    </for>
+  </ol>
+</div>

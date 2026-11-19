@@ -1,6 +1,7 @@
 node_modules/
 target/
 dist/
+!core/cli/crates/pragma-cli/tests/fixtures/dist/
 build/
 .pragma/
 .dev/

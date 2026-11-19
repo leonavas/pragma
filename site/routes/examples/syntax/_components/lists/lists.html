@@ -1,0 +1,21 @@
+<div>
+  <for group in $groups key=group.id>
+    <section class="lists-group" :aria-label="group.name">
+      <div class="lists-head">
+        <h3 class="label" :text="group.name"></h3>
+        <button type="button" class="lists-clear" @click="clear" :disabled="group.cleared">Clear</button>
+      </div>
+      <ul class="lists-items">
+        <for item in group.items key=item.id>
+          <li>
+            <button type="button" class="lists-item" .line-through="item.done" .text-faint="item.done" :aria-pressed="item.pressed" @click="pick" :text="item.label"></button>
+          </li>
+        </for>
+        <empty>
+          <li class="lists-empty">Empty group</li>
+        </empty>
+      </ul>
+    </section>
+  </for>
+  <button type="button" class="btn btn-small" @click="reset">Reset lists</button>
+</div>

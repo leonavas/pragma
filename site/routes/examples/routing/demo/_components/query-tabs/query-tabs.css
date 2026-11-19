@@ -1,0 +1,26 @@
+[data-c="query-tabs"] {
+  display: grid;
+  justify-items: start;
+  gap: 1rem;
+}
+[data-c="query-tabs"] .query-tabs-list {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  border-bottom: 1px solid var(--color-line);
+}
+[data-c="query-tabs"] .query-tabs-link {
+  margin-bottom: -1px;
+  padding: 0.5rem 0.875rem;
+  border-bottom: 1px solid transparent;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-decoration: none;
+}
+[data-c="query-tabs"] .query-tabs-link:hover { color: var(--color-ink); }
+[data-c="query-tabs"] .query-tabs-link[aria-current="true"] {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-ink);
+}
+[data-c="query-tabs"] .query-tabs-panel { min-height: 3rem; }

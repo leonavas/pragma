@@ -95,6 +95,18 @@ test('ssr route is rendered by the handler', async () => {
   assert.equal(await res.text(), '<!doctype html><html><head></head><body><main data-page><h1>olá</h1></main><script type="application/json" id="pragma-data">{"data":{"slug":"olá"}}</script></body></html>')
 })
 
+test('startup log uses the app service name', async () => {
+  const records = []
+  const quiet = console.log
+  console.log = (line) => records.push(JSON.parse(line))
+  const named = serve(handler, { root, port: 0, service: 'my-app' })
+  await once(named, 'listening')
+  console.log = quiet
+  named.close()
+  const started = records.find((record) => record.body.startsWith('pragma serving at'))
+  assert.equal(started.resource['service.name'], 'my-app')
+})
+
 test('/_otel goes through the handler', async () => {
   const res = await get('/_otel', { method: 'POST', body: JSON.stringify({ resource: {}, logs: [{ body: 'x' }] }) })
   assert.equal(res.status, 204)

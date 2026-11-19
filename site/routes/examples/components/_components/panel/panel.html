@@ -1,0 +1,10 @@
+<section :aria-label="$heading">
+  <header class="panel-head">
+    <h3 class="panel-heading" :text="$heading"></h3>
+    <button type="button" class="panel-toggle" @click="toggle" :aria-expanded="$expanded" :text="$toggleText"></button>
+  </header>
+  <div class="panel-body" :hidden="$collapsed">
+    <slot><p class="panel-empty">Nothing here yet.</p></slot>
+  </div>
+  <footer class="panel-actions"><slot name="actions"></slot></footer>
+</section>

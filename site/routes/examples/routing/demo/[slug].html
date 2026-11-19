@@ -1,0 +1,22 @@
+<title>Post · routing demo</title>
+<meta name="robots" content="noindex">
+
+<c-demo-page>
+  <p-demo-nav></p-demo-nav>
+  <if $post>
+    <article class="grid gap-3">
+      <h1 class="text-2xl font-medium tracking-tight" :text="$post.title"></h1>
+      <p-post-meta :post="$post"></p-post-meta>
+      <p class="text-muted" :text="$post.summary"></p>
+    </article>
+  </if>
+  <else>
+    <article class="grid gap-3">
+      <h1 class="text-2xl font-medium tracking-tight">Post not found</h1>
+      <p class="text-muted">No post has this slug. Not found is just data here, so the response is still 200.</p>
+    </article>
+  </else>
+  <p class="text-sm text-faint">
+    <span>params.slug = </span><code class="text-ink" :text="params.slug"></code>
+  </p>
+</c-demo-page>

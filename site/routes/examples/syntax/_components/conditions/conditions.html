@@ -1,0 +1,26 @@
+<div>
+  <div class="conditions-modes" role="group" aria-label="Simulated state">
+    <for mode in $modes key=mode.id>
+      <button type="button" class="conditions-mode" :aria-pressed="mode.pressed" @click="pick" :text="mode.id"></button>
+    </for>
+  </div>
+  <if $loading>
+    <div class="conditions-panel" aria-busy="true">
+      <span class="skeleton conditions-bar"></span>
+      <span class="skeleton conditions-bar conditions-short"></span>
+    </div>
+  </if>
+  <else-if $failed>
+    <p class="conditions-panel conditions-error" role="alert">Could not load the orders. Retry in a moment.</p>
+  </else-if>
+  <else-if !$orders.length>
+    <p class="conditions-panel conditions-muted">No orders yet.</p>
+  </else-if>
+  <else>
+    <ul class="conditions-panel">
+      <for order in $orders key=order.id>
+        <li class="conditions-order"><span :text="order.id"></span><span :text="order.total"></span></li>
+      </for>
+    </ul>
+  </else>
+</div>

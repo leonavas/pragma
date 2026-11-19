@@ -1,0 +1,26 @@
+<div class="grid w-full max-w-sm gap-4">
+  <div class="grid grid-cols-3 gap-3">
+    <label class="split-field">
+      <span class="label">Bill</span>
+      <input class="split-input" type="number" min="0" step="0.01" inputmode="decimal" :model="$amount">
+    </label>
+    <label class="split-field">
+      <span class="label">People</span>
+      <input class="split-input" type="number" min="1" step="1" inputmode="numeric" :model="$people">
+    </label>
+    <label class="split-field">
+      <span class="label">Tip %</span>
+      <select class="split-input" :model="$tipPercent">
+        <option value="0">0</option>
+        <option value="10">10</option>
+        <option value="15">15</option>
+        <option value="20">20</option>
+      </select>
+    </label>
+  </div>
+  <dl class="split-result">
+    <dt>tip</dt><dd :text="$tipLabel"></dd>
+    <dt>total</dt><dd :text="$totalLabel"></dd>
+    <dt>each</dt><dd class="text-accent" :text="$perPersonLabel"></dd>
+  </dl>
+</div>

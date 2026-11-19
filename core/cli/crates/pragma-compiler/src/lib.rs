@@ -95,6 +95,18 @@ fn gzip_len(bytes: &[u8]) -> u64 {
     miniz_oxide::deflate::compress_to_vec(bytes, 6).len() as u64 + 18
 }
 
+/// Authors scope a component's CSS with `[data-c="<name>"]`; a `routes/**/_components` one gets a
+/// per-folder id (`Component::id`), so its own selector is rewritten to that id (BUG-S-11).
+fn scope_component_css(css: &str, name: &str, id: &str) -> String {
+    if name == id {
+        return css.to_string();
+    }
+    let to = format!("[data-c=\"{id}\"]");
+    [format!("[data-c=\"{name}\"]"), format!("[data-c='{name}']"), format!("[data-c={name}]")]
+        .iter()
+        .fold(css.to_string(), |out, from| out.replace(from.as_str(), &to))
+}
+
 fn sort_diags(mut d: Vec<Diagnostic>) -> Vec<Diagnostic> {
     d.sort_by(|a, b| (&a.file, a.line, a.column, a.rule, &a.message).cmp(&(&b.file, b.line, b.column, b.rule, &b.message)));
     d.dedup();
@@ -348,7 +360,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         if let Some(css) = c.css.as_ref().and_then(|f| p.read(f)) {
             css_comment(c.css.as_ref().unwrap(), &css, &mut diags);
             validate::css_classes(&css, &mut project_classes);
-            comp_css.insert(c.dir.clone(), css);
+            comp_css.insert(c.dir.clone(), scope_component_css(&css, &c.name, &c.id));
         }
     }
     let mut classes = validate::ClassCheck::new(project_classes, theme);
@@ -394,14 +406,18 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             None => (false, false),
         };
         let page_actions = page.module.as_ref().map(|m| actions_of(m));
-        let comp_actions_owned: Vec<(String, Vec<String>)> = exp.components.values().filter_map(|c| c.module.as_ref().map(|m| (c.name.clone(), actions_of(m)))).collect();
+        let comp_actions_owned: Vec<(String, String, Vec<String>)> = exp
+            .components
+            .values()
+            .filter_map(|c| c.module.as_ref().map(|m| (c.id.clone(), format!("<{}-{}>", if c.id == c.name { "c" } else { "p" }, c.name), actions_of(m))))
+            .collect();
         let ctx = expand::PageCtx {
             loader,
             ssr,
             params: page.pattern.split('/').filter_map(|s| s.strip_prefix(':')).map(str::to_string).collect(),
             page_actions: page_actions.as_deref(),
             page_file: &p.files[page.html as usize],
-            comp_actions: comp_actions_owned.iter().map(|(n, a)| (n.clone(), a.as_slice())).collect(),
+            comp_actions: comp_actions_owned.iter().map(|(id, tag, a)| (id.clone(), (tag.as_str(), a.as_slice()))).collect(),
         };
         let mut sc = expand::Scoped { p: &p, ctx: &ctx, diags: Vec::new(), stores: BTreeSet::new(), classes: BTreeSet::new(), outer: Vec::new() };
         sc.run(&exp.body);
@@ -528,7 +544,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         let modules = closure(&mods, &entries, false);
         let module_urls: Vec<&str> = modules.iter().filter(|m| **m != boot).map(|m| urls[m].as_str()).collect();
         let url_of = |f: &Option<PathBuf>| f.as_ref().and_then(|f| urls.get(f)).map(|u| Value::String(u.clone())).unwrap_or(Value::Null);
-        let comps: serde_json::Map<String, Value> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| (c.name.clone(), url_of(&c.module))).collect();
+        let comps: serde_json::Map<String, Value> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| (c.id.clone(), url_of(&c.module))).collect();
         let stores: serde_json::Map<String, Value> = p.stores.iter().filter(|(name, f)| o.stores.contains(*name) || modules.contains(f)).map(|(name, f)| (name.clone(), url_of(&Some(f.clone())))).collect();
         let route = json!({
             "pattern": o.page.pattern,
@@ -621,7 +637,9 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
 
     report.has_server = !server_routes.is_empty();
     let handler = PathBuf::from("core/server/handler.js");
-    if opts.root.join(&handler).is_file() {
+    // no *.server.js: static-only app, no server bundle and no node (BUG-S-1); `pragma dev` and
+    // `serve` answer `/_otel` themselves
+    if report.has_server && opts.root.join(&handler).is_file() {
         let mut entries = vec![handler.clone(), PathBuf::from("core/server/node.mjs")];
         entries.extend(server_routes.iter().map(|r| r.1.clone()));
         entries.retain(|e| opts.root.join(e).is_file());
@@ -641,10 +659,11 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         worker.push_str("  ],\n})\n");
         w.write("server/worker.js", worker.as_bytes());
         w.write("server/package.json", b"{ \"type\": \"module\" }\n");
-        w.write(
-            "server/node.mjs",
-            b"import h from './worker.js'\nimport { serve } from './core/server/node.mjs'\n\nserve(h, { root: new URL('../client/', import.meta.url), port: process.env.PORT ?? 3000 })\n",
+        let node = format!(
+            "import h from './worker.js'\nimport {{ serve }} from './core/server/node.mjs'\n\nserve(h, {{ root: new URL('../client/', import.meta.url), port: process.env.PORT ?? 3000, service: {} }})\n",
+            json!(p.config.name)
         );
+        w.write("server/node.mjs", node.as_bytes());
         let wrangler = json!({
             "name": p.config.name,
             "main": "worker.js",

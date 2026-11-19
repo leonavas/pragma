@@ -1,0 +1,21 @@
+<figure class="flex flex-col border border-line-strong bg-sunken shadow-2xl">
+  <div class="flex items-center justify-between border-b border-line pl-4 font-mono text-xs text-faint">
+    <span>~/projects</span>
+    <button type="button" class="terminal-replay cursor-pointer border-l border-line px-4 py-3 text-muted hover:text-accent" @click="replay">Replay</button>
+  </div>
+  <div class="terminal-screen" .is-restarting="$restarting">
+    <p class="terminal-line is-command"><span class="text-accent" aria-hidden="true">$</span><span class="terminal-typed">pragma new my-app</span></p>
+    <p class="terminal-line"><span>app created in my-app (43 files)</span><span class="terminal-time">2 ms</span></p>
+    <p class="terminal-line is-command"><span class="text-accent" aria-hidden="true">$</span><span class="terminal-typed">cd my-app</span></p>
+    <p class="terminal-line is-command"><span class="text-accent" aria-hidden="true">$</span><span class="terminal-typed">pragma check --strict</span></p>
+    <p class="terminal-line text-accent"><span>no problems found</span><span class="terminal-time">10 ms</span></p>
+    <p class="terminal-line is-command"><span class="text-accent" aria-hidden="true">$</span><span class="terminal-typed">pragma build</span></p>
+    <p class="terminal-line text-faint"><span>page     JS gzip</span></p>
+    <p class="terminal-line"><span>/         <span class="text-ink">8.8 KB</span></span></p>
+    <p class="terminal-line"><span>CSS       <span class="text-ink">4.1 KB</span></span></p>
+    <p class="terminal-line text-faint"><span>1 page(s)</span></p>
+    <p class="terminal-line text-accent"><span>dist/ built in 6 ms</span></p>
+    <p class="terminal-line is-command"><span class="text-accent" aria-hidden="true">$</span><span class="terminal-cursor h-4 w-2.5 self-center bg-accent" aria-hidden="true"></span></p>
+  </div>
+  <figcaption class="border-t border-line px-4 py-3 font-mono text-xs text-faint">Real output of the starter app. Times on the right are wall clock.</figcaption>
+</figure>

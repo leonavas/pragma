@@ -1,0 +1,10 @@
+:root { --color-ink: #18181b; --color-paper: #fafafa; --color-accent: #4f46e5; --radius: 0.5rem; }
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; color: var(--color-ink); background: var(--color-paper); }
+header { display: flex; gap: 1rem; padding: 1rem 1.5rem; border-bottom: 1px solid #e4e4e7; }
+main { max-width: 64rem; margin: 0 auto; padding: 1.5rem; }
+h1 { font-size: 1.875rem; line-height: 2.25rem; font-weight: 600; }
+a { color: var(--color-accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius); }
+.btn-primary { background: var(--color-accent); color: white; }

@@ -14,6 +14,7 @@ pub struct Expanded {
     pub body: Vec<Node>,
     /// Content of `<main data-page>` (base of the SSR ops).
     pub page: Vec<Node>,
+    /// By `data-c` id (`Component::id`).
     pub components: BTreeMap<String, Component>,
 }
 
@@ -28,6 +29,8 @@ struct Scope<'s> {
     bound_props: HashMap<String, String>,
     stateful: bool,
     known_props: Option<&'s HashSet<String>>,
+    /// Keys of the component's `state()` when known statically: then `$x` is state only for them.
+    state_keys: Option<&'s HashSet<String>>,
     slots: Option<&'s Slots>,
     inst: u64,
 }
@@ -53,6 +56,7 @@ pub struct Expander<'p> {
     stack: Vec<&'p Path>,
     known_props: HashMap<String, HashSet<String>>,
     stateful: HashSet<PathBuf>,
+    state_keys: HashMap<PathBuf, HashSet<String>>,
 }
 
 fn collect_props(nodes: &[Node], out: &mut HashMap<String, HashSet<String>>) {
@@ -109,7 +113,7 @@ impl<'p> Expander<'p> {
         for tree in &p.trees {
             collect_props(tree, &mut known_props);
         }
-        let stateful = p
+        let stateful: HashSet<PathBuf> = p
             .components
             .values()
             .flat_map(|m| m.values())
@@ -117,7 +121,11 @@ impl<'p> Expander<'p> {
             .filter(|m| p.read(m).is_some_and(|src| crate::js::exports(&src).iter().any(|(n, _)| n == "state")))
             .cloned()
             .collect();
-        Expander { p, diags: Vec::new(), used: BTreeMap::new(), stack: Vec::new(), known_props, stateful }
+        let state_keys = stateful
+            .iter()
+            .filter_map(|m| Some((m.clone(), pragma_jslint::exported_state_keys(&p.read(m)?)?.into_iter().collect())))
+            .collect();
+        Expander { p, diags: Vec::new(), used: BTreeMap::new(), stack: Vec::new(), known_props, stateful, state_keys }
     }
 
     fn err(&mut self, pos: Pos, rule: &'static str, msg: impl Into<String>) {
@@ -144,7 +152,7 @@ impl<'p> Expander<'p> {
                 _ => content.push(n.clone()),
             }
         }
-        let sc = Scope { from: &page.dir, props: None, aliases: HashMap::new(), bound_props: HashMap::new(), stateful: true, known_props: None, slots: None, inst: 0 };
+        let sc = Scope { from: &page.dir, props: None, aliases: HashMap::new(), bound_props: HashMap::new(), stateful: true, known_props: None, state_keys: None, slots: None, inst: 0 };
         let page_nodes = self.expand_nodes(&content, &sc);
         let mut head = Vec::new();
         let mut body = Vec::new();
@@ -162,7 +170,7 @@ impl<'p> Expander<'p> {
                 }
             }
             let slots: Slots = HashMap::from([(String::new(), page_nodes.clone())]);
-            let lsc = Scope { from: Path::new("routes"), props: None, aliases: HashMap::new(), bound_props: HashMap::new(), stateful: true, known_props: None, slots: Some(&slots), inst: 0 };
+            let lsc = Scope { from: Path::new("routes"), props: None, aliases: HashMap::new(), bound_props: HashMap::new(), stateful: true, known_props: None, state_keys: None, slots: Some(&slots), inst: 0 };
             body = self.expand_nodes(&rest, &lsc);
         }
         merge_head(&mut head, own_head);
@@ -187,7 +195,13 @@ impl<'p> Expander<'p> {
                 return Res::Path(format!("{bang}{target}{tail}"));
             }
             let key = name.to_ascii_lowercase();
-            let is_state = sc.stateful && !sc.known_props.is_some_and(|k| k.contains(&key));
+            // with known state keys, any other `$x` is a prop (falsy when this caller omits it),
+            // whatever other files pass (BUG-S-15); otherwise guess from the props callers pass
+            let is_state = sc.stateful
+                && match sc.state_keys {
+                    Some(keys) => keys.contains(name),
+                    None => !sc.known_props.is_some_and(|k| k.contains(&key)),
+                };
             if !tail.is_empty() && (props.contains_key(&key) || !is_state) {
                 return Res::Path(v.to_string());
             }
@@ -461,22 +475,23 @@ impl<'p> Expander<'p> {
         h.write(&e.pos.line.to_le_bytes());
         h.write(&e.pos.col.to_le_bytes());
         let known = self.known_props.get(&name).cloned().unwrap_or_default();
-        let inner = Scope { from: &comp.scope, props: Some(&props), aliases, bound_props, stateful: comp.module.as_ref().is_some_and(|m| self.stateful.contains(m)), known_props: Some(&known), slots: Some(&slots), inst: h.finish() };
+        let state_keys = comp.module.as_ref().and_then(|m| self.state_keys.get(m)).cloned();
+        let inner = Scope { from: &comp.scope, props: Some(&props), aliases, bound_props, stateful: comp.module.as_ref().is_some_and(|m| self.stateful.contains(m)), known_props: Some(&known), state_keys: state_keys.as_ref(), slots: Some(&slots), inst: h.finish() };
         self.stack.push(&comp.dir);
         let mut nodes = self.expand_nodes(std::slice::from_ref(root), &inner);
         self.stack.pop();
-        match self.used.get(&name) {
+        match self.used.get(&comp.id) {
             Some(prev) if prev.dir != comp.dir => {
-                let msg = format!("two components \"{name}\" on the same page ({} and {})", rel_str(&prev.dir), rel_str(&comp.dir));
+                let msg = format!("two components with the id \"{}\" on the same page ({} and {}); rename one", comp.id, rel_str(&prev.dir), rel_str(&comp.dir));
                 self.err(e.pos, "html/component", msg);
             }
             _ => {
-                self.used.insert(name.clone(), comp.clone());
+                self.used.insert(comp.id.clone(), comp.clone());
             }
         }
         let mut dup = Vec::new();
         if let Some(Node::Element(r)) = nodes.iter_mut().find(|n| matches!(n, Node::Element(_))) {
-            r.attrs.insert(0, Attr { name: "data-c".into(), value: Some(name.clone()), pos: r.pos });
+            r.attrs.insert(0, Attr { name: "data-c".into(), value: Some(comp.id.clone()), pos: r.pos });
             if comp.module.is_some() {
                 for a in &e.attrs {
                     let k = a.name.to_ascii_lowercase();
@@ -566,8 +581,8 @@ pub struct PageCtx<'a> {
     pub params: Vec<String>,
     pub page_actions: Option<&'a [String]>,
     pub page_file: &'a Path,
-    /// Components used with a module -> exported actions.
-    pub comp_actions: HashMap<String, &'a [String]>,
+    /// Components used with a module: `data-c` id -> (tag for messages, exported actions).
+    pub comp_actions: HashMap<String, (&'a str, &'a [String])>,
 }
 
 #[derive(Clone)]
@@ -704,9 +719,9 @@ impl Scoped<'_> {
                 _ => {}
             },
             Owner::Comp(c) => {
-                let acts = self.ctx.comp_actions.get(c.as_str()).copied().unwrap_or(&[]);
+                let (tag, acts) = self.ctx.comp_actions.get(c.as_str()).copied().unwrap_or((c.as_str(), &[]));
                 if !acts.iter().any(|a| a == name) {
-                    self.err(pos, "html/unknown-action", format!("action \"{name}\" is not in the actions of component {c} (owner: nearest component with a module; slot content belongs to whoever wrote it)"));
+                    self.err(pos, "html/unknown-action", format!("action \"{name}\" is not in the actions of component {tag} (owner: nearest component with a module; slot content belongs to whoever wrote it)"));
                 }
             }
         }

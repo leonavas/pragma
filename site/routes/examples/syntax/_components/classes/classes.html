@@ -1,0 +1,4 @@
+<div>
+  <p class="classes-task" .line-through="$done" .text-faint="$done" .is-pending="!$done" .md:font-semibold="$done">Ship the release notes</p>
+  <button type="button" class="btn btn-small" :aria-pressed="$doneText" @click="toggle" :text="$buttonLabel">Mark as done</button>
+</div>

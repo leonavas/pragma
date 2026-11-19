@@ -1,0 +1,42 @@
+<form aria-label="Order options">
+  <label class="model-field">
+    <span class="label">text</span>
+    <input class="model-input" :model="$name">
+  </label>
+  <label class="model-field">
+    <span class="label">number</span>
+    <input class="model-input" type="number" min="0" max="9" :model="$quantity">
+  </label>
+  <label class="model-field">
+    <span class="label">range</span>
+    <input class="model-range" type="range" min="0" max="9" :model="$quantity">
+  </label>
+  <label class="model-field">
+    <span class="label">select</span>
+    <select class="model-input" :model="$shipping">
+      <option value="standard">Standard</option>
+      <option value="express">Express</option>
+    </select>
+  </label>
+  <fieldset class="model-field">
+    <legend class="label">radio</legend>
+    <div class="model-row">
+      <label><input type="radio" name="model-size" value="s" :model="$size"> S</label>
+      <label><input type="radio" name="model-size" value="m" :model="$size"> M</label>
+      <label><input type="radio" name="model-size" value="l" :model="$size"> L</label>
+    </div>
+  </fieldset>
+  <label class="model-row">
+    <input type="checkbox" :model="$gift">
+    <span>checkbox: gift wrap</span>
+  </label>
+  <label class="model-field">
+    <span class="label">textarea</span>
+    <textarea class="model-input" rows="2" :model="$note"></textarea>
+  </label>
+  <output class="model-readout">
+    <for field in $readout key=field.name>
+      <span class="model-line"><span class="model-key" :text="field.name"></span><span :text="field.shown"></span><span class="model-type" :text="field.kind"></span></span>
+    </for>
+  </output>
+</form>

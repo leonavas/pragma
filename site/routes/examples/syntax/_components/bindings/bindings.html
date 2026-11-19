@@ -1,0 +1,11 @@
+<div>
+  <button type="button" class="bindings-switch" :aria-pressed="$pressedText" @click="toggle">
+    <span class="bindings-knob" aria-hidden="true"></span>
+    <span>Service online</span>
+  </button>
+  <article class="bindings-card" :data-tone="$tone" aria-live="polite">
+    <p class="bindings-status" :text="$heading">Down</p>
+    <a class="bindings-link" :href="$link" :title="$linkTitle" :text="$linkLabel">No status page while down</a>
+  </article>
+  <button type="button" class="btn btn-small" :disabled="$offline">Deploy</button>
+</div>

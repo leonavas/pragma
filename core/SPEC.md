@@ -30,7 +30,7 @@ core/
     crates/pragma-css       Tailwind subset + base CSS
     crates/pragma-jslint    JS rules (oxc)
     crates/pragma-compiler  build, analysis, directives
-    crates/pragma-cli       `pragma` binary: new, dev, build, check, serve
+    crates/pragma-cli       `pragma` binary: new, dev, build, check, serve, upgrade
   example/           example app (generated with `pragma new`)
 ```
 
@@ -66,7 +66,8 @@ Route rules:
 - `index.html` serves its folder. `x.html` plus `x/index.html` = build error.
 - `[name]` (file or folder) = path param. Static beats param.
 - A page file is a fragment: content placed in the `<slot>` of `_layout.html`.
-  A `<title>` at the top of the fragment becomes the page title.
+  `<title>`, `<meta>` and `<link>` at the top level of the fragment go to `<head>` (§5.1);
+  elsewhere in a page or component they are an error (`html/head`).
 - Component use: `<c-name>` = `lib/components/<name>/`; `<p-name>` = `_components/<name>/` in
   the page's folder or any ancestor up to `routes/`. Not found = error.
 
@@ -118,10 +119,17 @@ outside that component. Directives on the root of a component with a module belo
 any ancestor up to `routes/`. 1 root element. Expanded at build (macro).
 - Static prop `title="X"`: build-time literal. Dynamic prop `:total="path"`: evaluated in the
   user's scope and updated each render. Inside: `$title`, `$total` (HTML) and `ctx.$` (JS).
-- Props are read-only; missing prop = empty/false; prop named like a state key = error.
+- Props are read-only; prop named like a state key = error. Falsy: missing, `""`, `"false"`;
+  truthy: bare attribute or any other value. In JS (`ctx.$`) a bare attribute or `"true"` is
+  `true`, `"false"` is `false`, other values are strings (the build writes a bare prop as `data-x="true"`).
 - A component with a module does not receive the user's `$` via `:x` (inside, `$` is its own).
+- In a component whose `state()` returns an object literal, `$x` is state only when `x` is one of
+  its keys (getters included); any other `$x` is a prop, falsy when the caller omits it. If the
+  keys are not static (spread, computed key), `$x` is a prop only when some caller passes `x`.
 - `<slot></slot>` receives children; `<slot name="actions">` receives children with `slot="actions"`.
-- The build marks the root with `data-c="x"`. `x.js` loads only on pages using the component.
+- The build marks the root with `data-c="x"` for `c-x`, and `data-c="x-<hash>"` for `p-x` (6 hex
+  of the component folder path), so same-named private components in different folders never
+  share CSS or the module lookup. `x.js` loads only on pages using the component.
 
 ### Rendered block DOM (client and SSR identical)
 
@@ -186,7 +194,9 @@ export async function load({ params, query, request, env, log }) { return { prod
 export const actions = { async save({ input, params, env, log }) { return { ok: true } } }
 export const ssr = false
 ```
-- Default, no SSR: prebuilt HTML arrives with skeleton (`<if page.loading>`).
+- Default, no SSR: prebuilt HTML has everything outside blocks; the `<if page.loading>` chain is
+  an inert `<template>` the runtime instantiates on boot, so the skeleton appears once
+  `core/boot.js` runs, not in the raw HTML.
   The client fetches `GET /_data/<path>?<query>` → `{ "data": ... }` or `{ "error": { "message" } }`.
 - In the `<head>` of pages with a loader, the build injects a minimal inline script that starts
   the fetch before modules: `self.__pd = fetch('/_data' + location.pathname + location.search)`.
@@ -196,6 +206,21 @@ export const ssr = false
   `<script type="application/json" id="pragma-data">`. The client binds directives without
   rebuilding the DOM.
 - Error in `load` → `page.error` on the client; 500 with ERROR log on the server.
+
+### 5.1 Head tags (SEO, link previews)
+
+- `<head>` = the layout `<head>` merged with the page's top-level `<title>`, `<meta>`, `<link>`.
+  A page tag replaces the layout tag with the same key (`title`; `meta` by `name`, `property` or
+  `http-equiv`; `link` by `rel` + `hreflang`), in place; the others are appended. No title at
+  all → `pragma.json` `name`.
+- The layout `<head>` is static: any directive there is `html/head`.
+- Page head tags take only `:text` (title) and `:<attr>` (meta, link), with roots `data`,
+  `params` or `query`, and require `export const ssr = true` (`html/head`). The build emits
+  them as `data-text`/`data-attr-*` in the shell; the handler renders them before sending
+  (escaped). Null/false keeps the static fallback; a `meta` left without `content` or a `link`
+  without `href` is removed.
+- The router replaces `<title>` and every `<meta>`/`<link>` except charset, viewport,
+  stylesheet and modulepreload with the target document's on each navigation.
 
 ## 6. Overlays: modal, alert, dropdown, popover
 
@@ -229,14 +254,15 @@ Usage:
 - Intercepts same-origin `<a>` clicks (without `target`, `download` or `data-reload`).
 - Prefetch on `pointerenter`/`focus` and when the link enters the viewport (idle): fetches the
   route's prebuilt HTML and `modulepreload`s its modules (manifest).
-- Navigate: fetch HTML, swap the content of `<main data-page>` and `<title>`, unmount the
+- Navigate: fetch HTML, swap the content of `<main data-page>` and the head tags (§5.1), unmount the
   previous page (cleanups), import modules and start the loader in parallel.
   The layout is not recreated; its directives are reapplied.
 - `popstate`: the overlay manager intercepts first.
 - Scroll: top on new navigation; restored on back/forward. Focus moves to `<main>`.
 - Links `href="/path"` (no query or hash) to the current route get `aria-current="page"`:
   the build marks prebuilt HTML and the router keeps it on each navigation.
-- `document.startViewTransition` when available.
+- `document.startViewTransition` when available, except under `prefers-reduced-motion: reduce`
+  (instant swap).
 - Manifest: `/_pragma/manifest.json` → `[{ "pattern": "/shop/:id", "html": "/shop/[id].html", "modules": [...], "loader": true, "ssr": false }]`.
 
 ## 8. CSS
@@ -249,7 +275,8 @@ Usage:
 - A class in HTML must be a supported utility or defined in project CSS (`lib/theme.css`,
   component `*.css`). Otherwise, check error.
 - Custom class: when a combination repeats in 3+ places or needs something outside the subset.
-  Component CSS goes in `<name>.css`, scoped with `[data-c="name"]`.
+  Component CSS goes in `<name>.css`, scoped with `[data-c="name"]`; for a `p-` component the
+  build rewrites that selector (`"name"`, `'name'` or unquoted) in its own `.css` to its id.
 - v0 output: one global minified CSS (lightningcss) with hash.
 
 ## 9. Build (`pragma build`)
@@ -259,7 +286,7 @@ dist/
   client/                 HTML per route, hashed assets, /_pragma/manifest.json
   server/worker.js        Cloudflare Workers entry (if any *.server.js)
   server/node.mjs         Node adapter (node:http) with static files
-  server/wrangler.jsonc   assets dist/client, not_found_handling SPA, run_worker_first
+  server/wrangler.jsonc   assets dist/client, run_worker_first (no not_found_handling)
   templates/<route>.json  ssr routes only
 ```
 - JS: ES modules, no bundler in v0. Each module minified (oxc) with hashed name; imports
@@ -277,14 +304,19 @@ dist/
 
 Errors with file:line:column, rule and message.
 - JS (oxc): HTML in JS (section 0); `console.*`; TS or JSDoc types (`@type`, `@param {`,
-  `@returns {`, `@typedef`, `@ts-`); import outside the project and `core/`; comment
+  `@returns {`, `@typedef`, `@ts-`); import outside the project and `core/`; `import()` with
+  a computed specifier (variable or `${}`) in app code (`js/import`); comment
   (`js/comment`); vague name (`js/vague-name`).
 - HTML: unknown or legacy syntax; invalid path root; `<for>` without `key`; malformed block or
   `<template>` in source; misplaced `<else-if>`/`<else>`/`<empty>`; block without single root;
-  action missing from the owner module; component not found; inline `style`/`on*`;
-  `<script>` in `routes/` and `lib/`.
+  action missing from the owner module; component not found; inline `style`/`on*`; `:class`
+  (`html/class`); `{{ }}`/`${ }` outside `<code>`/`<pre>` (`html/interpolation`); misplaced or
+  wrongly bound head tags (`html/head`, §5.1); `<script>` in `routes/` and `lib/`.
 - CSS: unknown class; arbitrary value.
 - Budgets (builds in a temp dir).
+- `core/` version: warning `app/core-outdated` when the app's `core/` is not byte-equal to the
+  runtime, docs and `base.css` embedded in the binary (a file changed, missing or extra); fix
+  with `pragma upgrade` (§11).
 - Accessibility warnings (`a11y/*`, non-blocking; `pragma check --strict` makes them errors), on
   the expanded page, pointing at the source file: `img-alt`, `accessible-name` (button or a
   without text, `:text`, `aria-label`/`labelledby` or `title`), `label` (input, select,
@@ -298,15 +330,22 @@ Errors with file:line:column, rule and message.
 - Server code is JS in `fetch(request, env, ctx)` form. Cloudflare Workers is the preferred
   target; Node ≥ 22 via `dist/server/node.mjs`.
 - `pragma dev` (Rust, hyper + tokio, port 5180): incremental build in `.pragma/dev/`, watch,
-  live reload via SSE at `/_pragma/reload` (CSS swaps without reload). If any `*.server.js`
+  live reload via a WebSocket at `/_pragma/reload` (CSS swaps without reload; not SSE, because an
+  `EventSource` per tab uses up the 6 HTTP/1.1 connections per host). If any `*.server.js`
   exists, starts `node .pragma/dev/server/node.mjs` on an internal port and proxies `/_data`,
-  `/_action`, `/_otel` and ssr pages.
+  `/_action`, `/_otel` and ssr pages. A build with errors still writes its outputs (pages without
+  errors keep working, with the error overlay): node is restarted for it too, so it always serves
+  the same build as the client files.
 - `pragma serve`: same server without watch, over `dist/`. Ctrl+C or SIGTERM also stop the
   child node.
 - A path ending in `.html` is never an SSR page (it is the prebuilt HTML the router fetches),
   in `pragma dev/serve` and in the handler.
 - `pragma new <dir>`: copies `starter/` + `runtime/` → `<dir>/core/` + `docs/` → `<dir>/core/docs/`
   (embedded in the binary).
+- `pragma upgrade`: makes `<app>/core/` equal to the embedded runtime, docs and `base.css`
+  (writes changed and missing files, removes files the binary does not have) and prints each
+  file updated, added or removed. Writes nothing outside `core/` (`AGENTS.md`, `pragma.json`,
+  `routes/`, `lib/`… are the app's).
 
 ## 12. Logs (OpenTelemetry)
 
@@ -317,7 +356,10 @@ Errors with file:line:column, rule and message.
   `traceparent`.
 - Server: span per request; `/_otel` forwards to OTLP/HTTP if `OTEL_EXPORTER_OTLP_ENDPOINT`
   is set, else prints OTel JSON to stdout.
-- `pragma dev` prints readable logs in the terminal.
+- `pragma dev` prints readable logs in the terminal and starts node with
+  `PRAGMA_LOG_LEVEL=debug` (unless set). Elsewhere the default minimum is `info`.
+- `pragma serve` without a backend answers `POST /_otel` with 204. The client stops sending
+  after a 404/405 from `/_otel` (static hosts).
 
 ## 13. Out of v0
 
@@ -344,10 +386,12 @@ Speculation Rules, i18n.
 <body>…_layout.html content with <main data-page>…page…</main>…</body>
 </html>
 ```
-- `__pd` only on pages with a loader. Extra `<head>` tags may come from a `<head>` block at the
-  start of `_layout.html`.
+- `__pd` only on pages with a loader. Extra `<head>` tags come from the layout `<head>` merged
+  with the page's head tags (§5.1), right after `<title>`.
 - `#pragma-route`: `{ "pattern", "page": "<page module url or null>",
-  "components": { "<name>": "<url>" }, "loader": bool, "ssr": bool }`. Only components with `.js`.
+  "components": { "<name>": "<url>" }, "stores": { "<name>": "<url>" }, "loader": bool, "ssr": bool }`.
+  Only components with `.js`. Stores: read in HTML (`shared.x`), in the page or component
+  modules (`shared.x`, e.g. `ctx.shared.x`) or statically imported.
 - `core/` modules (boot, router, …) are also hashed; imports between them rewritten.
 
 ### JS interfaces between runtime files
@@ -363,7 +407,7 @@ Speculation Rules, i18n.
 - Component module owner: lexical (§3). The runtime stores the owner in each element's scope;
   `data-slot="n"` goes up n components. With no component owner, the owner is the page. The
   layout has no module in v0: its directives use `shared`, `params`, `query`.
-- `/_pragma/reload` (SSE) and `/_pragma/dev.js` (live reload client) are served by
+- `/_pragma/reload` (WebSocket) and `/_pragma/dev.js` (live reload client) are served by
   `pragma dev`, injected only in dev.
 
 ### CSS the runtime expects from `base.css`
@@ -378,13 +422,16 @@ export function createHandler({ routes }) → { fetch(request, env, ctx) }
 // routes: [{ pattern: '/shop/:id', server: <.server.js namespace>, ssr: bool,
 //            template: <compiled ops> | null, shell: '<prebuilt page html>' | null }]
 ```
-- Handles `/_data/*`, `/_action/*`, `/_otel` and `ssr` pages. Everything else:
-  `env.ASSETS.fetch(request)` (Workers) or the Node adapter's static server.
+- Handles `/_data/*`, `/_action/*`, `/_otel` and `ssr` pages (body and head tags). Everything
+  else: `env.ASSETS.fetch(request)` (Workers) or the Node adapter's static server; on a 404 it
+  resolves non-ssr param routes via `/_pragma/manifest.json` and otherwise answers `_404.html`
+  with status 404.
 - The build emits `dist/server/worker.js`: imports `./core/server/handler.js` and each
   `.server.js` (copied to `dist/server/` with relative imports, paths preserved), embeds
   templates and shells as JS objects and does `export default createHandler(...)`.
 - The build emits `dist/server/node.mjs`:
-  `import h from './worker.js'; import { serve } from './core/server/node.mjs'; serve(h, { root: new URL('../client/', import.meta.url), port: process.env.PORT ?? 3000 })`.
+  `import h from './worker.js'; import { serve } from './core/server/node.mjs'; serve(h, { root: new URL('../client/', import.meta.url), port: process.env.PORT ?? 3000, service: "<pragma.json name>" })`.
+  `serve` logs with `service.name` = `service` (`OTEL_SERVICE_NAME` wins), as the handler does.
 - The Node adapter serves `client/` statics with correct MIME and cache, resolves param routes
   to their HTML via `client/_pragma/manifest.json`, and answers `_404.html` with 404.
 
