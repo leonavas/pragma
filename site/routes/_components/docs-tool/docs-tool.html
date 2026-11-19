@@ -1,0 +1,67 @@
+<script>
+  import { log } from 'pragma'
+
+  let shownTopic = ''
+  let docText = ''
+  let loading = false
+
+  const docUrl = () => '/docs/' + shownTopic + '.md'
+
+  async function readDoc(topic) {
+    try {
+      const response = await fetch('/docs/' + topic + '.md')
+      if (!response.ok) return 'No doc named "' + topic + '". The list is in /llms.txt.'
+      return await response.text()
+    } catch (failure) {
+      log.warn('doc fetch failed', { 'exception.message': failure.message, 'doc.topic': topic })
+      return 'Could not load /docs/' + topic + '.md: ' + failure.message
+    }
+  }
+
+  async function getDocs(event) {
+    const topic = String(new FormData(event.target).get('topic'))
+    const reading = readDoc(topic)
+    if (event.agentInvoked) event.respondWith(reading)
+    loading = true
+    shownTopic = topic
+    docText = await reading
+    loading = false
+  }
+</script>
+
+<article class="tool-card">
+  <header class="grid gap-2">
+    <h3 class="font-mono text-sm font-medium text-accent">get_pragma_docs</h3>
+    <p class="text-sm leading-relaxed text-muted">Returns one pragma doc as markdown. Same files as /docs/&lt;topic&gt;.md and /llms-full.txt.</p>
+  </header>
+  <form class="grid gap-3" toolname="get_pragma_docs" tooldescription="Get one pragma framework doc as markdown, by topic; read rules first, then the topic you need" toolautosubmit @submit="getDocs">
+    <label class="grid gap-1.5">
+      <span class="label">Topic</span>
+      <select class="tool-field" name="topic" required toolparamdescription="Doc to read: rules is AGENTS.md, the others are the files in core/docs">
+        <option value="rules">rules: AGENTS.md, read first</option>
+        <option value="structure">structure: files and pragma.json</option>
+        <option value="syntax">syntax: HTML directives and blocks</option>
+        <option value="components">components: props and slots</option>
+        <option value="state">state: script, actions, stores</option>
+        <option value="routes">routes: pages, router, SEO</option>
+        <option value="data">data: load, actions, SSR</option>
+        <option value="overlays">overlays: modal, alert, dropdown</option>
+        <option value="css">css: styles and theme</option>
+        <option value="classes">classes: utility classes</option>
+        <option value="webmcp">webmcp: forms as agent tools</option>
+        <option value="packages">packages: npm packages</option>
+        <option value="performance">performance: defaults and budgets</option>
+        <option value="logs">logs: OpenTelemetry</option>
+        <option value="cli">cli: commands and check rules</option>
+      </select>
+    </label>
+    <button class="btn btn-small w-fit" :disabled="$loading">Read the doc</button>
+  </form>
+  <if $docText>
+    <div class="grid gap-2">
+      <p class="font-mono text-xs text-faint"><a class="text-ink" :href="$docUrl">{$docUrl}</a></p>
+      <pre class="tool-output" tabindex="0" aria-label="Doc as markdown"><code><span>{$docText}</span></code></pre>
+    </div>
+  </if>
+</article>
+

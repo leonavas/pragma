@@ -16,6 +16,7 @@ pub struct Budgets {
 pub struct Config {
     pub name: String,
     pub lang: String,
+    pub webmcp: bool,
     pub budgets: Budgets,
     pub budget_lines: HashMap<&'static str, u32>,
 }
@@ -225,7 +226,7 @@ impl Project {
             files: Vec::new(),
             sources: Vec::new(),
             trees: Vec::new(),
-            config: Config::default(),
+            config: Config { webmcp: true, ..Config::default() },
             layout: None,
             not_found: None,
             pages: Vec::new(),
@@ -290,6 +291,10 @@ impl Project {
                     Some(s) if !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') => self.config.lang = s.to_string(),
                     _ => self.err("pragma.json", line_of("lang"), 1, "app/pragma-json", "\"lang\" must be a language tag such as \"en\" or \"pt-BR\""),
                 },
+                "webmcp" => match val.as_bool() {
+                    Some(b) => self.config.webmcp = b,
+                    None => self.err("pragma.json", line_of("webmcp"), 1, "app/pragma-json", "\"webmcp\" must be true or false"),
+                },
                 "budgets" => {
                     let Some(b) = val.as_object() else {
                         self.err("pragma.json", line_of("budgets"), 1, "app/pragma-json", "\"budgets\" must be an object");
@@ -321,7 +326,7 @@ impl Project {
                 }
                 _ => {
                     let l = line_of(k);
-                    self.err("pragma.json", l, 1, "app/pragma-json", format!("unknown key \"{k}\" (use name, lang, budgets)"));
+                    self.err("pragma.json", l, 1, "app/pragma-json", format!("unknown key \"{k}\" (use name, lang, webmcp, budgets)"));
                 }
             }
         }

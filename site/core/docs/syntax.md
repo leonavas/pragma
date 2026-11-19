@@ -80,8 +80,8 @@ Compute every derived value (total, label, filter, flag) in a function of the sc
 ## Example
 
 ```html
-<form class="flex gap-2" @submit="add">
-  <input class="flex-1 rounded-lg border border-line px-3 py-2" aria-label="New task" :model="$draft">
+<form class="flex gap-2" toolname="add_task" tooldescription="Add a task to the to-do list" @submit="add">
+  <input name="title" class="flex-1 rounded-lg border border-line px-3 py-2" aria-label="New task" toolparamdescription="Task title, 3 to 80 characters" :model="$draft">
   <button class="btn btn-primary">Add</button>
 </form>
 <p class="text-sm text-danger-600" role="status" :show="$error">{$error}</p>
@@ -108,7 +108,7 @@ Compute every derived value (total, label, filter, flag) in a function of the sc
 
 - Each `<if>`, `<else-if>`, `<else>`, `<for>`, `<empty>` contains exactly 1 root element, not another block. Put other directives on that element, not on the block tag.
 - Strict HTML: close every non-void tag. No `<html>`, `<body>`, `<template>`; one `<script>` and one `<style>` per file (state.md, css.md).
-- `@submit` calls `preventDefault()`. Pass the `<for>` item as an argument: `@click="remove(task)"`. Without parentheses the function gets the event (`@input="search"`); with them it gets only what you list (`@click="reset()"` gets nothing). Use `el`, not `event.currentTarget`, for the element with the `@` (events are delegated).
+- `@submit` calls `preventDefault()`. Every `<form>` is an agent tool: `toolname`, `tooldescription`, `name` on each field, or `notool` (webmcp.md). Pass the `<for>` item as an argument: `@click="remove(task)"`. Without parentheses the function gets the event (`@input="search"`); with them it gets only what you list (`@click="reset()"` gets nothing). Use `el`, not `event.currentTarget`, for the element with the `@` (events are delegated).
 - No `$` in events (`@click="increase"`, not `@click="$increase"`): `$` marks values. `:attr` takes a bare path (`:disabled="$atMinimum"`); to build text write `title="Count {$count}"` without the colon.
 - Block tags take one path, no operators: `<if $hasTasks>` with `const hasTasks = () => tasks.length > 0` in the script.
 - For `aria-*` states (`aria-pressed`, `aria-expanded`), return the strings `'true'`/`'false'`: boolean `false` removes the attribute.

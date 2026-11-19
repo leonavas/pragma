@@ -262,3 +262,41 @@
   }
   .doc-section code { overflow-wrap: anywhere; }
 }
+
+@layer components {
+  .tool-card {
+    display: grid;
+    align-content: start;
+    gap: 1.25rem;
+    min-width: 0;
+    padding: 1.25rem;
+    border: 1px solid var(--color-line);
+    background: var(--color-surface);
+  }
+  .tool-field {
+    width: 100%;
+    min-height: 2.5rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-sunken);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    caret-color: var(--color-accent);
+  }
+  .tool-field:focus-visible { outline-offset: 0; border-color: var(--color-accent); }
+  .tool-output {
+    max-height: 22rem;
+    margin: 0;
+    padding: 1rem;
+    overflow: auto;
+    border: 1px solid var(--color-line);
+    background: var(--color-sunken);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .tool-output:focus-visible { outline-offset: -2px; }
+}

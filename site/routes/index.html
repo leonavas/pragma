@@ -1,14 +1,48 @@
-<title>pragma: native web apps with rules an agent can't bend</title>
+<title>pragma: the web framework for agents</title>
+<meta name="description" content="A web framework built for coding agents: native HTML, CSS and JS, a Rust CLI that checks every line, WebMCP tools by default. Never TypeScript.">
 <link rel="canonical" href="https://pragma.dev/">
+<link rel="alternate" type="text/markdown" href="/index.md">
 <meta property="og:url" content="https://pragma.dev/">
+
+<p-audience>
+  <a href="/" aria-current="page">Human</a>
+  <a href="/agents">Agent</a>
+  <p slot="note">Agents: the full docs are one file at <a href="/llms-full.txt">/llms-full.txt</a> (index: <a href="/llms.txt">/llms.txt</a>). This page as markdown: <a href="/index.md">/index.md</a>.</p>
+</p-audience>
 
 <p-hero></p-hero>
 
+<section class="wrap" aria-labelledby="closing-title">
+  <div class="mt-24 grid gap-8 border border-line bg-sunken p-8 lg:grid-cols-3 lg:items-center lg:gap-16 lg:p-12">
+    <h2 id="closing-title" class="text-2xl font-medium tracking-tight lg:col-span-2">This framework is for agents. If you're still reading this instead of asking your agent to try it, it's not for you yet. <span class="text-accent">Come back in 6 months.</span></h2>
+    <a href="/agents" class="btn btn-primary w-fit">Hand it to your agent</a>
+  </div>
+</section>
+
+<section class="wrap" aria-labelledby="why-title">
+  <div class="grid gap-10 py-16 lg:grid-cols-3 lg:gap-16 lg:py-24">
+    <h2 id="why-title" class="text-2xl font-medium tracking-tight sm:text-3xl">Nobody argues about frameworks anymore. The agent picks one.</h2>
+    <div class="prose lg:col-span-2">
+      <p>Most people who build with an LLM don't know frontend. They ask for React or Angular because those are the names they know, and ship slow pages.</p>
+      <p>Some don't care and get plain HTML and JavaScript. Nothing beats it on speed. Nothing about it scales: it eats context, turns into a tangle, and the agent loses the thread.</p>
+      <p>Some know a bit more and pick SvelteKit, Astro or htmx. Good tools, made for people who read docs.</p>
+      <p><strong>pragma is made for the agent:</strong></p>
+      <ul>
+        <li>The minimum lint that stops the tangle: one way to do each thing, and every error names the rule and the fix.</li>
+        <li>Components and reactivity on what the browser already has: ES modules, <code>&lt;template&gt;</code>, <code>&lt;dialog&gt;</code>, popover, view transitions.</li>
+        <li>One Rust binary compiles, lints and validates. No Vite, no config.</li>
+        <li>Plain JavaScript. Never TypeScript.</li>
+        <li>WebMCP by default: every form is a tool an agent in the browser can call. A page with a .md next to it answers in markdown when an agent asks.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
 <section class="wrap" aria-labelledby="live-title">
-  <div class="grid gap-8 py-16 lg:py-24">
+  <div class="grid gap-8 border-t border-line py-16 lg:py-24">
     <div class="max-w-2xl">
       <h2 id="live-title" class="text-2xl font-medium tracking-tight sm:text-3xl">One file: markup, script and style</h2>
-      <p class="mt-4 text-muted">A component is one .html file. A top-level <code class="text-ink">let</code> is state, a function is an action or a derived value, and <code class="text-ink">{path}</code> puts a value in the text. Check a task, add one, hide the done ones: each action assigns a variable and the runtime reapplies the bindings. No hooks, no virtual DOM.</p>
+      <p class="mt-4 text-muted">A component is one .html file. A top-level <code class="text-ink">let</code> is state, a function is an action or a derived value, and <code class="text-ink">{path}</code> puts a value in the text. Check a task, add one, hide the done ones: each action assigns a variable and the runtime reapplies the bindings. No hooks, no virtual DOM. The form is also a WebMCP tool: an agent in the browser can call <code class="text-ink">add_task</code>.</p>
     </div>
     <c-showcase :source="data.examples.tasks" caption="This is the whole component, read from disk when the page renders: the source you see is the source that runs.">
       <p-task-list></p-task-list>
@@ -18,8 +52,24 @@
 
 <p-principles></p-principles>
 
-<section id="install" class="wrap" aria-labelledby="install-title">
+<section id="tools" class="wrap" aria-labelledby="tools-title">
   <div class="grid gap-10 pb-20 lg:grid-cols-3 lg:gap-16">
+    <div>
+      <h2 id="tools-title" class="text-2xl font-medium tracking-tight">Tools for agents on this page</h2>
+      <div class="prose mt-4 max-w-md">
+        <p>An agent in the browser sees these forms as WebMCP tools and calls them. You can use the same forms. Agents without a browser read the same docs at <a href="/llms-full.txt">/llms-full.txt</a>.</p>
+      </div>
+      <a href="/agents" class="btn mt-8">Everything for agents</a>
+    </div>
+    <div class="grid gap-6 lg:col-span-2 xl:grid-cols-2">
+      <p-setup-tool></p-setup-tool>
+      <p-docs-tool></p-docs-tool>
+    </div>
+  </div>
+</section>
+
+<section id="install" class="wrap" aria-labelledby="install-title">
+  <div class="grid gap-10 border-t border-line pt-16 pb-20 lg:grid-cols-3 lg:gap-16">
     <div>
       <h2 id="install-title" class="text-2xl font-medium tracking-tight">Install</h2>
       <div class="prose mt-4 max-w-md">

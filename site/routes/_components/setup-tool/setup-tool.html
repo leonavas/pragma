@@ -1,0 +1,46 @@
+<script>
+  let steps = ''
+
+  function stepsFor(description) {
+    const app = description.replace(/[.\s]+$/, '')
+    return [
+      '1. Install pragma (needs Rust and Cargo; Node 22+ only runs .server.js files):',
+      '   git clone https://github.com/leonavas/pragma',
+      '   cd pragma',
+      '   cargo install --path core/cli/crates/pragma-cli',
+      '',
+      '2. Create and run the app:',
+      '   pragma new my-app',
+      '   cd my-app',
+      '   pragma dev',
+      '',
+      '3. Prompt for the coding agent:',
+      '   Read ' + location.origin + '/llms-full.txt and create a pragma app that ' + app + '. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.',
+    ].join('\n')
+  }
+
+  function getSetup(event) {
+    const description = String(new FormData(event.target).get('app')).trim()
+    steps = stepsFor(description)
+    if (event.agentInvoked) event.respondWith(Promise.resolve(steps))
+  }
+</script>
+
+<article class="tool-card">
+  <header class="grid gap-2">
+    <h3 class="font-mono text-sm font-medium text-accent">get_setup_instructions</h3>
+    <p class="text-sm leading-relaxed text-muted">Say what the app does. You get the install commands and a prompt to paste into your coding agent.</p>
+  </header>
+  <form class="grid gap-3" toolname="get_setup_instructions" tooldescription="Get the commands to install pragma and create an app, plus a prompt for a coding agent, for a short app description" toolautosubmit @submit="getSetup">
+    <label class="grid gap-1.5">
+      <span class="label">The app</span>
+      <textarea class="tool-field" name="app" rows="2" required maxlength="300" placeholder="tracks my reading list with tags and notes" toolparamdescription="What the app does, in one sentence, written to follow 'create a pragma app that'"></textarea>
+    </label>
+    <button class="btn btn-small w-fit">Get the steps</button>
+  </form>
+  <if $steps>
+    <c-terminal title="setup steps" :copy="$steps">
+      <pre class="whitespace-pre-wrap" tabindex="0" aria-label="Setup steps and prompt"><code><span>{$steps}</span></code></pre>
+    </c-terminal>
+  </if>
+</article>

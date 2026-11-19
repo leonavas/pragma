@@ -18,8 +18,12 @@ pragma build && pragma serve  # production build; run from this folder (see "Sou
 ```
 routes/
   _layout.html                 header, footer and the site-wide <head> defaults (SEO/OGP)
-  index.html                   landing: <p-hero>, <p-principles>, section list
+  index.html                   landing: <p-audience>, <p-hero>, why, showcase, <p-principles>, tools, install, sections
+  agents.html                  /agents: the prompt, install, files for agents, the WebMCP tools
   _components/hero|principles|cli-session/   landing-only pieces (<p-...>); cli-session is the animated hero terminal
+  _components/audience/        Human / Agent switch (real links) + the "agents: read /llms-full.txt" note
+  _components/docs-tool/       WebMCP tool get_pragma_docs (fetches public/docs/<topic>.md)
+  _components/setup-tool/      WebMCP tool get_setup_instructions (commands + prompt for an app description)
   guide.html                   "how to use": install to deploy, real CLI output in <c-terminal>
   examples/
     index.html                 index of all sections
@@ -43,13 +47,43 @@ lib/
     terminal/                  <c-terminal title copy>: static terminal window for real CLI output (see below)
     modal/ alert/ dropdown/    the starter overlays, restyled
 utils/
+  agent-docs/                  generate.server.js + markdown templates for public/*.md and llms*.txt (see below)
   highlight.js                 highlight.js wrapper: markLines() on the server, highlightLines() for token spans
   code-lines.js                codeKinds (shared with the client) and plainLines()
 public/
   fonts/                       Martian Mono + Hanken Grotesk (woff2, OFL)
   og.png                       1200x630 Open Graph image
   robots.txt, sitemap.xml      sitemap lists every indexable page; update it when you add one
+  index.md, agents.md          the landing and /agents in markdown (generated)
+  llms.txt, llms-full.txt      llmstxt.org index and every doc in one file (generated)
+  docs/<topic>.md              one doc per file: rules (core/starter/AGENTS.md) + core/docs/*.md (generated)
 ```
+
+## Agent-first: markdown, llms.txt and WebMCP
+
+Same truth, different format: the markdown files carry the same content as the HTML, never extra
+text for agents. The landing and `/agents` start with the Human / Agent switch (plain `<a>` links)
+and a note pointing agents to `/llms-full.txt`; their `<head>` has
+`<link rel="alternate" type="text/markdown">` to their `.md`. The server answers `/` and `/agents`
+with `public/index.md` / `public/agents.md` when `Accept` prefers `text/markdown` (SPEC §11).
+
+Regenerate after changing `core/docs/`, `core/starter/AGENTS.md`, the landing or `/agents`:
+
+```sh
+npm run agent-docs     # node utils/agent-docs/generate.server.js
+```
+
+It reads the docs from the repo's `core/` (not `site/core/`, which lags until `pragma upgrade`),
+fills the templates in `utils/agent-docs/` (`{{origin}}`, `{{docs}}`, `{{all-docs}}`,
+`{{source <file>}}`, `{{tools <file>...}}`: tool names and params are read from the forms) and
+writes `public/`. It exits 1 and prints `drift:` lines when a doc is missing from its topic list,
+when a markdown heading is not in the page sources, or when `docs-tool.html` options or the
+`/docs/*.md` links in `agents.html` differ from the topics. Copy edits on the landing or `/agents`
+go in both the `.html` and the template.
+
+WebMCP is on (`"webmcp": true`). Tools: `get_setup_instructions` and `get_pragma_docs` on `/` and
+`/agents`, `add_task` on `/` (task-list), `sign_guestbook` on `/examples/data`. Every other form
+has `notool`.
 
 ## Design tokens
 
@@ -154,7 +188,7 @@ list its files in `readExamples`, and put a frame alone in the showcase slot:
 - Shared, coordinate before editing: `lib/theme.css`, `lib/components/*` (doc, showcase,
   section-nav, terminal), `routes/_layout.html`, `routes/examples/_source.server.js`, `utils/`,
   `pragma.json`, `package.json`, `public/` (robots, sitemap).
-- Landing: `routes/index.html` and `routes/_components/` (hero, principles, cli-session).
+- Landing and agents: `routes/index.html`, `routes/agents.html`, `routes/_components/` and `utils/agent-docs/`.
 - Guide: `routes/guide.html`.
 - `INVENTORY.md` and `BUGS.md` have their own owners; append to `BUGS.md` with the next free id.
 - Adding a section: add the route folder and one `<li>` to `lib/components/section-nav/section-nav.html`

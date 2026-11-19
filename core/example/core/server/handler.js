@@ -41,6 +41,40 @@ const json = (body, status = 200) =>
 
 const fail = (message, status) => json({ error: { message } }, status)
 
+export function prefersMarkdown(accept) {
+  let markdown = 0
+  let html = 0
+  for (const part of (accept ?? '').split(',')) {
+    const [name, ...params] = part.split(';').map((s) => s.trim().toLowerCase())
+    const q = params.find((p) => p.startsWith('q='))
+    const value = q ? Number(q.slice(2)) || 0 : 1
+    if (name === 'text/markdown') markdown = Math.max(markdown, value)
+    else if (name === 'text/html') html = Math.max(html, value)
+  }
+  return markdown > 0 && markdown >= html
+}
+
+function withVary(res) {
+  const out = new Response(res.body, res)
+  out.headers.append('vary', 'Accept')
+  return out
+}
+
+function asMarkdown(res) {
+  if (res.status !== 200) return res
+  const out = new Response(res.body, res)
+  out.headers.set('content-type', 'text/markdown; charset=utf-8')
+  return out
+}
+
+async function findMarkdown(path, request, env) {
+  for (const file of path ? [`${path}.md`, `${path}/index.md`] : ['/index.md']) {
+    const res = await env.ASSETS.fetch(new Request(new URL(file, request.url), { method: 'HEAD' }))
+    if (res.ok && !res.headers.get('content-type')?.startsWith('text/html')) return file
+  }
+  return null
+}
+
 function later(promise, ctx) {
   if (ctx?.waitUntil) ctx.waitUntil(promise)
   else return promise
@@ -48,7 +82,19 @@ function later(promise, ctx) {
 
 export function createHandler({ routes, service }) {
   const table = compileRoutes(routes)
+  const markdownFiles = new Map()
   let pages
+
+  function markdownFor(path, request, env) {
+    const key = path.replace(/\/+$/, '')
+    let found = markdownFiles.get(key)
+    if (!found) {
+      if (markdownFiles.size >= 1000) markdownFiles.clear()
+      found = findMarkdown(key, request, env).catch(() => null)
+      markdownFiles.set(key, found)
+    }
+    return found
+  }
 
   // Static files first; then a prebuilt param page from the manifest; then _404.html with status 404.
   async function asset(request, env) {
@@ -91,9 +137,18 @@ export function createHandler({ routes, service }) {
         kind = 'page'
       }
       const m = matchRoute(table, target)
+      const md = kind === 'page' && env.ASSETS && !/\.[^/]*$/.test(path) ? await markdownFor(path, request, env) : null
+      if (md && prefersMarkdown(request.headers.get('accept'))) {
+        return withVary(asMarkdown(await env.ASSETS.fetch(new Request(new URL(md, request.url), request))))
+      }
       // The router fetches prebuilt HTML (/shop/index.html): that is a file, not an SSR page.
       if (kind === 'page' && (path.endsWith('.html') || !(m?.route.ssr && m.route.template && m.route.shell))) kind = null
-      if (!kind) return env.ASSETS ? asset(request, env) : new Response('Not found', { status: 404 })
+      if (!kind) {
+        if (!env.ASSETS) return new Response('Not found', { status: 404 })
+        const res = await asset(request, env)
+        if (path.endsWith('.md')) return asMarkdown(res)
+        return md ? withVary(res) : res
+      }
 
       const start = performance.now()
       const parent = parseTraceparent(request.headers.get('traceparent'))
@@ -127,7 +182,7 @@ export function createHandler({ routes, service }) {
       if (status >= 500) attrs['error.type'] = String(status)
       log[status >= 500 ? 'error' : 'info'](`${request.method} ${m?.route.pattern ?? path}`, attrs)
       await later(flush(log.records, env), ctx)
-      return res
+      return md ? withVary(res) : res
     },
   }
 }

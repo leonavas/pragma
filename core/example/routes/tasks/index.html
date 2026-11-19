@@ -28,8 +28,9 @@
   }
 
   function add(event) {
-    const title = newTitle.trim()
+    const title = String(new FormData(event.target).get('title')).trim()
     error = validate(title)
+    if (event.agentInvoked) event.respondWith(Promise.resolve(error ? { error } : { added: title }))
     if (error) return
     shared.tasks.add(title)
     newTitle = ''
@@ -82,9 +83,9 @@
     <c-indicator title="Completed" :value="shared.tasks.summary" :tone="$tone"></c-indicator>
   </section>
 
-  <form class="flex flex-col gap-1" novalidate @submit="add">
+  <form class="flex flex-col gap-1" novalidate toolname="add_task" tooldescription="Add a task to the to-do list" toolautosubmit @submit="add">
     <div class="flex gap-2">
-      <input id="new-task" name="title" class="field flex-1" placeholder="New task" autocomplete="off" aria-label="New task" aria-describedby="task-error" :model="$newTitle" :aria-invalid="$invalid">
+      <input id="new-task" name="title" class="field flex-1" placeholder="New task" autocomplete="off" aria-label="New task" aria-describedby="task-error" toolparamdescription="Task title, 3 to 80 characters, not already in the list" :model="$newTitle" :aria-invalid="$invalid">
       <button class="btn btn-primary">Add</button>
     </div>
     <p id="task-error" class="min-h-5 text-sm text-danger-600">{$error}</p>

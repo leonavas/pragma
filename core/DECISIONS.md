@@ -20,6 +20,7 @@ Status: **[firm]** · **[firm v0]** v0 contract, revisable later · **[likely]**
 9. OpenTelemetry logs by design; the app does not use `console.*`.
 10. Server in JS as a fetch handler; local tool in Rust (`pragma`).
 11. Simple, lean, LLM-oriented docs.
+12. Agent-first: every form is a WebMCP tool by default; pages can serve markdown to agents.
 
 Empirical basis: `../../pragma-tests_1/COMPARACAO.md` (outside the repo; SvelteKit SPA × astra ×
 fable). The native apps shipped about 4× less on first visit (10.8 to 12.3 kB gzip vs 41.5 kB)
@@ -339,6 +340,41 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - **[proposal]** Optional WASM/WASI build (e.g. `wasmtime --dir=.`) as a real sandbox and for a
   browser playground.
 - **[superseded]** "`pragma check` validates only JavaScript".
+
+## Agent-first and WebMCP
+
+- **[firm]** pragma is a framework for agents, both ways: agents build with it, and the apps
+  they build are usable by agents. *Why:* people building with LLMs still reach for React or
+  Angular out of habit and pay in performance. Others skip frameworks and write plain HTML and
+  JS: the fastest result, but it does not scale; over time it eats context, turns into a
+  tangle, and the agent loses track of it. Others pick SvelteKit, Astro or htmx, made for
+  humans first. pragma keeps the speed of plain HTML and JS and adds only what stops the
+  tangle: the minimum lint, components and reactivity on native browser features, and a Rust
+  compiler, linter and validator. Never TypeScript. Agent-first means an agent given the
+  landing URL understands everything it needs, and an app built with pragma works for agents
+  too (WebMCP).
+- **[firm v0]** WebMCP on by default (`"webmcp": true`; absent = true), with opt-out per form
+  (`notool`) and per app (`"webmcp": false`, then any tool attribute is `webmcp/disabled`).
+  *Why:* a default nobody has to remember is the only one agents apply every time; login and
+  password forms are the exceptions, so they opt out.
+- **[firm v0]** Declarative first: every `<form>` is a tool through the standard attributes
+  (`toolname`, `tooldescription`, `toolparamdescription`, `toolautosubmit`), static only
+  (SPEC §3.1). *Why:* the tool lifecycle is the DOM: the browser registers the form when it
+  enters the document and removes it when it leaves, which matches the router with zero runtime
+  code. The result goes back through `@submit` (`event.agentInvoked`, `respondWith`).
+- **[firm v0]** The imperative API (`document.modelContext.registerTool`) is out of v0. *Why:*
+  it needs runtime code and manual register/unregister on navigation; forms cover the actions
+  apps expose.
+- **[firm v0]** `check` severity (SPEC §10): rules for a broken tool (`webmcp/pair`, `name`,
+  `duplicate`, `param-name`, `dynamic`, `notool`, `attribute`) are errors, because the browser
+  registers nothing or the wrong thing; quality rules (`form-tool`, `name-style`,
+  `description`, `param-description`, `autosubmit`) are warnings, errors with `--strict`.
+  `toolautosubmit` on destructive or payment names is a warning: never act without the user
+  for delete, pay or send.
+- **[firm v0]** Markdown for fetch agents (SPEC §11): a request whose `Accept` prefers
+  `text/markdown` gets `public/<path>.md` when it exists, with `Vary: Accept`; same in `dev`,
+  `serve`, Workers and Node. *Why:* agents that fetch without a browser read markdown at a
+  fraction of the tokens of HTML; a static file keeps it zero-cost and explicit.
 
 ## Documentation
 

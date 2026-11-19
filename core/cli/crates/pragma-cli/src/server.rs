@@ -124,6 +124,15 @@ impl Site {
         }
         None
     }
+
+    fn markdown_file(&self, path: &str) -> Option<String> {
+        let rel = path.trim_matches('/');
+        if is_server_path(path) || rel.rsplit('/').next().is_some_and(|s| s.contains('.')) {
+            return None;
+        }
+        let candidates = if rel.is_empty() { vec!["index.md".to_owned()] } else { vec![format!("{rel}.md"), format!("{rel}/index.md")] };
+        candidates.into_iter().find(|c| self.root.join(c).is_file())
+    }
 }
 
 pub async fn serve(listener: TcpListener, site: Arc<Site>) {
@@ -155,11 +164,26 @@ async fn handle(site: Arc<Site>, req: Request<Incoming>) -> Result<Response<Body
     let Some(path) = decode_path(&raw) else {
         return Ok(response(StatusCode::BAD_REQUEST, "text/plain; charset=utf-8", "no-store", Bytes::from_static("invalid path".as_bytes())));
     };
+    let markdown = if req.method() == Method::GET || req.method() == Method::HEAD { site.markdown_file(&path) } else { None };
+    if let Some(md) = &markdown
+        && prefers_markdown(req.headers())
+    {
+        let mut res = file_response(&site, md, StatusCode::OK, req.headers()).await;
+        if req.method() == Method::HEAD {
+            *res.body_mut() = empty();
+        }
+        vary_accept(&mut res);
+        return Ok(res);
+    }
     let route = site.match_route(&path);
     if let Some(port) = site.backend()
         && (is_server_path(&path) || route.as_ref().is_some_and(|r| r.ssr) && !path.ends_with(".html"))
     {
-        return Ok(proxy(&site, port, req).await);
+        let mut res = proxy(&site, port, req).await;
+        if markdown.is_some() {
+            vary_accept(&mut res);
+        }
+        return Ok(res);
     }
     if path == "/_otel" && req.method() == Method::POST {
         if let Ok(body) = req.into_body().collect().await
@@ -187,7 +211,39 @@ async fn handle(site: Arc<Site>, req: Request<Incoming>) -> Result<Response<Body
     if req.method() == Method::HEAD {
         *res.body_mut() = empty();
     }
+    if markdown.is_some() {
+        vary_accept(&mut res);
+    }
     Ok(res)
+}
+
+fn prefers_markdown(headers: &HeaderMap) -> bool {
+    let accept = headers.get(header::ACCEPT).and_then(|v| v.to_str().ok()).unwrap_or("");
+    let (mut markdown, mut html) = (0.0f32, 0.0f32);
+    for part in accept.split(',') {
+        let mut it = part.split(';');
+        let name = it.next().unwrap_or("").trim();
+        let q = match it.find_map(|p| p.trim().strip_prefix("q=")) {
+            Some(q) => q.trim().parse::<f32>().unwrap_or(0.0),
+            None => 1.0,
+        };
+        if name.eq_ignore_ascii_case("text/markdown") {
+            markdown = markdown.max(q);
+        } else if name.eq_ignore_ascii_case("text/html") {
+            html = html.max(q);
+        }
+    }
+    markdown > 0.0 && markdown >= html
+}
+
+fn vary_accept(res: &mut Response<Body>) {
+    let h = res.headers_mut();
+    let value = match h.get(header::VARY).and_then(|v| v.to_str().ok()) {
+        Some(v) if v.split(',').any(|t| t.trim().eq_ignore_ascii_case("accept")) => return,
+        Some(v) => format!("{v}, accept"),
+        None => "accept".to_owned(),
+    };
+    h.insert(header::VARY, HeaderValue::from_str(&value).unwrap());
 }
 
 async fn file_response(site: &Site, rel: &str, status: StatusCode, headers: &HeaderMap) -> Response<Body> {
@@ -353,6 +409,7 @@ pub fn mime(path: &str) -> &'static str {
         "json" | "map" => "application/json",
         "webmanifest" => "application/manifest+json",
         "txt" => "text/plain; charset=utf-8",
+        "md" => "text/markdown; charset=utf-8",
         "xml" => "application/xml",
         "svg" => "image/svg+xml",
         "png" => "image/png",

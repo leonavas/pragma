@@ -105,6 +105,14 @@ const BASE: &str = r#"@layer base {
   ::view-transition-new(root) {
     mix-blend-mode: normal;
   }
+  :tool-form-active {
+    outline: 2px dashed var(--color-primary-500);
+    outline-offset: 4px;
+  }
+  :tool-submit-active {
+    outline: 2px dashed var(--color-primary-500);
+    outline-offset: 2px;
+  }
   .skeleton {
     display: block;
     min-height: 1em;

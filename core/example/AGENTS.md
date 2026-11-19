@@ -1,6 +1,6 @@
 # AGENTS.md
 
-pragma app: native HTML, CSS and JS, no framework. Docs are in `core/docs/`: read the relevant one before changing code.
+pragma app: native HTML, CSS and JS, no framework, usable by AI agents. Docs are in `core/docs/`: read the relevant one before changing code.
 
 ## Syntax
 
@@ -9,7 +9,7 @@ In the `<script>`, a top-level `let` is state, a function is an action (`@click=
 derived value (`{$total}` in HTML, `total()` in JS), `export let step = 1` is a prop and
 `function mount(el) { …; return cleanup }` runs after mount. Services:
 `import { shared, data, params, query, page, call, navigate, open, close, confirm, log } from 'pragma'`.
-`<style>` is scoped to its component or page (`:global(…)` opts out).
+`<style>` is scoped to its component or page (`:global(…)` opts out only what is inside it).
 
 `{path}` puts a value in text and attribute strings (`<p>Hi {$name}</p>`, `href="/shop/{p.id}"`),
 `:` binds a whole value (`:href`, `:disabled`), `.` binds a class, `@` binds an event, `$` is a
@@ -36,6 +36,8 @@ Blocks are tags: `<if v>`, `<else-if v>`, `<else>`, `<for x in v key=x.id>`, `<e
 - Data comes from `load` in `.server.js`, with a skeleton.
 - CSS: utilities from `classes.md`; a custom class only when a combination repeats 3+ times. No inline `style`.
 - Accessible: a name on every control, `alt`, labels, one `<h1>`.
+- Agent-first: every `<form>` is a WebMCP tool: `toolname` (`snake_case` verb_object), `tooldescription`,
+  `name` and `toolparamdescription` on each field; `notool` for login or password forms (`webmcp.md`).
 - Finish with `pragma check --strict`: zero errors, zero warnings.
 
 ## To do X, read Y
@@ -51,6 +53,7 @@ Blocks are tags: `<if v>`, `<else-if v>`, `<else>`, `<for x in v key=x.id>`, `<e
 | load, server actions, skeleton, SSR | `data.md` |
 | modal, alert, dropdown | `overlays.md` |
 | styles, theme | `css.md`, `classes.md` |
+| forms as agent tools (WebMCP), markdown for agents | `webmcp.md` |
 | performance | `performance.md` |
 | logs | `logs.md` |
 | npm packages (install, which to use) | `packages.md` |

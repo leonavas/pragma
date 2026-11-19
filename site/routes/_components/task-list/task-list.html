@@ -14,12 +14,13 @@
   const filterText = () => (pendingOnly ? 'Show all' : 'Hide done')
   const filterPressed = () => (pendingOnly ? 'true' : 'false')
 
-  function add() {
-    const title = draft.trim()
+  function add(event) {
+    const title = String(new FormData(event.target).get('title')).trim()
     if (!title) return
     tasks.push({ id: nextId, title, done: false })
     nextId += 1
     draft = ''
+    if (event.agentInvoked) event.respondWith(Promise.resolve('Added "' + title + '". ' + pending() + ' of ' + total() + ' tasks pending.'))
   }
 
   function toggle(task) {
@@ -36,8 +37,8 @@
     <p class="text-faint tabular-nums" role="status">{$pending} of {$total} pending</p>
     <button type="button" class="tasks-filter cursor-pointer py-1.5 underline hover:text-ink" @click="toggleFilter" :aria-pressed="$filterPressed">{$filterText}</button>
   </div>
-  <form class="flex gap-2" @submit="add">
-    <input class="h-8 min-w-0 flex-1 border border-line-strong bg-sunken px-3 text-sm text-ink focus-visible:border-accent" type="text" maxlength="48" placeholder="Add a task" aria-label="New task" :model="$draft">
+  <form class="flex gap-2" toolname="add_task" tooldescription="Add a task to the demo to-do list on the pragma landing page" @submit="add">
+    <input class="h-8 min-w-0 flex-1 border border-line-strong bg-sunken px-3 text-sm text-ink focus-visible:border-accent" type="text" name="title" required maxlength="48" placeholder="Add a task" aria-label="New task" toolparamdescription="Title of the task, up to 48 characters" :model="$draft">
     <button type="submit" class="btn btn-small">Add</button>
   </form>
   <ul class="border-t border-line">

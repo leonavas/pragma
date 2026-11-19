@@ -37,8 +37,8 @@ runtime reapplies the HTML (one render per microtask). No signals, no manual ren
   }
 </script>
 
-<form class="flex gap-2" @submit="add">
-  <input class="flex-1" aria-label="New task" :model="$draft">
+<form class="flex gap-2" toolname="add_task" tooldescription="Add a task to the to-do list" @submit="add">
+  <input name="title" class="flex-1" aria-label="New task" toolparamdescription="Task title, at least 3 characters" :model="$draft">
   <button class="btn btn-primary">Add</button>
 </form>
 <p role="alert" :show="$error">{$error}</p>

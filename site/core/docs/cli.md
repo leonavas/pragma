@@ -4,7 +4,7 @@
 |---|---|
 | `pragma new <dir>` | creates an app with the fixed structure |
 | `pragma dev [--port 5180] [--host 127.0.0.1]` | dev server with live reload over a WebSocket (any number of tabs); a build error shows an overlay, and pages without errors keep working, `load` included (starts Node ≥ 22 when there is a `.server.js`); prints `app/core-outdated` first when `core/` is older than this `pragma` |
-| `pragma check [--strict]` | checks JS, HTML, CSS, budgets and accessibility; `--strict` turns warnings into errors |
+| `pragma check [--strict]` | checks JS, HTML, CSS, budgets, accessibility and WebMCP tools; `--strict` turns warnings into errors |
 | `pragma build [--allow-outdated-core]` | writes `dist/`; stops with `app/core-outdated` when `core/` is older than this `pragma` (run `pragma upgrade`; `--allow-outdated-core` builds anyway) |
 | `pragma serve [--port 3000] [--host 127.0.0.1]` | serves `dist/` as in production |
 | `pragma upgrade` | makes `core/` (runtime, docs, `base.css`) equal to this `pragma` version; prints each file updated, added or removed; never touches files outside `core/` |
@@ -71,6 +71,14 @@ Run `pragma check --strict` before finishing: zero errors, zero warnings. Output
 
 `:<attr>` and `{}` in the attribute count as the attribute (`:aria-label="task.title"`, `aria-label="Remove {task.title}"`).
 
+## WebMCP (`webmcp/*`, only with `"webmcp": true`)
+
+Every `<form>` is an agent tool (webmcp.md). Errors (the tool is broken): `webmcp/pair`,
+`webmcp/name`, `webmcp/duplicate`, `webmcp/param-name`, `webmcp/dynamic`, `webmcp/notool`,
+`webmcp/attribute`; with `"webmcp": false`, any tool attribute is `webmcp/disabled`. Warnings
+(errors with `--strict`): `webmcp/form-tool`, `webmcp/name-style`, `webmcp/description`,
+`webmcp/param-description`, `webmcp/autosubmit`. Each rule and its fix: webmcp.md.
+
 ## `dist/`
 
 | Path | Use |
@@ -78,3 +86,6 @@ Run `pragma check --strict` before finishing: zero errors, zero warnings. Output
 | `client/` | HTML per route and assets; without `.server.js`, deploy it to static hosting |
 | `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (the worker resolves param pages via the manifest and answers `_404.html` with 404) |
 | `server/node.mjs` | `node dist/server/node.mjs` (port from `PORT`, default 3000) |
+
+Every server (`dev`, `serve`, Workers, Node) answers a request whose `Accept` prefers
+`text/markdown` with the page's `.md` from `public/` when it exists (webmcp.md, Markdown for agents).

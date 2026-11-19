@@ -1,0 +1,95 @@
+<title>pragma for agents: the prompt, the docs and the tools</title>
+<meta name="description" content="Everything an agent needs to build with pragma: a prompt to copy, the docs as markdown and llms.txt, and the WebMCP tools of this site.">
+<link rel="canonical" href="https://pragma.dev/agents">
+<link rel="alternate" type="text/markdown" href="/agents.md">
+<meta property="og:url" content="https://pragma.dev/agents">
+<meta property="og:title" content="pragma for agents: the prompt, the docs and the tools">
+<meta property="og:description" content="Send your agent one URL: the docs as markdown, llms.txt and WebMCP tools.">
+
+<p-audience>
+  <a href="/">Human</a>
+  <a href="/agents" aria-current="page">Agent</a>
+  <p slot="note">Agents: the full docs are one file at <a href="/llms-full.txt">/llms-full.txt</a>. This page as markdown: <a href="/agents.md">/agents.md</a>.</p>
+</p-audience>
+
+<div class="wrap pt-16 lg:pt-24">
+  <header class="max-w-3xl border-b border-line pb-10">
+    <h1 class="text-4xl font-medium tracking-tighter sm:text-5xl">pragma, for your agent</h1>
+    <p class="mt-6 text-lg leading-relaxed text-muted">Everything an agent needs to build with pragma, in files it reads without a browser. Human: copy the prompt, paste it into your coding agent and say what to build.</p>
+  </header>
+
+  <section class="doc-section max-w-3xl" aria-labelledby="prompt">
+    <h2 id="prompt">The prompt</h2>
+    <div class="prose">
+      <p>Replace the brackets with your app. The agent reads the docs, installs pragma, creates the app and runs <code>pragma check --strict</code> until it passes.</p>
+    </div>
+    <c-terminal title="prompt" copy="Read https://pragma.dev/llms-full.txt and create a pragma app that [describe your app]. Install pragma first if the pragma command is missing. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.">
+      <pre class="whitespace-pre-wrap" tabindex="0" aria-label="Prompt for a coding agent"><code>Read https://pragma.dev/llms-full.txt and create a pragma app that <span class="term-ok">[describe your app]</span>. Install pragma first if the pragma command is missing. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.</code></pre>
+    </c-terminal>
+  </section>
+
+  <section class="doc-section max-w-3xl" aria-labelledby="install">
+    <h2 id="install">Install and create</h2>
+    <div class="prose">
+      <p>One Rust binary. Building it needs Cargo; Node 22 or newer only runs <code>.server.js</code> files.</p>
+    </div>
+    <c-terminal title="~" copy="git clone https://github.com/leonavas/pragma && cd pragma && cargo install --path core/cli/crates/pragma-cli && cd .. && pragma new my-app && cd my-app && pragma dev">
+      <pre tabindex="0" aria-label="Commands that install pragma and create an app"><code><span class="term-cmd">git clone https://github.com/leonavas/pragma</span>
+<span class="term-cmd">cd pragma</span>
+<span class="term-cmd">cargo install --path core/cli/crates/pragma-cli</span>
+<span class="term-cmd">cd ..</span>
+<span class="term-cmd">pragma new my-app</span>
+<span class="term-cmd">cd my-app</span>
+<span class="term-cmd">pragma dev</span></code></pre>
+    </c-terminal>
+  </section>
+
+  <section class="doc-section max-w-3xl" aria-labelledby="files">
+    <h2 id="files">Files for agents</h2>
+    <div class="prose">
+      <p>Same content as the HTML pages, in markdown. No hidden text, nothing written only for agents.</p>
+      <ul>
+        <li><a href="/llms-full.txt">/llms-full.txt</a>: the app rules and every doc in one file. Start here.</li>
+        <li><a href="/llms.txt">/llms.txt</a>: the index, in the llmstxt.org format.</li>
+        <li><a href="/index.md">/index.md</a>: the landing page.</li>
+        <li><a href="/agents.md">/agents.md</a>: this page.</li>
+      </ul>
+      <p>A request for <code>/</code> or <code>/agents</code> with <code>Accept: text/markdown</code> gets the markdown file instead of the HTML. One doc per file:</p>
+      <ul>
+        <li><a href="/docs/rules.md">/docs/rules.md</a>: the rules of every app (AGENTS.md). Read first.</li>
+        <li><a href="/docs/structure.md">/docs/structure.md</a>: where each file goes, pragma.json.</li>
+        <li><a href="/docs/syntax.md">/docs/syntax.md</a>: HTML directives and blocks.</li>
+        <li><a href="/docs/components.md">/docs/components.md</a>: components, props, slots.</li>
+        <li><a href="/docs/state.md">/docs/state.md</a>: script, actions, derived values, stores.</li>
+        <li><a href="/docs/routes.md">/docs/routes.md</a>: pages, router, head tags.</li>
+        <li><a href="/docs/data.md">/docs/data.md</a>: load, server actions, SSR.</li>
+        <li><a href="/docs/overlays.md">/docs/overlays.md</a>: modal, alert, dropdown.</li>
+        <li><a href="/docs/css.md">/docs/css.md</a>: styles and theme.</li>
+        <li><a href="/docs/classes.md">/docs/classes.md</a>: every utility class.</li>
+        <li><a href="/docs/webmcp.md">/docs/webmcp.md</a>: forms as agent tools, markdown for agents.</li>
+        <li><a href="/docs/packages.md">/docs/packages.md</a>: npm packages.</li>
+        <li><a href="/docs/performance.md">/docs/performance.md</a>: defaults and budgets.</li>
+        <li><a href="/docs/logs.md">/docs/logs.md</a>: OpenTelemetry logs.</li>
+        <li><a href="/docs/cli.md">/docs/cli.md</a>: commands and check rules.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="doc-section" aria-labelledby="tools">
+    <h2 id="tools">WebMCP tools on this site</h2>
+    <div class="prose">
+      <p>This page and the landing page expose these tools to agents in the browser, as declarative WebMCP forms. Humans use the same forms. The landing page also has <code>add_task</code> (its demo to-do list), and <code>/examples/data</code> has <code>sign_guestbook</code>.</p>
+    </div>
+    <div class="grid gap-6 xl:grid-cols-2">
+      <p-setup-tool></p-setup-tool>
+      <p-docs-tool></p-docs-tool>
+    </div>
+  </section>
+
+  <section class="doc-section max-w-3xl border-b-0" aria-labelledby="closing">
+    <h2 id="closing">Still reading?</h2>
+    <div class="prose">
+      <p>This framework is for agents. If you're still reading this instead of asking your agent to try it, it's not for you yet. Come back in 6 months.</p>
+    </div>
+  </section>
+</div>

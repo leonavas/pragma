@@ -6,11 +6,14 @@
   let sending = false
   let error = ''
 
-  async function sign() {
+  async function sign(event) {
+    const fields = new FormData(event.target)
+    const signing = call('sign', { name: fields.get('name'), message: fields.get('message') })
+    if (event.agentInvoked) event.respondWith(signing)
     sending = true
     error = ''
     try {
-      data.guestbook = (await call('sign', { name, message })).guestbook
+      data.guestbook = (await signing).guestbook
       message = ''
     } catch (failure) {
       error = failure.message
@@ -21,14 +24,14 @@
 </script>
 
 <div class="grid w-full gap-5">
-  <form class="grid gap-3" @submit="sign">
+  <form class="grid gap-3" toolname="sign_guestbook" tooldescription="Sign the demo guestbook with a name and a short message" @submit="sign">
     <label class="guestbook-field">
       <span class="label">Name</span>
-      <input class="guestbook-input" name="name" autocomplete="nickname" :model="$name">
+      <input class="guestbook-input" name="name" autocomplete="nickname" toolparamdescription="Name shown on the entry, 2 to 40 characters" :model="$name">
     </label>
     <label class="guestbook-field">
       <span class="label">Message</span>
-      <input class="guestbook-input" name="message" :model="$message">
+      <input class="guestbook-input" name="message" toolparamdescription="Message of the entry, 3 to 140 characters" :model="$message">
     </label>
     <div class="flex items-center gap-3">
       <button class="btn btn-primary btn-small" :disabled="$sending">Sign</button>

@@ -10,6 +10,7 @@ mod js;
 mod project;
 mod sugar;
 mod validate;
+mod webmcp;
 
 use pragma_diag::{Diagnostic, Severity};
 use pragma_jslint::script::{self, ScriptInfo, ScriptKind};
@@ -435,6 +436,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         fc.run(&p.trees[id as usize], html::Pos { file: id, line: 1, col: 1 });
         diags.extend(fc.diags);
     }
+    diags.extend(webmcp::source(&p.files, &p.trees, p.config.webmcp));
 
     let mut outs: Vec<PageOut> = Vec::new();
     let mut used_classes: BTreeSet<String> = BTreeSet::new();
@@ -448,6 +450,11 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             mark_current(&mut exp.page, &page.pattern);
         }
         diags.extend(a11y::check(&p.files, if p.layout.is_some() { &exp.body } else { &exp.page }));
+        if p.config.webmcp {
+            diags.extend(webmcp::check(&p.files, if p.layout.is_some() { &exp.body } else { &exp.page }));
+        }
+        webmcp::strip_notool(&mut exp.body);
+        webmcp::strip_notool(&mut exp.page);
         let overlays = any_element(if p.layout.is_some() { &exp.body } else { &exp.page }, &|e| e.is("dialog") || e.has("popover"));
         let (loader, ssr) = match page.server.as_ref().and_then(|s| sources.get(s)) {
             Some(src) => {

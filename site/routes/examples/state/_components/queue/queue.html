@@ -36,7 +36,7 @@
 </script>
 
 <div class="grid w-full max-w-sm gap-3">
-  <form class="flex gap-2" @submit="add">
+  <form class="flex gap-2" notool @submit="add">
     <input class="queue-input" aria-label="New job" placeholder="New job" :model="$draft">
     <button class="btn btn-small" :disabled="$blank">Add</button>
   </form>

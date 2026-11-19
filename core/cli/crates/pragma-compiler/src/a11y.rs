@@ -17,7 +17,7 @@ struct A11y<'a> {
 }
 
 /// Static attribute or bound at runtime by `data-attr-<name>`.
-fn has(e: &Element, name: &str) -> bool {
+pub(crate) fn has(e: &Element, name: &str) -> bool {
     e.has(name) || e.has(&format!("data-attr-{name}"))
 }
 
@@ -35,7 +35,7 @@ fn has_text(nodes: &[Node]) -> bool {
     })
 }
 
-fn collect_labels(nodes: &[Node], out: &mut HashSet<String>) {
+pub(crate) fn collect_labels(nodes: &[Node], out: &mut HashSet<String>) {
     for n in nodes {
         if let Node::Element(e) = n {
             if e.is("label") && let Some(f) = e.value("for") {

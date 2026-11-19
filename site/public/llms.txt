@@ -1,0 +1,35 @@
+# pragma
+
+> pragma is a web framework built for coding agents. An app is native HTML, CSS and plain JavaScript (never TypeScript) with a closed set of directives; a Rust CLI compiles, lints and validates it and answers every error with the file, the line, the rule and the fix. Pages ship prebuilt with only the JavaScript they use, and every form is a WebMCP tool by default.
+
+To build an app with pragma, read https://pragma.dev/llms-full.txt: install commands, the app rules (AGENTS.md) and every doc in one file. Each doc is also a separate markdown file below. Every app created with `pragma new` has the same docs in `core/docs/` and the rules in `AGENTS.md`.
+
+## Start
+
+- [Everything in one file](https://pragma.dev/llms-full.txt): install, app rules and every doc
+- [For agents](https://pragma.dev/agents.md): the prompt, install commands, files and WebMCP tools of this site
+- [Landing page](https://pragma.dev/index.md): what pragma is and why it exists
+
+## Docs
+
+- [App rules (AGENTS.md)](https://pragma.dev/docs/rules.md): the rules every pragma app follows; read first
+- [App structure](https://pragma.dev/docs/structure.md): where each file goes, pragma.json
+- [HTML syntax](https://pragma.dev/docs/syntax.md): HTML directives ({path}, :, ., @, $) and blocks
+- [Components](https://pragma.dev/docs/components.md): components, props, slots
+- [State: script, actions, derived values, stores](https://pragma.dev/docs/state.md): script: state, actions, derived values, mount, stores
+- [Routes and router](https://pragma.dev/docs/routes.md): pages, links, params, query, layout, head tags
+- [Data: load, server actions, skeleton, SSR](https://pragma.dev/docs/data.md): load, server actions, skeleton, SSR
+- [Overlays: modal, alert, dropdown](https://pragma.dev/docs/overlays.md): modal, alert, dropdown
+- [CSS](https://pragma.dev/docs/css.md): styles and theme
+- [Utility classes](https://pragma.dev/docs/classes.md): every utility class
+- [WebMCP: forms are agent tools](https://pragma.dev/docs/webmcp.md): forms as WebMCP tools, markdown for agents
+- [npm packages](https://pragma.dev/docs/packages.md): npm packages: when and which
+- [Performance](https://pragma.dev/docs/performance.md): performance defaults and budgets
+- [Logs](https://pragma.dev/docs/logs.md): OpenTelemetry logs
+- [pragma CLI](https://pragma.dev/docs/cli.md): commands, check rules, deploy
+
+## Optional
+
+- [Guide](https://pragma.dev/guide): from an empty folder to a deployed app, with real CLI output
+- [Examples](https://pragma.dev/examples): every feature with its source files and a live result
+- [Source code](https://github.com/leonavas/pragma): the framework, the CLI and this site

@@ -4,7 +4,7 @@
 }
 .hero-grid { display: grid; gap: 3rem; }
 .hero-title {
-  max-width: 17ch;
+  max-width: 19ch;
   font-size: clamp(2.4rem, 6.4vw, 4.25rem);
   font-stretch: 75%;
   font-weight: 500;

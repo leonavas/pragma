@@ -39,7 +39,8 @@ core/
 ```
 <app>/
   AGENTS.md            agent rules (CLAUDE.md points to it)
-  pragma.json          config: { "name", "lang", "budgets": { "initialJsKb", "routeJsKb", "cssKb" } }
+  pragma.json          config: { "name", "lang", "webmcp", "budgets": { "initialJsKb", "routeJsKb", "cssKb" } }
+                       "webmcp": true (default when absent) | false (§3.1)
   routes/
     _layout.html       root layout; contains <main data-page><slot></slot></main>
     _404.html
@@ -177,6 +178,40 @@ Each block op follows its template's html. A chain with a `shared` path is left 
 client, and so is one with a `state` path when the server has no instance for that scope (§5); a
 `text`/`attr` template with such a path is too. Instances carry `data-of` and `data-key` as above. A block newly inserted on the
 client with `[autofocus]` receives focus.
+
+### 3.1 WebMCP tools (forms)
+
+pragma is agent-first: WebMCP is on by default (`"webmcp": true` in `pragma.json`; absent =
+true). Each `<form>` is a WebMCP declarative tool for in-browser agents, written with the
+standard attributes (Chrome declarative API / W3C WebMCP draft):
+
+```html
+<form toolname="search_products" tooldescription="Search the catalog by name or category" toolautosubmit @submit="search">
+  <input name="query" required toolparamdescription="Words to search for">
+</form>
+```
+
+- `toolname` + `tooldescription` on `<form>`: both required (one without the other = the browser
+  registers nothing). `toolname`: 1–128 chars of `[A-Za-z0-9_.-]`; pragma style is lowercase
+  `snake_case` verb_object (`search_products`, `create_order`).
+- `toolautosubmit` (optional): the agent submits without a user click. Never on forms that
+  delete, pay or send.
+- `toolparamdescription` (optional) on input/select/textarea; fallback is the `<label>` text,
+  then `aria-description`. Every field needs `name` (it is the parameter).
+- `notool` on a `<form>`: opt-out for forms that must not be tools (login, password). The build
+  removes it from the output.
+- All these attributes are static: no `:` binding, no `{}`.
+- Lifecycle is the DOM: the browser registers the tool when the form is in the document and
+  removes it when it leaves, so router navigation needs no runtime code.
+- Result to the agent: `@submit="fn"` gets the `SubmitEvent` (the runtime already called
+  `preventDefault()`); `event.agentInvoked` is true for an agent call; `event.respondWith(promise)`,
+  called before any `await`, returns the resolved value to the model. Read fields with
+  `new FormData(event.target)`: an agent fill may not fire input events, so `:model` state can lag.
+- CSS: `:tool-form-active` (the form) and `:tool-submit-active` (its submit button) are valid
+  pseudo-classes in project CSS; `base.css` styles them with theme tokens.
+- `"webmcp": false`: the `webmcp/*` rules are off and any of `toolname`, `tooldescription`,
+  `toolparamdescription`, `toolautosubmit`, `notool` in source is an error (`webmcp/disabled`).
+- The imperative API (`document.modelContext.registerTool`) is out of v0.
 
 ## 4. Page, component and store scripts (client)
 
@@ -376,6 +411,8 @@ Usage:
   `.list:where(…) .hit`); a selector whose every compound starts with it is global. Style rules
   inside `@media`, `@supports`, `@layer`, `@container`, `@starting-style` are scoped; other
   at-rules (`@keyframes`, `@font-face`…) are copied.
+- WebMCP pseudo-classes `:tool-form-active` and `:tool-submit-active` are valid in any project
+  CSS (§3.1).
 - v0 output: one global minified CSS (lightningcss) with hash.
 
 ## 9. Build (`pragma build`)
@@ -438,6 +475,20 @@ Errors with file:line:column, rule and message.
   `click-non-interactive` (`@click` on a non-interactive element without `role` and
   `tabindex`), `heading` (skipped level), `single-h1` (if/else branches count separately),
   `tabindex` (> 0), `duplicate-id`, `iframe-title`, `a-no-href`.
+- WebMCP (§3.1; only with `"webmcp": true`), on the expanded page, pointing at the source file.
+  Errors (the tool is broken): `webmcp/pair` (only one of `toolname`/`tooldescription`),
+  `webmcp/name` (`toolname` outside `[A-Za-z0-9_.-]{1,128}`), `webmcp/duplicate` (same
+  `toolname` twice on a page; if/else branches count separately), `webmcp/param-name` (field
+  without `name` in a tool form; `type=submit|reset|button|image` exempt), `webmcp/dynamic`
+  (`:` binding or `{}` on a tool attribute; checked on the source, before expansion), `webmcp/notool` (`notool` with `toolname`, or on a
+  non-form element), `webmcp/attribute` (`toolname`/`tooldescription`/`toolautosubmit` off a `<form>`,
+  `toolparamdescription` off input/select/textarea). Warnings (non-blocking; `--strict` makes
+  them errors): `webmcp/form-tool` (`<form>` without `toolname`+`tooldescription` and without
+  `notool`), `webmcp/name-style` (not lowercase `snake_case` with at least one `_`),
+  `webmcp/description` (`tooldescription` under 4 words), `webmcp/param-description` (field
+  without `toolparamdescription`, label or `aria-description`), `webmcp/autosubmit`
+  (`toolautosubmit` on a tool whose name starts with `delete_`, `remove_`, `destroy_`, `pay_`,
+  `buy_`, `purchase_`, `cancel_`, `send_` or `transfer_`).
 
 ## 11. Server and dev
 
@@ -452,6 +503,13 @@ Errors with file:line:column, rule and message.
   the same build as the client files.
 - `pragma serve`: same server without watch, over `dist/`. Ctrl+C or SIGTERM also stop the
   child node.
+- Markdown for agents: a request without a file extension whose `Accept` lists
+  `text/markdown` with a q greater than or equal to that of `text/html` (or `text/html` absent;
+  browsers never send `text/markdown`) gets the static
+  `<path>.md` or `<path>/index.md` (`/` → `/index.md`) from the client output (from `public/`)
+  when it exists, as `text/markdown; charset=utf-8`. Responses for such paths (HTML or
+  markdown) carry `Vary: Accept`. Same behavior in `pragma dev`, `pragma serve` and the handler
+  (Workers and Node). No `.md` = normal HTML.
 - A path ending in `.html` is never an SSR page (it is the prebuilt HTML the router fetches),
   in `pragma dev/serve` and in the handler.
 - `pragma new <dir>`: copies `starter/` + `runtime/` → `<dir>/core/` + `docs/` → `<dir>/core/docs/`

@@ -2,6 +2,9 @@
   "name": "pragma-site",
   "private": true,
   "type": "module",
+  "scripts": {
+    "agent-docs": "node utils/agent-docs/generate.server.js"
+  },
   "dependencies": {
     "dayjs": "^1.11.23",
     "es-toolkit": "^1.53.2",
