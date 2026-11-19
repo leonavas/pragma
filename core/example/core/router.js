@@ -37,6 +37,17 @@ function text(u) {
   return p
 }
 
+const own = el => (el.localName === 'meta' && el.name !== 'viewport' && !el.hasAttribute('charset')) || (el.localName === 'link' && el.rel !== 'stylesheet' && el.rel !== 'modulepreload')
+
+function syncHead(doc) {
+  document.title = doc.title
+  const old = [...document.head.children].filter(own), next = [...doc.head.children].filter(own)
+  if (old.length === next.length && old.every((el, i) => el.isEqualNode(next[i]))) return
+  const at = document.head.querySelector('link[rel=stylesheet]')
+  for (const el of old) el.remove()
+  for (const el of next) document.head.insertBefore(document.importNode(el, true), at)
+}
+
 const link = el => {
   const a = el?.closest?.('a[href]')
   return a && !a.target && !a.hasAttribute('download') && !a.hasAttribute('data-reload') && a.origin === location.origin ? a : null
@@ -101,7 +112,7 @@ export async function navigate(to, pop) {
     leave()
     const main = document.querySelector('main[data-page]')
     main.replaceChildren(...doc.querySelector('main[data-page]').childNodes)
-    document.title = doc.title
+    syncHead(doc)
     const done = enter(route, mods, url, match(route.pattern, url.pathname) ?? {}, doc, pending)
     const y = pop ? positions.get(key) ?? 0 : 0
     if (!pop && url.hash) document.getElementById(decodeURIComponent(url.hash.slice(1)))?.scrollIntoView()

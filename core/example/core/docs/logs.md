@@ -19,7 +19,7 @@ export const actions = {
 
 | Level | When |
 |---|---|
-| `debug` | diagnostics (off in production) |
+| `debug` | diagnostics (shown in `pragma dev`; off in production unless `PRAGMA_LOG_LEVEL=debug`) |
 | `info` | business event |
 | `warn` | recoverable problem |
 | `error` | failure |
@@ -27,4 +27,5 @@ export const actions = {
 - Message: short and fixed. Variable parts go in attributes (`order.id`, `exception.message`, `http.request.method`).
 - Already automatic, do not repeat: unhandled errors, navigation, fetch failures, one span per request, `traceparent`.
 - In `pragma dev`, every client `log.*` also prints to the browser console.
+- Client logs go to `POST /_otel`; on a static host without it (404/405) the client stops sending.
 - Forbidden: `console.*`; logging inside loops or on every keystroke; passwords, tokens, cookies, emails or any personal data.

@@ -1,5 +1,10 @@
 import { log, traceHeaders } from './log.js'
 
+let leaving = false
+addEventListener('beforeunload', () => { leaving = true })
+addEventListener('pagehide', () => { leaving = true })
+addEventListener('pageshow', () => { leaving = false })
+
 const headers = extra => ({ accept: 'application/json', ...traceHeaders(), ...extra })
 
 export const fetchData = url => fetch('/_data' + url.pathname + url.search, { headers: headers() })
@@ -16,6 +21,7 @@ export async function load(p, doc, pending) {
       r = await res.json().catch(() => ({}))
       if (!res.ok && !r.error) r = { error: { message: `Failed to load data (HTTP ${res.status})` } }
     } catch (e) {
+      if (leaving || e.name === 'AbortError') return
       r = { error: { message: e.message } }
     }
   }

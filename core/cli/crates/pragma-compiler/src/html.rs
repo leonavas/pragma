@@ -344,6 +344,7 @@ pub fn push_attr(out: &mut String, a: &Attr) {
     }
 }
 
+#[cfg(test)]
 pub fn serialize(nodes: &[Node], out: &mut String) {
     for n in nodes {
         match n {
@@ -354,6 +355,7 @@ pub fn serialize(nodes: &[Node], out: &mut String) {
     }
 }
 
+#[cfg(test)]
 pub fn serialize_element(e: &Element, out: &mut String) {
     open_tag(out, e);
     if VOID.contains(&e.name.to_ascii_lowercase().as_str()) {

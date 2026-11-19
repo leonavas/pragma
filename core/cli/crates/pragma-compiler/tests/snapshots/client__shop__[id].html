@@ -8,7 +8,7 @@
 <link rel="icon" href="/img/icon.svg">
 <link rel="stylesheet" href="/assets/app.css">
 <script>self.__pragmaDev=true</script>
-<script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}})</script>
+<script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}});self.__pd.catch(()=>{})</script>
 <link rel="modulepreload" href="/assets/routes/shop/[id].js">
 <link rel="modulepreload" href="/assets/lib/components/counter/counter.js">
 <link rel="modulepreload" href="/assets/lib/state/cart.js">

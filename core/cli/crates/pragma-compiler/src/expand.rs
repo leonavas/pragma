@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 pub struct Expanded {
-    pub title: Option<String>,
+    /// Layout `<head>` merged with the page's top-level `<title>`, `<meta>` and `<link>`.
     pub head: Vec<Node>,
     pub body: Vec<Node>,
     /// Content of `<main data-page>` (base of the SSR ops).
@@ -42,7 +42,7 @@ fn prop_truthy(p: &Option<Option<String>>) -> bool {
     match p {
         None => false,
         Some(None) => true,
-        Some(Some(v)) => v != "false",
+        Some(Some(v)) => !v.is_empty() && v != "false",
     }
 }
 
@@ -136,15 +136,11 @@ impl<'p> Expander<'p> {
     pub fn page(mut self, page: &Page) -> (Expanded, Vec<Diagnostic>) {
         let p = self.p;
         let tree = &p.trees[page.html as usize];
-        let mut title = None;
+        let mut own_head: Vec<Element> = Vec::new();
         let mut content: Vec<Node> = Vec::new();
         for n in tree {
             match n {
-                Node::Element(e) if e.is("title") && title.is_none() => {
-                    let mut s = String::new();
-                    crate::html::serialize(&e.children, &mut s);
-                    title = Some(s.trim().to_string());
-                }
+                Node::Element(e) if is_head_tag(e) => own_head.push(e.clone()),
                 _ => content.push(n.clone()),
             }
         }
@@ -169,7 +165,8 @@ impl<'p> Expander<'p> {
             let lsc = Scope { from: Path::new("routes"), props: None, aliases: HashMap::new(), bound_props: HashMap::new(), stateful: true, known_props: None, slots: Some(&slots), inst: 0 };
             body = self.expand_nodes(&rest, &lsc);
         }
-        (Expanded { title, head, body, page: page_nodes, components: self.used }, self.diags)
+        merge_head(&mut head, own_head);
+        (Expanded { head, body, page: page_nodes, components: self.used }, self.diags)
     }
 
     fn resolve(&self, v: &str, sc: &Scope) -> Res {
@@ -485,7 +482,7 @@ impl<'p> Expander<'p> {
                     let k = a.name.to_ascii_lowercase();
                     let attr = format!("data-{k}");
                     if props.contains_key(&k) && k != "class" && k != "id" && !r.has(&attr) {
-                        r.attrs.push(Attr { name: attr, value: Some(a.value.clone().unwrap_or_default()), pos: r.pos });
+                        r.attrs.push(Attr { name: attr, value: Some(a.value.clone().unwrap_or_else(|| "true".into())), pos: r.pos });
                     }
                 }
             }
@@ -507,6 +504,51 @@ impl<'p> Expander<'p> {
     }
 }
 
+pub fn is_head_tag(e: &Element) -> bool {
+    e.is("title") || e.is("meta") || e.is("link")
+}
+
+/// Identity of a head tag: a page tag replaces the layout tag with the same key.
+fn head_key(e: &Element) -> Option<String> {
+    let v = |n: &str| e.value(n).map(|s| s.to_ascii_lowercase());
+    if e.is("title") {
+        return Some("title".into());
+    }
+    if e.is("meta") {
+        return ["name", "property", "http-equiv"].iter().find_map(|k| v(k).map(|x| format!("meta {k}={x}")));
+    }
+    if e.is("link") {
+        return v("rel").map(|r| format!("link {r} {}", v("hreflang").unwrap_or_default()));
+    }
+    None
+}
+
+fn merge_head(head: &mut Vec<Node>, own: Vec<Element>) {
+    for e in own {
+        let key = head_key(&e);
+        let same = |n: &Node| matches!(n, Node::Element(x) if key.is_some() && head_key(x) == key);
+        match head.iter().position(same) {
+            Some(i) => {
+                head[i] = Node::Element(e);
+                let mut j = i + 1;
+                while j < head.len() {
+                    if same(&head[j]) {
+                        head.remove(j);
+                    } else {
+                        j += 1;
+                    }
+                }
+            }
+            None => {
+                if !head.last().is_some_and(is_blank) {
+                    head.push(Node::Text("\n".into(), e.pos));
+                }
+                head.push(Node::Element(e));
+            }
+        }
+    }
+}
+
 fn merge_class(el: &mut Element, extra: &str) {
     match el.attrs.iter_mut().find(|a| a.name.eq_ignore_ascii_case("class")) {
         Some(a) => {
@@ -520,6 +562,7 @@ fn merge_class(el: &mut Element, extra: &str) {
 /// Page data for scoped validation.
 pub struct PageCtx<'a> {
     pub loader: bool,
+    pub ssr: bool,
     pub params: Vec<String>,
     pub page_actions: Option<&'a [String]>,
     pub page_file: &'a Path,
@@ -551,6 +594,31 @@ impl Scoped<'_> {
 
     pub fn run(&mut self, body: &[Node]) {
         self.walk(body, &mut Vec::new(), Owner::None, false);
+    }
+
+    /// Bindings in the page's head tags are rendered by the server, so they need `ssr`.
+    pub fn head(&mut self, head: &[Node]) {
+        let mut told = false;
+        for n in head {
+            let Node::Element(e) = n else { continue };
+            if self.p.files[e.pos.file as usize] != self.ctx.page_file {
+                continue;
+            }
+            for a in &e.attrs {
+                if !matches!(directive::parse(&a.name.to_ascii_lowercase()), Some(Some(Dir::Text | Dir::Attr(_)))) {
+                    continue;
+                }
+                let v = a.value.as_deref().unwrap_or("");
+                if !matches!(directive::root(v), "data" | "params" | "query") {
+                    continue;
+                }
+                if !self.ctx.ssr && !std::mem::replace(&mut told, true) {
+                    let f = rel_str(&self.ctx.page_file.with_extension("server.js"));
+                    self.err(a.pos, "html/head", format!("bound head tags are rendered by the server so crawlers see them: add export const ssr = true to {f}"));
+                }
+                self.path(a.pos, v, &[], &Owner::Page, true);
+            }
+        }
     }
 
     fn walk(&mut self, nodes: &[Node], vars: &mut Vec<String>, owner: Owner, in_page: bool) {

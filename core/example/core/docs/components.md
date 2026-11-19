@@ -22,11 +22,12 @@ name/
 |---|---|
 | `label="Hi"` (static) | `$label` in HTML, `ctx.$.label` in JS |
 | `:product="p"` (dynamic, updates on each render) | `$product` in HTML; in JS `ctx.$.product` is the attribute string |
+| `locked` (bare) / `locked="false"` | `<if $locked>` true / false; in JS `ctx.$.locked` is `true` / `false` |
 
-- Props are read-only. A missing prop is empty and falsy.
+- Props are read-only. A missing prop, `""` and `"false"` are falsy; a bare attribute and any other value are truthy, in HTML and JS alike.
 - Name props in one lowercase word (`label`, `step`): HTML attributes are case-insensitive.
 - Never give a state key or getter the same name as a prop: the state key hides the prop, and a getter reading `ctx.$.<same name>` recurses forever.
-- In JS every prop is a string. Use objects only in HTML; to use one in JS, pass an id and look it up in `ctx.data` or a store.
+- In JS every prop is a string, except a bare attribute or `"true"` (`true`) and `"false"` (`false`). Use objects only in HTML; to use one in JS, pass an id and look it up in `ctx.data` or a store.
 - A component with a `.js` does not accept the caller's `$`: pass `data`, `shared` or a `<for>` item, or use a store.
 - `class` is appended to the root's classes. `id` is a prop: apply it with `:id="$id"`.
 

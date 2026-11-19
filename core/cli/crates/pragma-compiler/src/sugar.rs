@@ -69,7 +69,7 @@ fn attrs(element: &mut Element, errors: &mut Vec<SugarError>) {
         if let Some(Some(old)) = directive::parse(&lname)
             && !matches!(old, Dir::Marker | Dir::Generated)
         {
-            errors.push((attr.pos, "html/legacy-syntax", format!("legacy syntax `{}`: use `{}`", attr.name, short_form(old))));
+            errors.push((attr.pos, "html/data-attribute", format!("`{lname}` is internal; write `{}`", written_form(old))));
             continue;
         }
         let internal = if let Some(name) = lname.strip_prefix(':') {
@@ -125,6 +125,15 @@ fn expand_dollar(value: &str, pos: Pos, errors: &mut Vec<SugarError>) -> String 
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+fn written_form(old: Dir) -> String {
+    let short = short_form(old);
+    match old {
+        Dir::If | Dir::ElseIf | Dir::Else | Dir::For | Dir::Key | Dir::Empty | Dir::Close => short,
+        Dir::Open => format!("{short}=\"overlay-id\""),
+        _ => format!("{short}=\"...\""),
+    }
 }
 
 fn short_form(old: Dir) -> String {

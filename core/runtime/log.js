@@ -18,7 +18,7 @@ export const traceHeaders = () => ({ traceparent: `00-${traceId}-${hex(8)}-01` }
 
 function emit(level, body, attributes) {
   if (globalThis.__pragmaDev) console[level](body, ...(attributes ? [attributes] : []))
-  if (SEV[level] < min) return
+  if (SEV[level] < min || !endpoint) return
   queue.push({
     timeUnixNano: Date.now() + '000000',
     severityNumber: SEV[level],
@@ -41,11 +41,13 @@ export const log = {
 export function flush(beacon) {
   clearTimeout(timer)
   timer = 0
-  if (!queue.length) return
+  if (!queue.length || !endpoint) return
   const body = JSON.stringify({ resource, logs: queue })
   queue = []
   if (beacon === true && navigator.sendBeacon?.(endpoint, new Blob([body], { type: 'application/json' }))) return
-  fetch(endpoint, { method: 'POST', body, keepalive: true, headers: { 'content-type': 'application/json' } }).catch(() => {})
+  fetch(endpoint, { method: 'POST', body, keepalive: true, headers: { 'content-type': 'application/json' } })
+    .then((r) => (r.status === 404 || r.status === 405) && (endpoint = null))
+    .catch(() => {})
 }
 
 export function initClientLog(opts = {}) {

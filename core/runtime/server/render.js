@@ -102,3 +102,40 @@ function instance(html, tid, key) {
   const marks = ` data-of="${escape(tid)}"` + (key === undefined ? '' : ` data-key="${escape(key)}"`)
   return m[0] + marks + root.slice(m[0].length)
 }
+
+const HEAD_TAG = /<(title|meta|link)\b([^>]*)>(?:([^<]*)<\/title>)?(\n?)/g
+const ATTR = /\s([^\s=]+)(?:="([^"]*)")?/g
+const BOUND = /^data-(?:attr-(.+)|(text))$/
+
+function lookup(scope, path) {
+  try {
+    return resolve(scope, path)
+  } catch {
+    return null
+  }
+}
+
+export function renderHead(html, scope) {
+  const end = html.indexOf('</head>')
+  if (end < 0) return html
+  const head = html.slice(0, end).replace(HEAD_TAG, (tag, name, raw, text, nl) => {
+    const attrs = new Map()
+    const bound = []
+    for (const [, k, v] of raw.matchAll(ATTR)) {
+      const b = BOUND.exec(k)
+      if (b) bound.push([b[1] ?? 'text', v])
+      else attrs.set(k, v)
+    }
+    if (!bound.length) return tag
+    for (const [attr, path] of bound) {
+      const v = lookup(scope, path)
+      if (v == null || v === false) continue
+      if (attr === 'text') text = escape(v)
+      else attrs.set(attr, v === true ? undefined : escape(v))
+    }
+    if ((name === 'meta' && !attrs.has('content')) || (name === 'link' && !attrs.has('href'))) return ''
+    const out = [...attrs].map(([k, v]) => (v === undefined ? ` ${k}` : ` ${k}="${v}"`)).join('')
+    return (name === 'title' ? `<title${out}>${text ?? ''}</title>` : `<${name}${out}>`) + nl
+  })
+  return head + html.slice(end)
+}

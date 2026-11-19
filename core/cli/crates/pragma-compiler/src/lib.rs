@@ -296,7 +296,7 @@ struct PageOut<'a> {
     overlays: bool,
 }
 
-const PD: &str = "<script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}})</script>";
+const PD: &str = "<script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}});self.__pd.catch(()=>{})</script>";
 const THEME: &str = "<script>try{document.documentElement.dataset.theme=localStorage.getItem('pragma:theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}catch{}</script>";
 
 fn any_element(nodes: &[html::Node], f: &impl Fn(&html::Element) -> bool) -> bool {

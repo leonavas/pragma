@@ -33,6 +33,8 @@ function flush() {
   }
 }
 
+const prop = v => (v === 'true' ? true : v === 'false' ? false : v)
+
 function owner(el, mod) {
   const o = { el, mod }
   o.ctx = {
@@ -44,7 +46,7 @@ function owner(el, mod) {
     call: (name, data) => call(cur.url, name, data),
     update(fn) { fn(o.state); schedule() },
     $: new Proxy({}, {
-      get: (_, key) => o.state && key in o.state ? o.state[key] : el.dataset[key],
+      get: (_, key) => o.state && key in o.state ? o.state[key] : prop(el.dataset[key]),
       set: (_, key, value) => (o.state[key] = value, true),
       has: (_, key) => (o.state && key in o.state) || key in el.dataset,
     }),

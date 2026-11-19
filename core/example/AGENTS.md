@@ -32,6 +32,7 @@ Blocks are tags: `<if v>`, `<else-if v>`, `<else>`, `<for x in v key=x.id>`, `<e
 | HTML syntax (`:`, `.`, `@`, `$`, blocks) | `syntax.md` |
 | where each file goes, `pragma.json` | `structure.md` |
 | pages, links, params, query, layout | `routes.md` |
+| page title, description, canonical, Open Graph | `routes.md` (SEO) |
 | components, props, slots | `components.md` |
 | state, actions, mount, stores, `ctx` | `state.md` |
 | load, server actions, skeleton, SSR | `data.md` |

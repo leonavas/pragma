@@ -9,7 +9,7 @@
 
 - Every `.html` in `routes/` is a route, except names starting with `_`. `x.html` plus `x/index.html` = error.
 - `[name]` (file or folder) = path param; a static segment beats a param. No `[...rest]`, no nested layouts.
-- A page is a fragment: no `<html>`, `<head>`, `<body>`. A `<title>` at the top becomes the page title.
+- A page is a fragment: no `<html>`, `<head>`, `<body>`. `<title>`, `<meta>` and `<link>` at the top level of the page go to `<head>` (see SEO).
 - Read params as `params.id`, `query.filter` in HTML and `ctx.params`, `ctx.query` in JS. Always strings.
 
 ## Layout
@@ -29,9 +29,49 @@
 <main data-page><slot></slot></main>
 ```
 
-- `<head>` is optional and must come first. Exactly one `<main data-page>` containing only `<slot></slot>`.
+- `<head>` is optional and must come first. Its tags go on every page; it is static (no `:` bindings). Exactly one `<main data-page>` containing only `<slot></slot>`.
 - The layout has no `.js`: it reads only `shared`, `params`, `query`. For behavior, use a component with a `.js`.
 - `routes/_404.html` renders unknown routes. Neither it nor the layout has a `.server.js`.
+
+## SEO and link previews
+
+Site-wide tags go in the layout `<head>`. Each page writes its own `<title>`, `<meta>` and `<link>` at the top level; a page tag replaces the layout tag with the same `name`, `property`, `http-equiv` or `rel` (+ `hreflang`); new ones are added.
+
+`routes/about.html`:
+```html
+<title>About · Shop</title>
+<meta name="description" content="Who we are">
+<link rel="canonical" href="https://shop.example/about">
+<meta property="og:title" content="About">
+<meta property="og:url" content="https://shop.example/about">
+<h1>About</h1>
+```
+
+From server data: bind `:text` on `<title>` and `:<attr>` on `<meta>`/`<link>` to `data`, `params` or `query`, with `export const ssr = true` in the page's `.server.js`. The server renders them into the first HTML, so crawlers and link-preview bots (no JS) see them.
+
+`routes/blog/[slug].html`:
+```html
+<title :text="data.post.title">Blog · Shop</title>
+<meta name="description" :content="data.post.summary">
+<link rel="canonical" :href="data.url">
+<meta property="og:type" content="article">
+<meta property="og:title" :content="data.post.title">
+<meta property="og:image" :content="data.post.image">
+<h1 :text="data.post.title"></h1>
+```
+`routes/blog/[slug].server.js`:
+```js
+export const ssr = true
+
+export async function load({ params, request }) {
+  return { post: await findPost(params.slug), url: new URL(request.url).href }
+}
+```
+
+- A missing value keeps the tag's static text or attribute; a `<meta>` without `content` or a `<link>` without `href` is dropped.
+- Never put `canonical` or `og:url` in the layout: every page would point to the same URL.
+- `<meta>` and `<link>` anywhere else in a page or component are an error (`html/head`).
+- The router updates `<title>`, `<meta>` and `<link>` on every navigation.
 
 ## Active link
 

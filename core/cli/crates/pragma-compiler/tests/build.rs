@@ -256,7 +256,51 @@ fn unclosed_tag() {
 
 #[test]
 fn unknown_directive() {
-    expect(&page("<p>a</p>\n<p data-label=\"data.x\">b</p>"), "html/unknown-directive", PAGE, 2);
+    expect(&page("<p>a</p>\n<p data-label=\"data.x\">b</p>"), "html/data-attribute", PAGE, 2);
+}
+
+#[track_caller]
+fn message(d: &[Diagnostic], rule: &str) -> String {
+    let list: Vec<String> = d.iter().map(|x| x.to_string()).collect();
+    d.iter().find(|x| x.rule == rule).map(|x| x.message.clone()).unwrap_or_else(|| panic!("expected {rule}; got:\n{}", list.join("\n")))
+}
+
+#[test]
+fn reserved_data_attribute_names_short_form() {
+    let cases = [
+        ("<p data-text=\"$heading\"></p>", "`data-text` is internal; write `:text=\"...\"`"),
+        ("<button data-on-click=\"save\">s</button>", "write `@click=\"...\"`"),
+        ("<p data-class-active=\"$on\"></p>", "write `.active=\"...\"`"),
+        ("<a data-attr-href=\"$url\">a</a>", "write `:href=\"...\"`"),
+        ("<div data-if=\"$open\"></div>", "write `<if path>`"),
+        ("<div data-c=\"card\"></div>", "write the component tag `<c-name>`"),
+        ("<p data-slot=\"1\">x</p>", "put `slot=\"name\"`"),
+    ];
+    for (src, want) in cases {
+        let d = page(src);
+        expect(&d, "html/data-attribute", PAGE, 1);
+        let m = message(&d, "html/data-attribute");
+        assert!(m.contains(want), "{src}: {m}");
+    }
+}
+
+#[test]
+fn arbitrary_data_attribute_suggests_alternatives() {
+    let d = page("<p data-testid=\"hero\">x</p>");
+    expect(&d, "html/data-attribute", PAGE, 1);
+    let m = message(&d, "html/data-attribute");
+    for want in ["`data-testid`", ":data-testid=\"$path\"", ".class=\"$flag\"", "aria-*", "role, label or id"] {
+        assert!(m.contains(want), "{m}");
+    }
+}
+
+#[test]
+fn bound_data_attribute_passes() {
+    let src = fs::read_to_string(fixture().join("routes/blog/[slug].html")).unwrap();
+    let src = src.replace("class=\"tag\"", ":data-hl=\"t.kind\" class=\"tag\"");
+    assert!(src.contains(":data-hl"));
+    let d = check_with(&[("routes/blog/[slug].html", Some(&src)), (PAGE, Some("<p :data-state=\"$heading\">x</p>"))]);
+    assert!(!d.iter().any(|x| x.rule == "html/data-attribute" || x.rule == "html/unknown-directive"), "{:#?}", d);
 }
 
 #[test]
@@ -304,7 +348,7 @@ fn unknown_param() {
 
 #[test]
 fn props_outside_component() {
-    expect(&page("<p data-text=\"state.heading\"></p>"), "html/legacy-syntax", PAGE, 1);
+    expect(&page("<p data-text=\"state.heading\"></p>"), "html/data-attribute", PAGE, 1);
 }
 
 #[test]
@@ -394,7 +438,7 @@ fn slot_marks_lexical_owner_and_module_props() {
 
 #[test]
 fn data_slot_is_generated() {
-    expect(&page("<p data-slot=\"1\">x</p>"), "html/unknown-directive", PAGE, 1);
+    expect(&page("<p data-slot=\"1\">x</p>"), "html/data-attribute", PAGE, 1);
 }
 
 #[test]

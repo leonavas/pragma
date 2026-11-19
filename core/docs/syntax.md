@@ -6,7 +6,7 @@ and loops are tags. Closed list: anything else is an error.
 | Write | On | Effect |
 |---|---|---|
 | `:text="v"` | element | text content (escaped) |
-| `:<attr>="v"` | element | attribute (`:href`, `:disabled`, `:aria-current`); `false`/`null`/`undefined` removes it, `true` sets it empty. `:checked`, `:selected` also set the property |
+| `:<attr>="v"` | element | attribute (`:href`, `:disabled`, `:aria-current`); `false`/`null`/`undefined` removes it, `true` sets it empty. `:checked`, `:selected` also set the property. Never `:class`, `:style`, `:on*` |
 | `.<class>="[!]v"` | element | toggles the class |
 | `:show="[!]v"` | element | `hidden` when falsy |
 | `:model="$v"` | input, select, textarea | two-way binding; `$` or `shared` only |
@@ -89,4 +89,5 @@ Compute every derived value (total, label, filter, flag) in a getter on the stat
 - `:show` hides an element that stays in the DOM; `<if>` creates/removes it. An element with `autofocus` inside a newly inserted block gets focus.
 - In dev, a path that does not exist throws (except under `query`).
 - Markers: `data-page` (layout `<main>`), `data-reload` (`<a>` that does a full page load). Never write `data-c`, `data-tid`, `data-of`, `data-slot`: the build generates them.
-- Forbidden: inline `style` and `on*`, `{{ }}`, `${ }`, and the legacy syntax `data-text`, `data-on-*`, `data-attr-*`, `data-class-*`, `data-with-*`, `state.`, `props.`.
+- Never write `data-*` by hand (`html/data-attribute`): `data-*` is the compiled form of the short syntax (`data-text` is `:text`, `data-on-click` is `@click`). For a dynamic style hook with many values, bind `:data-x="path"` and select it in CSS with `[data-x=value]`; for on/off, use `.name="path"`; for tests, select by role, label or id.
+- Forbidden: inline `style` and `on*`, `:class` (use `.name`), `{{ }}` and `${ }` outside `<code>`/`<pre>` (`html/interpolation`), and the legacy syntax `state.`, `props.`.

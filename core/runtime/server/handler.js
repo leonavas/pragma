@@ -1,4 +1,4 @@
-import { render } from './render.js'
+import { render, renderHead } from './render.js'
 import { createLogger, flush, fromClient, minSeverity, newSpanId, newTraceId, parseTraceparent, resourceFrom } from './log.js'
 
 const OTEL_MAX_BYTES = 256 * 1024
@@ -48,6 +48,26 @@ function later(promise, ctx) {
 
 export function createHandler({ routes, service }) {
   const table = compileRoutes(routes)
+  let pages
+
+  // Static files first; then a prebuilt param page from the manifest; then _404.html with status 404.
+  async function asset(request, env) {
+    const res = await env.ASSETS.fetch(request)
+    if (res.status !== 404 || (request.method !== 'GET' && request.method !== 'HEAD')) return res
+    const at = (path) => new URL(path.replace(/index\.html$/, '').replace(/\.html$/, ''), request.url)
+    pages ??= env.ASSETS.fetch(new Request(new URL('/_pragma/manifest.json', request.url)))
+      .then((r) => (r.ok ? r.json() : []))
+      .then(compileRoutes)
+      .catch(() => [])
+    const m = matchRoute(await pages, new URL(request.url).pathname)
+    if (m?.route.html && !m.route.ssr) {
+      const page = await env.ASSETS.fetch(new Request(at(m.route.html), request))
+      if (page.ok) return page
+    }
+    const missing = await env.ASSETS.fetch(new Request(at('/_404.html'), request))
+    if (!missing.ok) return res
+    return new Response(request.method === 'HEAD' ? null : missing.body, { status: 404, headers: missing.headers })
+  }
 
   return {
     async fetch(request, env = {}, ctx) {
@@ -73,7 +93,7 @@ export function createHandler({ routes, service }) {
       const m = matchRoute(table, target)
       // The router fetches prebuilt HTML (/shop/index.html): that is a file, not an SSR page.
       if (kind === 'page' && (path.endsWith('.html') || !(m?.route.ssr && m.route.template && m.route.shell))) kind = null
-      if (!kind) return env.ASSETS ? env.ASSETS.fetch(request) : new Response('Not found', { status: 404 })
+      if (!kind) return env.ASSETS ? asset(request, env) : new Response('Not found', { status: 404 })
 
       const start = performance.now()
       const parent = parseTraceparent(request.headers.get('traceparent'))
@@ -149,10 +169,12 @@ async function page(m, { query, request, env, log }) {
   let payload
   let body
   let status = 200
+  const scope = { data: null, params, query, page: { loading: false, error: null } }
   try {
     const value = route.server?.load ? await route.server.load({ params, query, request, env, log }) : null
     payload = { data: value ?? null }
-    body = render(route.template, { data: payload.data, params, query, page: { loading: false, error: null } })
+    scope.data = payload.data
+    body = render(route.template, scope)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     log.error(message, err)
@@ -160,14 +182,15 @@ async function page(m, { query, request, env, log }) {
     body = undefined
     status = 500
   }
-  return new Response(request.method === 'HEAD' ? null : shellWith(route.shell, body, payload), {
+  return new Response(request.method === 'HEAD' ? null : shellWith(route.shell, body, payload, scope), {
     status,
     headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, no-cache' },
   })
 }
 
-export function shellWith(shell, body, payload) {
+export function shellWith(shell, body, payload, scope) {
   let html = shell.replace(/<script>self\.__pd=[^<]*<\/script>\s*/, '')
+  if (scope) html = renderHead(html, scope)
   if (body !== undefined) {
     const open = /<main\b[^>]*\bdata-page\b[^>]*>/.exec(html)
     const end = open ? html.indexOf('</main>', open.index) : -1

@@ -246,6 +246,15 @@ export function appSuite(mode, app) {
           assert.equal(await page.getByRole('alert').count(), 0)
           assert.equal(new URL(page.url()).search, '')
         })
+
+        it('leaving before the data arrives logs no loader error', async () => {
+          for (let i = 0; i < 3; i++) {
+            await page.goto('/shop', { waitUntil: 'commit' })
+            await page.locator('main h1').waitFor()
+            await page.goto('/tasks')
+            await waitForH1('Tasks')
+          }
+        })
       })
 
       describe('stores', () => {
@@ -714,7 +723,7 @@ export function appSuite(mode, app) {
 
           allowErrors(/net::ERR_FAILED/)
           await page.route('**/*.js', route => route.abort())
-          await page.goto('/tasks')
+          await page.goto('/shop')
           assert.equal(await page.evaluate(() => document.documentElement.dataset.theme), 'dark')
           assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor), darkBackground)
           await page.unroute('**/*.js')
