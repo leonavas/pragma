@@ -1,0 +1,43 @@
+<title>Produtos</title>
+
+<section class="flex flex-col gap-6">
+  <h1 class="text-3xl font-semibold tracking-tight">Produtos</h1>
+  <nav class="flex flex-wrap gap-4 text-sm" aria-label="Categorias">
+    <a href="?categoria=todas" class="nav-link" :aria-current="$categoria.todas">Todas</a>
+    <a href="?categoria=mercearia" class="nav-link" :aria-current="$categoria.mercearia">Mercearia</a>
+    <a href="?categoria=limpeza" class="nav-link" :aria-current="$categoria.limpeza">Limpeza</a>
+    <a href="?categoria=hortifruti" class="nav-link" :aria-current="$categoria.hortifruti">Hortifruti</a>
+  </nav>
+
+  <template :if="page.loading">
+    <ul class="grid gap-4 sm:grid-cols-2" aria-busy="true" aria-label="Carregando produtos">
+      <li class="skeleton h-24 rounded-2xl"></li>
+      <li class="skeleton h-24 rounded-2xl"></li>
+      <li class="skeleton h-24 rounded-2xl"></li>
+      <li class="skeleton h-24 rounded-2xl"></li>
+    </ul>
+  </template>
+  <template :else>
+    <div>
+      <template :if="page.error">
+        <div class="card flex flex-col items-start gap-3" role="alert">
+          <p class="text-danger-600" :text="page.error.message"></p>
+          <a href="/produtos" class="btn">Tentar de novo</a>
+        </div>
+      </template>
+      <template :else>
+        <ul class="grid gap-4 sm:grid-cols-2">
+          <template :for="p in data.produtos" :key="p.id">
+            <li class="card">
+              <a class="font-semibold hover:underline" :href="p.url" :text="p.nome"></a>
+              <p class="mt-1 text-sm text-muted" :text="p.descricao"></p>
+            </li>
+          </template>
+          <template :empty>
+            <li class="card text-muted sm:col-span-2">Nenhum produto.</li>
+          </template>
+        </ul>
+      </template>
+    </div>
+  </template>
+</section>

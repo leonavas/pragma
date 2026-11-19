@@ -14,6 +14,6 @@ const exibir = p => ({
 export const listar = categoria => produtos.filter(p => !CATEGORIAS[categoria] || p.categoria === categoria).map(exibir)
 
 export function achar(id) {
-  const p = produtos.find(p => p.id === id)
-  return p ? exibir(p) : null
+  const produto = produtos.find(p => p.id === id)
+  return produto ? exibir(produto) : null
 }

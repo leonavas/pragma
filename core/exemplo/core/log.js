@@ -17,6 +17,7 @@ export const newTrace = () => {
 export const traceHeaders = () => ({ traceparent: `00-${traceId}-${hex(8)}-01` })
 
 function emit(level, body, attributes) {
+  if (globalThis.__pragmaDev) console[level](body, ...(attributes ? [attributes] : []))
   if (SEV[level] < min) return
   queue.push({
     timeUnixNano: Date.now() + '000000',

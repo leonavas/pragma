@@ -1,12 +1,12 @@
 //! Expansão de componentes (macro, SPEC §3) e validação com escopo sobre a página expandida.
 use crate::directive::{self, Dir};
 use crate::html::{Attr, Element, Node, Pos, escape_text, is_blank};
-use crate::project::{Component, Page, Project, rel_str};
+use crate::project::{Component, Page, Project, component_tag, is_component_tag, rel_str};
 use crate::validate::diag;
 use crate::{Fnv, short_hash};
 use pragma_diag::Diagnostic;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::path::Path;
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::path::{Path, PathBuf};
 
 pub struct Expanded {
     pub title: Option<String>,
@@ -25,6 +25,9 @@ struct Scope<'s> {
     from: &'s Path,
     props: Option<&'s Props>,
     aliases: HashMap<String, String>,
+    bound_props: HashMap<String, String>,
+    stateful: bool,
+    known_props: Option<&'s HashSet<String>>,
     slots: Option<&'s Slots>,
     inst: u64,
 }
@@ -48,6 +51,27 @@ pub struct Expander<'p> {
     pub diags: Vec<Diagnostic>,
     used: BTreeMap<String, Component>,
     stack: Vec<&'p Path>,
+    known_props: HashMap<String, HashSet<String>>,
+    stateful: HashSet<PathBuf>,
+}
+
+fn collect_props(nodes: &[Node], out: &mut HashMap<String, HashSet<String>>) {
+    for node in nodes {
+        let Node::Element(element) = node else { continue };
+        let tag = element.name.to_ascii_lowercase();
+        if let Some((_, name)) = component_tag(&tag) {
+            let names = out.entry(name.to_string()).or_default();
+            for attr in &element.attrs {
+                let lname = attr.name.to_ascii_lowercase();
+                if let Some(bound) = lname.strip_prefix("data-with-") {
+                    names.insert(bound.to_string());
+                } else if !lname.starts_with("data-") && lname != "slot" {
+                    names.insert(lname);
+                }
+            }
+        }
+        collect_props(&element.children, out);
+    }
 }
 
 fn first_element(nodes: &[Node]) -> Option<&Element> {
@@ -81,7 +105,19 @@ fn collect_slots(nodes: &[Node], out: &mut BTreeSet<String>) {
 
 impl<'p> Expander<'p> {
     pub fn new(p: &'p Project) -> Self {
-        Expander { p, diags: Vec::new(), used: BTreeMap::new(), stack: Vec::new() }
+        let mut known_props = HashMap::new();
+        for tree in &p.trees {
+            collect_props(tree, &mut known_props);
+        }
+        let stateful = p
+            .components
+            .values()
+            .flat_map(|m| m.values())
+            .filter_map(|c| c.module.as_ref())
+            .filter(|m| p.read(m).is_some_and(|src| crate::js::exports(&src).iter().any(|(n, _)| n == "state")))
+            .cloned()
+            .collect();
+        Expander { p, diags: Vec::new(), used: BTreeMap::new(), stack: Vec::new(), known_props, stateful }
     }
 
     fn err(&mut self, pos: Pos, rule: &'static str, msg: impl Into<String>) {
@@ -112,7 +148,7 @@ impl<'p> Expander<'p> {
                 _ => content.push(n.clone()),
             }
         }
-        let sc = Scope { from: &page.dir, props: None, aliases: HashMap::new(), slots: None, inst: 0 };
+        let sc = Scope { from: &page.dir, props: None, aliases: HashMap::new(), bound_props: HashMap::new(), stateful: true, known_props: None, slots: None, inst: 0 };
         let page_nodes = self.expand_nodes(&content, &sc);
         let mut head = Vec::new();
         let mut body = Vec::new();
@@ -130,7 +166,7 @@ impl<'p> Expander<'p> {
                 }
             }
             let slots: Slots = HashMap::from([(String::new(), page_nodes.clone())]);
-            let lsc = Scope { from: Path::new("routes"), props: None, aliases: HashMap::new(), slots: Some(&slots), inst: 0 };
+            let lsc = Scope { from: Path::new("routes"), props: None, aliases: HashMap::new(), bound_props: HashMap::new(), stateful: true, known_props: None, slots: Some(&slots), inst: 0 };
             body = self.expand_nodes(&rest, &lsc);
         }
         (Expanded { title, head, body, page: page_nodes, components: self.used }, self.diags)
@@ -140,8 +176,32 @@ impl<'p> Expander<'p> {
         if directive::check_path(v, true).is_err() {
             return Res::Path(v.to_string());
         }
-        let (_, p) = directive::split_neg(v);
+        let (negated, p) = directive::split_neg(v);
         let r = directive::root(p);
+        if r == "$" {
+            let bang = if negated { "!" } else { "" };
+            let rest = &p[2..];
+            let name = rest.split('.').next().unwrap_or("");
+            let tail = &rest[name.len()..];
+            let Some(props) = sc.props else {
+                return Res::Path(format!("{bang}state.{rest}"));
+            };
+            if let Some(target) = sc.bound_props.get(name) {
+                return Res::Path(format!("{bang}{target}{tail}"));
+            }
+            let key = name.to_ascii_lowercase();
+            let is_state = sc.stateful && !sc.known_props.is_some_and(|k| k.contains(&key));
+            if !tail.is_empty() && (props.contains_key(&key) || !is_state) {
+                return Res::Path(v.to_string());
+            }
+            if let Some(value) = props.get(&key) {
+                return Res::Prop(Some(value.clone()));
+            }
+            if is_state {
+                return Res::Path(format!("{bang}state.{rest}"));
+            }
+            return Res::Prop(None);
+        }
         if r == "props" {
             if let Some(props) = sc.props {
                 let name = p.split('.').nth(1).unwrap_or("");
@@ -162,7 +222,7 @@ impl<'p> Expander<'p> {
                 Node::Text(..) => out.push(nodes[i].clone()),
                 Node::Element(e) => {
                     let lname = e.name.to_ascii_lowercase();
-                    if lname.starts_with("c-") {
+                    if is_component_tag(&lname) {
                         out.extend(self.component(e, sc));
                     } else if lname == "slot" && sc.slots.is_some() {
                         let name = e.value("name").unwrap_or("");
@@ -272,28 +332,43 @@ impl<'p> Expander<'p> {
 
     fn component(&mut self, e: &Element, sc: &Scope) -> Vec<Node> {
         let p = self.p;
-        let name = e.name[2..].to_ascii_lowercase();
-        let Some(comp) = p.find_component(sc.from, &name) else {
-            let dirs: Vec<String> = p.component_search(sc.from).iter().map(|d| rel_str(d)).collect();
-            self.err(e.pos, "html/componente-inexistente", format!("componente <c-{name}> não encontrado (procurado em {})", dirs.join(", ")));
+        let tag = e.name.to_ascii_lowercase();
+        let (local, name) = component_tag(&tag).map(|(l, n)| (l, n.to_string())).unwrap();
+        let Some(comp) = p.find_component(sc.from, local, &name) else {
+            let dirs: Vec<String> = p.component_search(sc.from, local).iter().map(|d| rel_str(d)).collect();
+            let msg = if dirs.is_empty() {
+                format!("<{tag}> só existe dentro de routes/; fora dela use <c-{name}> em lib/components")
+            } else {
+                format!("componente <{tag}> não encontrado (procurado em {})", dirs.join(", "))
+            };
+            self.err(e.pos, "html/componente-inexistente", msg);
             return Vec::new();
         };
         if self.stack.contains(&comp.dir.as_path()) {
-            self.err(e.pos, "html/componente", format!("componente <c-{name}> usa a si mesmo (ciclo)"));
+            self.err(e.pos, "html/componente", format!("componente <{tag}> usa a si mesmo (ciclo)"));
             return Vec::new();
         }
         let mut props: Props = HashMap::new();
-        let mut aliases = sc.aliases.clone();
+        let aliases = sc.aliases.clone();
+        let mut bound_props = HashMap::new();
         let mut forward = Vec::new();
         let mut class_extra = None;
         for a in &e.attrs {
             let lname = a.name.to_ascii_lowercase();
             if let Some(alias) = lname.strip_prefix("data-with-") {
-                if let Res::Path(p) = self.resolve(a.value.as_deref().unwrap_or(""), sc) {
-                    if comp.module.is_some() && directive::root(&p) == "state" {
-                        self.err(a.pos, "html/componente", format!("{lname}=\"{p}\": dentro de <c-{name}> (que tem .js) state é o do componente; passe o valor por data-attr-data-* ou use um store"));
+                match self.resolve(a.value.as_deref().unwrap_or(""), sc) {
+                    Res::Path(p) => {
+                        if comp.module.is_some() {
+                            if directive::root(&p) == "state" {
+                                self.err(a.pos, "html/componente", format!(":{alias}: <{tag}> tem .js e não recebe $ de quem usa; passe data., shared. ou o item do :for, ou use um store"));
+                            }
+                            forward.push(Attr { name: format!("data-attr-data-{alias}"), value: Some(p.clone()), pos: a.pos });
+                        }
+                        bound_props.insert(alias.to_string(), p);
                     }
-                    aliases.insert(alias.to_string(), p);
+                    Res::Prop(value) => {
+                        props.insert(alias.to_string(), value.flatten());
+                    }
                 }
             } else if lname == "slot" {
             } else if lname.starts_with("data-") {
@@ -326,7 +401,7 @@ impl<'p> Expander<'p> {
             if !names.contains(k) && v.iter().any(|n| !is_blank(n)) {
                 let at = first_element(v).map_or(e.pos, |x| x.pos);
                 let what = if k.is_empty() { "filhos (não tem <slot>)".to_string() } else { format!("slot \"{k}\"") };
-                self.err(at, "html/componente", format!("<c-{name}> não aceita {what}"));
+                self.err(at, "html/componente", format!("<{tag}> não aceita {what}"));
             }
         }
         let Some(root) = tree.iter().find(|n| matches!(n, Node::Element(_))) else { return Vec::new() };
@@ -335,7 +410,8 @@ impl<'p> Expander<'p> {
         h.write(rel_str(&p.files[e.pos.file as usize]).as_bytes());
         h.write(&e.pos.line.to_le_bytes());
         h.write(&e.pos.col.to_le_bytes());
-        let inner = Scope { from: &comp.scope, props: Some(&props), aliases, slots: Some(&slots), inst: h.finish() };
+        let known = self.known_props.get(&name).cloned().unwrap_or_default();
+        let inner = Scope { from: &comp.scope, props: Some(&props), aliases, bound_props, stateful: comp.module.as_ref().is_some_and(|m| self.stateful.contains(m)), known_props: Some(&known), slots: Some(&slots), inst: h.finish() };
         self.stack.push(&comp.dir);
         let mut nodes = self.expand_nodes(std::slice::from_ref(root), &inner);
         self.stack.pop();
@@ -372,7 +448,7 @@ impl<'p> Expander<'p> {
             }
         }
         for a in dup {
-            self.err(a.pos, "html/componente", format!("{} já existe na raiz de <c-{name}>", a.name));
+            self.err(a.pos, "html/componente", format!("{} já existe na raiz de <{tag}>", a.name));
         }
         nodes
     }
@@ -467,7 +543,7 @@ impl Scoped<'_> {
             let v = a.value.as_deref().unwrap_or("");
             match d {
                 Dir::Model if !matches!(directive::root(v), "state" | "shared") && directive::check_path(v, false).is_ok() => {
-                    self.err(a.pos, "html/raiz-invalida", format!("data-model só aceita raiz state ou shared; \"{v}\" (o alias do componente precisa apontar para state ou shared)"));
+                    self.err(a.pos, "html/raiz-invalida", format!(":model só aceita $ ou shared; \"{v}\""));
                 }
                 Dir::Text | Dir::Show | Dir::Attr(_) | Dir::If | Dir::Model => self.path(a.pos, v, vars, &owner, in_page),
                 Dir::Class(c) => {
@@ -536,10 +612,10 @@ impl Scoped<'_> {
                 }
             }
             "state" => match owner {
-                Owner::None => self.err(pos, "html/raiz-invalida", "state não existe no layout (o layout não tem módulo)"),
+                Owner::None => self.err(pos, "html/raiz-invalida", "$ não existe no layout (o layout não tem módulo)"),
                 Owner::Page if self.ctx.page_actions.is_none() => {
                     let f = rel_str(&self.ctx.page_file.with_extension("js"));
-                    self.err(pos, "html/raiz-invalida", format!("state exige o módulo {f} com export const state"));
+                    self.err(pos, "html/raiz-invalida", format!("$ exige o módulo {f} com export const state"));
                 }
                 _ => {}
             },
@@ -564,7 +640,11 @@ impl Scoped<'_> {
                 }
             }
             "props" => {}
-            _ => self.err(pos, "html/raiz-invalida", format!("raiz desconhecida \"{root}\" (use data, state, shared, params, query, page, props ou a variável de um data-for/data-with-*)")),
+            "$" => {
+                let name = segs.get(1).copied().unwrap_or("");
+                self.err(pos, "html/raiz-invalida", format!("${name} não foi passado com :{name} (prop de texto não tem subcampo)"));
+            }
+            _ => self.err(pos, "html/raiz-invalida", format!("raiz desconhecida \"{root}\" (use $, data, shared, params, query, page ou a variável de um :for)")),
         }
     }
 }

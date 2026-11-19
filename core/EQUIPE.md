@@ -27,8 +27,8 @@ coordenador. Você pode adicionar dependências no `Cargo.toml` do seu crate.
   Edition 2024, poucas dependências, versões atuais.
 - JS: puro, ES modules, sem TypeScript, sem JSDoc de tipos, sem dependências de runtime.
   Ferramentas de teste (ex.: Playwright) só instaladas em `/tmp/pragma-tools-<papel>`, nunca no repo.
-- Sem comentários inúteis: comentário só para o porquê não óbvio. Código pequeno e direto,
-  sem abstração especulativa.
+- Sem comentários, em nada (JS, HTML, CSS, Rust, testes). O código é a documentação: nomes
+  que dizem o que a coisa é ou faz. Código pequeno e direto, sem abstração especulativa.
 - Mensagens ao usuário (erros, CLI, docs) em português. Identificadores do framework em inglês.
 - Testes obrigatórios para o que você entrega; rode-os antes de terminar.
 - Resposta final: no máximo 15 linhas — o que entregou, como testar, o que faltou e onde

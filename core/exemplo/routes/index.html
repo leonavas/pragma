@@ -8,16 +8,16 @@
     </div>
     <div class="flex gap-2">
       <c-tema></c-tema>
-      <button type="button" class="btn" data-open="sobre">Sobre o app</button>
+      <button type="button" class="btn" @open="sobre">Sobre o app</button>
     </div>
   </header>
 
   <section class="flex flex-col gap-4" aria-labelledby="resumo">
     <h2 id="resumo" class="text-lg font-semibold">Resumo</h2>
     <div class="grid gap-4 sm:grid-cols-3">
-      <c-indicador titulo="Tarefas pendentes" dica="Veja em Tarefas" data-with-valor="shared.tarefas.pendentes" data-with-tom="state.tomTarefas"></c-indicador>
-      <c-indicador titulo="Itens no carrinho" data-with-valor="shared.carrinho.quantidade" data-with-tom="state.tomCarrinho"></c-indicador>
-      <c-indicador titulo="Total do carrinho" dica="Preços da loja" data-with-valor="shared.carrinho.total" data-with-tom="state.tomCarrinho"></c-indicador>
+      <c-indicador titulo="Tarefas pendentes" dica="Veja em Tarefas" :valor="shared.tarefas.pendentes" :tom="$tomTarefas"></c-indicador>
+      <c-indicador titulo="Itens no carrinho" :valor="shared.carrinho.quantidade" :tom="$tomCarrinho"></c-indicador>
+      <c-indicador titulo="Total do carrinho" dica="Preços da loja" :valor="shared.carrinho.total" :tom="$tomCarrinho"></c-indicador>
     </div>
   </section>
 
@@ -45,5 +45,5 @@
 
 <c-modal id="sobre" titulo="Sobre o Mercadinho">
   <p>O app de exemplo do pragma: cada página é HTML pronto, o JS só liga comportamento, e o estado do carrinho e das tarefas sobrevive ao refresh.</p>
-  <button slot="acoes" type="button" class="btn btn-primary" data-close value="ok">Fechar</button>
+  <button slot="acoes" type="button" class="btn btn-primary" @close value="ok">Fechar</button>
 </c-modal>

@@ -5,14 +5,14 @@
   <h1 class="max-w-2xl text-4xl font-semibold tracking-tight sm:text-5xl">Seu app começa aqui.</h1>
   <p class="max-w-xl text-lg text-muted">Edite <code class="font-mono text-ink">routes/index.html</code>, salve e veja a página atualizar.</p>
   <div class="flex flex-wrap items-center gap-3">
-    <button type="button" class="btn btn-primary" data-open="como-funciona">Como funciona</button>
+    <button type="button" class="btn btn-primary" @open="como-funciona">Como funciona</button>
     <c-dropdown id="mais-acoes" rotulo="Mais ações">
       <a href="/nao-existe">Ver a página 404</a>
       <hr>
-      <button type="button" class="text-danger-600" data-on-click="apagar">Apagar rascunho…</button>
+      <button type="button" class="text-danger-600" @click="apagar">Apagar rascunho…</button>
     </c-dropdown>
   </div>
-  <p class="text-sm font-medium text-success-700" data-show="state.apagado" role="status">Rascunho apagado.</p>
+  <p class="text-sm font-medium text-success-700" :show="$apagado" role="status">Rascunho apagado.</p>
 </section>
 
 <section class="mt-16 grid gap-4 sm:grid-cols-3">
@@ -32,11 +32,11 @@
 
 <c-modal id="como-funciona" titulo="Como funciona">
   <p>O HTML de cada página sai pronto do build. O JS só cuida do comportamento, ligado por atributos data-*.</p>
-  <button slot="acoes" type="button" class="btn btn-primary" data-close value="ok">Entendi</button>
+  <button slot="acoes" type="button" class="btn btn-primary" @close value="ok">Entendi</button>
 </c-modal>
 
 <c-alert id="apagar" titulo="Apagar rascunho?">
   <p>Essa ação não pode ser desfeita.</p>
-  <button slot="acoes" type="button" class="btn" data-close value="cancel" autofocus>Cancelar</button>
-  <button slot="acoes" type="button" class="btn btn-danger" data-close value="ok">Apagar</button>
+  <button slot="acoes" type="button" class="btn" @close value="cancel" autofocus>Cancelar</button>
+  <button slot="acoes" type="button" class="btn btn-danger" @close value="ok">Apagar</button>
 </c-alert>

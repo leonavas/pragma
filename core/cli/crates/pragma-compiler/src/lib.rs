@@ -1,11 +1,13 @@
 //! Build, análise e diretivas. Contrato: core/SPEC.md §2, §3, §5, §9, §10.
 mod a11y;
 mod compile;
+mod deps;
 mod directive;
 mod expand;
 mod html;
 mod js;
 mod project;
+mod sugar;
 mod validate;
 
 use pragma_diag::{Diagnostic, Severity};
@@ -159,8 +161,9 @@ struct Module {
     imports: Vec<(js::Import, Option<PathBuf>)>,
 }
 
-/// Grafo de módulos a partir das entradas. `client` proíbe importar `.server.js`.
-fn module_graph(root: &Path, entries: &[PathBuf], client: bool, sources: &HashMap<PathBuf, String>, diags: &mut Vec<Diagnostic>) -> BTreeMap<PathBuf, Module> {
+/// Grafo de módulos a partir das entradas. `client` proíbe importar `.server.js` e segue os
+/// pacotes de node_modules; no servidor o pacote só precisa estar no package.json.
+fn module_graph(root: &Path, entries: &[PathBuf], client: bool, sources: &HashMap<PathBuf, String>, deps: &deps::Deps, diags: &mut Vec<Diagnostic>) -> BTreeMap<PathBuf, Module> {
     let mut mods = BTreeMap::new();
     let mut queue: VecDeque<PathBuf> = entries.iter().cloned().collect();
     while let Some(path) = queue.pop_front() {
@@ -168,13 +171,47 @@ fn module_graph(root: &Path, entries: &[PathBuf], client: bool, sources: &HashMa
             continue;
         }
         let Some(src) = sources.get(&path).cloned().or_else(|| fs::read_to_string(root.join(&path)).ok()) else { continue };
+        let in_package = deps::is_package_file(&path);
+        if in_package && deps::looks_commonjs(&src) {
+            diags.push(Diagnostic::error(&path, 1, 1, "app/pacote", "pacote CommonJS não funciona no pragma; use um pacote ES module (JS puro)"));
+            mods.insert(path, Module { src, imports: Vec::new() });
+            continue;
+        }
+        let src = if in_package { deps.prepare(src) } else { src };
         let lines = html::LineIndex::new(&src);
         let mut imports = Vec::new();
         for imp in js::imports(&src) {
             let is_rel = imp.spec.starts_with("./") || imp.spec.starts_with("../") || imp.spec.starts_with('/');
-            let target = if is_rel { normalize(path.parent().unwrap_or(Path::new("")), &imp.spec) } else { None };
+            let dir = path.parent().unwrap_or(Path::new(""));
             let pos = lines.pos(&src, imp.start, 0);
             let mut ok = None;
+            let is_pkg = pragma_jslint::is_package(&imp.spec);
+            if is_pkg || (in_package && is_rel) {
+                let listed = if in_package { Ok(()) } else { deps.check_listed(&imp.spec, client).map_err(|e| (deps::RULE_IMPORT, e)) };
+                let resolved = match listed {
+                    Err(e) => Err(e),
+                    Ok(()) if client => deps.resolve(dir, &imp.spec).map(Some),
+                    Ok(()) => Ok(None),
+                };
+                match resolved {
+                    Ok(Some(t)) => {
+                        queue.push_back(t.clone());
+                        ok = Some(t);
+                    }
+                    Ok(None) => {}
+                    Err((rule, e)) => diags.push(Diagnostic::error(&path, pos.line, pos.col, if in_package { deps::RULE_PACKAGE } else { rule }, e)),
+                }
+                imports.push((imp, ok));
+                continue;
+            }
+            if in_package {
+                if client {
+                    diags.push(Diagnostic::error(&path, pos.line, pos.col, "app/pacote", format!("o pacote importa \"{}\", que não roda no navegador", imp.spec)));
+                }
+                imports.push((imp, None));
+                continue;
+            }
+            let target = if is_rel { normalize(dir, &imp.spec) } else { None };
             match target {
                 Some(t) if root.join(&t).is_file() => {
                     if client && rel_str(&t).ends_with(".server.js") {
@@ -262,12 +299,19 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     }
 
     let theme_src = p.theme_css.clone().unwrap_or_default();
+    let css_comment = |path: &Path, src: &str, diags: &mut Vec<Diagnostic>| {
+        for (line, col) in project::comment_positions(src, "/*") {
+            diags.push(Diagnostic::error(path, line, col, "css/comentario", "comentário é proibido; o código é a documentação"));
+        }
+    };
+    css_comment(Path::new("lib/theme.css"), &theme_src, &mut diags);
     let theme = pragma_css::parse_theme(&theme_src);
     let mut project_classes = HashSet::new();
     validate::css_classes(&theme_src, &mut project_classes);
     let mut comp_css: HashMap<PathBuf, String> = HashMap::new();
     for c in p.all_components() {
         if let Some(css) = c.css.as_ref().and_then(|f| p.read(f)) {
+            css_comment(c.css.as_ref().unwrap(), &css, &mut diags);
             validate::css_classes(&css, &mut project_classes);
             comp_css.insert(c.dir.clone(), css);
         }
@@ -353,7 +397,8 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         e
     };
     let all_entries: Vec<PathBuf> = outs.iter().flat_map(page_entries).collect();
-    let mods = module_graph(&opts.root, &all_entries, true, &sources, &mut diags);
+    let deps = deps::Deps::new(&opts.root, prod, &mut diags);
+    let mods = module_graph(&opts.root, &all_entries, true, &sources, &deps, &mut diags);
     let content_hash: HashMap<&PathBuf, u64> = mods
         .iter()
         .map(|(k, m)| {
@@ -364,7 +409,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         .collect();
     let mut urls: HashMap<PathBuf, String> = HashMap::new();
     for path in mods.keys() {
-        let rel = rel_str(path);
+        let rel = deps::asset_path(&rel_str(path));
         let url = if prod {
             let mut deps = closure(&mods, std::slice::from_ref(path), true);
             deps.sort();
@@ -399,6 +444,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             js::rewrite(&m.src, &m.imports.iter().map(|(i, _)| i.clone()).collect::<Vec<_>>(), |i| map.get(i.spec.as_str()).map(|u| u.to_string()))
         };
         gz.insert(path.clone(), gzip_len(code.as_bytes()));
+        let code = if !prod && urls[path] == "/assets/core/log.js" { with_ignore_map(code) } else { code };
         w.write(&format!("client{}", urls[path]), code.as_bytes());
     }
 
@@ -535,7 +581,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         let mut entries = vec![handler.clone(), PathBuf::from("core/server/node.mjs")];
         entries.extend(server_routes.iter().map(|r| r.1.clone()));
         entries.retain(|e| opts.root.join(e).is_file());
-        let smods = module_graph(&opts.root, &entries, false, &sources, &mut diags);
+        let smods = module_graph(&opts.root, &entries, false, &sources, &deps, &mut diags);
         for (path, m) in &smods {
             w.write(&format!("server/{}", rel_str(path)), m.src.as_bytes());
         }
@@ -550,6 +596,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         }
         worker.push_str("  ],\n})\n");
         w.write("server/worker.js", worker.as_bytes());
+        w.write("server/package.json", b"{ \"type\": \"module\" }\n");
         w.write(
             "server/node.mjs",
             b"import h from './worker.js'\nimport { serve } from './core/server/node.mjs'\n\nserve(h, { root: new URL('../client/', import.meta.url), port: process.env.PORT ?? 3000 })\n",
@@ -574,6 +621,31 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         }
     }
     (sort_diags(diags), report)
+}
+
+fn with_ignore_map(code: String) -> String {
+    let lines = code.lines().count().max(1);
+    let map = serde_json::json!({
+        "version": 3,
+        "sources": ["log.js"],
+        "sourcesContent": [code],
+        "mappings": format!("AAAA{}", ";AACA".repeat(lines - 1)),
+        "ignoreList": [0],
+        "x_google_ignoreList": [0],
+    });
+    format!("{code}\n//# sourceMappingURL=data:application/json;base64,{}\n", base64(map.to_string().as_bytes()))
+}
+
+fn base64(bytes: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for c in bytes.chunks(3) {
+        let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        for i in 0..4 {
+            out.push(if i <= c.len() { T[(n >> (18 - 6 * i) & 63) as usize] as char } else { '=' });
+        }
+    }
+    out
 }
 
 fn budget(p: &Project, key: &'static str, limit: Option<f64>, bytes: u64, what: &str, diags: &mut Vec<Diagnostic>) {

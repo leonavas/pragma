@@ -1,3 +1,3 @@
-export function formatar(n) {
-  return `R$ ${n.toFixed(2)}`
+export function formatar(valor) {
+  return `R$ ${valor.toFixed(2)}`
 }

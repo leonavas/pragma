@@ -1,10 +1,10 @@
 <div class="flex flex-col gap-4">
-  <div role="tablist" class="flex gap-1 border-b border-line" data-attr-aria-label="props.rotulo" data-on-keydown="tecla">
-    <button type="button" role="tab" class="aba" value="a" data-on-click="ir" data-attr-aria-selected="state.selecionada.a" data-attr-tabindex="state.tabindex.a" data-text="props.a"></button>
-    <button type="button" role="tab" class="aba" value="b" data-on-click="ir" data-attr-aria-selected="state.selecionada.b" data-attr-tabindex="state.tabindex.b" data-text="props.b"></button>
-    <button type="button" role="tab" class="aba" value="c" data-on-click="ir" data-attr-aria-selected="state.selecionada.c" data-attr-tabindex="state.tabindex.c" data-text="props.c"></button>
+  <div role="tablist" class="flex gap-1 border-b border-line" :aria-label="$rotulo" @keydown="tecla">
+    <button type="button" role="tab" class="aba" value="a" @click="selecionar" :aria-selected="$selecionada.a" :tabindex="$tabindex.a" :text="$a"></button>
+    <button type="button" role="tab" class="aba" value="b" @click="selecionar" :aria-selected="$selecionada.b" :tabindex="$tabindex.b" :text="$b"></button>
+    <button type="button" role="tab" class="aba" value="c" @click="selecionar" :aria-selected="$selecionada.c" :tabindex="$tabindex.c" :text="$c"></button>
   </div>
-  <div role="tabpanel" data-attr-aria-label="props.a" data-show="state.ativa.a"><slot name="a"></slot></div>
-  <div role="tabpanel" data-attr-aria-label="props.b" data-show="state.ativa.b"><slot name="b"></slot></div>
-  <div role="tabpanel" data-attr-aria-label="props.c" data-show="state.ativa.c"><slot name="c"></slot></div>
+  <div role="tabpanel" :aria-label="$a" :show="$ativa.a"><slot name="a"></slot></div>
+  <div role="tabpanel" :aria-label="$b" :show="$ativa.b"><slot name="b"></slot></div>
+  <div role="tabpanel" :aria-label="$c" :show="$ativa.c"><slot name="c"></slot></div>
 </div>

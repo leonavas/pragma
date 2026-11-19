@@ -1,59 +1,44 @@
 # AGENTS.md
 
-App feito com o pragma: HTML, CSS e JS nativos, sem framework. Construa apps performáticos,
-escaláveis e extensíveis. A documentação está em `core/docs/`. Leia o arquivo do assunto
-antes de mexer nele.
+App pragma: HTML, CSS e JS nativos, sem framework. Docs em `core/docs/`: leia o do assunto antes de mexer.
 
-## Regras obrigatórias
+## Sintaxe
 
-- JavaScript puro (ES modules). Nunca TypeScript, nunca JSDoc de tipos.
-- Nunca HTML em JS: sem `innerHTML`, `createElement` nem template literal com markup.
-  Marcação só em `.html`.
-- HTML estrito: feche toda tag não void (`</p>`, `</li>`, `</option>`).
-- Comportamento só por diretivas (`data-*`). Não escreva no DOM pelo JS: mude o estado.
-- Valor calculado (total, rótulo, lista filtrada) é getter no `state(ctx)` ou no store. Nunca
-  calcule no HTML nem guarde cópia atualizada pela action.
-- Conteúdo de slot pertence a quem o escreveu: suas actions e `state` são dele, não do
-  componente que o recebe.
-- Estrutura de pastas fixa. Não crie pastas novas nem edite `core/`.
-- Reaproveite componentes. Procure em `lib/components/` e `_components/` antes de criar.
-- Overlays (modal, alert, dropdown, popover) sempre com HTML + JS, usando os componentes
-  prontos. Voltar no browser ou no Android fecha o overlay, não a página.
-- Modal e alert travam o scroll da página.
-- Dados da página no `load` do `.server.js`, com skeleton enquanto carrega.
-- CSS: utilitários de `core/docs/classes.md`; classe custom só para repetição (3+) ou caso
-  refinado. Sem `style` inline, sem valores arbitrários.
-- Logs com `log.*`, nunca `console.*`. Sem dado pessoal nos logs.
-- Sem comentários inúteis. Comentário só para o porquê não óbvio.
-- Sem dependências npm no código do app.
-- Acessível: nome em todo controle, `alt` em toda imagem, label em todo campo, um `<h1>`.
-  Link ativo ganha `aria-current="page"` sozinho.
-- Rode `pragma check --strict` antes de terminar. Zero erros, zero avisos.
+`:` liga valor (`:text`, `:href`, `:if`, `:for`+`:key`), `.` liga classe, `@` liga evento, `$` é
+estado ou prop. `<c-x>` = `lib/components/x/`; `<p-x>` = `_components/x/` da pasta da página.
+
+## Regras
+
+- JS puro (ES modules). Sem TypeScript, JSDoc de tipos, `console.*` (use `log.*`).
+- Pacote npm só se o nativo não resolve, de JS puro (ESM) e da lista de `pacotes.md`.
+- Sem HTML em JS. Não escreva no DOM: mude o estado.
+- HTML estrito: feche toda tag não void.
+- Valor calculado é getter no estado ou no store, nunca no HTML.
+- Nunca escreva comentários. O código é a documentação.
+- Nomes dizem o que a coisa é ou faz. Sem vagos (`tmp`, `data`, `aux`) nem curtos (`t`, `e`),
+  salvo parâmetro de arrow de uma linha e `i`, `j`, `k`, `id`, `el`, `ctx`.
+- Estrutura fixa; não edite `core/`. Reaproveite componentes antes de criar.
+- Overlays só com `c-modal`, `c-alert`, `c-dropdown`.
+- Dados no `load` do `.server.js`, com skeleton.
+- CSS: utilitários de `classes.md`; classe custom só se repete 3+ vezes. Sem `style` inline.
+- Acessível: nome em todo controle, `alt`, label, um `<h1>`.
+- Termine com `pragma check --strict`: zero erros, zero avisos.
 
 ## Para fazer X, leia Y
 
 | Para | Leia |
 |---|---|
-| saber onde cada arquivo vai | `core/docs/estrutura.md` |
-| criar página, link, params, query | `core/docs/rotas.md` |
-| ligar dados e eventos ao HTML | `core/docs/diretivas.md` |
-| criar ou reaproveitar componente | `core/docs/componentes.md` |
-| estado, actions, mount, stores | `core/docs/estado.md` |
-| buscar dados, salvar no servidor, SSR, skeleton | `core/docs/dados.md` |
-| modal, alert, dropdown, popover | `core/docs/overlays.md` |
-| estilizar, tema claro/escuro | `core/docs/css.md` e `core/docs/classes.md` |
-| deixar rápido, orçamentos | `core/docs/performance.md` |
-| logar | `core/docs/logs.md` |
-| rodar, checar, buildar, publicar, avisos `a11y/*` | `core/docs/cli.md` |
+| sintaxe do HTML (`:`, `.`, `@`, `$`) | `sintaxe.md` |
+| onde cada arquivo vai | `estrutura.md` |
+| página, link, params, query, layout | `rotas.md` |
+| componente, props, slots | `componentes.md` |
+| estado, actions, mount, stores, `ctx` | `estado.md` |
+| load, actions de servidor, skeleton, SSR | `dados.md` |
+| modal, alert, dropdown | `overlays.md` |
+| estilo, tema | `css.md`, `classes.md` |
+| performance | `performance.md` |
+| logs | `logs.md` |
+| pacote npm (instalar, quais usar) | `pacotes.md` |
+| comandos, `check`, `a11y/*`, deploy | `cli.md` |
 
-## Direcionais
-
-- Performático: a página abre com HTML pronto e skeleton; cada página baixa só o que usa;
-  navegue com `<a href>`.
-- Escalável: uma forma de fazer cada coisa; estado na URL quando é filtro ou aba; estado
-  compartilhado em `lib/state/`.
-- Extensível: componentes pequenos com props e slots; tokens em `lib/theme.css`; nada
-  duplicado entre páginas.
-- Na dúvida, siga o exemplo canônico do doc. Os docs citam `exemplo/<caminho>`: o app de
-  exemplo no repositório do pragma; sem acesso a ele, o exemplo do doc basta. Se o doc não
-  cobre, faça o mais simples que passe no `pragma check --strict`.
+Na dúvida, siga o exemplo do doc. Se o doc não cobre, faça o mais simples que passe no `check`.

@@ -1,32 +1,16 @@
 # CSS
 
-Use utilitários. Crie classe custom só quando eles não bastam.
-Referência: `exemplo/lib/theme.css`, `exemplo/lib/components/*/*.css`.
+Utilitários primeiro (`classes.md`). Classe custom só quando eles não bastam.
 
-## Camadas
+| Arquivo | Conteúdo |
+|---|---|
+| `core/base.css` | preflight, camadas, `.skeleton`, `[hidden]`, scroll lock. Não edite. |
+| `lib/theme.css` | tokens e classes custom globais (`@layer components`) |
+| `<nome>.css` do componente | só daquele componente, escopo `[data-c="<nome>"]` |
 
-- `core/base.css`: preflight + `@layer reset, tokens, base, components, utilities`. Já
-  inclui `.skeleton`, `[hidden]`, scroll lock (`html[data-scroll-lock]`) e `dialog::backdrop`.
-  Não edite.
-- `lib/theme.css`: tokens e classes custom globais. O do starter já cria `surface`, `ink`,
-  `muted` e `line` (`bg-surface`, `text-ink`, `text-muted`, `border-line`), claro e escuro, e
-  `.card`, `.btn`, `.btn-primary`, `.btn-danger`, `.dialog`.
-- `<nome>.css` do componente: CSS só daquele componente, escopado por `[data-c="<nome>"]`.
+O starter já traz `bg-surface`, `text-ink`, `text-muted`, `border-line` (claro e escuro) e
+`.card`, `.btn`, `.btn-primary`, `.btn-danger`, `.dialog`.
 
-## Utilitários
-
-- Nomes do Tailwind v4, subconjunto fechado. Lista completa: `classes.md`.
-- Só as classes usadas vão para o build.
-- Variantes como `hover:`, `md:` e `dark:`: só as listadas em `classes.md`.
-- Sem valores arbitrários: `w-[37px]`, `bg-[#f00]` = erro. Use a escala ou um token.
-- Cores: `white`, `black`, `transparent`, `current` e
-  `{neutral,primary,danger,success,warning}-{50…950}` (`text-`, `bg-`, `border-`, `ring-`…).
-- Tema escuro: `data-theme="dark"` no `<html>` e variante `dark:`. Prefira tokens que mudam no
-  `[data-theme="dark"]` (`text-ink`) a pares `dark:`.
-
-## Exemplo canônico
-
-`lib/theme.css`:
 ```css
 @layer tokens {
   :root {
@@ -39,30 +23,14 @@ Referência: `exemplo/lib/theme.css`, `exemplo/lib/components/*/*.css`.
 }
 
 @layer components {
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 1rem;
-    border-radius: 0.5rem;
-    background: var(--color-primary-600);
-    color: var(--color-white);
-  }
   .btn:hover { background: var(--color-primary-700); }
-  .btn:disabled { opacity: 0.5; }
 }
 ```
 
-- `--color-<nome>` ou `--color-<nome>-<tom>` cria a cor; `bg-marca` e `text-marca` passam
-  a existir.
-- Redefinir `--color-primary-*` troca a cor da marca no app inteiro.
+- `--color-<nome>` cria `bg-<nome>`, `text-<nome>`… Redefinir `--color-primary-*` troca a marca.
+- Prefira token que muda no `[data-theme="dark"]` a pares `dark:`.
 
-## Tema claro/escuro
-
-`core/theme.js`: `theme()` → `'dark'|'light'`; `setTheme('dark'|'light')` aplica e grava
-(`localStorage['pragma:theme']`). Se algum módulo importa `core/theme.js`, o build põe em toda
-página um script inline que restaura o tema (ou segue `prefers-color-scheme`) antes do CSS, sem
-piscar. Componente pronto: `exemplo/lib/components/tema/`.
+## Tema
 
 ```js
 import { theme, setTheme } from '../../../core/theme.js'
@@ -74,25 +42,16 @@ export const state = () => ({
 
 export const actions = {
   alternar(ctx) {
-    ctx.state.escuro = !ctx.state.escuro
-    setTheme(ctx.state.escuro ? 'dark' : 'light')
+    ctx.$.escuro = !ctx.$.escuro
+    setTheme(ctx.$.escuro ? 'dark' : 'light')
   },
 }
 ```
 
-- Não escreva `data-theme` no `<html>` nem leia `localStorage` para o tema: use `core/theme.js`.
+Não escreva `data-theme` nem leia `localStorage` para o tema: use `core/theme.js`.
 
-## Quando criar classe custom
+## Classe custom
 
-- A mesma combinação de utilitários se repete em 3+ lugares (`.btn`, `.card`, `.campo`).
-- Precisa de algo fora do subconjunto (seletor de estado, animação, `grid-template-areas`).
-- Global em `lib/theme.css`, `@layer components`. De um componente só: no `.css` dele.
-
-## Não faça
-
-- Não use `style="..."`.
-- Não invente nome de utilitário: classe fora de `classes.md` e sem definição no CSS do
-  projeto = erro no `pragma check`.
-- Não use cor ou medida solta repetida: crie token.
-- Não crie classe custom para uso único: use utilitários.
-- Não use `!important`, IDs como seletor nem `@import` de CSS externo.
+- Mesma combinação em 3+ lugares, ou algo fora do subconjunto (seletor de estado, animação).
+- Proibido: `style="..."`, valor arbitrário (`w-[37px]`), classe inventada, `!important`, ID
+  como seletor, `@import` externo, classe custom de uso único.

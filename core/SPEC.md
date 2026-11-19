@@ -12,7 +12,8 @@ Mudar este contrato exige avisar o coordenador (@claude-16).
 - Página abre rápido: HTML pré-gerado com skeleton, dados buscados em paralelo.
   Cada página baixa só o JS dos módulos que usa.
 - Determinístico e fechado: uma forma de fazer cada coisa; o que não está aqui é erro.
-- Sem comentários inúteis. Comentário só para o porquê não óbvio.
+- Sem comentários, em nada (app e framework). O código é a documentação: nomes que se explicam.
+  No app, `pragma check` barra comentário e nome vago.
 
 ## 1. Repositório do pragma
 
@@ -65,64 +66,53 @@ Regras de rota:
 - `[nome]` (arquivo ou pasta) = path param. Estático vence param.
 - Arquivo de página é fragmento: conteúdo que entra no `<slot>` do `_layout.html`.
   Um `<title>` no topo do fragmento vira o título da página.
-- Componente usado na página: `<c-nome>`. Resolução: `routes/<rota>/_components/`,
-  depois `lib/components/`. Não encontrado = erro.
+- Componente usado na página: `<c-nome>` = `lib/components/<nome>/`; `<p-nome>` =
+  `_components/<nome>/` da pasta da página ou de uma acima, até `routes/`. Não encontrado = erro.
 
-## 3. Diretivas (lista fechada)
+## 3. Sintaxe do HTML (lista fechada)
 
-Caminhos: só `raiz.a.b` (sem expressões, sem chamadas, sem índices). Raízes:
+`:` liga valor, `.` liga classe, `@` liga evento, `$` é estado ou prop do dono. O build traduz
+para os `data-*` internos que o runtime lê (`:text` → `data-text`, `@click` → `data-on-click`,
+`:href` → `data-attr-href`, `.x` → `data-class-x`, `$x` → `state.x` ou prop). Escrever `data-*`
+de diretiva, `state.` ou `props.` no fonte é erro.
 
-| Raiz | Origem |
-|---|---|
-| `data` | retorno do `load` da página |
-| `state` | estado local da página/componente (`state()` do módulo) |
-| `shared` | stores de `lib/state/<nome>.js` (`shared.carrinho.total`) |
-| `params` `query` | path params e query string (strings) |
-| `page` | `page.loading` `page.error` (ciclo do loader) |
-| `props` | atributos do `<c-x>`; resolvidos NO BUILD |
-| variável de `data-for` / alias de `data-with-*` | escopo léxico |
+Caminhos: só `raiz.a.b` (sem expressões, chamadas, índices). Raízes: `$x` (estado ou prop do
+dono), `data` (retorno do `load`), `shared` (stores), `params` `query` (strings), `page`
+(`page.loading`, `page.error`), variável do `:for`.
 
-| Diretiva | Onde | Efeito |
+| Sintaxe | Onde | Efeito |
 |---|---|---|
-| `data-text="p"` | elemento | `textContent` (sempre escapado) |
-| `data-attr-<nome>="p"` | elemento | atributo; `false`/`null`/`undefined` remove; `true` = vazio |
-| `data-class-<nome>="[!]p"` | elemento | liga/desliga a classe `<nome>` |
-| `data-show="[!]p"` | elemento | atributo `hidden` quando falso |
-| `data-if="[!]p"` | `<template>` | renderiza o bloco se verdadeiro |
-| `data-else` | `<template>` imediatamente após `data-if` | |
-| `data-for="x in p"` + `data-key="x.campo"` | `<template>` | repete; `data-key` obrigatório |
-| `data-empty` | `<template>` imediatamente após `data-for` | lista vazia |
-| `data-on-<evento>="acao"` | elemento | chama `actions.acao` do dono léxico (ver abaixo) |
-| `data-model="state.p"` | input/select/textarea | ligação de mão dupla; só raiz `state` ou `shared` (num componente, pode ser um alias que aponte para elas) |
-| `data-with-<alias>="p"` | `<c-x>` | dentro do componente, `<alias>` = `p` |
-| `data-open="id"` `data-close` | botão | abre/fecha overlay (seção 6) |
+| `:text="p"` | elemento | `textContent` (escapado) |
+| `:<atributo>="p"` | elemento | atributo; `false`/`null`/`undefined` remove; `true` = vazio |
+| `.<classe>="[!]p"` | elemento | liga/desliga a classe |
+| `:show="[!]p"` | elemento | `hidden` quando falso |
+| `:if="[!]p"` / `:else` | `<template>` | bloco condicional; `:else` logo após `:if` |
+| `:for="x in p"` + `:key="x.campo"` | `<template>` | repete; `:key` obrigatório |
+| `:empty` | `<template>` logo após `:for` | lista vazia |
+| `:model="$p"` | input/select/textarea | mão dupla; só `$` ou `shared` |
+| `@<evento>="acao"` | elemento | chama `actions.acao` do dono |
+| `@open="id"` `@close` | botão | abre/fecha overlay (seção 6) |
 
-Regras: conteúdo de `<template data-if|else|for|empty>` tem exatamente 1 elemento raiz.
-Caminho inexistente em dev = erro (não vazio silencioso). `!` só em if/show/class.
-Atributos `style` e `on*` inline são proibidos.
-`data-attr-checked` e `data-attr-selected` também ligam a propriedade (vale depois de o usuário mexer).
+Regras: `<template>` com `:if|:else|:for|:empty` tem exatamente 1 elemento raiz. Caminho
+inexistente em dev = erro. `!` só em `:if`, `:show` e `.classe`. `style` e `on*` inline são
+proibidos. `:checked` e `:selected` também ligam a propriedade.
 
-**Dono léxico.** O dono de `data-on-*`, `data-model` e da raiz `state` é quem escreveu o
-elemento: no `.html` de um componente com módulo, o componente; na página, a página. Conteúdo
-de slot pertence a quem o escreveu, não ao componente que o recebe. O build marca cada raiz de
-conteúdo de slot que tenha diretivas com `data-slot="n"` (n = quantos componentes acima está o
-dono); o runtime avalia esse elemento no escopo de fora daquele componente. As diretivas da raiz
-de um componente com módulo pertencem ao componente.
+**Dono léxico.** O dono de `@`, `:model` e `$` é quem escreveu o elemento: no `.html` de um
+componente com módulo, o componente; na página, a página. Conteúdo de slot pertence a quem o
+escreveu. O build marca cada raiz de conteúdo de slot que tenha diretivas com `data-slot="n"`
+(n = quantos componentes acima está o dono); o runtime avalia esse elemento no escopo de fora
+daquele componente. As diretivas da raiz de um componente com módulo pertencem ao componente.
 
 ### Componentes
 
-`lib/components/card/card.html` tem 1 elemento raiz. Uso: `<c-card titulo="X">filhos</c-card>`.
-- Expandido no build (macro). `props.*` vira literal no build.
+`<c-x>` = `lib/components/x/x.html`; `<p-x>` = `_components/x/x.html` da pasta da página ou de uma
+acima, até `routes/`. 1 elemento raiz. Expandido no build (macro).
+- Prop fixa `titulo="X"`: literal no build. Prop dinâmica `:total="caminho"`: avaliada no escopo
+  de quem usa e atualizada a cada render. Dentro: `$titulo`, `$total` (HTML) e `ctx.$` (JS).
+- Prop é só leitura; prop ausente = vazio/falso; prop com nome de chave do estado = erro.
+- Componente com módulo não recebe `$` de quem usa via `:x` (lá dentro `$` é o dele).
 - `<slot></slot>` recebe os filhos; `<slot name="acoes">` recebe filhos com `slot="acoes"`.
-- O build marca a raiz com `data-c="card"`. Se existir `card.js`, ele é carregado só nas
-  páginas que usam o componente, e o build copia as props do `<c-card>` (menos `class` e `id`)
-  para a raiz como `data-<prop>`; o JS as lê em `ctx.props` (strings, nomes como em `dataset`).
-  Valor de runtime para o JS: `data-attr-data-<prop>="caminho"` no `<c-card>`, avaliado no
-  escopo de quem usa e aplicado antes do `state(ctx)`.
-- `data-with-<alias>` com caminho de raiz `state` num componente com módulo = erro (lá dentro
-  `state` é o do componente).
-- Caminhos de runtime dentro do componente resolvem no escopo de quem usa; use
-  `data-with-<alias>` para renomear.
+- O build marca a raiz com `data-c="x"`. `x.js` só carrega nas páginas que usam o componente.
 
 ### DOM de blocos renderizados (cliente e SSR fazem igual)
 
@@ -153,15 +143,16 @@ export const state = ctx => ({
   get total() { return ctx.shared.carrinho.itens.length },
 })
 export const actions = {
-  alternar(ctx) { ctx.state.aberto = !ctx.state.aberto },
+  alternar(ctx) { ctx.$.aberto = !ctx.$.aberto },
   async salvar(ctx) { await ctx.call('salvar', { id: ctx.params.id }) },
 }
 export function mount(ctx) {
-  const t = setInterval(() => ctx.update(s => { s.agora = Date.now() }), 1000)
-  return () => clearInterval(t)
+  const intervalo = setInterval(() => ctx.update(estado => { estado.agora = Date.now() }), 1000)
+  return () => clearInterval(intervalo)
 }
 ```
-`ctx`: `state data shared params query page props event el scope log open close confirm navigate call update`.
+`ctx`: `$ data shared params query page event el scope log open close confirm navigate call update`
+(`$` = estado + props do dono).
 - `state(ctx)` recebe o ctx do dono (sem `event`/`el`/`scope` de evento); `ctx.data` só existe
   depois do load. Valor derivado = getter no objeto de estado ou do store, recalculado a cada
   render.
@@ -182,7 +173,7 @@ export async function load({ params, query, request, env, log }) { return { prod
 export const actions = { async salvar({ input, params, env, log }) { return { ok: true } } }
 export const ssr = false
 ```
-- Padrão sem SSR: o HTML pré-gerado chega com skeleton (`<template data-if="page.loading">`).
+- Padrão sem SSR: o HTML pré-gerado chega com skeleton (`<template :if="page.loading">`).
   O cliente busca `GET /_data/<caminho>?<query>` → `{ "data": ... }` ou `{ "error": { "message" } }`.
 - O build injeta no `<head>` das páginas com loader um script inline mínimo que dispara o
   fetch antes dos módulos: `self.__pd = fetch('/_data' + location.pathname + location.search)`.
@@ -198,9 +189,9 @@ export const ssr = false
 Sempre HTML + JS. Primitiva em `core/overlay.js`; componentes em `lib/components/`.
 - Modal e alert: `<dialog>` com `showModal()`. Alert usa `role="alertdialog"`.
 - Dropdown e popover: atributo `popover` nativo.
-- Abrir: `<button data-open="sobre">`. Fechar: `data-close` dentro do overlay, Esc ou clique
+- Abrir: `<button @open="sobre">`. Fechar: `@close` dentro do overlay, Esc ou clique
   no fundo (modal). Em JS: `ctx.open(id)`, `ctx.close(id)`, `await ctx.confirm(id)` → o
-  `value` do botão `data-close` clicado (`'cancel'` se fechou de outro jeito).
+  `value` do botão `@close` clicado (`'cancel'` se fechou de outro jeito).
 - Voltar (browser ou Android) fecha o overlay do topo, nunca navega: abrir faz `pushState`;
   `popstate` com overlay aberto fecha e para; fechar pela UI consome a entrada com `history.back()`.
 - Modal e alert travam o scroll da página (`html[data-scroll-lock]` com `overflow:hidden`). Se a
@@ -213,10 +204,10 @@ Sempre HTML + JS. Primitiva em `core/overlay.js`; componentes em `lib/components
 
 Uso:
 ```html
-<button data-open="sobre">Sobre</button>
+<button @open="sobre">Sobre</button>
 <c-modal id="sobre" titulo="Sobre o app">
   <p>Conteúdo.</p>
-  <button slot="acoes" data-close value="ok">Fechar</button>
+  <button slot="acoes" @close value="ok">Fechar</button>
 </c-modal>
 ```
 
@@ -272,18 +263,19 @@ dist/
 
 Erros com arquivo:linha:coluna, regra e mensagem.
 - JS (oxc): HTML em JS (seção 0); `console.*`; TS ou JSDoc de tipos (`@type`, `@param {`,
-  `@returns {`, `@typedef`, `@ts-`); import fora do projeto e de `core/`.
-- HTML: diretiva desconhecida; raiz de caminho inválida; `data-for` sem `data-key`;
-  if/for fora de `<template>`; `data-else`/`data-empty` fora de lugar; bloco sem raiz única;
+  `@returns {`, `@typedef`, `@ts-`); import fora do projeto e de `core/`; comentário
+  (`js/comentario`); nome vago (`js/nome-vago`).
+- HTML: sintaxe desconhecida ou antiga; raiz de caminho inválida; `:for` sem `:key`;
+  if/for fora de `<template>`; `:else`/`:empty` fora de lugar; bloco sem raiz única;
   action inexistente no módulo dono; componente não encontrado; `style`/`on*` inline;
   `<script>` em `routes/` e `lib/`.
 - CSS: classe desconhecida; valor arbitrário.
 - Orçamentos (faz build em diretório temporário).
 - Avisos de acessibilidade (`a11y/*`, não bloqueiam; `pragma check --strict` os torna erro),
   sobre a página expandida, apontando o arquivo de origem: `img-alt`, `nome-acessivel` (button
-  ou a sem texto, `data-text`, `aria-label`/`labelledby` ou `title`), `label` (input, select e
+  ou a sem texto, `:text`, `aria-label`/`labelledby` ou `title`), `label` (input, select e
   textarea; `type=hidden|submit|reset|button|image` isentos), `dialog-nome`,
-  `clique-nao-interativo` (`data-on-click` fora de elemento interativo sem `role` e
+  `clique-nao-interativo` (`@click` fora de elemento interativo sem `role` e
   `tabindex`), `heading` (nível pulado), `h1-unico` (ramos if/else contam separados),
   `tabindex` (> 0), `id-duplicado`, `iframe-title`, `a-sem-href`.
 

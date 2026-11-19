@@ -189,6 +189,17 @@ pub fn imports(src: &str) -> Vec<Import> {
     out
 }
 
+pub fn has_module_syntax(src: &str) -> bool {
+    let toks = tokens(src);
+    toks.iter().enumerate().any(|(i, t)| {
+        let word = text(src, t);
+        t.kind == Kind::Ident
+            && (word == "import" || word == "export")
+            && (i == 0 || text(src, &toks[i - 1]) != ".")
+            && toks.get(i + 1).is_some_and(|n| !matches!(text(src, n), "(" | "."))
+    })
+}
+
 /// Nome exportado diretamente: `export [async] function n`, `export const|let|var n`.
 pub fn exports(src: &str) -> Vec<(String, Option<String>)> {
     let toks = tokens(src);

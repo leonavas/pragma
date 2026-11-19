@@ -81,6 +81,25 @@ fn walk(root: &Path, rel: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
+pub fn component_tag(tag: &str) -> Option<(bool, &str)> {
+    tag.strip_prefix("c-").map(|n| (false, n)).or_else(|| tag.strip_prefix("p-").map(|n| (true, n)))
+}
+
+pub fn is_component_tag(tag: &str) -> bool {
+    component_tag(&tag.to_ascii_lowercase()).is_some()
+}
+
+pub fn comment_positions(src: &str, open: &str) -> Vec<(u32, u32)> {
+    src.match_indices(open)
+        .map(|(i, _)| {
+            let head = &src[..i];
+            let line = head.matches('\n').count() as u32 + 1;
+            let col = (i - head.rfind('\n').map_or(0, |n| n + 1)) as u32 + 1;
+            (line, col)
+        })
+        .collect()
+}
+
 pub fn is_component_name(s: &str) -> bool {
     s.starts_with(|c: char| c.is_ascii_lowercase()) && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
@@ -106,12 +125,20 @@ impl Project {
     fn add_html(&mut self, rel: PathBuf) -> u32 {
         let id = self.files.len() as u32;
         let src = self.read(&rel).unwrap_or_default();
-        let (tree, errors) = html::parse(&src, id);
+        let (mut tree, errors) = html::parse(&src, id);
+        let mut sugar_errors = Vec::new();
+        crate::sugar::desugar(&mut tree, &mut sugar_errors);
         self.files.push(rel);
         self.sources.push(src);
         self.trees.push(tree);
         for e in errors {
             self.err_at(e.pos, "html/sintaxe", e.message);
+        }
+        for (pos, message) in sugar_errors {
+            self.err_at(pos, "html/sintaxe-antiga", message);
+        }
+        for (line, col) in comment_positions(&self.sources[id as usize], "<!--") {
+            self.err_at(Pos { file: id, line, col }, "html/comentario", "comentário é proibido; o código é a documentação");
         }
         id
     }
@@ -371,9 +398,12 @@ impl Project {
         }
     }
 
-    pub fn component_search(&self, start: &Path) -> Vec<PathBuf> {
+    pub fn component_search(&self, start: &Path, local: bool) -> Vec<PathBuf> {
+        if !local {
+            return vec![PathBuf::from("lib/components")];
+        }
         let mut out = Vec::new();
-        if start != Path::new("lib/components") {
+        if start.starts_with("routes") {
             for a in start.ancestors() {
                 out.push(a.join("_components"));
                 if a == Path::new("routes") {
@@ -381,12 +411,11 @@ impl Project {
                 }
             }
         }
-        out.push(PathBuf::from("lib/components"));
         out
     }
 
-    pub fn find_component(&self, start: &Path, name: &str) -> Option<&Component> {
-        self.component_search(start).iter().find_map(|d| self.components.get(d).and_then(|m| m.get(name)))
+    pub fn find_component(&self, start: &Path, local: bool, name: &str) -> Option<&Component> {
+        self.component_search(start, local).iter().find_map(|d| self.components.get(d).and_then(|m| m.get(name)))
     }
 
     pub fn all_components(&self) -> impl Iterator<Item = &Component> {

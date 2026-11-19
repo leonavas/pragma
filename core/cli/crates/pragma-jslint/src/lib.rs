@@ -2,15 +2,15 @@
 use oxc_allocator::Allocator;
 use oxc_ast::Comment;
 use oxc_ast::ast::{
-    ComputedMemberExpression, ExportAllDeclaration, ExportFromDeclaration, Expression,
-    IdentifierReference, ImportDeclaration, ImportExpression, ObjectPropertyKind, Program,
+    ArrowFunctionExpression, BindingIdentifier, ComputedMemberExpression, ExportAllDeclaration, ExportFromDeclaration, Expression, FormalParameters,
+    IdentifierReference, ImportDeclaration, ImportExpression, ObjectProperty, ObjectPropertyKind, Program,
     Statement, StaticMemberExpression, StringLiteral, TemplateLiteral,
 };
 use oxc_ast_visit::{Visit, VisitMut, walk, walk_mut};
 use oxc_codegen::{Codegen, CodegenOptions};
 use oxc_minifier::{CompressOptions, MangleOptions, Minifier, MinifierOptions};
 use oxc_parser::{Parser, ParserReturn};
-use oxc_span::{SourceType, Span};
+use oxc_span::{GetSpan, SourceType, Span};
 use oxc_syntax::module_record::ExportExportName;
 use pragma_diag::Diagnostic;
 use std::path::{Component, Path};
@@ -24,6 +24,24 @@ pub const RULE_HTML: &str = "js/html-em-js";
 pub const RULE_CONSOLE: &str = "js/console";
 pub const RULE_JSDOC: &str = "js/jsdoc-tipos";
 pub const RULE_IMPORT: &str = "js/import";
+pub const RULE_COMMENT: &str = "js/comentario";
+pub const RULE_NAME: &str = "js/nome-vago";
+pub const RULE_CTX: &str = "js/ctx";
+
+const SHORT_OK: &[&str] = &["$", "i", "j", "k", "id", "ok", "el", "ctx", "url", "log"];
+const VAGUE: &[&str] = &[
+    "tmp", "temp", "aux", "foo", "bar", "baz", "qux", "obj", "arr", "val", "res", "ret", "fn", "func", "cb",
+    "data", "dado", "dados", "info", "stuff", "thing", "things", "coisa", "coisas", "algo", "teste", "test",
+    "handle", "handler", "helper", "util", "utils", "misc", "doit", "fazer", "processar", "process",
+];
+const DIGIT_OK: &[&str] = &["base64", "sha1", "sha256", "md5", "utf8", "i18n"];
+
+fn vague_name(name: &str, short_ok: bool) -> bool {
+    let lower = name.to_ascii_lowercase();
+    VAGUE.contains(&lower.as_str())
+        || (lower.ends_with(|c: char| c.is_ascii_digit()) && !DIGIT_OK.contains(&lower.as_str()))
+        || (!short_ok && name.chars().count() < 3 && !SHORT_OK.contains(&name))
+}
 
 fn parse<'a>(allocator: &'a Allocator, source: &'a str) -> ParserReturn<'a> {
     Parser::new(allocator, source, SourceType::mjs()).parse()
@@ -46,6 +64,8 @@ pub fn lint(path: &Path, source: &str, ctx: &LintContext) -> Vec<Diagnostic> {
     let mut linter = Linter {
         ctx,
         server: is_server_file(path, ctx),
+        short_ok: false,
+        concise_arrow: false,
         found: &mut found,
     };
     linter.visit_program(&ret.program);
@@ -86,10 +106,18 @@ fn is_server_file(path: &Path, ctx: &LintContext) -> bool {
 struct Linter<'c> {
     ctx: &'c LintContext,
     server: bool,
+    short_ok: bool,
+    concise_arrow: bool,
     found: &'c mut Vec<(u32, &'static str, String)>,
 }
 
 impl Linter<'_> {
+    fn check_name(&mut self, name: &str, span: Span) {
+        if !self.ctx.is_core && vague_name(name, self.short_ok) {
+            self.report(span, RULE_NAME, format!("nome `{name}` não diz o que é nem o que faz; use um nome que se explique (ex.: `produto`, `totalItens`, `adicionarAoCarrinho`)"));
+        }
+    }
+
     fn report(&mut self, span: Span, rule: &'static str, message: String) {
         self.found.push((span.start, rule, message));
     }
@@ -116,6 +144,11 @@ impl Linter<'_> {
                 RULE_HTML,
                 format!("`{name}` só é permitido no runtime (core/); a marcação vive no .html"),
             ),
+            "state" | "props" if object_name == Some("ctx") && !self.ctx.is_core => self.report(
+                span,
+                RULE_CTX,
+                format!("`ctx.{name}` não existe; use `ctx.$` (estado e props)"),
+            ),
             "console" if matches!(object_name, Some("globalThis" | "window" | "self")) => {
                 self.report(span, RULE_CONSOLE, console_message());
             }
@@ -123,7 +156,7 @@ impl Linter<'_> {
         }
     }
 
-    fn check_specifier(&mut self, specifier: &str, span: Span) {
+    fn check_specifier(&mut self, specifier: &str, span: Span, literal: bool) {
         if specifier.starts_with("./")
             || specifier.starts_with("../")
             || specifier.starts_with("/core/")
@@ -139,13 +172,43 @@ impl Linter<'_> {
             || specifier.starts_with("https:")
             || specifier.starts_with("//")
         {
-            format!("import remoto `{specifier}` é proibido; copie o código para o projeto")
+            format!("import remoto `{specifier}` é proibido; instale o pacote (npm i, bun add) ou copie o código para o projeto")
+        } else if is_package(specifier) {
+            if literal {
+                return;
+            }
+            format!("import de pacote `{specifier}` deve usar aspas, não template literal")
         } else {
             format!(
-                "import `{specifier}` é proibido; use caminho relativo (./, ../) ou /core/ (sem pacotes npm)"
+                "import `{specifier}` é proibido; use caminho relativo (./, ../), /core/ ou um pacote do package.json"
             )
         };
         self.report(span, RULE_IMPORT, message);
+    }
+}
+
+pub fn is_package(specifier: &str) -> bool {
+    let name = package_name(specifier);
+    !name.is_empty()
+        && !specifier.starts_with('.')
+        && !specifier.starts_with('/')
+        && !name.contains(':')
+        && name
+            .trim_start_matches('@')
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/'))
+}
+
+pub fn package_name(specifier: &str) -> &str {
+    let mut parts = specifier.splitn(3, '/');
+    let first = parts.next().unwrap_or_default();
+    if first.starts_with('@') {
+        match parts.next() {
+            Some(second) if !second.is_empty() => &specifier[..first.len() + 1 + second.len()],
+            _ => "",
+        }
+    } else {
+        first
     }
 }
 
@@ -154,6 +217,30 @@ fn console_message() -> String {
 }
 
 impl<'a> Visit<'a> for Linter<'_> {
+    fn visit_binding_identifier(&mut self, it: &BindingIdentifier<'a>) {
+        self.check_name(it.name.as_str(), it.span);
+    }
+
+    fn visit_arrow_function_expression(&mut self, it: &ArrowFunctionExpression<'a>) {
+        self.concise_arrow = it.is_expression();
+        walk::walk_arrow_function_expression(self, it);
+    }
+
+    fn visit_formal_parameters(&mut self, it: &FormalParameters<'a>) {
+        let outer = self.short_ok;
+        self.short_ok = std::mem::take(&mut self.concise_arrow);
+        walk::walk_formal_parameters(self, it);
+        self.short_ok = outer;
+    }
+
+    fn visit_object_property(&mut self, it: &ObjectProperty<'a>) {
+        let is_function = it.method || matches!(it.value, Expression::FunctionExpression(_) | Expression::ArrowFunctionExpression(_));
+        if is_function && let Some(name) = it.key.static_name().and_then(|n| n.as_str().map(str::to_string)) {
+            self.check_name(&name, it.key.span());
+        }
+        walk::walk_object_property(self, it);
+    }
+
     fn visit_static_member_expression(&mut self, it: &StaticMemberExpression<'a>) {
         self.check_member(it.property.name.as_str(), it.property.span, &it.object);
         walk::walk_static_member_expression(self, it);
@@ -196,24 +283,24 @@ impl<'a> Visit<'a> for Linter<'_> {
     }
 
     fn visit_import_declaration(&mut self, it: &ImportDeclaration<'a>) {
-        self.check_specifier(it.source.value.as_str().unwrap_or_default(), it.source.span);
+        self.check_specifier(it.source.value.as_str().unwrap_or_default(), it.source.span, true);
     }
 
     fn visit_export_all_declaration(&mut self, it: &ExportAllDeclaration<'a>) {
-        self.check_specifier(it.source.value.as_str().unwrap_or_default(), it.source.span);
+        self.check_specifier(it.source.value.as_str().unwrap_or_default(), it.source.span, true);
     }
 
     fn visit_export_from_declaration(&mut self, it: &ExportFromDeclaration<'a>) {
-        self.check_specifier(it.source.value.as_str().unwrap_or_default(), it.source.span);
+        self.check_specifier(it.source.value.as_str().unwrap_or_default(), it.source.span, true);
     }
 
     fn visit_import_expression(&mut self, it: &ImportExpression<'a>) {
         match &it.source {
             Expression::StringLiteral(lit) => {
-                self.check_specifier(lit.value.as_str().unwrap_or_default(), lit.span);
+                self.check_specifier(lit.value.as_str().unwrap_or_default(), lit.span, true);
             }
             Expression::TemplateLiteral(t) if t.expressions.is_empty() => {
-                self.check_specifier(t.quasis[0].value.raw.as_str(), t.span);
+                self.check_specifier(t.quasis[0].value.raw.as_str(), t.span, false);
             }
             _ => {}
         }
@@ -276,6 +363,7 @@ fn check_comment(source: &str, comment: &Comment, found: &mut Vec<(u32, &'static
     let span = comment.content_span();
     let text = &source[span.start as usize..span.end as usize];
     let b = text.as_bytes();
+    let before = found.len();
     for (i, _) in text.match_indices('@') {
         if i > 0 && (b[i - 1].is_ascii_alphanumeric() || matches!(b[i - 1], b'_' | b'.' | b'-')) {
             continue;
@@ -297,6 +385,13 @@ fn check_comment(source: &str, comment: &Comment, found: &mut Vec<(u32, &'static
             ));
         }
     }
+    if found.len() == before {
+        found.push((comment.span.start, RULE_COMMENT, comment_message()));
+    }
+}
+
+fn comment_message() -> String {
+    "comentário é proibido; o código é a documentação: nomes claros e funções pequenas".to_string()
 }
 
 struct LineIndex {

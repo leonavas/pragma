@@ -1,12 +1,12 @@
 <div class="flex items-center justify-between gap-2">
   <div class="inline-flex items-center gap-1" role="group" aria-label="Quantidade">
-    <button type="button" class="btn btn-icone" data-on-click="menos" data-attr-disabled="state.semMenos">
+    <button type="button" class="btn btn-icone" @click="menos" :disabled="$semMenos">
       <span aria-hidden="true">−</span><span class="sr-only">Diminuir quantidade</span>
     </button>
-    <output class="w-8 text-center tabular-nums" data-text="state.qtd">1</output>
-    <button type="button" class="btn btn-icone" data-on-click="mais" data-attr-disabled="state.semMais">
+    <output class="w-8 text-center tabular-nums" :text="$qtd">1</output>
+    <button type="button" class="btn btn-icone" @click="mais" :disabled="$semMais">
       <span aria-hidden="true">+</span><span class="sr-only">Aumentar quantidade</span>
     </button>
   </div>
-  <button type="button" class="btn btn-primary" data-on-click="adicionar" data-attr-disabled="state.esgotado">Adicionar</button>
+  <button type="button" class="btn btn-primary" @click="adicionar" :disabled="$esgotado">Adicionar</button>
 </div>

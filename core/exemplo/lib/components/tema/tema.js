@@ -8,7 +8,7 @@ export const state = () => ({
 
 export const actions = {
   alternar(ctx) {
-    ctx.state.escuro = !ctx.state.escuro
-    setTheme(ctx.state.escuro ? 'dark' : 'light')
+    ctx.$.escuro = !ctx.$.escuro
+    setTheme(ctx.$.escuro ? 'dark' : 'light')
   },
 }

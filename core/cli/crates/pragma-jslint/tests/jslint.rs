@@ -25,8 +25,8 @@ fn rules(src: &str) -> Vec<&'static str> {
 fn codigo_limpo_sem_diagnosticos() {
     let src = "import { store } from '/core/state.js'\nimport { fmt } from '../utils/fmt.js'\n\
                export const state = () => ({ n: 0 })\n\
-               export const actions = { inc(ctx) { ctx.state.n++ } }\n\
-               const s = 'a < b e c>d'\nconst t = `x ${s} < y`\n";
+               export const actions = { inc(ctx) { ctx.$.n++ } }\n\
+               const sinal = 'a < b e c>d'\nconst texto = `x ${sinal} < y`\n";
     assert_eq!(app(src), vec![]);
 }
 
@@ -34,7 +34,7 @@ fn codigo_limpo_sem_diagnosticos() {
 fn inner_html_e_outer_html() {
     assert_eq!(app("el.innerHTML = x"), vec![(1, 4, "js/html-em-js")]);
     assert_eq!(
-        app("const a = 1\n  el['outerHTML'] = x"),
+        app("const total = 1\n  el['outerHTML'] = x"),
         vec![(2, 6, "js/html-em-js")]
     );
     assert_eq!(app("el.textContent = x"), vec![]);
@@ -57,30 +57,30 @@ fn insert_adjacent_html_document_write_e_domparser() {
 #[test]
 fn string_e_template_com_markup() {
     assert_eq!(
-        app("const a = '<div class=\"x\">'"),
-        vec![(1, 11, "js/html-em-js")]
+        app("const marca = '<div class=\"x\">'"),
+        vec![(1, 15, "js/html-em-js")]
     );
-    assert_eq!(app("const a = \"fim</p>\""), vec![(1, 11, "js/html-em-js")]);
+    assert_eq!(app("const marca = \"fim</p>\""), vec![(1, 15, "js/html-em-js")]);
     assert_eq!(
-        app("const a = `\n  <li>${x}</li>`"),
-        vec![(1, 12, "js/html-em-js")]
-    );
-    assert_eq!(
-        app("const a = '<!-- c -->'"),
-        vec![(1, 11, "js/html-em-js")]
+        app("const marca = `\n  <li>${x}</li>`"),
+        vec![(1, 16, "js/html-em-js")]
     );
     assert_eq!(
-        app("const a = 'a<b', b = '1 < 2', c = '<=', d = `<${x}>`"),
+        app("const marca = '<!-- c -->'"),
+        vec![(1, 15, "js/html-em-js")]
+    );
+    assert_eq!(
+        app("const menor = 'a<b', conta = '1 < 2', simbolo = '<=', molde = `<${x}>`"),
         vec![]
     );
 }
 
 #[test]
 fn create_element_so_no_core() {
-    let src = "const li = document.createElement('li')\nli.append(document.createTextNode(x))";
+    let src = "const item = document.createElement('li')\nitem.append(document.createTextNode(x))";
     assert_eq!(
         app(src),
-        vec![(1, 21, "js/html-em-js"), (2, 20, "js/html-em-js")]
+        vec![(1, 23, "js/html-em-js"), (2, 22, "js/html-em-js")]
     );
     assert_eq!(diags("core/runtime/directives.js", src, &CORE), vec![]);
 }
@@ -113,10 +113,10 @@ fn typescript_e_erro_de_sintaxe() {
     assert!(rules("interface A { x: string }").contains(&"js/sintaxe"));
     assert!(rules("const a = b as string").contains(&"js/sintaxe"));
     assert!(rules("enum Cor { A }").contains(&"js/sintaxe"));
-    let d = app("const a = 1\nconst b = (\n");
+    let d = app("const total = 1\nconst soma = (\n");
     assert_eq!(d.len(), 1);
     assert_eq!(d[0].0, 3);
-    assert_eq!(app("const a = 1"), vec![]);
+    assert_eq!(app("const total = 1"), vec![]);
 }
 
 #[test]
@@ -127,38 +127,38 @@ fn jsx_nao_e_js_puro() {
 #[test]
 fn jsdoc_de_tipos() {
     assert_eq!(
-        app("/** @type {number} */\nlet a = 1"),
+        app("/** @type {number} */\nlet total = 1"),
         vec![(1, 5, "js/jsdoc-tipos")]
     );
     assert_eq!(
-        app("/**\n * Soma.\n * @param {number} a\n */\nfunction f(a) {}"),
+        app("/**\n * Soma.\n * @param {number} parcela\n */\nfunction somar(parcela) {}"),
         vec![(3, 4, "js/jsdoc-tipos")]
     );
     assert_eq!(
-        rules("/** @returns {string} */\nfunction f() {}"),
+        rules("/** @returns {string} */\nfunction rotulo() {}"),
         vec!["js/jsdoc-tipos"]
     );
     assert_eq!(
-        rules("/** @return {string} */\nfunction f() {}"),
+        rules("/** @return {string} */\nfunction rotulo() {}"),
         vec!["js/jsdoc-tipos"]
     );
     assert_eq!(rules("/** @typedef {Object} X */"), vec!["js/jsdoc-tipos"]);
     assert_eq!(rules("/** @template T */"), vec!["js/jsdoc-tipos"]);
     assert_eq!(
-        app("let a = 1 // @ts-ignore"),
-        vec![(1, 14, "js/jsdoc-tipos")]
+        app("let total = 1 // @ts-ignore"),
+        vec![(1, 18, "js/jsdoc-tipos")]
     );
     assert_eq!(rules("// @ts-check"), vec!["js/jsdoc-tipos"]);
 }
 
 #[test]
-fn jsdoc_sem_tipos_e_permitido() {
+fn comentario_e_proibido() {
     assert_eq!(
-        app("/**\n * @param ctx contexto da action\n * @returns nada\n */\nfunction f(ctx) {}"),
-        vec![]
+        rules("/**\n * @param ctx contexto da action\n * @returns nada\n */\nfunction salvar(ctx) {}"),
+        vec!["js/comentario"]
     );
-    assert_eq!(app("// ver @types/node e @typescript"), vec![]);
-    assert_eq!(app("// contato: fulano@type.com"), vec![]);
+    assert_eq!(rules("// ver @types/node e @typescript"), vec!["js/comentario"]);
+    assert_eq!(rules("const total = 1 /* x */"), vec!["js/comentario"]);
 }
 
 #[test]
@@ -170,7 +170,6 @@ fn imports_permitidos() {
 
 #[test]
 fn imports_proibidos() {
-    assert_eq!(app("import x from 'lodash'"), vec![(1, 15, "js/import")]);
     assert_eq!(
         app("import x from 'https://esm.sh/x'"),
         vec![(1, 15, "js/import")]
@@ -181,16 +180,22 @@ fn imports_proibidos() {
     );
     assert_eq!(app("import fs from 'node:fs'"), vec![(1, 16, "js/import")]);
     assert_eq!(app("import x from '/lib/x.js'"), vec![(1, 15, "js/import")]);
-    assert_eq!(app("export * from 'pkg'"), vec![(1, 15, "js/import")]);
-    assert_eq!(app("export { a } from 'pkg'"), vec![(1, 19, "js/import")]);
     assert_eq!(
-        app("const m = await import('pkg')"),
-        vec![(1, 24, "js/import")]
+        app("const modulo = await import(`pkg`)"),
+        vec![(1, 29, "js/import")]
     );
-    assert_eq!(
-        app("const m = await import(`pkg`)"),
-        vec![(1, 24, "js/import")]
-    );
+}
+
+#[test]
+fn pacotes_npm_permitidos() {
+    assert_eq!(app("import dayjs from 'dayjs'"), vec![]);
+    assert_eq!(app("import { debounce } from 'lodash-es'"), vec![]);
+    assert_eq!(app("import utc from '@scope/pkg/sub.js'"), vec![]);
+    assert_eq!(app("export * from 'pkg'"), vec![]);
+    assert_eq!(app("export { debounce } from 'pkg'"), vec![]);
+    assert_eq!(app("const modulo = await import('pkg')"), vec![]);
+    assert_eq!(pragma_jslint::package_name("@scope/pkg/sub.js"), "@scope/pkg");
+    assert_eq!(pragma_jslint::package_name("dayjs/plugin/utc.js"), "dayjs");
 }
 
 #[test]
@@ -208,16 +213,16 @@ fn node_so_no_servidor() {
         vec![(1, 26, "js/import")]
     );
     assert_eq!(
-        diags("routes/loja/[id].server.js", "import x from 'pg'", &APP),
-        vec![(1, 15, "js/import")]
+        diags("routes/loja/[id].server.js", "import postgres from 'pg'", &APP),
+        vec![]
     );
 }
 
 #[test]
 fn coluna_conta_caracteres_e_nao_bytes() {
     assert_eq!(
-        app("const é = 'ção'; el.innerHTML = é"),
-        vec![(1, 21, "js/html-em-js")]
+        app("const cédula = 'ção'; el.innerHTML = cédula"),
+        vec![(1, 26, "js/html-em-js")]
     );
 }
 
@@ -274,7 +279,7 @@ fn minify_preserva_exports_e_imports() {
     let src = "import { store } from '/core/state.js'\nimport './efeito.js'\n\
                import { formatar as fmt } from \"../utils/fmt.js\"\n\
                export const state = () => ({ aberto: false, total: store.x })\n\
-               export const actions = {\n  alternar(ctx) { ctx.state.aberto = !ctx.state.aberto },\n  \
+               export const actions = {\n  alternar(ctx) { ctx.$.aberto = !ctx.$.aberto },\n  \
                async salvar(ctx) { await ctx.call('salvar', { id: fmt(ctx.params.id) }) },\n}\n\
                export function mount(ctx) {\n  const intervalo = setInterval(() => ctx.update(s => { s.agora = Date.now() }), 1000)\n  \
                return () => clearInterval(intervalo)\n}\nexport { mount as montar }\n\
@@ -293,7 +298,11 @@ fn minify_preserva_exports_e_imports() {
     assert_eq!(exported_names(&out), exported_names(src), "{out}");
     assert_eq!(exported_actions(&out), vec!["alternar", "salvar"]);
     assert!(!out.contains("intervalo"), "deveria renomear locais: {out}");
-    assert_eq!(lint(Path::new("x.js"), &out, &APP), vec![]);
+    let diagnosticos: Vec<_> = lint(Path::new("x.js"), &out, &APP)
+        .into_iter()
+        .filter(|d| d.rule != pragma_jslint::RULE_NAME)
+        .collect();
+    assert_eq!(diagnosticos, vec![]);
 }
 
 #[test]

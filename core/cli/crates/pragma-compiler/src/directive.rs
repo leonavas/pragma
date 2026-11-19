@@ -22,7 +22,7 @@ pub enum Dir<'a> {
     Generated,
 }
 
-pub const ROOTS: &[&str] = &["data", "state", "shared", "params", "query", "page", "props"];
+pub const ROOTS: &[&str] = &["data", "state", "shared", "params", "query", "page", "props", "$"];
 
 /// `None`: não é `data-*`. `Some(None)`: diretiva desconhecida.
 pub fn parse(name: &str) -> Option<Option<Dir<'_>>> {

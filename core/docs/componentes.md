@@ -1,110 +1,83 @@
 # Componentes
 
-Reaproveite. Antes de escrever marcação nova, procure em `lib/components/` e
-`routes/<pasta>/_components/`. Referência: `exemplo/lib/components/` (`contador`, `indicador`,
-`abas`) e `exemplo/routes/loja/_components/comprar/`.
+Procure em `lib/components/` e `_components/` antes de criar.
 
-## Quando criar
+| Tag | Pasta | Quando |
+|---|---|---|
+| `<c-nome>` | `lib/components/nome/` | usado em mais de uma pasta de rotas |
+| `<p-nome>` | `_components/nome/` da pasta da página ou acima | usado só naquela pasta |
 
-- Usado em 2+ lugares, ou é uma unidade com nome claro (card, item, contador): componente.
-- Usado só numa pasta de rotas: `routes/<pasta>/_components/<nome>/`.
-- Usado em mais de uma pasta: `lib/components/<nome>/`.
-- Resolução de `<c-nome>`: primeiro `_components/` da rota, depois `lib/components/`.
-
-## Arquivos
+Promover: mova a pasta para `lib/components/` e troque `p-` por `c-`.
 
 ```
-lib/components/contador/
-  contador.html   obrigatório, 1 elemento raiz (não <template>, <slot> nem <c-x>)
-  contador.js     opcional: state, actions, mount
-  contador.css    opcional, escopo [data-c="contador"]
+nome/
+  nome.html   obrigatório, 1 elemento raiz (não <template>, <slot> nem componente)
+  nome.js     opcional: state, actions, mount
+  nome.css    opcional, escopo [data-c="nome"]
 ```
 
-## Exemplo canônico: com `.js` e props
+## Props
+
+| Quem usa escreve | Dentro do componente |
+|---|---|
+| `titulo="Oi"` (fixa) | `$titulo` no HTML, `ctx.$.titulo` no JS |
+| `:total="$total"` (dinâmica, atualiza sozinha) | `$total`, `ctx.$.total` |
+
+- Prop é só leitura. Prop ausente = vazio e falso. Prop com nome de chave do estado = erro.
+- Componente com `.js` não recebe `$` de quem usa: passe `data`, `shared` ou item do `:for`,
+  ou use um store.
+- `class` soma às classes da raiz. `id` é prop: aplique com `:id="$id"`.
+
+## Exemplo
 
 `lib/components/contador/contador.html`:
 ```html
-<div class="inline-flex items-center gap-2" role="group" data-attr-aria-label="props.rotulo">
-  <span class="text-sm text-muted" data-text="props.rotulo"></span>
-  <button type="button" class="btn" aria-label="Diminuir" data-on-click="menos" data-attr-disabled="state.semMenos">−</button>
-  <output class="w-8 text-center tabular-nums" data-text="state.n"></output>
-  <button type="button" class="btn" aria-label="Aumentar" data-on-click="mais">+</button>
+<div class="inline-flex items-center gap-2" role="group" :aria-label="$rotulo">
+  <span class="text-sm text-muted" :text="$rotulo"></span>
+  <button type="button" class="btn" aria-label="Diminuir" @click="menos" :disabled="$semMenos">−</button>
+  <output class="w-8 text-center tabular-nums" :text="$quantidade"></output>
+  <button type="button" class="btn" aria-label="Aumentar" @click="mais">+</button>
 </div>
 ```
 
 `contador.js`:
 ```js
-export const state = ({ props }) => ({
-  n: Number(props.inicial || 0),
-  get passo() { return Number(props.passo || 1) },
-  get semMenos() { return this.n - this.passo < 0 },
+export const state = ctx => ({
+  quantidade: Number(ctx.$.inicial || 0),
+  get passo() { return Number(ctx.$.passo || 1) },
+  get semMenos() { return this.quantidade - this.passo < 0 },
 })
 
 export const actions = {
-  menos(ctx) { ctx.state.n -= ctx.state.passo },
-  mais(ctx) { ctx.state.n += ctx.state.passo },
+  menos(ctx) { ctx.$.quantidade -= ctx.$.passo },
+  mais(ctx) { ctx.$.quantidade += ctx.$.passo },
 }
-```
-
-Uso: `<c-contador rotulo="Pulos de 5" inicial="10" passo="5"></c-contador>`
-
-## Exemplo canônico: dados de runtime e slots
-
-`lib/components/indicador/indicador.html` (sem `.js`):
-```html
-<article class="card flex flex-col gap-1" data-attr-data-tom="tom">
-  <h3 class="text-sm text-muted" data-text="props.titulo"></h3>
-  <p class="text-2xl font-semibold" data-text="valor"></p>
-  <slot></slot>
-</article>
 ```
 
 Uso:
 ```html
-<c-indicador titulo="Pendentes" data-with-valor="shared.tarefas.pendentes" data-with-tom="state.tom">
-  <a href="/tarefas">Ver tarefas</a>
-</c-indicador>
+<c-contador rotulo="Pulos de 5" inicial="10" passo="5"></c-contador>
+<template :for="p in data.produtos" :key="p.id">
+  <p-produto-card :produto="p"></p-produto-card>
+</template>
 ```
 
-Valor de runtime para um componente com `.js` (`exemplo/routes/loja/_components/produto-card/`):
+## Slots
+
 ```html
-<c-comprar data-attr-data-id="p.id" data-attr-data-estoque="p.estoque"></c-comprar>
+<c-modal id="sobre" titulo="Sobre">
+  <p>Corpo vai no slot padrão.</p>
+  <button slot="acoes" type="button" class="btn" @close>Fechar</button>
+</c-modal>
 ```
-No `comprar.js`: `ctx.props.id`, `Number(ctx.props.estoque)`.
 
-## Props
-
-- Prop = atributo do `<c-x>`. Sempre texto. `props.nome` vira literal no build.
-- Prop ausente = vazio e falso: `<template data-if="props.dica">` some no build.
-- Componente com `.js`: o build copia as props (menos `class` e `id`) para a raiz como
-  `data-<prop>`; o JS lê `ctx.props.<prop>` (strings; `max-itens` → `ctx.props.maxItens`),
-  também no `state(ctx)`.
-- Valor de runtime para o JS: `data-attr-data-<prop>="caminho"` no `<c-x>`, avaliado no escopo
-  de quem usa, antes do `state(ctx)`. Caminho de `data`, `shared` ou variável do `data-for`.
-- `class` no `<c-x>` soma às classes da raiz. `id` é prop: o componente o aplica
-  (`data-attr-id="props.id"`).
+- `<slot></slot>` recebe os filhos; `<slot name="acoes">` recebe `slot="acoes"`. Slot inexistente = erro.
+- Conteúdo de slot é de quem o escreveu: `$` e `@` dele.
 
 ## Regras
 
-- Dados de runtime para o HTML: alias no componente, `data-with-<alias>="caminho"` em quem usa.
-- Caminhos de runtime dentro do componente resolvem no escopo de quem usa.
-- `data-with-<alias>="state.x"` em componente com `.js` = erro: lá dentro `state` é o do
-  componente. Use `data-attr-data-*` ou um store.
-- `<slot></slot>` recebe os filhos; `<slot name="acoes">` recebe filhos com `slot="acoes"`.
-  Filho para slot inexistente = erro.
-- Conteúdo de slot é de quem o escreveu: suas actions e `state` são da página (ver
-  `diretivas.md`, dono léxico).
-- `state` de componente é por instância.
-- `data-on-*` no `.html` de componente sem `.js` chama a action de quem usa.
-- O build marca a raiz com `data-c="<nome>"`. O CSS do componente usa esse escopo.
-- O `.js` do componente só é baixado nas páginas que o usam.
-- Componente não tem `.server.js`; dados vêm do `load` da página.
-
-## Não faça
-
-- Não copie e cole marcação repetida entre páginas: extraia componente.
-- Não crie componente de uma linha só para envolver uma classe; use classe custom (ver `css.md`).
-- Não use custom elements (`customElements.define`) nem shadow DOM.
-- Não leia nem mude o estado de um componente filho pela página: o pai passa props, o filho
-  muda store ou chama action própria.
-- Não escreva overlays do zero: use `c-modal`, `c-alert`, `c-dropdown` (ver `overlays.md`).
+- Componente sem `.js`: `@` chama a action de quem usa.
+- Estado de componente é por instância. O `.js` só baixa nas páginas que o usam.
+- Sem `.server.js`: dados vêm do `load` da página.
+- Não leia nem mude o estado de um filho: passe props; o filho muda store ou chama action própria.
+- Sem `customElements.define` e sem shadow DOM. Overlay: use `c-modal`, `c-alert`, `c-dropdown`.

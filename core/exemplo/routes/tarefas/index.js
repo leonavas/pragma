@@ -28,29 +28,29 @@ export const state = ({ query, shared }) => ({
 
 export const actions = {
   adicionar(ctx) {
-    const titulo = ctx.state.nova.trim()
-    ctx.state.erro = validar(ctx.shared.tarefas, titulo)
-    if (ctx.state.erro) return
+    const titulo = ctx.$.nova.trim()
+    ctx.$.erro = validar(ctx.shared.tarefas, titulo)
+    if (ctx.$.erro) return
     ctx.shared.tarefas.adicionar(titulo)
-    ctx.state.nova = ''
+    ctx.$.nova = ''
     ctx.el.elements.titulo.focus()
   },
   alternar(ctx) {
-    const t = ctx.shared.tarefas.achar(ctx.scope.t.id)
-    t.feita = !t.feita
+    const tarefa = ctx.shared.tarefas.achar(ctx.scope.t.id)
+    tarefa.feita = !tarefa.feita
   },
   remover(ctx) { ctx.shared.tarefas.remover(ctx.scope.t.id) },
   editar(ctx) {
-    ctx.state.editando = ctx.scope.t.id
-    ctx.state.rascunho = ctx.scope.t.titulo
+    ctx.$.editando = ctx.scope.t.id
+    ctx.$.rascunho = ctx.scope.t.titulo
   },
   teclaEdicao(ctx) {
-    if (ctx.event.key === 'Escape') ctx.state.editando = null
+    if (ctx.event.key === 'Escape') ctx.$.editando = null
     if (ctx.event.key === 'Enter') salvar(ctx)
   },
   salvarEdicao(ctx) { salvar(ctx) },
   concluirTodas(ctx) {
-    for (const t of ctx.shared.tarefas.itens) t.feita = true
+    for (const tarefa of ctx.shared.tarefas.itens) tarefa.feita = true
   },
   async limpar(ctx) {
     if (await ctx.confirm('limpar-concluidas') !== 'ok') return
@@ -60,8 +60,8 @@ export const actions = {
 }
 
 function salvar(ctx) {
-  const id = ctx.state.editando, titulo = ctx.state.rascunho.trim()
+  const id = ctx.$.editando, titulo = ctx.$.rascunho.trim()
   if (!id) return
-  ctx.state.editando = null
+  ctx.$.editando = null
   if (!validar(ctx.shared.tarefas, titulo, id)) ctx.shared.tarefas.achar(id).titulo = titulo
 }

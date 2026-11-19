@@ -1,7 +1,7 @@
-<div class="card p-4" data-class-destaque="props.destaque">
-  <h2 class="text-lg" data-text="props.titulo">Título</h2>
-  <template data-if="props.destaque"><span class="badge">★</span></template>
-  <template data-else><span>-</span></template>
+<div class="card p-4" .destaque="$destaque">
+  <h2 class="text-lg" :text="$titulo">Título</h2>
+  <template :if="$destaque"><span class="badge">★</span></template>
+  <template :else><span>-</span></template>
   <slot></slot>
-  <footer><button class="btn" data-on-click="comprar">Comprar</button><slot name="acoes"><small>sem ações</small></slot></footer>
+  <footer><button class="btn" @click="comprar">Comprar</button><slot name="acoes"><small>sem ações</small></slot></footer>
 </div>

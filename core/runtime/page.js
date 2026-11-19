@@ -36,15 +36,20 @@ function flush() {
 function owner(el, mod) {
   const o = { el, mod }
   o.ctx = {
-    el, props: el.dataset, shared, log, open, close, confirm, navigate,
+    el, shared, log, open, close, confirm, navigate,
     get data() { return cur.data },
     get params() { return cur.params },
     get query() { return cur.query },
     get page() { return cur.page },
     call: (name, data) => call(cur.url, name, data),
     update(fn) { fn(o.state); schedule() },
+    $: new Proxy({}, {
+      get: (_, key) => o.state && key in o.state ? o.state[key] : el.dataset[key],
+      set: (_, key, value) => (o.state[key] = value, true),
+      has: (_, key) => (o.state && key in o.state) || key in el.dataset,
+    }),
   }
-  o.ctx.state = o.state = mod.state?.(o.ctx) ?? {}
+  o.state = mod.state?.(o.ctx) ?? {}
   mounted.add(o)
   mounts.push(o)
   return (el[C] = o)

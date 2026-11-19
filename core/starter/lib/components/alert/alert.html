@@ -1,5 +1,5 @@
-<dialog class="dialog" role="alertdialog" data-attr-id="props.id" data-attr-aria-label="props.titulo">
-  <h2 class="text-lg font-semibold" data-text="props.titulo"></h2>
+<dialog class="dialog" role="alertdialog" :id="$id" :aria-label="$titulo">
+  <h2 class="text-lg font-semibold" :text="$titulo"></h2>
   <div class="mt-2 text-sm text-muted"><slot></slot></div>
   <footer class="mt-6 flex justify-end gap-2"><slot name="acoes"></slot></footer>
 </dialog>

@@ -184,7 +184,7 @@ fn hash_follows_dependencies() {
     };
     let a = t.0.join("a");
     build(&BuildOptions { root: root.clone(), out_dir: a.clone(), mode: Mode::Prod }).unwrap();
-    fs::write(root.join("utils/fmt.js"), "export function formatar(n) {\n  return `R$ ${n}`\n}\n").unwrap();
+    fs::write(root.join("utils/fmt.js"), "export function formatar(valor) {\n  return `R$ ${valor}`\n}\n").unwrap();
     let b = t.0.join("b");
     build(&BuildOptions { root: root.clone(), out_dir: b.clone(), mode: Mode::Prod }).unwrap();
     let (na, nb) = (names(&a), names(&b));
@@ -261,111 +261,111 @@ fn unknown_directive() {
 
 #[test]
 fn invalid_path() {
-    expect(&page("<p data-text=\"state.itens[0]\"></p>"), "html/caminho-invalido", PAGE, 1);
+    expect(&page("<p :text=\"$itens[0]\"></p>"), "html/caminho-invalido", PAGE, 1);
 }
 
 #[test]
 fn negation_only_where_allowed() {
-    expect(&page("<p data-text=\"!state.aberto\"></p>"), "html/caminho-invalido", PAGE, 1);
+    expect(&page("<p :text=\"!$aberto\"></p>"), "html/caminho-invalido", PAGE, 1);
 }
 
 #[test]
 fn unknown_root() {
-    expect(&page("<p data-text=\"usuario.nome\"></p>"), "html/raiz-invalida", PAGE, 1);
+    expect(&page("<p :text=\"usuario.nome\"></p>"), "html/raiz-invalida", PAGE, 1);
 }
 
 #[test]
 fn for_variable_out_of_scope() {
-    let src = "<ul><template data-for=\"x in state.itens\" data-key=\"x.id\"><li data-text=\"x.nome\"></li></template></ul>\n<p data-text=\"x.nome\"></p>";
+    let src = "<ul><template :for=\"x in $itens\" :key=\"x.id\"><li :text=\"x.nome\"></li></template></ul>\n<p :text=\"x.nome\"></p>";
     expect(&page(src), "html/raiz-invalida", PAGE, 2);
 }
 
 #[test]
 fn data_without_loader() {
-    expect(&page("<p data-text=\"data.x\"></p>"), "html/raiz-invalida", PAGE, 1);
+    expect(&page("<p :text=\"data.x\"></p>"), "html/raiz-invalida", PAGE, 1);
 }
 
 #[test]
 fn state_without_module() {
-    let d = check_with(&[("routes/loja/index.html", Some("<p data-text=\"state.x\"></p>"))]);
+    let d = check_with(&[("routes/loja/index.html", Some("<p :text=\"$x\"></p>"))]);
     expect(&d, "html/raiz-invalida", "routes/loja/index.html", 1);
 }
 
 #[test]
 fn unknown_store() {
-    expect(&page("<p data-text=\"shared.sacola.total\"></p>"), "html/raiz-invalida", PAGE, 1);
+    expect(&page("<p :text=\"shared.sacola.total\"></p>"), "html/raiz-invalida", PAGE, 1);
 }
 
 #[test]
 fn unknown_param() {
-    let d = check_with(&[("routes/loja/[id].html", Some("<p data-text=\"params.slug\"></p>"))]);
+    let d = check_with(&[("routes/loja/[id].html", Some("<p :text=\"params.slug\"></p>"))]);
     expect(&d, "html/raiz-invalida", "routes/loja/[id].html", 1);
 }
 
 #[test]
 fn props_outside_component() {
-    expect(&page("<p data-text=\"props.titulo\"></p>"), "html/raiz-invalida", PAGE, 1);
+    expect(&page("<p data-text=\"state.titulo\"></p>"), "html/sintaxe-antiga", PAGE, 1);
 }
 
 #[test]
 fn alias_missing_in_component() {
-    let d = check_with(&[("routes/loja/[id].html", Some("<c-preco></c-preco>"))]);
+    let d = check_with(&[("routes/loja/[id].html", Some("<p-preco></p-preco>"))]);
     expect(&d, "html/raiz-invalida", "routes/loja/_components/preco/preco.html", 1);
 }
 
 #[test]
 fn for_without_key() {
-    expect(&page("<ul>\n<template data-for=\"x in state.itens\"><li></li></template></ul>"), "html/for-sem-key", PAGE, 2);
+    expect(&page("<ul>\n<template :for=\"x in $itens\"><li></li></template></ul>"), "html/for-sem-key", PAGE, 2);
 }
 
 #[test]
 fn key_must_use_for_variable() {
-    expect(&page("<ul><template data-for=\"x in state.itens\" data-key=\"y.id\"><li></li></template></ul>"), "html/raiz-invalida", PAGE, 1);
+    expect(&page("<ul><template :for=\"x in $itens\" :key=\"y.id\"><li></li></template></ul>"), "html/raiz-invalida", PAGE, 1);
 }
 
 #[test]
 fn if_outside_template() {
-    expect(&page("<div data-if=\"state.aberto\"></div>"), "html/fora-de-template", PAGE, 1);
+    expect(&page("<div :if=\"$aberto\"></div>"), "html/fora-de-template", PAGE, 1);
 }
 
 #[test]
 fn else_out_of_place() {
-    expect(&page("<p>a</p>\n<template data-else><p>b</p></template>"), "html/else-fora-de-lugar", PAGE, 2);
+    expect(&page("<p>a</p>\n<template :else><p>b</p></template>"), "html/else-fora-de-lugar", PAGE, 2);
 }
 
 #[test]
 fn empty_out_of_place() {
-    let src = "<template data-if=\"state.aberto\"><p>a</p></template>\n<template data-empty><p>b</p></template>";
+    let src = "<template :if=\"$aberto\"><p>a</p></template>\n<template :empty><p>b</p></template>";
     expect(&page(src), "html/empty-fora-de-lugar", PAGE, 2);
 }
 
 #[test]
 fn block_needs_single_root() {
-    expect(&page("<template data-if=\"state.aberto\">\n  <p>a</p>\n  <p>b</p>\n</template>"), "html/bloco-sem-raiz-unica", PAGE, 1);
+    expect(&page("<template :if=\"$aberto\">\n  <p>a</p>\n  <p>b</p>\n</template>"), "html/bloco-sem-raiz-unica", PAGE, 1);
 }
 
 #[test]
 fn unknown_page_action() {
-    expect(&page("<button data-on-click=\"sumir\">x</button>"), "html/acao-inexistente", PAGE, 1);
+    expect(&page("<button @click=\"sumir\">x</button>"), "html/acao-inexistente", PAGE, 1);
 }
 
 const CAIXA: [(&str, Option<&str>); 2] = [
-    ("lib/components/caixa/caixa.html", Some("<section><button data-on-click=\"fechar\">x</button><slot></slot></section>")),
+    ("lib/components/caixa/caixa.html", Some("<section><button @click=\"fechar\">x</button><slot></slot></section>")),
     ("lib/components/caixa/caixa.js", Some("export const actions = { fechar() {} }")),
 ];
 
 #[test]
 fn slot_content_belongs_to_writer() {
-    let src = "<c-caixa><button data-on-click=\"fechar\">x</button></c-caixa>";
+    let src = "<c-caixa><button @click=\"fechar\">x</button></c-caixa>";
     expect(&check_with(&[CAIXA[0], CAIXA[1], (PAGE, Some(src))]), "html/acao-inexistente", PAGE, 1);
-    let ok = "<c-card titulo=\"x\"><c-caixa><button data-on-click=\"alternar\" data-text=\"state.aberto\">x</button></c-caixa></c-card>";
+    let ok = "<c-card titulo=\"x\"><c-caixa><button @click=\"alternar\" :text=\"$aberto\">x</button></c-caixa></c-card>";
     let d = check_with(&[CAIXA[0], CAIXA[1], (PAGE, Some(ok))]);
     assert!(d.is_empty(), "{d:?}");
 }
 
 #[test]
 fn slot_marks_lexical_owner_and_module_props() {
-    let src = "<c-card titulo=\"x\"><p>fixo</p><div><c-caixa passo=\"2\" class=\"p-4\"><b data-text=\"state.aberto\"></b></c-caixa></div></c-card>";
+    let src = "<c-card titulo=\"x\"><p>fixo</p><div><c-caixa passo=\"2\" class=\"p-4\"><b :text=\"$aberto\"></b></c-caixa></div></c-card>";
     let t = app_with(&[CAIXA[0], CAIXA[1], (PAGE, Some(src))]);
     let out = t.0.join("out");
     build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
@@ -383,7 +383,7 @@ fn data_slot_is_generated() {
 
 #[test]
 fn layout_action_without_owner() {
-    let layout = "<button data-on-click=\"abrir\">x</button>\n<main data-page><slot></slot></main>";
+    let layout = "<button @click=\"abrir\">x</button>\n<main data-page><slot></slot></main>";
     expect(&check_with(&[("routes/_layout.html", Some(layout))]), "html/acao-inexistente", "routes/_layout.html", 1);
 }
 
@@ -394,7 +394,7 @@ fn unknown_component() {
 
 #[test]
 fn route_component_not_visible_elsewhere() {
-    expect(&page("<c-preco></c-preco>"), "html/componente-inexistente", PAGE, 1);
+    expect(&page("<p-preco></p-preco>"), "html/componente-inexistente", PAGE, 1);
 }
 
 #[test]
@@ -553,7 +553,7 @@ fn a11y_img_alt() {
 fn a11y_accessible_name() {
     warns("<p>x</p>\n<button><svg aria-hidden=\"true\"></svg></button>", "a11y/nome-acessivel", 2);
     warns("<a href=\"/\"></a>", "a11y/nome-acessivel", 1);
-    let ok = "<button data-text=\"state.aberto\"></button><button aria-label=\"Fechar\">×</button><a href=\"/\"><span class=\"sr-only\">Início</span></a>";
+    let ok = "<button :text=\"$aberto\"></button><button aria-label=\"Fechar\">×</button><a href=\"/\"><span class=\"sr-only\">Início</span></a>";
     assert!(page(ok).is_empty(), "{:?}", page(ok));
 }
 
@@ -573,8 +573,8 @@ fn a11y_dialog_name() {
 
 #[test]
 fn a11y_click_on_non_interactive() {
-    warns("<div data-on-click=\"alternar\">x</div>", "a11y/clique-nao-interativo", 1);
-    assert!(page("<div role=\"button\" tabindex=\"0\" data-on-click=\"alternar\">x</div>").is_empty());
+    warns("<div @click=\"alternar\">x</div>", "a11y/clique-nao-interativo", 1);
+    assert!(page("<div role=\"button\" tabindex=\"0\" @click=\"alternar\">x</div>").is_empty());
 }
 
 #[test]
@@ -582,7 +582,7 @@ fn a11y_headings() {
     warns("<h1>a</h1>\n<h3>b</h3>", "a11y/heading", 2);
     warns("<h1>a</h1>\n<h2>b</h2>\n<h1>c</h1>", "a11y/h1-unico", 3);
     assert!(page("<h1>a</h1><h2>b</h2><h3>c</h3><h2>d</h2>").is_empty());
-    let branches = "<template data-if=\"state.aberto\"><h1>a</h1></template>\n<template data-else><h1>b</h1></template>";
+    let branches = "<template :if=\"$aberto\"><h1>a</h1></template>\n<template :else><h1>b</h1></template>";
     assert!(page(branches).is_empty(), "{:?}", page(branches));
     warns(&format!("{branches}\n<h1>c</h1>"), "a11y/h1-unico", 3);
 }
@@ -616,14 +616,154 @@ fn a11y_points_to_component_source() {
 
 #[test]
 fn alias_in_component_model() {
-    let busca = ("lib/components/busca/busca.html", Some("<input aria-label=\"Buscar\" data-model=\"valor\">"));
-    let ok = check_with(&[busca, (PAGE, Some("<c-busca data-with-valor=\"state.aberto\"></c-busca>"))]);
+    let busca = ("lib/components/busca/busca.html", Some("<input aria-label=\"Buscar\" :model=\"$valor\">"));
+    let ok = check_with(&[busca, (PAGE, Some("<c-busca :valor=\"$aberto\"></c-busca>"))]);
     assert!(ok.is_empty(), "{ok:?}");
-    let d = check_with(&[busca, (PAGE, Some("<ul><template data-for=\"x in state.itens\" data-key=\"x.id\"><li><c-busca data-with-valor=\"x.nome\"></c-busca></li></template></ul>"))]);
+    let d = check_with(&[busca, (PAGE, Some("<ul><template :for=\"x in $itens\" :key=\"x.id\"><li><c-busca :valor=\"x.nome\"></c-busca></li></template></ul>"))]);
     expect(&d, "html/raiz-invalida", "lib/components/busca/busca.html", 1);
 }
 
 #[test]
 fn state_alias_into_module_component() {
-    expect(&page("<c-contador data-with-n=\"state.aberto\"></c-contador>"), "html/componente", PAGE, 1);
+    expect(&page("<c-contador :n=\"$aberto\"></c-contador>"), "html/componente", PAGE, 1);
+}
+
+const PAGINA_COM_PACOTE: &str = "import { carrinho } from '../lib/state/carrinho.js'\n\
+import { formatar } from '../utils/fmt.js'\n\
+import { hora, modo } from 'relogio'\n\
+import { extra } from 'relogio/sub'\n\n\
+export const state = () => ({ aberto: false, itens: [], agora: hora(), modo, extra })\n\
+export const actions = {\n  alternar(ctx) {\n    ctx.$.aberto = !ctx.$.aberto\n    ctx.log.info(formatar(carrinho.total))\n  },\n}\n";
+
+const PACOTE_RELOGIO: [(&str, Option<&str>); 8] = [
+    ("package.json", Some("{ \"name\": \"loja\", \"dependencies\": { \"relogio\": \"1.0.0\" } }")),
+    ("node_modules/relogio/package.json", Some("{ \"name\": \"relogio\", \"type\": \"module\", \"exports\": { \".\": \"./index.js\", \"./sub\": \"./lib/sub.js\" } }")),
+    ("node_modules/relogio/index.js", Some("import { ajuda } from './interno.js'\nimport { somar } from 'calculo'\nexport const modo = process.env.NODE_ENV\nexport function hora() {\n  return ajuda() + somar(1, 2)\n}\n")),
+    ("node_modules/relogio/interno.js", Some("export function ajuda() {\n  return 'interno'\n}\n")),
+    ("node_modules/relogio/lib/sub.js", Some("export const extra = 'subcaminho'\n")),
+    ("node_modules/relogio/node_modules/calculo/package.json", Some("{ \"name\": \"calculo\", \"type\": \"module\", \"main\": \"main.js\" }")),
+    ("node_modules/relogio/node_modules/calculo/main.js", Some("export function somar(parcela, outra) {\n  return parcela + outra\n}\n")),
+    ("routes/index.js", Some(PAGINA_COM_PACOTE)),
+];
+
+fn com_relogio(extra: &[(&'static str, Option<&'static str>)]) -> Vec<(&'static str, Option<&'static str>)> {
+    PACOTE_RELOGIO.iter().copied().chain(extra.iter().copied()).collect()
+}
+
+fn asset_com_prefixo(client: &Path, prefixo: &str) -> String {
+    let mut files = Vec::new();
+    all_files(&client.join("assets"), &mut files);
+    let achados: Vec<String> = files
+        .iter()
+        .map(|f| format!("/{}", f.strip_prefix(client).unwrap().to_string_lossy()))
+        .filter(|u| u.starts_with(prefixo) && u.ends_with(".js") && u.len() == prefixo.len() + 11)
+        .collect();
+    assert_eq!(achados.len(), 1, "esperava um asset {prefixo}*: {achados:?}");
+    achados[0].clone()
+}
+
+#[test]
+fn npm_package_in_prod_build() {
+    let t = app_with(&com_relogio(&[]));
+    let root = t.0.join("app");
+    assert!(check(&root).is_empty(), "{:?}", check(&root));
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: root.clone(), out_dir: out.clone(), mode: Mode::Prod }).unwrap();
+    let client = out.join("client");
+    let index = fs::read_to_string(client.join("index.html")).unwrap();
+    let npm: Vec<String> = ["/assets/npm/relogio/index-", "/assets/npm/relogio/interno-", "/assets/npm/relogio/lib/sub-", "/assets/npm/relogio/node_modules/calculo/main-"]
+        .iter()
+        .map(|p| asset_com_prefixo(&client, p))
+        .collect();
+    for url in &npm {
+        assert!(index.contains(&format!("<link rel=\"modulepreload\" href=\"{url}\">")), "sem modulepreload de {url}:\n{index}");
+    }
+    let pagina = fs::read_to_string(client.join(&asset_com_prefixo(&client, "/assets/routes/index-")[1..])).unwrap();
+    assert!(pagina.contains(&npm[0]) && pagina.contains(&npm[2]), "{pagina}");
+    assert!(!pagina.contains("'relogio") && !pagina.contains("\"relogio"), "{pagina}");
+    let relogio = fs::read_to_string(client.join(&npm[0][1..])).unwrap();
+    assert!(relogio.contains(&npm[1]) && relogio.contains(&npm[3]), "{relogio}");
+    assert!(relogio.contains("production") && !relogio.contains("process.env"), "{relogio}");
+    assert!(!client.join("assets/node_modules").exists());
+}
+
+#[test]
+fn npm_package_in_dev_build() {
+    let t = app_with(&com_relogio(&[]));
+    let out = t.0.join("dev");
+    build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let relogio = fs::read_to_string(out.join("client/assets/npm/relogio/index.js")).unwrap();
+    assert!(relogio.contains("\"development\"") && relogio.contains("/assets/npm/relogio/interno.js"), "{relogio}");
+    let index = fs::read_to_string(out.join("client/index.html")).unwrap();
+    assert!(index.contains("href=\"/assets/npm/relogio/lib/sub.js\""), "{index}");
+}
+
+#[test]
+fn npm_package_not_listed() {
+    let d = check_with(&com_relogio(&[("package.json", Some("{ \"dependencies\": {} }"))]));
+    expect(&d, "js/import", "routes/index.js", 3);
+    let d = check_with(&com_relogio(&[("package.json", None)]));
+    expect(&d, "js/import", "routes/index.js", 3);
+}
+
+#[test]
+fn npm_package_not_installed() {
+    let d = check_with(&[
+        ("package.json", Some("{ \"dependencies\": { \"relogio\": \"1.0.0\" } }")),
+        ("routes/index.js", Some(PAGINA_COM_PACOTE)),
+    ]);
+    expect(&d, "js/import", "routes/index.js", 3);
+    expect(&d, "js/import", "routes/index.js", 4);
+}
+
+#[test]
+fn npm_package_commonjs() {
+    let d = check_with(&com_relogio(&[
+        ("node_modules/relogio/interno.js", Some("module.exports = { ajuda: () => 'interno' }\n")),
+    ]));
+    expect(&d, "app/pacote", "node_modules/relogio/interno.js", 1);
+}
+
+#[test]
+fn npm_package_not_pure_js() {
+    for main in ["dados.json", "index.ts"] {
+        let manifest = format!("{{ \"name\": \"relogio\", \"main\": \"{main}\" }}");
+        let manifest: &'static str = Box::leak(manifest.into_boxed_str());
+        let d = check_with(&com_relogio(&[
+            ("node_modules/relogio/package.json", Some(manifest)),
+            ("node_modules/relogio/dados.json", Some("{}")),
+            ("node_modules/relogio/index.ts", Some("export const hora = (): number => 1\n")),
+            ("routes/index.js", Some("import { hora } from 'relogio'\n\nexport const state = () => ({ aberto: false, itens: [], agora: hora() })\nexport const actions = { alternar(ctx) {} }\n")),
+        ]));
+        expect(&d, "app/pacote", "routes/index.js", 1);
+    }
+}
+
+#[test]
+fn npm_ui_framework_denied() {
+    let d = check_with(&com_relogio(&[
+        ("package.json", Some("{ \"dependencies\": { \"relogio\": \"1.0.0\", \"react\": \"18.0.0\" } }")),
+        ("node_modules/react/package.json", Some("{ \"name\": \"react\", \"type\": \"module\", \"main\": \"index.js\" }")),
+        ("node_modules/react/index.js", Some("export const createElement = () => null\n")),
+        ("routes/index.js", Some("import { createElement } from 'react'\n\nexport const state = () => ({ aberto: false, itens: [], vazio: createElement() })\nexport const actions = { alternar(ctx) {} }\n")),
+    ]));
+    expect(&d, "js/import", "routes/index.js", 1);
+}
+
+#[test]
+fn npm_package_on_server_only_needs_listing() {
+    let server = "import postgres from 'postgres'\nimport { buscar } from '../../utils/db.js'\n\nexport async function load({ params }) {\n  return { produto: await buscar(params.id), cliente: typeof postgres }\n}\n";
+    let t = app_with(&[
+        ("package.json", Some("{ \"dependencies\": { \"postgres\": \"3.0.0\" } }")),
+        ("routes/loja/[id].server.js", Some(server)),
+    ]);
+    let root = t.0.join("app");
+    let d = check(&root);
+    assert!(d.is_empty(), "{d:?}");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: root.clone(), out_dir: out.clone(), mode: Mode::Prod }).unwrap();
+    assert_eq!(fs::read_to_string(out.join("server/package.json")).unwrap().trim(), "{ \"type\": \"module\" }");
+    assert!(fs::read_to_string(out.join("server/routes/loja/[id].server.js")).unwrap().contains("from 'postgres'"));
+    let d = check_with(&[("routes/loja/[id].server.js", Some(server))]);
+    expect(&d, "js/import", "routes/loja/[id].server.js", 1);
 }

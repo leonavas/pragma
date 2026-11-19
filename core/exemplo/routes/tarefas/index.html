@@ -4,48 +4,48 @@
   <header class="flex flex-wrap items-center justify-between gap-4">
     <h1 class="text-3xl font-semibold tracking-tight">Tarefas</h1>
     <c-dropdown id="acoes-tarefas" rotulo="Ações">
-      <button type="button" data-close data-on-click="concluirTodas">Concluir todas</button>
+      <button type="button" @close @click="concluirTodas">Concluir todas</button>
       <hr>
-      <button type="button" class="text-danger-600" data-on-click="limpar">Limpar concluídas…</button>
+      <button type="button" class="text-danger-600" @click="limpar">Limpar concluídas…</button>
     </c-dropdown>
   </header>
 
   <section class="grid gap-4 sm:grid-cols-3" aria-labelledby="resumo-tarefas">
     <h2 id="resumo-tarefas" class="sr-only">Resumo</h2>
-    <c-indicador titulo="Concluídas" data-with-valor="shared.tarefas.resumo" data-with-tom="state.tom"></c-indicador>
+    <c-indicador titulo="Concluídas" :valor="shared.tarefas.resumo" :tom="$tom"></c-indicador>
   </section>
 
-  <form class="flex flex-col gap-1" novalidate data-on-submit="adicionar">
+  <form class="flex flex-col gap-1" novalidate @submit="adicionar">
     <div class="flex gap-2">
-      <input id="nova-tarefa" name="titulo" class="campo flex-1" placeholder="Nova tarefa" autocomplete="off" aria-label="Nova tarefa" aria-describedby="erro-tarefa" data-model="state.nova" data-attr-aria-invalid="state.invalida">
+      <input id="nova-tarefa" name="titulo" class="campo flex-1" placeholder="Nova tarefa" autocomplete="off" aria-label="Nova tarefa" aria-describedby="erro-tarefa" :model="$nova" :aria-invalid="$invalida">
       <button class="btn btn-primary">Adicionar</button>
     </div>
-    <p id="erro-tarefa" class="min-h-5 text-sm text-danger-600" data-text="state.erro"></p>
+    <p id="erro-tarefa" class="min-h-5 text-sm text-danger-600" :text="$erro"></p>
   </form>
 
   <div class="flex flex-wrap items-center justify-between gap-3">
-    <c-busca rotulo="Buscar tarefa" placeholder="Buscar tarefa…" data-with-valor="state.busca"></c-busca>
+    <c-busca rotulo="Buscar tarefa" placeholder="Buscar tarefa…" :valor="$busca"></c-busca>
     <c-filtros rotulo="Filtrar tarefas">
-      <a href="?filtro=todas" data-attr-aria-current="state.filtro.todas">Todas</a>
-      <a href="?filtro=pendentes" data-attr-aria-current="state.filtro.pendentes">Pendentes</a>
-      <a href="?filtro=concluidas" data-attr-aria-current="state.filtro.concluidas">Concluídas</a>
+      <a href="?filtro=todas" :aria-current="$filtro.todas">Todas</a>
+      <a href="?filtro=pendentes" :aria-current="$filtro.pendentes">Pendentes</a>
+      <a href="?filtro=concluidas" :aria-current="$filtro.concluidas">Concluídas</a>
     </c-filtros>
   </div>
 
   <ul class="card divide-y divide-line p-0">
-    <template data-for="t in state.visiveis" data-key="t.id">
+    <template :for="t in $visiveis" :key="t.id">
       <li class="flex items-center gap-3 px-4 py-2">
-        <input type="checkbox" class="size-4" data-attr-checked="t.feita" data-attr-aria-label="t.titulo" data-on-change="alternar">
-        <template data-if="t.editando">
-          <input class="campo flex-1" aria-label="Editar tarefa" autofocus data-model="state.rascunho" data-on-keydown="teclaEdicao" data-on-focusout="salvarEdicao">
+        <input type="checkbox" class="size-4" :checked="t.feita" :aria-label="t.titulo" @change="alternar">
+        <template :if="t.editando">
+          <input class="campo flex-1" aria-label="Editar tarefa" autofocus :model="$rascunho" @keydown="teclaEdicao" @focusout="salvarEdicao">
         </template>
-        <template data-else>
-          <span class="flex-1 py-2" title="Duplo clique para editar" data-class-line-through="t.feita" data-class-text-muted="t.feita" data-text="t.titulo" data-on-dblclick="editar"></span>
+        <template :else>
+          <span class="flex-1 py-2" title="Duplo clique para editar" .line-through="t.feita" .text-muted="t.feita" :text="t.titulo" @dblclick="editar"></span>
         </template>
-        <button type="button" class="btn btn-icone" data-attr-aria-label="t.rotuloRemover" data-on-click="remover">×</button>
+        <button type="button" class="btn btn-icone" :aria-label="t.rotuloRemover" @click="remover">×</button>
       </li>
     </template>
-    <template data-empty>
+    <template :empty>
       <li class="px-4 py-8 text-center text-muted">Nenhuma tarefa</li>
     </template>
   </ul>
@@ -53,6 +53,6 @@
 
 <c-alert id="limpar-concluidas" titulo="Limpar concluídas?">
   <p>As tarefas concluídas serão removidas.</p>
-  <button slot="acoes" type="button" class="btn" data-close value="cancel" autofocus>Cancelar</button>
-  <button slot="acoes" type="button" class="btn btn-danger" data-close value="ok">Limpar</button>
+  <button slot="acoes" type="button" class="btn" @close value="cancel" autofocus>Cancelar</button>
+  <button slot="acoes" type="button" class="btn btn-danger" @close value="ok">Limpar</button>
 </c-alert>

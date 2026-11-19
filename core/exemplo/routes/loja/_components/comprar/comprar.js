@@ -1,17 +1,17 @@
-export const state = ({ props }) => ({
+export const state = ({ $ }) => ({
   qtd: 1,
-  get esgotado() { return Number(props.estoque) === 0 },
+  get esgotado() { return Number($.estoque) === 0 },
   get semMenos() { return this.qtd <= 1 },
-  get semMais() { return this.qtd >= Number(props.estoque) },
+  get semMais() { return this.qtd >= Number($.estoque) },
 })
 
 export const actions = {
-  menos(ctx) { ctx.state.qtd-- },
-  mais(ctx) { ctx.state.qtd++ },
+  menos(ctx) { ctx.$.qtd-- },
+  mais(ctx) { ctx.$.qtd++ },
   adicionar(ctx) {
-    const { id, nome, preco, estoque } = ctx.props
-    ctx.shared.carrinho.adicionar({ id, nome, preco: Number(preco), estoque: Number(estoque) }, ctx.state.qtd)
-    ctx.log.info('produto adicionado ao carrinho', { 'produto.id': id, 'carrinho.item.quantidade': ctx.state.qtd })
-    ctx.state.qtd = 1
+    const { id, nome, preco, estoque } = ctx.$
+    ctx.shared.carrinho.adicionar({ id, nome, preco: Number(preco), estoque: Number(estoque) }, ctx.$.qtd)
+    ctx.log.info('produto adicionado ao carrinho', { 'produto.id': id, 'carrinho.item.quantidade': ctx.$.qtd })
+    ctx.$.qtd = 1
   },
 }

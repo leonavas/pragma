@@ -4,16 +4,16 @@
   <section class="flex flex-col gap-6 lg:col-span-2" aria-labelledby="titulo-loja">
     <h1 id="titulo-loja" class="text-3xl font-semibold tracking-tight">Loja</h1>
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <c-busca rotulo="Buscar produto" placeholder="Buscar produto…" data-with-valor="state.busca"></c-busca>
+      <c-busca rotulo="Buscar produto" placeholder="Buscar produto…" :valor="$busca"></c-busca>
       <c-filtros rotulo="Categorias">
-        <a href="?categoria=todas" data-attr-aria-current="state.categoria.todas">Todas</a>
-        <a href="?categoria=mercearia" data-attr-aria-current="state.categoria.mercearia">Mercearia</a>
-        <a href="?categoria=limpeza" data-attr-aria-current="state.categoria.limpeza">Limpeza</a>
-        <a href="?categoria=hortifruti" data-attr-aria-current="state.categoria.hortifruti">Hortifruti</a>
+        <a href="?categoria=todas" :aria-current="$categoria.todas">Todas</a>
+        <a href="?categoria=mercearia" :aria-current="$categoria.mercearia">Mercearia</a>
+        <a href="?categoria=limpeza" :aria-current="$categoria.limpeza">Limpeza</a>
+        <a href="?categoria=hortifruti" :aria-current="$categoria.hortifruti">Hortifruti</a>
       </c-filtros>
     </div>
 
-    <template data-if="page.loading">
+    <template :if="page.loading">
       <ul class="grid gap-4 sm:grid-cols-2" aria-busy="true" aria-label="Carregando produtos">
         <li class="skeleton h-48 rounded-2xl"></li>
         <li class="skeleton h-48 rounded-2xl"></li>
@@ -21,20 +21,20 @@
         <li class="skeleton h-48 rounded-2xl"></li>
       </ul>
     </template>
-    <template data-else>
+    <template :else>
       <div>
-        <template data-if="page.error">
+        <template :if="page.error">
           <div class="card flex flex-col items-start gap-3" role="alert">
-            <p class="text-danger-600" data-text="page.error.message"></p>
+            <p class="text-danger-600" :text="page.error.message"></p>
             <a href="/loja" class="btn">Tentar de novo</a>
           </div>
         </template>
-        <template data-else>
+        <template :else>
           <ul class="grid gap-4 sm:grid-cols-2">
-            <template data-for="p in state.produtos" data-key="p.id">
-              <li><c-produto-card data-with-produto="p"></c-produto-card></li>
+            <template :for="p in $produtos" :key="p.id">
+              <li><p-produto-card :produto="p"></p-produto-card></li>
             </template>
-            <template data-empty>
+            <template :empty>
               <li class="card text-center text-muted sm:col-span-2">Nenhum produto</li>
             </template>
           </ul>
@@ -43,5 +43,5 @@
     </template>
   </section>
 
-  <c-resumo-carrinho></c-resumo-carrinho>
+  <p-resumo-carrinho></p-resumo-carrinho>
 </div>

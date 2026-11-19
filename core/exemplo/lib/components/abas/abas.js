@@ -10,12 +10,12 @@ export const state = () => ({
 })
 
 export const actions = {
-  ir(ctx) { ctx.state.aba = ctx.el.value },
+  selecionar(ctx) { ctx.$.aba = ctx.el.value },
   tecla(ctx) {
     const passo = SETAS[ctx.event.key]
     if (!passo) return
-    const i = (ABAS.indexOf(ctx.state.aba) + passo + ABAS.length) % ABAS.length
-    ctx.state.aba = ABAS[i]
+    const i = (ABAS.indexOf(ctx.$.aba) + passo + ABAS.length) % ABAS.length
+    ctx.$.aba = ABAS[i]
     ctx.el.children[i].focus()
   },
 }

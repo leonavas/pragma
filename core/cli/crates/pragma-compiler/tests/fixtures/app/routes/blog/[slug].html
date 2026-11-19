@@ -1,8 +1,8 @@
 <title>Post</title>
 <article class="p-4">
-  <h1 data-text="data.post.titulo">Título</h1>
+  <h1 :text="data.post.titulo">Título</h1>
   <ul>
-    <template data-for="t in data.post.tags" data-key="t.id"><li data-class-ativo="t.ativo" class="tag" data-text="t.nome"></li></template>
+    <template :for="t in data.post.tags" :key="t.id"><li .ativo="t.ativo" class="tag" :text="t.nome"></li></template>
   </ul>
-  <p data-show="state.lido">lido</p>
+  <p :show="$lido">lido</p>
 </article>

@@ -5,7 +5,7 @@
 <header class="flex items-center gap-4 p-4">
   <a href="/">Início</a>
   <c-contador></c-contador>
-  <span data-text="shared.carrinho.total">0</span>
+  <span :text="shared.carrinho.total">0</span>
 </header>
 <main data-page><slot></slot></main>
-<footer class="text-sm text-neutral-500" data-text="query.ref"></footer>
+<footer class="text-sm text-neutral-500" :text="query.ref"></footer>

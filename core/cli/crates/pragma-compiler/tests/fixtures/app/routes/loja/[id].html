@@ -1,11 +1,11 @@
 <title>Produto</title>
-<template data-if="page.loading"><div class="skeleton h-8"></div></template>
-<template data-else>
+<template :if="page.loading"><div class="skeleton h-8"></div></template>
+<template :else>
   <article>
-    <h1 data-text="data.produto.nome">…</h1>
-    <c-preco data-with-p="data.produto"></c-preco>
-    <a data-attr-href="data.produto.url" data-class-hidden="!data.produto.url" href="#">ver</a>
-    <span data-text="params.id"></span>
-    <input data-model="state.qtd" aria-label="Quantidade">
+    <h1 :text="data.produto.nome">…</h1>
+    <p-preco :p="data.produto"></p-preco>
+    <a :href="data.produto.url" .hidden="!data.produto.url" href="#">ver</a>
+    <span :text="params.id"></span>
+    <input :model="$qtd" aria-label="Quantidade">
   </article>
 </template>

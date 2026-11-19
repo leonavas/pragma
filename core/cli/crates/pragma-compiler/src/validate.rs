@@ -1,7 +1,7 @@
 //! Validação por arquivo (SPEC §3, §10): o que não depende de escopo nem de expansão.
 use crate::directive::{self, Dir};
 use crate::html::{Element, Node, Pos, is_blank, stray_text};
-use crate::project::is_component_name;
+use crate::project::{component_tag, is_component_name, is_component_tag};
 use pragma_diag::Diagnostic;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -119,7 +119,7 @@ impl FileCheck<'_> {
                     self.err(text.or(roots.get(1).map(|e| e.pos)).unwrap_or(file_pos), "html/componente", "componente precisa de exatamente 1 elemento raiz");
                 }
                 if let Some(r) = roots.first()
-                    && (r.is("template") || r.is("slot") || r.name.to_ascii_lowercase().starts_with("c-")) {
+                    && (r.is("template") || r.is("slot") || is_component_tag(&r.name)) {
                         self.err(r.pos, "html/componente", "a raiz do componente não pode ser <template>, <slot> nem outro componente");
                     }
             }
@@ -183,7 +183,7 @@ impl FileCheck<'_> {
             "main" if self.kind == Kind::Layout && e.has("data-page") => {}
             _ => {}
         }
-        if let Some(c) = name.strip_prefix("c-")
+        if let Some((_, c)) = component_tag(&name)
             && !is_component_name(c) {
                 self.err(e.pos, "html/componente-inexistente", format!("nome de componente inválido <{name}>"));
             }
@@ -196,7 +196,7 @@ impl FileCheck<'_> {
                 continue;
             }
             if an.starts_with("on") {
-                self.err(a.pos, "html/on-inline", format!("{an} inline é proibido; use data-on-<evento>=\"acao\""));
+                self.err(a.pos, "html/on-inline", format!("{an} inline é proibido; use @<evento>=\"acao\""));
                 continue;
             }
             if an == "class" {
@@ -205,8 +205,8 @@ impl FileCheck<'_> {
                 }
                 continue;
             }
-            if an == "slot" && !parent.is_some_and(|p| p.name.to_ascii_lowercase().starts_with("c-")) {
-                self.err(a.pos, "html/componente", "atributo slot só em filhos diretos de <c-…>");
+            if an == "slot" && !parent.is_some_and(|p| is_component_tag(&p.name)) {
+                self.err(a.pos, "html/componente", "atributo slot só em filhos diretos de <c-…> ou <p-…>");
                 continue;
             }
             let Some(d) = directive::parse(&an) else { continue };
@@ -219,7 +219,7 @@ impl FileCheck<'_> {
         if e.is("template") {
             let blocks: Vec<&str> = BLOCKS.iter().copied().filter(|b| e.has(b)).collect();
             if blocks.is_empty() {
-                self.err(e.pos, "html/fora-de-template", "<template> precisa de data-if, data-else, data-for ou data-empty");
+                self.err(e.pos, "html/fora-de-template", "<template> precisa de :if, :else, :for ou :empty");
             } else if blocks.len() > 1 {
                 self.err(e.pos, "html/fora-de-template", format!("<template> com mais de um bloco ({})", blocks.join(", ")));
             }
@@ -233,12 +233,12 @@ impl FileCheck<'_> {
                     self.err(r.pos, "html/bloco-sem-raiz-unica", "a raiz de um bloco não pode ser outro <template>; envolva-o num elemento");
                 }
             match blocks.first().copied() {
-                Some("data-for") if !e.has("data-key") => self.err(e.pos, "html/for-sem-key", "data-for exige data-key=\"x.campo\""),
+                Some("data-for") if !e.has("data-key") => self.err(e.pos, "html/for-sem-key", ":for exige :key=\"x.campo\""),
                 Some("data-else") if !prev.is_some_and(|p| template_kind(p) == Some("data-if")) => {
-                    self.err(e.pos, "html/else-fora-de-lugar", "data-else deve vir imediatamente após um <template data-if>")
+                    self.err(e.pos, "html/else-fora-de-lugar", ":else deve vir imediatamente após um <template :if>")
                 }
                 Some("data-empty") if !prev.is_some_and(|p| template_kind(p) == Some("data-for")) => {
-                    self.err(e.pos, "html/empty-fora-de-lugar", "data-empty deve vir imediatamente após um <template data-for>")
+                    self.err(e.pos, "html/empty-fora-de-lugar", ":empty deve vir imediatamente após um <template :for>")
                 }
                 _ => {}
             }
@@ -267,11 +267,11 @@ impl FileCheck<'_> {
         let is_tpl = name == "template";
         let on_tpl = |d: Dir| matches!(d, Dir::If | Dir::Else | Dir::For | Dir::Empty | Dir::Key);
         if on_tpl(d) && !is_tpl {
-            self.err(pos, "html/fora-de-template", "data-if, data-else, data-for, data-empty e data-key só em <template>");
+            self.err(pos, "html/fora-de-template", ":if, :else, :for, :empty e :key só em <template>");
             return;
         }
         if !on_tpl(d) && is_tpl {
-            self.err(pos, "html/fora-de-template", "<template> só aceita data-if, data-else, data-for, data-empty e data-key");
+            self.err(pos, "html/fora-de-template", "<template> só aceita :if, :else, :for, :empty e :key");
             return;
         }
         match d {
@@ -283,42 +283,42 @@ impl FileCheck<'_> {
             }
             Dir::Attr(n) => {
                 if n.starts_with("on") || n == "style" {
-                    self.err(pos, "html/on-inline", format!("data-attr-{n} é proibido"));
+                    self.err(pos, "html/on-inline", format!(":{n} é proibido"));
                 }
                 self.path(pos, v, false, true);
             }
             Dir::Model => {
                 if !matches!(name, "input" | "select" | "textarea") {
-                    self.err(pos, "html/diretiva-desconhecida", "data-model só em input, select e textarea");
+                    self.err(pos, "html/diretiva-desconhecida", ":model só em input, select e textarea");
                 }
                 self.path(pos, v, false, false);
                 let alias = self.kind == Kind::Component && !directive::ROOTS.contains(&directive::root(v));
-                if !alias && !matches!(directive::root(v), "state" | "shared" | "props") && directive::check_path(v, false).is_ok() {
-                    self.err(pos, "html/raiz-invalida", "data-model só aceita raiz state ou shared");
+                if !alias && !matches!(directive::root(v), "state" | "shared" | "props" | "$") && directive::check_path(v, false).is_ok() {
+                    self.err(pos, "html/raiz-invalida", ":model só aceita $ ou shared");
                 }
             }
             Dir::Else | Dir::Empty => {
                 if !v.is_empty() {
-                    self.err(pos, "html/caminho-invalido", "data-else e data-empty não têm valor");
+                    self.err(pos, "html/caminho-invalido", ":else e :empty não têm valor");
                 }
             }
             Dir::For => match directive::parse_for(v) {
-                None => self.err(pos, "html/caminho-invalido", "use data-for=\"x in caminho\""),
+                None => self.err(pos, "html/caminho-invalido", "use :for=\"x in caminho\""),
                 Some((var, p)) => {
                     if directive::ROOTS.contains(&var) {
-                        self.err(pos, "html/raiz-invalida", format!("variável \"{var}\" do data-for não pode ter nome de raiz"));
+                        self.err(pos, "html/raiz-invalida", format!("variável \"{var}\" do :for não pode ter nome de raiz"));
                     }
                     self.path(pos, p, false, false);
                 }
             },
             Dir::Key => {
                 if !e.has("data-for") {
-                    self.err(pos, "html/for-sem-key", "data-key só junto de data-for");
+                    self.err(pos, "html/for-sem-key", ":key só junto de :for");
                 } else if let Err(m) = directive::check_path(v, false) {
                     self.err(pos, "html/caminho-invalido", m);
                 } else if let Some(var) = for_var
                     && directive::root(v) != var {
-                        self.err(pos, "html/raiz-invalida", format!("data-key deve partir da variável do data-for ({var}.campo)"));
+                        self.err(pos, "html/raiz-invalida", format!(":key deve partir da variável do :for ({var}.campo)"));
                     }
             }
             Dir::On(ev) => {
@@ -326,12 +326,12 @@ impl FileCheck<'_> {
                     self.err(pos, "html/diretiva-desconhecida", format!("evento inválido \"{ev}\""));
                 }
                 if !directive::is_ident(v) {
-                    self.err(pos, "html/acao-inexistente", format!("data-on-{ev} espera o nome de uma action, não \"{v}\""));
+                    self.err(pos, "html/acao-inexistente", format!("@{ev} espera o nome de uma action, não \"{v}\""));
                 }
             }
             Dir::With(alias) => {
-                if !name.starts_with("c-") {
-                    self.err(pos, "html/componente", "data-with-* só em <c-…>");
+                if !is_component_tag(name) {
+                    self.err(pos, "html/componente", "prop dinâmica (:nome) só em <c-…> ou <p-…>");
                 } else if !directive::is_ident(alias) || directive::ROOTS.contains(&alias) {
                     self.err(pos, "html/componente", format!("alias inválido \"{alias}\""));
                 }
@@ -339,7 +339,7 @@ impl FileCheck<'_> {
             }
             Dir::Open => {
                 if v.is_empty() {
-                    self.err(pos, "html/diretiva-desconhecida", "data-open precisa do id do overlay");
+                    self.err(pos, "html/diretiva-desconhecida", "@open precisa do id do overlay");
                 }
             }
             Dir::Close => {}

@@ -4,7 +4,7 @@ O que foi decidido e por quê. O **como** está em `SPEC.md`, que é o contrato 
 vale sobre este arquivo. Mudar uma decisão **[firme]** exige decisão explícita do autor.
 
 Status: **[firme]** · **[firme v0]** contrato da v0, revisável depois · **[provável]** ·
-**[proposta]** · **[em aberto]** · **[substituída]**. Data de todos os itens: 2026-11-18.
+**[proposta]** · **[em aberto]** · **[substituída]** · **[descartada]**. Data de todos os itens: 2026-11-18.
 
 ## Resumo: o contrato do pragma
 
@@ -28,7 +28,9 @@ em metade do tempo sem throttling (108 contra 212 ms). n = 1, um modelo por app.
 
 - **[firme]** Nunca TypeScript: nem `.ts`, nem build com TS, nem suporte opcional.
 - **[firme]** Nem JSDoc de tipos (`@type`, `@param {…}`, `@typedef`, `@ts-*`, `tsc`).
-- **[firme]** Sem comentários inúteis: comentário só para o porquê não óbvio.
+- **[firme]** Sem comentários, em nada: app e framework (JS, HTML, CSS, Rust). O código é a
+  documentação. No app, comentário e nome vago são erro de `pragma check` (`*/comentario`,
+  `js/nome-vago`). *Motivo:* comentário envelhece e gasta contexto; nome bom não.
 
 ## HTML, diretivas e componentes
 
@@ -112,6 +114,27 @@ em metade do tempo sem throttling (108 contra 212 ms). n = 1, um modelo por app.
 - **[substituída]** Chunk por rota com bundler e manifesto de chunks: a v0 usa módulos
   soltos e o manifesto `/_pragma/manifest.json`.
 
+## Dependências npm
+
+- **[firme]** Pacotes npm são permitidos. *Motivo:* é um projeto de dev web; proibir o
+  ecossistema afasta pessoas e agentes. Substitui "sem pacotes npm".
+- **[firme]** Instalação com o gerenciador que a pessoa quiser (npm, bun, pnpm); o pragma
+  não tem gerenciador próprio, só lê `package.json` (`dependencies`) e `node_modules`.
+- **[firme v0]** Cliente: só pacote de JS puro em ES module. Sem bundler: o build resolve o
+  import (`oxc_resolver`, conditions `browser`/`import`/`module`) e trata cada módulo do pacote
+  como os do app (minificado, hash, `/assets/npm/...`, `modulepreload`, conta no orçamento).
+  CommonJS, TS, JSX, `.json`/CSS e `node:*` são erro `app/pacote`. `process.env.NODE_ENV` é
+  substituído. *Motivo:* zero dependência nova de bundler e o mesmo modelo dos módulos do app.
+- **[firme]** Guard-rails: import de pacote fora de `dependencies` é erro `js/import`;
+  frameworks de UI (React, Vue, Svelte, lit, jQuery…) são recusados no cliente; os docs
+  (`docs/pacotes.md`) trazem a lista recomendada e a de "não use".
+- **[firme]** Servidor: pacote do `package.json` importado normalmente (inclusive CJS), sem
+  resolver no build; Node acha `node_modules` subindo de `dist/server`; o build grava
+  `server/package.json` com `"type": "module"`. Workers: `wrangler` empacota.
+- **[descartada]** Pré-empacotar dependências com `rolldown` + import map: mais peso e
+  complexidade; reavaliar se índices sem tree-shaking virarem problema.
+- **[descartada]** CDN em produção (esm.sh, jsdelivr) e vendoring manual como padrão.
+
 ## Observabilidade (OTel)
 
 - **[firme]** Logs em OpenTelemetry por design, no cliente e no servidor, sem configuração
@@ -156,8 +179,20 @@ em metade do tempo sem throttling (108 contra 212 ms). n = 1, um modelo por app.
 - **[firme v0]** `hyper` + `tokio` sem framework; `oxc`; `lightningcss`; `pragma-css`.
 - **[firme v0]** Parser de HTML próprio e estrito no compilador: toda tag não void fecha
   explicitamente; erro com linha e coluna. Substitui o em aberto `lol_html` × `html5ever`.
-- **[provável]** Distribuição com `cargo-dist`. Meta: igualar o esbuild do `tests_1`
+- **[firme]** A CLI fica em Rust; reescrever em Node foi descartado. *Motivo:* binário único
+  e boot instantâneo (bom para agentes que chamam a CLI em loop), parser nativo (oxc), e
+  Node não traz ganho de segurança: pacote npm roda com as mesmas permissões que um binário.
+- **[firme]** Distribuição via npm com binários pré-compilados por plataforma
+  (`optionalDependencies`, modelo esbuild/biome) + shim JS mínimo; `npx pragma` funciona sem
+  saber que é Rust. Também release no GitHub para quem não usa Node.
+- **[firme]** Ao publicar, o projeto será aberto (open source) e auditável: binários
+  gerados só no CI a partir do repo público, `npm publish --provenance` + attestations do
+  GitHub, checksums assinados (sigstore), nenhum `postinstall`, e a CLI sem acesso à rede
+  nem a nada fora do projeto. *Ainda não feito; só na publicação.*
+- **[provável]** Ferramenta de release: `cargo-dist`. Meta: igualar o esbuild do `tests_1`
   (build em cerca de 0,33 s, dev em cerca de 0,4 s).
+- **[proposta]** Build WASM/WASI opcional (ex.: `wasmtime --dir=.`) como sandbox real e
+  para playground no browser.
 - **[substituída]** "`pragma check` valida só JavaScript".
 
 ## Documentação
@@ -174,6 +209,10 @@ em metade do tempo sem throttling (108 contra 212 ms). n = 1, um modelo por app.
       `index.html`; falta resolver para `loja/[id].html` (no Node, o manifesto resolve).
 - [ ] Interfaces `db`, `kv` e `files` sobre o `env`.
 - [ ] Valores padrão dos orçamentos em `pragma.json`.
+- [ ] Publicação: pipeline de release (cargo-dist), pacotes npm por plataforma,
+      provenance/attestations e checksums assinados (ver "Ferramenta (CLI Rust)").
+- [ ] Pacotes npm: sem tree-shaking, importar o índice de um pacote grande baixa todos os
+      módulos; hoje só o orçamento segura. Avaliar aviso ou pré-empacotar.
 - [ ] Bundler depois da v0 (`rolldown` ou próprio sobre o oxc) e se ele compensa.
 - [ ] CSS por rota e CSS crítico inline.
 - [ ] Brotli ou gzip; pré-comprimir no build.

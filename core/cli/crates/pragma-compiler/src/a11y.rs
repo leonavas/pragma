@@ -87,10 +87,10 @@ impl A11y<'_> {
             _ => {}
         }
         if (name == "a" || name == "button") && !named(e) && !e.has("data-text") && !has_text(&e.children) {
-            self.warn(e.pos, "a11y/nome-acessivel", format!("<{name}> sem nome acessível: dê um texto, data-text ou aria-label"));
+            self.warn(e.pos, "a11y/nome-acessivel", format!("<{name}> sem nome acessível: dê um texto, :text ou aria-label"));
         }
         if e.has("data-on-click") && !INTERACTIVE.contains(&name.as_str()) && !(e.has("role") && has(e, "tabindex")) {
-            self.warn(e.pos, "a11y/clique-nao-interativo", format!("data-on-click em <{name}>: use <button>, ou dê role e tabindex"));
+            self.warn(e.pos, "a11y/clique-nao-interativo", format!("@click em <{name}>: use <button>, ou dê role e tabindex"));
         }
         if e.value("tabindex").and_then(|t| t.trim().parse::<i32>().ok()).is_some_and(|t| t > 0) {
             self.warn(e.pos, "a11y/tabindex", "tabindex maior que 0 bagunça a ordem do foco; use 0 ou -1");

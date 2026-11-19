@@ -1,10 +1,10 @@
-<div class="inline-flex items-center gap-2" role="group" data-attr-aria-label="props.rotulo">
-  <span class="text-sm text-muted" data-text="props.rotulo"></span>
-  <button type="button" class="btn btn-icone" data-on-click="menos" data-attr-disabled="state.semMenos">
-    <span aria-hidden="true">−</span><span class="sr-only">Diminuir <span data-text="props.rotulo"></span></span>
+<div class="inline-flex items-center gap-2" role="group" :aria-label="$rotulo">
+  <span class="text-sm text-muted" :text="$rotulo"></span>
+  <button type="button" class="btn btn-icone" @click="menos" :disabled="$semMenos">
+    <span aria-hidden="true">−</span><span class="sr-only">Diminuir <span :text="$rotulo"></span></span>
   </button>
-  <output class="w-8 text-center font-semibold tabular-nums" data-text="state.n"></output>
-  <button type="button" class="btn btn-icone" data-on-click="mais" data-attr-disabled="state.semMais">
-    <span aria-hidden="true">+</span><span class="sr-only">Aumentar <span data-text="props.rotulo"></span></span>
+  <output class="w-8 text-center font-semibold tabular-nums" :text="$n"></output>
+  <button type="button" class="btn btn-icone" @click="mais" :disabled="$semMais">
+    <span aria-hidden="true">+</span><span class="sr-only">Aumentar <span :text="$rotulo"></span></span>
   </button>
 </div>

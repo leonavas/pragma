@@ -2,16 +2,16 @@ export const state = () => ({ enviando: false, erro: '' })
 
 export const actions = {
   async curtir(ctx) {
-    ctx.state.enviando = true
-    ctx.state.erro = ''
+    ctx.$.enviando = true
+    ctx.$.erro = ''
     try {
-      const r = await ctx.call('curtir')
-      ctx.data.produto.curtidas = r.curtidas
-    } catch (e) {
-      ctx.log.error('falha ao curtir produto', { 'produto.id': ctx.params.id, 'exception.message': e.message })
-      ctx.state.erro = 'Não foi possível registrar agora.'
+      const resposta = await ctx.call('curtir')
+      ctx.data.produto.curtidas = resposta.curtidas
+    } catch (erro) {
+      ctx.log.error('falha ao curtir produto', { 'produto.id': ctx.params.id, 'exception.message': erro.message })
+      ctx.$.erro = 'Não foi possível registrar agora.'
     } finally {
-      ctx.state.enviando = false
+      ctx.$.enviando = false
     }
   },
 }

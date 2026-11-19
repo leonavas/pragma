@@ -1,0 +1,9 @@
+<div class="inline-flex">
+  <button type="button" class="btn" :data-open="$id" :popovertarget="$id">
+    <span :text="$rotulo"></span>
+    <svg class="size-4 text-muted" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
+  </button>
+  <div popover :id="$id" class="min-w-48 rounded-xl border border-line bg-surface p-1 text-sm text-ink shadow-lg">
+    <slot></slot>
+  </div>
+</div>
