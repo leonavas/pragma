@@ -1,31 +1,30 @@
 # Logs
 
-OpenTelemetry no cliente e no servidor, sem configuração. `ctx.log` em actions e `mount`; `log`
-no `load` e nas actions de servidor; `import { log } from '../core/log.js'` em `utils/`.
+OpenTelemetry on client and server, zero config. Use `ctx.log` in actions and `mount`; `log`
+in `load` and server actions; `import { log } from '../core/log.js'` in `utils/`.
 
 ```js
 export const actions = {
-  async salvar(ctx) {
+  async save(ctx) {
     try {
-      await ctx.call('salvar', { id: ctx.params.id })
-      ctx.log.info('pedido salvo', { 'pedido.id': ctx.params.id })
-    } catch (erro) {
-      ctx.log.error('falha ao salvar pedido', { 'pedido.id': ctx.params.id, 'exception.message': erro.message })
-      ctx.$.erro = 'Não foi possível salvar.'
+      await ctx.call('save', { id: ctx.params.id })
+      ctx.log.info('order saved', { 'order.id': ctx.params.id })
+    } catch (failure) {
+      ctx.log.error('order save failed', { 'order.id': ctx.params.id, 'exception.message': failure.message })
+      ctx.$.error = 'Could not save.'
     }
   },
 }
 ```
 
-| Nível | Quando |
+| Level | When |
 |---|---|
-| `debug` | diagnóstico (desligado em produção) |
-| `info` | fato de negócio |
-| `warn` | algo recuperável |
-| `error` | falha |
+| `debug` | diagnostics (off in production) |
+| `info` | business event |
+| `warn` | recoverable problem |
+| `error` | failure |
 
-- Mensagem curta e fixa; o que varia vai nos atributos (`pedido.id`, `exception.message`,
-  `http.request.method`).
-- Automático, não repita: erro não tratado, navegação, falha de fetch, span por request, `traceparent`.
-- Em `pragma dev`, todo `log.*` do cliente também aparece no console do navegador.
-- Proibido: `console.*`, log em laço ou a cada tecla, senha, token, cookie, e-mail ou dado pessoal.
+- Message: short and fixed. Variable parts go in attributes (`order.id`, `exception.message`, `http.request.method`).
+- Already automatic, do not repeat: unhandled errors, navigation, fetch failures, one span per request, `traceparent`.
+- In `pragma dev`, every client `log.*` also prints to the browser console.
+- Forbidden: `console.*`; logging inside loops or on every keystroke; passwords, tokens, cookies, emails or any personal data.

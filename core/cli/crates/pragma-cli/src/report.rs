@@ -22,8 +22,8 @@ fn relative(root: &Path, file: &Path) -> PathBuf {
 pub fn print_diagnostics(root: &Path, diagnostics: &[Diagnostic]) {
     for d in diagnostics {
         let level = match d.severity {
-            Severity::Error => red("erro"),
-            Severity::Warning => paint("33", "aviso"),
+            Severity::Error => red("error"),
+            Severity::Warning => paint("33", "warning"),
         };
         let rel = relative(root, &d.file);
         eprintln!("{}:{}:{} {level} {} {}", rel.display(), d.line, d.column, dim(&format!("[{}]", d.rule)), d.message);
@@ -41,7 +41,7 @@ pub fn print_diagnostics(root: &Path, diagnostics: &[Diagnostic]) {
     let errors = diagnostics.iter().filter(|d| d.severity == Severity::Error).count();
     let warnings = diagnostics.len() - errors;
     if !diagnostics.is_empty() {
-        eprintln!("{errors} erro(s), {warnings} aviso(s)");
+        eprintln!("{errors} error(s), {warnings} warning(s)");
     }
 }
 
@@ -55,7 +55,7 @@ pub fn diagnostics_json(root: &Path, diagnostics: &[Diagnostic]) -> String {
                 "column": d.column,
                 "rule": d.rule,
                 "message": d.message,
-                "severity": match d.severity { Severity::Error => "erro", Severity::Warning => "aviso" },
+                "severity": match d.severity { Severity::Error => "error", Severity::Warning => "warning" },
             })
         })
         .collect();
@@ -68,11 +68,11 @@ pub fn kb(bytes: u64) -> String {
 
 pub fn print_summary(report: &BuildReport) {
     let width = report.pages.iter().map(|p| p.pattern.chars().count()).max().unwrap_or(0).max(6);
-    println!("{:width$}  {:>8}", "página", "JS gzip");
+    println!("{:width$}  {:>8}", "page", "JS gzip");
     for page in &report.pages {
         println!("{:width$}  {:>8}", page.pattern, kb(page.js_gzip_bytes));
     }
     println!("{:width$}  {:>8}", "CSS", kb(report.css_gzip_bytes));
-    let server = if report.has_server { ", com servidor" } else { "" };
-    println!("{} página(s){server}", report.pages.len());
+    let server = if report.has_server { ", with server" } else { "" };
+    println!("{} page(s){server}", report.pages.len());
 }

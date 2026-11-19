@@ -119,13 +119,13 @@ export function flush(records, env = {}) {
     headers: { ...parsePairs(env.OTEL_EXPORTER_OTLP_HEADERS), 'content-type': 'application/json' },
     body: JSON.stringify(toOtlp(records)),
   }).then(
-    (res) => res.ok || fallback(records, `OTLP respondeu ${res.status}`),
+    (res) => res.ok || fallback(records, `OTLP responded ${res.status}`),
     (err) => fallback(records, err),
   )
 }
 
 function fallback(records, error) {
-  writeLine({ timeUnixNano: nowUnixNano(), severityNumber: SEVERITY.WARN, severityText: 'WARN', body: 'falha ao exportar logs OTLP', attributes: exceptionAttributes(error), resource: records[0].resource })
+  writeLine({ timeUnixNano: nowUnixNano(), severityNumber: SEVERITY.WARN, severityText: 'WARN', body: 'failed to export OTLP logs', attributes: exceptionAttributes(error), resource: records[0].resource })
   for (const r of records) writeLine(r)
 }
 
@@ -143,7 +143,7 @@ function cleanAttributes(attrs) {
 }
 
 export function fromClient(payload) {
-  if (!payload || !Array.isArray(payload.logs)) throw new Error('lote de logs inválido')
+  if (!payload || !Array.isArray(payload.logs)) throw new Error('invalid log batch')
   const resource = {}
   for (const [k, v] of Object.entries(payload.resource ?? {})) if (typeof v === 'string') resource[k.slice(0, 128)] = v.slice(0, 256)
   resource['service.name'] ??= 'pragma-client'

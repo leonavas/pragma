@@ -1,0 +1,10 @@
+<div class="inline-flex items-center gap-2" role="group" :aria-label="$label">
+  <span class="text-sm text-muted" :text="$label"></span>
+  <button type="button" class="btn btn-icon" @click="decrement" :disabled="$atMin">
+    <span aria-hidden="true">−</span><span class="sr-only">Decrease <span :text="$label"></span></span>
+  </button>
+  <output class="w-8 text-center font-semibold tabular-nums" :text="$count"></output>
+  <button type="button" class="btn btn-icon" @click="increment" :disabled="$atMax">
+    <span aria-hidden="true">+</span><span class="sr-only">Increase <span :text="$label"></span></span>
+  </button>
+</div>

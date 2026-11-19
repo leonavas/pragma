@@ -1,386 +1,400 @@
-# pragma v0 — contrato de implementação
+# pragma v0: implementation contract
 
-Fonte única para quem implementa o pragma. Decisões e motivos: `DECISOES.md`.
-Mudar este contrato exige avisar o coordenador (@claude-16).
+Single source for implementers. Decisions and rationale: `DECISIONS.md`.
+Changing this contract requires notifying the coordinator (`@claude-16`).
 
-## 0. Princípios
+## 0. Principles
 
-- JavaScript puro (ES modules). Nunca TypeScript, nunca JSDoc de tipos.
-- Nunca HTML em JS: sem `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`,
-  `createElement`, nem template literal com markup. A marcação vive em `.html`.
-  Exceção: o runtime (`core/`) clona `<template>` e aplica diretivas.
-- Página abre rápido: HTML pré-gerado com skeleton, dados buscados em paralelo.
-  Cada página baixa só o JS dos módulos que usa.
-- Determinístico e fechado: uma forma de fazer cada coisa; o que não está aqui é erro.
-- Sem comentários, em nada (app e framework). O código é a documentação: nomes que se explicam.
-  No app, `pragma check` barra comentário e nome vago.
+- Plain JavaScript (ES modules). Never TypeScript, never JSDoc types.
+- Never HTML in JS: no `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`,
+  `createElement`, or template literals with markup. Markup lives in `.html`.
+  Exception: the runtime (`core/`) clones `<template>` and applies directives.
+- Pages open fast: prebuilt HTML with skeleton, data fetched in parallel.
+  Each page downloads only the JS of the modules it uses.
+- Deterministic and closed: one way to do each thing; anything not listed here is an error.
+- No comments anywhere (app and framework). Code is the documentation: self-explaining names.
+  In the app, `pragma check` rejects comments and vague names.
+- English everywhere: messages, docs, identifiers.
 
-## 1. Repositório do pragma
+## 1. pragma repository
 
 ```
 core/
-  DECISOES.md  SPEC.md  README.md
-  docs/              docs para LLMs (copiadas para <app>/core/docs/)
-  runtime/           JS do framework (copiado para <app>/core/)
-    server/          handler fetch, SSR, adaptador Node, logs do servidor
-  starter/           esqueleto de app usado por `pragma new`
-  cli/               workspace Rust
-    crates/pragma-diag      tipo Diagnostic compartilhado
-    crates/pragma-css       subconjunto Tailwind + base CSS
-    crates/pragma-jslint    regras de JS (oxc)
-    crates/pragma-compiler  build, análise, diretivas
-    crates/pragma-cli       binário `pragma`: new, dev, build, check, serve
-  exemplo/           app de exemplo (gerado com `pragma new`)
+  DECISIONS.md  SPEC.md  TEAM.md  TESTING.md  README.md
+  docs/              LLM docs (copied to <app>/core/docs/)
+  runtime/           framework JS (copied to <app>/core/)
+    server/          fetch handler, SSR, Node adapter, server logs
+  starter/           app skeleton used by `pragma new`
+  cli/               Rust workspace
+    crates/pragma-diag      shared Diagnostic type
+    crates/pragma-css       Tailwind subset + base CSS
+    crates/pragma-jslint    JS rules (oxc)
+    crates/pragma-compiler  build, analysis, directives
+    crates/pragma-cli       `pragma` binary: new, dev, build, check, serve
+  example/           example app (generated with `pragma new`)
 ```
 
-## 2. Estrutura do app (fixa)
+## 2. App structure (fixed)
 
 ```
 <app>/
-  AGENTS.md            regras para agentes (CLAUDE.md aponta para ele)
-  pragma.json          config: { "name", "budgets": { "initialJsKb", "routeJsKb", "cssKb" } }
+  AGENTS.md            agent rules (CLAUDE.md points to it)
+  pragma.json          config: { "name", "lang", "budgets": { "initialJsKb", "routeJsKb", "cssKb" } }
   routes/
-    _layout.html       layout raiz; contém <main data-page><slot></slot></main>
+    _layout.html       root layout; contains <main data-page><slot></slot></main>
     _404.html
     index.html         → /
-    index.js           comportamento da página (opcional)
-    index.server.js    dados da página (opcional)
-    loja/
-      index.html       → /loja
-      [id].html        → /loja/:id
+    index.js           page behavior (optional)
+    index.server.js    page data (optional)
+    shop/
+      index.html       → /shop
+      [id].html        → /shop/:id
       [id].js  [id].server.js
-      _components/<nome>/<nome>.html|.js|.css   componentes só desta rota
+      _components/<name>/<name>.html|.js|.css   components for this route only
   lib/
-    components/<nome>/<nome>.html|.js|.css      componentes do app
-      modal/  alert/  dropdown/                 vêm do starter
-    state/<nome>.js    estado compartilhado (store)
-    theme.css          tokens e classes custom globais
-  utils/               funções puras JS
-  public/              arquivos copiados como estão
-  core/                framework (gerado; não editar)
+    components/<name>/<name>.html|.js|.css      app components
+      modal/  alert/  dropdown/                 from the starter
+    state/<name>.js    shared state (store)
+    theme.css          global tokens and custom classes
+  utils/               pure JS functions
+  public/              files copied as-is
+  core/                framework (generated; do not edit)
 ```
 
-Regras de rota:
-- Todo `.html` em `routes/` é rota, exceto nomes e pastas que começam com `_`.
-- `index.html` responde pela pasta. `x.html` e `x/index.html` juntos = erro de build.
-- `[nome]` (arquivo ou pasta) = path param. Estático vence param.
-- Arquivo de página é fragmento: conteúdo que entra no `<slot>` do `_layout.html`.
-  Um `<title>` no topo do fragmento vira o título da página.
-- Componente usado na página: `<c-nome>` = `lib/components/<nome>/`; `<p-nome>` =
-  `_components/<nome>/` da pasta da página ou de uma acima, até `routes/`. Não encontrado = erro.
+Route rules:
+- Every `.html` in `routes/` is a route, except names and folders starting with `_`.
+- `index.html` serves its folder. `x.html` plus `x/index.html` = build error.
+- `[name]` (file or folder) = path param. Static beats param.
+- A page file is a fragment: content placed in the `<slot>` of `_layout.html`.
+  A `<title>` at the top of the fragment becomes the page title.
+- Component use: `<c-name>` = `lib/components/<name>/`; `<p-name>` = `_components/<name>/` in
+  the page's folder or any ancestor up to `routes/`. Not found = error.
 
-## 3. Sintaxe do HTML (lista fechada)
+## 3. HTML syntax (closed list)
 
-`:` liga valor, `.` liga classe, `@` liga evento, `$` é estado ou prop do dono. O build traduz
-para os `data-*` internos que o runtime lê (`:text` → `data-text`, `@click` → `data-on-click`,
-`:href` → `data-attr-href`, `.x` → `data-class-x`, `$x` → `state.x` ou prop). Escrever `data-*`
-de diretiva, `state.` ou `props.` no fonte é erro.
+`:` binds a value, `.` binds a class, `@` binds an event, `$` is owner state or prop. Condition
+and repetition are tags (`<if>`, `<else-if>`, `<else>`, `<for>`, `<empty>`). The build
+translates everything to the internal `data-*` the runtime reads (`:text` → `data-text`,
+`@click` → `data-on-click`, `:href` → `data-attr-href`, `.x` → `data-class-x`, `$x` →
+`state.x` or prop). Writing directive `data-*`, `<template>`, `state.` or `props.` in source is an error.
 
-Caminhos: só `raiz.a.b` (sem expressões, chamadas, índices). Raízes: `$x` (estado ou prop do
-dono), `data` (retorno do `load`), `shared` (stores), `params` `query` (strings), `page`
-(`page.loading`, `page.error`), variável do `:for`.
+Paths: only `root.a.b` (no expressions, calls, indexes). Roots: `$x` (owner state or prop),
+`data` (`load` result), `shared` (stores), `params` `query` (strings), `page`
+(`page.loading`, `page.error`), `<for>` variable.
 
-| Sintaxe | Onde | Efeito |
+| Syntax | Where | Effect |
 |---|---|---|
-| `:text="p"` | elemento | `textContent` (escapado) |
-| `:<atributo>="p"` | elemento | atributo; `false`/`null`/`undefined` remove; `true` = vazio |
-| `.<classe>="[!]p"` | elemento | liga/desliga a classe |
-| `:show="[!]p"` | elemento | `hidden` quando falso |
-| `:if="[!]p"` / `:else` | `<template>` | bloco condicional; `:else` logo após `:if` |
-| `:for="x in p"` + `:key="x.campo"` | `<template>` | repete; `:key` obrigatório |
-| `:empty` | `<template>` logo após `:for` | lista vazia |
-| `:model="$p"` | input/select/textarea | mão dupla; só `$` ou `shared` |
-| `@<evento>="acao"` | elemento | chama `actions.acao` do dono |
-| `@open="id"` `@close` | botão | abre/fecha overlay (seção 6) |
+| `:text="p"` | element | `textContent` (escaped) |
+| `:<attribute>="p"` | element | attribute; `false`/`null`/`undefined` removes; `true` = empty |
+| `.<class>="[!]p"` | element | toggles the class |
+| `:show="[!]p"` | element | `hidden` when false |
+| `:model="$p"` | input/select/textarea | two-way; only `$` or `shared` |
+| `@<event>="action"` | element | calls the owner's `actions.action` |
+| `@open="id"` `@close` | button | opens/closes overlay (section 6) |
 
-Regras: `<template>` com `:if|:else|:for|:empty` tem exatamente 1 elemento raiz. Caminho
-inexistente em dev = erro. `!` só em `:if`, `:show` e `.classe`. `style` e `on*` inline são
-proibidos. `:checked` e `:selected` também ligam a propriedade.
+Blocks (path unquoted; the build emits `<template data-if>` etc.):
 
-**Dono léxico.** O dono de `@`, `:model` e `$` é quem escreveu o elemento: no `.html` de um
-componente com módulo, o componente; na página, a página. Conteúdo de slot pertence a quem o
-escreveu. O build marca cada raiz de conteúdo de slot que tenha diretivas com `data-slot="n"`
-(n = quantos componentes acima está o dono); o runtime avalia esse elemento no escopo de fora
-daquele componente. As diretivas da raiz de um componente com módulo pertencem ao componente.
+| Syntax | Effect |
+|---|---|
+| `<if [!]p>…</if>` | conditional block |
+| `<else-if [!]p>…</else-if>` | right after `</if>` or `</else-if>`; any number |
+| `<else>…</else>` | right after `</if>` or `</else-if>` |
+| `<for x in p key=x.field>…</for>` | repeats; `key` required |
+| `<empty>…</empty>` | right after `</for>`: empty list |
 
-### Componentes
+Rules: each block has exactly 1 root element. Missing path in dev = error. `!` only in `<if>`,
+`<else-if>`, `:show` and `.class`. Inline `style` and `on*` are forbidden. `:checked` and
+`:selected` also set the property.
 
-`<c-x>` = `lib/components/x/x.html`; `<p-x>` = `_components/x/x.html` da pasta da página ou de uma
-acima, até `routes/`. 1 elemento raiz. Expandido no build (macro).
-- Prop fixa `titulo="X"`: literal no build. Prop dinâmica `:total="caminho"`: avaliada no escopo
-  de quem usa e atualizada a cada render. Dentro: `$titulo`, `$total` (HTML) e `ctx.$` (JS).
-- Prop é só leitura; prop ausente = vazio/falso; prop com nome de chave do estado = erro.
-- Componente com módulo não recebe `$` de quem usa via `:x` (lá dentro `$` é o dele).
-- `<slot></slot>` recebe os filhos; `<slot name="acoes">` recebe filhos com `slot="acoes"`.
-- O build marca a raiz com `data-c="x"`. `x.js` só carrega nas páginas que usam o componente.
+**Lexical owner.** The owner of `@`, `:model` and `$` is whoever wrote the element: in a
+component's `.html` with a module, the component; in a page, the page. Slot content belongs to
+its author. The build marks each slot-content root that has directives with `data-slot="n"`
+(n = how many components up the owner is); the runtime evaluates that element in the scope
+outside that component. Directives on the root of a component with a module belong to the component.
 
-### DOM de blocos renderizados (cliente e SSR fazem igual)
+### Components
 
-O `<template>` fica no DOM. Cada instância é inserida como irmã logo depois dele, com
-`data-of="<tid>"` (id que o build põe no template como `data-tid`) e, em `for`,
-`data-key="<valor>"`. Atualizações fazem diff por chave; não recriam nós existentes.
+`<c-x>` = `lib/components/x/x.html`; `<p-x>` = `_components/x/x.html` in the page's folder or
+any ancestor up to `routes/`. 1 root element. Expanded at build (macro).
+- Static prop `title="X"`: build-time literal. Dynamic prop `:total="path"`: evaluated in the
+  user's scope and updated each render. Inside: `$title`, `$total` (HTML) and `ctx.$` (JS).
+- Props are read-only; missing prop = empty/false; prop named like a state key = error.
+- A component with a module does not receive the user's `$` via `:x` (inside, `$` is its own).
+- `<slot></slot>` receives children; `<slot name="actions">` receives children with `slot="actions"`.
+- The build marks the root with `data-c="x"`. `x.js` loads only on pages using the component.
 
-### Formato compilado (para SSR)
+### Rendered block DOM (client and SSR identical)
 
-O build gera `templates/<rota>.json`: lista de ops.
+The generated `<template>` stays in the DOM. Each instance is inserted as a sibling right after
+the template of the branch that produced it, with `data-of="<tid>"` (the `data-tid` of the
+`if`/`for` opening the chain) and, in `for`, `data-key="<value>"`. Updates diff by key; existing
+nodes are not recreated.
+
+### Compiled format (for SSR)
+
+The build emits `templates/<route>.json`: a list of ops.
 ```
 ["html", "<literal>"]
 ["text", "path"]
-["attr", "nome", "path"]                    dentro da tag de abertura
-["class", "estaticas", [["nome","path",neg]]]
+["attr", "name", "path"]                    inside the opening tag
+["class", "static", [["name","path",neg]]]
 ["show", "path", neg]
-["if", tid, "path", neg, [ops], [opsElse]]
-["for", tid, "var", "path", "keyPath", [ops], [opsEmpty]]
+["if", tid, "path", neg, [ops]]
+["elif", tid, "path", neg, [ops]]           only if no earlier branch in the chain rendered
+["else", tid, [ops]]
+["for", tid, "var", "path", "keyPath", [ops]]
+["empty", tid, [ops]]                       only if the preceding for had no items
 ```
-Instâncias saem com `data-of` e `data-key` como acima. Bloco recém-inserido no cliente que
-tenha `[autofocus]` recebe o foco.
+Each block op follows its template's html. A chain with a `state`/`shared` path is left entirely
+to the client. Instances carry `data-of` and `data-key` as above. A block newly inserted on the
+client with `[autofocus]` receives focus.
 
-## 4. Módulos de página e componente (cliente)
+## 4. Page and component modules (client)
 
 ```js
 export const state = ctx => ({
-  aberto: false,
-  get total() { return ctx.shared.carrinho.itens.length },
+  expanded: false,
+  get total() { return ctx.shared.cart.items.length },
 })
 export const actions = {
-  alternar(ctx) { ctx.$.aberto = !ctx.$.aberto },
-  async salvar(ctx) { await ctx.call('salvar', { id: ctx.params.id }) },
+  toggle(ctx) { ctx.$.expanded = !ctx.$.expanded },
+  async save(ctx) { await ctx.call('save', { id: ctx.params.id }) },
 }
 export function mount(ctx) {
-  const intervalo = setInterval(() => ctx.update(estado => { estado.agora = Date.now() }), 1000)
-  return () => clearInterval(intervalo)
+  const timer = setInterval(() => ctx.update(state => { state.now = Date.now() }), 1000)
+  return () => clearInterval(timer)
 }
 ```
 `ctx`: `$ data shared params query page event el scope log open close confirm navigate call update`
-(`$` = estado + props do dono).
-- `state(ctx)` recebe o ctx do dono (sem `event`/`el`/`scope` de evento); `ctx.data` só existe
-  depois do load. Valor derivado = getter no objeto de estado ou do store, recalculado a cada
-  render.
-- Depois de cada action (sync ou async) o runtime reaplica as diretivas.
-  Fora de actions, mudar estado só via `ctx.update(fn)`.
-- `mount` é só para efeitos externos (timer, listener global, observer). Retorna cleanup,
-  chamado ao sair da página/remover o componente.
-- `lib/state/carrinho.js`: `export default store({ itens: [] }, { persist: 'carrinho' })`
-  (`store` vem de `core/state.js`). Usado no template como `shared.carrinho.*` e no JS
-  como `ctx.shared.carrinho`. Getters do store são derivados (não vão para o `localStorage`);
-  métodos do store concentram as mutações usadas por várias páginas.
+(`$` = owner state + props).
+- `state(ctx)` gets the owner's ctx (no event `event`/`el`/`scope`); `ctx.data` exists only
+  after load. Derived value = getter on the state object or store, recomputed each render.
+- After each action (sync or async) the runtime reapplies directives.
+  Outside actions, change state only via `ctx.update(fn)`.
+- `mount` is only for external effects (timer, global listener, observer). Returns a cleanup,
+  called when leaving the page/removing the component.
+- `lib/state/cart.js`: `export default store({ items: [] }, { persist: 'cart' })`
+  (`store` from `core/state.js`). Used in templates as `shared.cart.*` and in JS as
+  `ctx.shared.cart`. Store getters are derived (not saved to `localStorage`); store methods
+  hold mutations shared by several pages.
 
-## 5. Dados, loaders e SSR
+## 5. Data, loaders and SSR
 
-`routes/loja/[id].server.js`:
+`routes/shop/[id].server.js`:
 ```js
-export async function load({ params, query, request, env, log }) { return { produto } }
-export const actions = { async salvar({ input, params, env, log }) { return { ok: true } } }
+export async function load({ params, query, request, env, log }) { return { product } }
+export const actions = { async save({ input, params, env, log }) { return { ok: true } } }
 export const ssr = false
 ```
-- Padrão sem SSR: o HTML pré-gerado chega com skeleton (`<template :if="page.loading">`).
-  O cliente busca `GET /_data/<caminho>?<query>` → `{ "data": ... }` ou `{ "error": { "message" } }`.
-- O build injeta no `<head>` das páginas com loader um script inline mínimo que dispara o
-  fetch antes dos módulos: `self.__pd = fetch('/_data' + location.pathname + location.search)`.
-  O runtime usa `self.__pd` se existir.
-- `ctx.call('nome', input)` → `POST /_action/<caminho>/<nome>` com JSON → retorno da action.
-- `ssr = true`: o servidor roda `load`, renderiza o template compilado e embute os dados em
-  `<script type="application/json" id="pragma-data">`. O cliente liga as diretivas sem
-  reconstruir o DOM.
-- Erro no `load` → `page.error` no cliente; 500 com log ERROR no servidor.
+- Default, no SSR: prebuilt HTML arrives with skeleton (`<if page.loading>`).
+  The client fetches `GET /_data/<path>?<query>` → `{ "data": ... }` or `{ "error": { "message" } }`.
+- In the `<head>` of pages with a loader, the build injects a minimal inline script that starts
+  the fetch before modules: `self.__pd = fetch('/_data' + location.pathname + location.search)`.
+  The runtime uses `self.__pd` if present.
+- `ctx.call('name', input)` → `POST /_action/<path>/<name>` with JSON → action result.
+- `ssr = true`: the server runs `load`, renders the compiled template and embeds data in
+  `<script type="application/json" id="pragma-data">`. The client binds directives without
+  rebuilding the DOM.
+- Error in `load` → `page.error` on the client; 500 with ERROR log on the server.
 
 ## 6. Overlays: modal, alert, dropdown, popover
 
-Sempre HTML + JS. Primitiva em `core/overlay.js`; componentes em `lib/components/`.
-- Modal e alert: `<dialog>` com `showModal()`. Alert usa `role="alertdialog"`.
-- Dropdown e popover: atributo `popover` nativo.
-- Abrir: `<button @open="sobre">`. Fechar: `@close` dentro do overlay, Esc ou clique
-  no fundo (modal). Em JS: `ctx.open(id)`, `ctx.close(id)`, `await ctx.confirm(id)` → o
-  `value` do botão `@close` clicado (`'cancel'` se fechou de outro jeito).
-- Voltar (browser ou Android) fecha o overlay do topo, nunca navega: abrir faz `pushState`;
-  `popstate` com overlay aberto fecha e para; fechar pela UI consome a entrada com `history.back()`.
-- Modal e alert travam o scroll da página (`html[data-scroll-lock]` com `overflow:hidden`). Se a
-  página tinha barra de rolagem, o valor é `gutter` e o CSS reserva o espaço dela
-  (`scrollbar-gutter: stable`); sem barra, nada é reservado. Sem salto de layout nos dois casos.
-  Vários abertos = pilha; destrava quando a pilha esvazia.
-- `core/overlay.js` só é importado em página com `<dialog>` ou `[popover]` (o build faz o
-  modulepreload dele só nessas páginas).
-- Foco volta ao elemento que abriu.
+Always HTML + JS. Primitive in `core/overlay.js`; components in `lib/components/`.
+- Modal and alert: `<dialog>` with `showModal()`. Alert uses `role="alertdialog"`.
+- Dropdown and popover: native `popover` attribute.
+- Open: `<button @open="about">`. Close: `@close` inside the overlay, Esc, or backdrop click
+  (modal). In JS: `ctx.open(id)`, `ctx.close(id)`, `await ctx.confirm(id)` → `value` of the
+  clicked `@close` button (`'cancel'` if closed otherwise).
+- Back (browser or Android) closes the top overlay, never navigates: opening does `pushState`;
+  `popstate` with an open overlay closes it and stops; closing via UI consumes the entry with `history.back()`.
+- Modal and alert lock page scroll (`html[data-scroll-lock]` with `overflow:hidden`). If the page
+  had a scrollbar, the value is `gutter` and CSS reserves its space (`scrollbar-gutter: stable`);
+  without one, nothing is reserved. No layout shift either way.
+  Several open = stack; unlocks when the stack empties.
+- `core/overlay.js` is imported only on pages with `<dialog>` or `[popover]` (the build
+  modulepreloads it only there).
+- Focus returns to the opener.
 
-Uso:
+Usage:
 ```html
-<button @open="sobre">Sobre</button>
-<c-modal id="sobre" titulo="Sobre o app">
-  <p>Conteúdo.</p>
-  <button slot="acoes" @close value="ok">Fechar</button>
+<button @open="about">About</button>
+<c-modal id="about" title="About the app">
+  <p>Content.</p>
+  <button slot="actions" @close value="ok">Close</button>
 </c-modal>
 ```
 
-## 7. Router (cliente)
+## 7. Router (client)
 
-- Intercepta cliques em `<a>` da mesma origem (sem `target`, `download` ou `data-reload`).
-- Prefetch no `pointerenter`/`focus` e quando o link entra na viewport (idle): baixa o HTML
-  pré-gerado da rota e faz `modulepreload` dos módulos dela (manifesto).
-- Navegar: busca HTML, troca o conteúdo de `<main data-page>` e o `<title>`, desmonta a
-  página anterior (cleanups), importa os módulos e dispara o loader em paralelo.
-  O layout não é recriado; suas diretivas são reaplicadas.
-- `popstate`: o gerenciador de overlay intercepta primeiro.
-- Scroll: topo em navegação nova; restaura em voltar/avançar. Foco vai para o `<main>`.
-- Links `href="/caminho"` (sem query nem hash) para a rota atual recebem `aria-current="page"`:
-  o build marca no HTML pré-gerado e o router mantém a cada navegação.
-- `document.startViewTransition` quando disponível.
-- Manifesto: `/_pragma/manifest.json` → `[{ "pattern": "/loja/:id", "html": "/loja/[id].html", "modules": [...], "loader": true, "ssr": false }]`.
+- Intercepts same-origin `<a>` clicks (without `target`, `download` or `data-reload`).
+- Prefetch on `pointerenter`/`focus` and when the link enters the viewport (idle): fetches the
+  route's prebuilt HTML and `modulepreload`s its modules (manifest).
+- Navigate: fetch HTML, swap the content of `<main data-page>` and `<title>`, unmount the
+  previous page (cleanups), import modules and start the loader in parallel.
+  The layout is not recreated; its directives are reapplied.
+- `popstate`: the overlay manager intercepts first.
+- Scroll: top on new navigation; restored on back/forward. Focus moves to `<main>`.
+- Links `href="/path"` (no query or hash) to the current route get `aria-current="page"`:
+  the build marks prebuilt HTML and the router keeps it on each navigation.
+- `document.startViewTransition` when available.
+- Manifest: `/_pragma/manifest.json` → `[{ "pattern": "/shop/:id", "html": "/shop/[id].html", "modules": [...], "loader": true, "ssr": false }]`.
 
 ## 8. CSS
 
 - `core/base.css`: preflight (Tailwind v4, MIT) + `@layer reset, tokens, base, components, utilities`.
-- `lib/theme.css`: tokens (`--color-*`, `--font-*`, `--radius-*`, `--shadow-*`) e classes custom
-  em `@layer components`.
-- Utilitários: subconjunto fechado com nomes do Tailwind v4, gerado pelo `pragma-css` só com as
-  classes usadas. Sem valores arbitrários (`w-[37px]` = erro). Lista em `docs/classes.md`
-  (gerada pelo próprio crate).
-- Classe no HTML precisa ser utilitário suportado ou estar definida no CSS do projeto
-  (`lib/theme.css`, `*.css` de componentes). Senão, erro no check.
-- Classe custom: quando a combinação se repete em 3+ lugares ou precisa de algo fora do
-  subconjunto. CSS de componente fica no `<nome>.css` e usa `[data-c="nome"]` como escopo.
-- Saída v0: um CSS global minificado (lightningcss) com hash.
+- `lib/theme.css`: tokens (`--color-*`, `--font-*`, `--radius-*`, `--shadow-*`) and custom
+  classes in `@layer components`.
+- Utilities: closed subset with Tailwind v4 names, generated by `pragma-css` with only used
+  classes. No arbitrary values (`w-[37px]` = error). List in `docs/classes.md` (generated by the crate).
+- A class in HTML must be a supported utility or defined in project CSS (`lib/theme.css`,
+  component `*.css`). Otherwise, check error.
+- Custom class: when a combination repeats in 3+ places or needs something outside the subset.
+  Component CSS goes in `<name>.css`, scoped with `[data-c="name"]`.
+- v0 output: one global minified CSS (lightningcss) with hash.
 
 ## 9. Build (`pragma build`)
 
 ```
 dist/
-  client/                 HTML por rota, assets com hash, /_pragma/manifest.json
-  server/worker.js        entrada Cloudflare Workers (se houver *.server.js)
-  server/node.mjs         adaptador Node (node:http) com estáticos
+  client/                 HTML per route, hashed assets, /_pragma/manifest.json
+  server/worker.js        Cloudflare Workers entry (if any *.server.js)
+  server/node.mjs         Node adapter (node:http) with static files
   server/wrangler.jsonc   assets dist/client, not_found_handling SPA, run_worker_first
-  templates/<rota>.json   só para rotas ssr
+  templates/<route>.json  ssr routes only
 ```
-- JS: ES modules sem bundler na v0. Cada módulo minificado (oxc) com hash no nome; imports
-  reescritos. Cada página recebe `<link rel="modulepreload">` só do que usa na primeira pintura:
-  o fecho dos imports estáticos (nunca os de `import()`), mais `core/overlay.js` se a página
-  tem overlay. O manifesto usa a mesma lista.
-- Build de dev põe `<script>self.__pragmaDev=true</script>` no `<head>` (erros de caminho e de
-  action em dev).
-- `index.html` não é cacheado; assets com hash são `immutable`.
-- Orçamentos de `pragma.json` checados no fim do build.
+- JS: ES modules, no bundler in v0. Each module minified (oxc) with hashed name; imports
+  rewritten. Each page gets `<link rel="modulepreload">` only for what first paint uses:
+  the static-import closure (never `import()`), plus `core/overlay.js` if the page has an
+  overlay. The manifest uses the same list.
+- Client npm packages: prebundled with `rolldown` (tree-shaking, only names the app imports),
+  one `/assets/npm/<package>-<hash>.js` per package and shared chunks in `/assets/npm/_*`;
+  modulepreloaded like app modules (`docs/packages.md`).
+- Dev build adds `<script>self.__pragmaDev=true</script>` to `<head>` (path and action errors in dev).
+- `index.html` is not cached; hashed assets are `immutable`.
+- `pragma.json` budgets checked at the end of the build.
 
 ## 10. Check (`pragma check`)
 
-Erros com arquivo:linha:coluna, regra e mensagem.
-- JS (oxc): HTML em JS (seção 0); `console.*`; TS ou JSDoc de tipos (`@type`, `@param {`,
-  `@returns {`, `@typedef`, `@ts-`); import fora do projeto e de `core/`; comentário
-  (`js/comentario`); nome vago (`js/nome-vago`).
-- HTML: sintaxe desconhecida ou antiga; raiz de caminho inválida; `:for` sem `:key`;
-  if/for fora de `<template>`; `:else`/`:empty` fora de lugar; bloco sem raiz única;
-  action inexistente no módulo dono; componente não encontrado; `style`/`on*` inline;
-  `<script>` em `routes/` e `lib/`.
-- CSS: classe desconhecida; valor arbitrário.
-- Orçamentos (faz build em diretório temporário).
-- Avisos de acessibilidade (`a11y/*`, não bloqueiam; `pragma check --strict` os torna erro),
-  sobre a página expandida, apontando o arquivo de origem: `img-alt`, `nome-acessivel` (button
-  ou a sem texto, `:text`, `aria-label`/`labelledby` ou `title`), `label` (input, select e
-  textarea; `type=hidden|submit|reset|button|image` isentos), `dialog-nome`,
-  `clique-nao-interativo` (`@click` fora de elemento interativo sem `role` e
-  `tabindex`), `heading` (nível pulado), `h1-unico` (ramos if/else contam separados),
-  `tabindex` (> 0), `id-duplicado`, `iframe-title`, `a-sem-href`.
+Errors with file:line:column, rule and message.
+- JS (oxc): HTML in JS (section 0); `console.*`; TS or JSDoc types (`@type`, `@param {`,
+  `@returns {`, `@typedef`, `@ts-`); import outside the project and `core/`; comment
+  (`js/comment`); vague name (`js/vague-name`).
+- HTML: unknown or legacy syntax; invalid path root; `<for>` without `key`; malformed block or
+  `<template>` in source; misplaced `<else-if>`/`<else>`/`<empty>`; block without single root;
+  action missing from the owner module; component not found; inline `style`/`on*`;
+  `<script>` in `routes/` and `lib/`.
+- CSS: unknown class; arbitrary value.
+- Budgets (builds in a temp dir).
+- Accessibility warnings (`a11y/*`, non-blocking; `pragma check --strict` makes them errors), on
+  the expanded page, pointing at the source file: `img-alt`, `accessible-name` (button or a
+  without text, `:text`, `aria-label`/`labelledby` or `title`), `label` (input, select,
+  textarea; `type=hidden|submit|reset|button|image` exempt), `dialog-name`,
+  `click-non-interactive` (`@click` on a non-interactive element without `role` and
+  `tabindex`), `heading` (skipped level), `single-h1` (if/else branches count separately),
+  `tabindex` (> 0), `duplicate-id`, `iframe-title`, `a-no-href`.
 
-## 11. Servidor e dev
+## 11. Server and dev
 
-- Código de servidor é JS no formato `fetch(request, env, ctx)`. Cloudflare Workers é o alvo
-  preferido; Node ≥ 22 via `dist/server/node.mjs`.
-- `pragma dev` (Rust, hyper + tokio, porta 5180): build incremental em `.pragma/dev/`,
-  watch, live reload por SSE em `/_pragma/reload` (CSS troca sem recarregar). Se houver
-  `*.server.js`, sobe `node .pragma/dev/server/node.mjs` numa porta interna e faz proxy de
-  `/_data`, `/_action`, `/_otel` e páginas ssr.
-- `pragma serve`: o mesmo servidor sem watch, sobre `dist/`. Ctrl+C ou SIGTERM encerram também o
-  node filho.
-- Caminho que termina em `.html` nunca é página SSR (é o HTML pré-gerado que o router busca),
-  no `pragma dev/serve` e no handler.
-- `pragma new <dir>`: copia `starter/` + `runtime/` → `<dir>/core/` + `docs/` → `<dir>/core/docs/`
-  (embutidos no binário).
+- Server code is JS in `fetch(request, env, ctx)` form. Cloudflare Workers is the preferred
+  target; Node ≥ 22 via `dist/server/node.mjs`.
+- `pragma dev` (Rust, hyper + tokio, port 5180): incremental build in `.pragma/dev/`, watch,
+  live reload via SSE at `/_pragma/reload` (CSS swaps without reload). If any `*.server.js`
+  exists, starts `node .pragma/dev/server/node.mjs` on an internal port and proxies `/_data`,
+  `/_action`, `/_otel` and ssr pages.
+- `pragma serve`: same server without watch, over `dist/`. Ctrl+C or SIGTERM also stop the
+  child node.
+- A path ending in `.html` is never an SSR page (it is the prebuilt HTML the router fetches),
+  in `pragma dev/serve` and in the handler.
+- `pragma new <dir>`: copies `starter/` + `runtime/` → `<dir>/core/` + `docs/` → `<dir>/core/docs/`
+  (embedded in the binary).
 
 ## 12. Logs (OpenTelemetry)
 
-- `core/log.js` (cliente) e `core/server/log.js`: `log.debug|info|warn|error(msg, attrs)`.
-  Registro no OTel Logs Data Model; atributos com semantic conventions.
-- Cliente: captura `error`, `unhandledrejection`, navegação e falha de fetch; envia em lote
-  para `POST /_otel` (`keepalive`/`sendBeacon` no `visibilitychange`). Todo fetch do runtime
-  manda `traceparent`.
-- Servidor: span por request; `/_otel` repassa para OTLP/HTTP se `OTEL_EXPORTER_OTLP_ENDPOINT`
-  existir, senão imprime JSON OTel no stdout.
-- `pragma dev` mostra os logs legíveis no terminal.
+- `core/log.js` (client) and `core/server/log.js`: `log.debug|info|warn|error(msg, attrs)`.
+  Records follow the OTel Logs Data Model; attributes use semantic conventions.
+- Client: captures `error`, `unhandledrejection`, navigation and fetch failures; batches to
+  `POST /_otel` (`keepalive`/`sendBeacon` on `visibilitychange`). Every runtime fetch sends
+  `traceparent`.
+- Server: span per request; `/_otel` forwards to OTLP/HTTP if `OTEL_EXPORTER_OTLP_ENDPOINT`
+  is set, else prints OTel JSON to stdout.
+- `pragma dev` prints readable logs in the terminal.
 
-## 13. Fora da v0
+## 13. Out of v0
 
-SSG com dados (`entries()`), CSS por rota, layouts aninhados, `[...rest]`, bundler,
+SSG with data (`entries()`), per-route CSS, nested layouts, `[...rest]`, bundler,
 Speculation Rules, i18n.
 
-## 14. Contrato build ↔ runtime
+## 14. Build ↔ runtime contract
 
-### HTML gerado por página
+### Generated HTML per page
 ```html
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">                                         from pragma.json "lang" (default "en")
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>…</title>
-  <script>try{document.documentElement.dataset.theme=…}catch{}</script>   só se o app usa core/theme.js
+  <script>try{document.documentElement.dataset.theme=…}catch{}</script>   only if the app uses core/theme.js
   <link rel="stylesheet" href="/assets/app-<hash>.css">
   <script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}})</script>
-  <link rel="modulepreload" href="/assets/…">            um por módulo da página
+  <link rel="modulepreload" href="/assets/…">            one per page module
   <script type="application/json" id="pragma-route">{…}</script>
   <script type="module" src="/assets/core/boot-<hash>.js"></script>
 </head>
-<body>…conteúdo do _layout.html com <main data-page>…página…</main>…</body>
+<body>…_layout.html content with <main data-page>…page…</main>…</body>
 </html>
 ```
-- `__pd` só em páginas com loader. Tags extras de `<head>` podem vir de um bloco `<head>` no
-  início do `_layout.html`.
-- `#pragma-route`: `{ "pattern", "page": "<url do módulo da página ou null>",
-  "components": { "<nome>": "<url>" }, "loader": bool, "ssr": bool }`. Só componentes com `.js`.
-- Os módulos de `core/` (boot, router, …) também saem com hash; imports entre eles reescritos.
+- `__pd` only on pages with a loader. Extra `<head>` tags may come from a `<head>` block at the
+  start of `_layout.html`.
+- `#pragma-route`: `{ "pattern", "page": "<page module url or null>",
+  "components": { "<name>": "<url>" }, "loader": bool, "ssr": bool }`. Only components with `.js`.
+- `core/` modules (boot, router, …) are also hashed; imports between them rewritten.
 
-### Interfaces JS entre arquivos do runtime
-- `core/boot.js`: entrada. Lê `#pragma-route`, inicia log e router, monta a página.
-- `core/page.js` importa `core/overlay.js` sob demanda (`overlays()`) e o exporta em `overlay`
-  para o router (`overlay?.handlePopState`, `overlay?.closeAll`).
-- `core/overlay.js` (dono: overlays): `initOverlays({ log })`, `open(id)`, `close(id)`,
-  `confirm(id) → Promise<string>`, `handlePopState(event) → boolean` (true = consumido; o
-  router não navega).
-- `core/log.js` (dono: servidor/logs): `log` com `debug|info|warn|error(msg, attrs)`,
+### JS interfaces between runtime files
+- `core/boot.js`: entry. Reads `#pragma-route`, starts log and router, mounts the page.
+- `core/page.js` imports `core/overlay.js` on demand (`overlays()`) and exports it as `overlay`
+  for the router (`overlay?.handlePopState`, `overlay?.closeAll`).
+- `core/overlay.js` (owner: overlays): `initOverlays({ log })`, `open(id)`, `close(id)`,
+  `confirm(id) → Promise<string>`, `handlePopState(event) → boolean` (true = consumed; the
+  router does not navigate).
+- `core/log.js` (owner: server/logs): `log` with `debug|info|warn|error(msg, attrs)`,
   `initClientLog({ endpoint: '/_otel', service })`, `traceHeaders() → { traceparent }`.
-- `core/state.js` (dono: runtime cliente): `store(initial, { persist })`.
-- Dono de um módulo de componente: léxico (§3). O runtime guarda o dono no escopo de cada
-  elemento; `data-slot="n"` volta n componentes. Sem dono de componente, o dono é a página. O layout não tem
-  módulo na v0: suas diretivas usam `shared`, `params`, `query`.
-- `/_pragma/reload` (SSE) e `/_pragma/dev.js` (cliente do live reload) são servidos pelo
-  `pragma dev`, injetado só em dev.
+- `core/state.js` (owner: client runtime): `store(initial, { persist })`.
+- Component module owner: lexical (§3). The runtime stores the owner in each element's scope;
+  `data-slot="n"` goes up n components. With no component owner, the owner is the page. The
+  layout has no module in v0: its directives use `shared`, `params`, `query`.
+- `/_pragma/reload` (SSE) and `/_pragma/dev.js` (live reload client) are served by
+  `pragma dev`, injected only in dev.
 
-### CSS que o runtime espera do `base.css`
+### CSS the runtime expects from `base.css`
 `html[data-scroll-lock]{overflow:hidden}`, `html[data-scroll-lock=gutter]{scrollbar-gutter:stable}`, `[hidden]{display:none!important}`,
-`dialog::backdrop` padrão e `.skeleton` (bloco pulsante com `prefers-reduced-motion`).
+default `dialog::backdrop` and `.skeleton` (pulsing block honoring `prefers-reduced-motion`).
 
-## 15. Contrato servidor ↔ build
+## 15. Server ↔ build contract
 
 ```js
 // core/server/handler.js
 export function createHandler({ routes }) → { fetch(request, env, ctx) }
-// routes: [{ pattern: '/loja/:id', server: <namespace do .server.js>, ssr: bool,
-//            template: <ops compiladas> | null, shell: '<html da página pré-gerada>' | null }]
+// routes: [{ pattern: '/shop/:id', server: <.server.js namespace>, ssr: bool,
+//            template: <compiled ops> | null, shell: '<prebuilt page html>' | null }]
 ```
-- Trata `/_data/*`, `/_action/*`, `/_otel` e páginas `ssr`. O resto: `env.ASSETS.fetch(request)`
-  (Workers) ou o servidor de estáticos do adaptador Node.
-- O build gera `dist/server/worker.js`: importa `./core/server/handler.js` e cada
-  `.server.js` (copiados para `dist/server/` com seus imports relativos, preservando
-  caminhos), embute templates e shells como objetos JS e faz `export default createHandler(...)`.
-- O build gera `dist/server/node.mjs`:
+- Handles `/_data/*`, `/_action/*`, `/_otel` and `ssr` pages. Everything else:
+  `env.ASSETS.fetch(request)` (Workers) or the Node adapter's static server.
+- The build emits `dist/server/worker.js`: imports `./core/server/handler.js` and each
+  `.server.js` (copied to `dist/server/` with relative imports, paths preserved), embeds
+  templates and shells as JS objects and does `export default createHandler(...)`.
+- The build emits `dist/server/node.mjs`:
   `import h from './worker.js'; import { serve } from './core/server/node.mjs'; serve(h, { root: new URL('../client/', import.meta.url), port: process.env.PORT ?? 3000 })`.
-- O adaptador Node serve estáticos de `client/` com MIME e cache certos, resolve rotas com
-  param para o HTML delas via `client/_pragma/manifest.json` e responde `_404.html` com 404.
+- The Node adapter serves `client/` statics with correct MIME and cache, resolves param routes
+  to their HTML via `client/_pragma/manifest.json`, and answers `_404.html` with 404.
 
-## 16. Paleta padrão
+## 16. Default palette
 
-Cores que o `base.css` define e o `pragma-css` gera (`text-`, `bg-`, `border-`, `ring-`…):
-`white`, `black`, `transparent`, `current` e `{neutral,primary,danger,success,warning}-{50,100,200,300,400,500,600,700,800,900,950}`.
-O `lib/theme.css` pode redefinir valores e criar novas cores com `--color-<nome>` ou
-`--color-<nome>-<tom>`; o gerador as reconhece. Escuro: `[data-theme="dark"]` no `<html>`
-e variante `dark:`. Trocar o tema: `setTheme('dark'|'light')` e `theme()` de `core/theme.js`
-(grava `localStorage['pragma:theme']`). Se algum módulo do app importa `core/theme.js`, o build
-põe em toda página, antes do CSS, um script inline que restaura o tema (ou segue
-`prefers-color-scheme`), sem piscar.
+Colors defined by `base.css` and generated by `pragma-css` (`text-`, `bg-`, `border-`, `ring-`…):
+`white`, `black`, `transparent`, `current` and `{neutral,primary,danger,success,warning}-{50,100,200,300,400,500,600,700,800,900,950}`.
+`lib/theme.css` may redefine values and add colors with `--color-<name>` or
+`--color-<name>-<shade>`; the generator recognizes them. Dark: `[data-theme="dark"]` on `<html>`
+and the `dark:` variant. Switch theme: `setTheme('dark'|'light')` and `theme()` from
+`core/theme.js` (stores `localStorage['pragma:theme']`). If any app module imports
+`core/theme.js`, the build adds to every page, before the CSS, an inline script restoring the
+theme (or following `prefers-color-scheme`), without flash.

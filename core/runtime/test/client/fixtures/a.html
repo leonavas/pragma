@@ -1,24 +1,24 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Página A</title>
-  <style>#alto{height:3000px}</style>
+  <title>Page A</title>
+  <style>#tall{height:3000px}</style>
   <script>self.__pragmaDev=true</script>
   <link rel="modulepreload" href="/assets/a.js">
-  <script type="application/json" id="pragma-route">{"pattern":"/a","page":"/assets/a.js","components":{},"stores":{"carrinho":"/assets/carrinho.js"},"loader":false,"ssr":false}</script>
+  <script type="application/json" id="pragma-route">{"pattern":"/a","page":"/assets/a.js","components":{},"stores":{"cart":"/assets/cart.js"},"loader":false,"ssr":false}</script>
   <script type="module" src="/core/boot.js"></script>
 </head>
 <body>
-  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qtd" data-text="shared.carrinho.itens.length"></span></header>
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="shared.cart.items.length"></span></header>
   <main data-page>
-    <h1 id="titulo">Página A</h1>
+    <h1 id="title">Page A</h1>
     <span id="ticks" data-text="state.ticks"></span>
-    <div id="alto"></div>
-    <a id="p1" href="/produto/1">Produto 1</a>
-    <a id="novo" href="/produto/novo">Novo</a>
-    <a id="ir-b" href="/b">ir para B</a>
+    <div id="tall"></div>
+    <a id="p1" href="/product/1">Product 1</a>
+    <a id="new" href="/product/new">New</a>
+    <a id="go-b" href="/b">go to B</a>
   </main>
 </body>
 </html>

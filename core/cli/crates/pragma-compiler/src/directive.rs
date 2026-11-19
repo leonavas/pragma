@@ -1,4 +1,4 @@
-//! Diretivas (SPEC §3): leitura dos nomes e dos caminhos.
+//! Directives (SPEC §3): parsing names and paths.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Dir<'a> {
@@ -7,6 +7,7 @@ pub enum Dir<'a> {
     Class(&'a str),
     Show,
     If,
+    ElseIf,
     Else,
     For,
     Key,
@@ -16,21 +17,22 @@ pub enum Dir<'a> {
     With(&'a str),
     Open,
     Close,
-    /// `data-page`, `data-reload`, `data-theme`: marcadores sem caminho.
+    /// `data-page`, `data-reload`, `data-theme`: markers without a path.
     Marker,
-    /// `data-c`, `data-tid`, `data-of`, `data-slot`: escritos só pelo build.
+    /// `data-c`, `data-tid`, `data-of`, `data-slot`: written only by the build.
     Generated,
 }
 
 pub const ROOTS: &[&str] = &["data", "state", "shared", "params", "query", "page", "props", "$"];
 
-/// `None`: não é `data-*`. `Some(None)`: diretiva desconhecida.
+/// `None`: not `data-*`. `Some(None)`: unknown directive.
 pub fn parse(name: &str) -> Option<Option<Dir<'_>>> {
     let rest = name.strip_prefix("data-")?;
     let d = match rest {
         "text" => Dir::Text,
         "show" => Dir::Show,
         "if" => Dir::If,
+        "else-if" => Dir::ElseIf,
         "else" => Dir::Else,
         "for" => Dir::For,
         "key" => Dir::Key,
@@ -63,19 +65,19 @@ pub fn is_ident(s: &str) -> bool {
         && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
 }
 
-/// Caminho `raiz.a.b`, com `!` opcional quando `neg_ok`.
+/// Path `root.a.b`, with optional `!` when `neg_ok`.
 pub fn check_path(v: &str, neg_ok: bool) -> Result<(), String> {
     let p = v.strip_prefix('!').unwrap_or(v);
     if p.len() != v.len() && !neg_ok {
-        return Err("`!` só vale em data-if, data-show e data-class-*".into());
+        return Err("`!` is only valid in <if>, <else-if>, :show and .class".into());
     }
     if p.is_empty() {
-        return Err("caminho vazio".into());
+        return Err("empty path".into());
     }
     if p.split('.').all(is_ident) {
         Ok(())
     } else {
-        Err(format!("caminho inválido \"{v}\": use só raiz.a.b (sem expressões, chamadas ou índices)"))
+        Err(format!("invalid path \"{v}\": use only root.a.b (no expressions, calls or indexes)"))
     }
 }
 
@@ -90,14 +92,14 @@ pub fn root(path: &str) -> &str {
     split_neg(path).1.split('.').next().unwrap_or("")
 }
 
-/// `x in caminho` → (x, caminho).
+/// `x in path` -> (x, path).
 pub fn parse_for(v: &str) -> Option<(&str, &str)> {
     let mut it = v.split_whitespace();
     let (var, kw, path) = (it.next()?, it.next()?, it.next()?);
     (kw == "in" && it.next().is_none() && is_ident(var)).then_some((var, path))
 }
 
-/// Troca a raiz do caminho (preservando `!`).
+/// Replaces the path root (keeping `!`).
 pub fn replace_root(v: &str, new_root: &str) -> String {
     let (neg, p) = split_neg(v);
     let rest = &p[root(p).len()..];

@@ -4,17 +4,17 @@ import { serve } from './server.mjs'
 
 const pw = await import(process.env.PLAYWRIGHT ?? '/tmp/pragma-tools-overlays/node_modules/playwright/index.mjs')
 
-const aberto = id => document.getElementById(id).matches('[open], :popover-open')
+const open = id => document.getElementById(id).matches('[open], :popover-open')
 
-for (const nome of ['chromium', 'firefox']) {
-  describe(nome, () => {
+for (const name of ['chromium', 'firefox']) {
+  describe(name, () => {
     let server, browser, page, base
 
     before(async () => {
       server = await serve()
       base = `http://127.0.0.1:${server.address().port}`
-      // Barra de rolagem clássica (o headless esconde) para medir o salto de layout do scroll lock.
-      browser = await pw[nome].launch(nome == 'chromium' ? { ignoreDefaultArgs: ['--hide-scrollbars'] } : {})
+      // Classic scrollbar (headless hides it) to measure the scroll lock layout shift.
+      browser = await pw[name].launch(name == 'chromium' ? { ignoreDefaultArgs: ['--hide-scrollbars'] } : {})
     })
     after(async () => {
       await browser.close()
@@ -23,8 +23,8 @@ for (const nome of ['chromium', 'firefox']) {
     afterEach(() => page.close())
     beforeEach(async () => {
       page = await browser.newPage()
-      await page.goto(base + '/inicio.html')
-      await page.click('#ir')
+      await page.goto(base + '/home.html')
+      await page.click('#go')
       await page.waitForFunction(() => self.t)
       await page.evaluate(() => {
         self.pops = 0
@@ -32,228 +32,228 @@ for (const nome of ['chromium', 'firefox']) {
       })
     })
 
-    const estado = () => page.evaluate(() => ({
+    const state = () => page.evaluate(() => ({
       path: location.pathname,
-      navegacoes: self.navegacoes,
+      navigations: self.navigations,
       lock: document.documentElement.hasAttribute('data-scroll-lock'),
-      foco: document.activeElement?.id,
+      focus: document.activeElement?.id,
     }))
-    const esperaAberto = (id, v = true) => page.waitForFunction(([id, v]) =>
+    const waitOpen = (id, v = true) => page.waitForFunction(([id, v]) =>
       document.getElementById(id).matches('[open], :popover-open') == v, [id, v])
-    const esperaLock = v => page.waitForFunction(v => document.documentElement.hasAttribute('data-scroll-lock') == v, v)
-    const esperaPops = n => page.waitForFunction(n => self.pops == n, n)
-    const voltaAoInicio = async () => {
+    const waitLock = v => page.waitForFunction(v => document.documentElement.hasAttribute('data-scroll-lock') == v, v)
+    const waitPops = n => page.waitForFunction(n => self.pops == n, n)
+    const backToStart = async () => {
       await page.goBack()
-      await page.waitForURL(/inicio\.html$/)
+      await page.waitForURL(/home\.html$/)
     }
 
-    it('abre e fecha pelo botão, sem navegar e consumindo a entrada', async () => {
-      await page.click('#abre-sobre')
-      assert.equal(await page.evaluate(aberto, 'sobre'), true)
-      assert.equal((await estado()).lock, true)
-      await page.click('#ok-sobre')
-      await esperaAberto('sobre', false)
-      await esperaPops(1)
-      assert.deepEqual(await estado(), { path: '/index.html', navegacoes: 0, lock: false, foco: 'abre-sobre' })
-      await voltaAoInicio()
+    it('opens and closes via button, without navigating and consuming the entry', async () => {
+      await page.click('#open-about')
+      assert.equal(await page.evaluate(open, 'about'), true)
+      assert.equal((await state()).lock, true)
+      await page.click('#ok-about')
+      await waitOpen('about', false)
+      await waitPops(1)
+      assert.deepEqual(await state(), { path: '/index.html', navigations: 0, lock: false, focus: 'open-about' })
+      await backToStart()
     })
 
-    it('Esc fecha o modal', async () => {
-      await page.click('#abre-sobre')
+    it('Esc closes the modal', async () => {
+      await page.click('#open-about')
       await page.keyboard.press('Escape')
-      await esperaAberto('sobre', false)
-      await esperaPops(1)
-      assert.deepEqual(await estado(), { path: '/index.html', navegacoes: 0, lock: false, foco: 'abre-sobre' })
-      await voltaAoInicio()
+      await waitOpen('about', false)
+      await waitPops(1)
+      assert.deepEqual(await state(), { path: '/index.html', navigations: 0, lock: false, focus: 'open-about' })
+      await backToStart()
     })
 
-    it('clique no fundo fecha o modal, mas não o alert', async () => {
-      await page.click('#abre-sobre')
+    it('backdrop click closes the modal but not the alert', async () => {
+      await page.click('#open-about')
       await page.mouse.click(5, 5)
-      await esperaAberto('sobre', false)
-      await esperaPops(1)
-      await page.click('#abre-apagar')
+      await waitOpen('about', false)
+      await waitPops(1)
+      await page.click('#open-delete')
       await page.mouse.click(5, 5)
       await page.waitForTimeout(100)
-      assert.equal(await page.evaluate(aberto, 'apagar'), true)
-      await page.click('#cancela-apagar')
-      await esperaAberto('apagar', false)
-      await esperaPops(2)
-      assert.equal((await estado()).navegacoes, 0)
-      await voltaAoInicio()
+      assert.equal(await page.evaluate(open, 'delete'), true)
+      await page.click('#cancel-delete')
+      await waitOpen('delete', false)
+      await waitPops(2)
+      assert.equal((await state()).navigations, 0)
+      await backToStart()
     })
 
-    it('voltar fecha o overlay sem mudar a URL', async () => {
-      await page.click('#abre-sobre')
+    it('back closes the overlay without changing the URL', async () => {
+      await page.click('#open-about')
       await page.goBack()
-      await esperaAberto('sobre', false)
-      await esperaLock(false)
-      assert.deepEqual(await estado(), { path: '/index.html', navegacoes: 0, lock: false, foco: 'abre-sobre' })
-      await voltaAoInicio()
+      await waitOpen('about', false)
+      await waitLock(false)
+      assert.deepEqual(await state(), { path: '/index.html', navigations: 0, lock: false, focus: 'open-about' })
+      await backToStart()
     })
 
-    it('pilha de dois overlays fecha do topo para baixo', async () => {
-      await page.click('#abre-sobre')
-      await page.click('#abre-detalhes')
-      assert.equal(await page.evaluate(aberto, 'detalhes'), true)
+    it('a stack of two overlays closes top-down', async () => {
+      await page.click('#open-about')
+      await page.click('#open-details')
+      assert.equal(await page.evaluate(open, 'details'), true)
       await page.keyboard.press('Escape')
-      await esperaAberto('detalhes', false)
-      await esperaPops(1)
-      assert.equal(await page.evaluate(aberto, 'sobre'), true)
-      assert.deepEqual(await estado(), { path: '/index.html', navegacoes: 0, lock: true, foco: 'abre-detalhes' })
+      await waitOpen('details', false)
+      await waitPops(1)
+      assert.equal(await page.evaluate(open, 'about'), true)
+      assert.deepEqual(await state(), { path: '/index.html', navigations: 0, lock: true, focus: 'open-details' })
       await page.goBack()
-      await esperaAberto('sobre', false)
-      await esperaLock(false)
-      assert.deepEqual(await estado(), { path: '/index.html', navegacoes: 0, lock: false, foco: 'abre-sobre' })
-      await voltaAoInicio()
+      await waitOpen('about', false)
+      await waitLock(false)
+      assert.deepEqual(await state(), { path: '/index.html', navigations: 0, lock: false, focus: 'open-about' })
+      await backToStart()
     })
 
-    it('scroll lock trava e libera', async () => {
+    it('scroll lock locks and releases', async () => {
       await page.evaluate(() => scrollTo(0, 500))
-      await page.evaluate(() => t.open('sobre'))
-      const travado = await page.evaluate(() => getComputedStyle(document.documentElement).overflow)
-      assert.equal(travado, 'hidden')
+      await page.evaluate(() => t.open('about'))
+      const locked = await page.evaluate(() => getComputedStyle(document.documentElement).overflow)
+      assert.equal(locked, 'hidden')
       await page.mouse.wheel(0, 800)
       await page.waitForTimeout(100)
       assert.equal(await page.evaluate(() => scrollY), 500)
-      await page.click('#ok-sobre')
-      await esperaLock(false)
+      await page.click('#ok-about')
+      await waitLock(false)
       assert.equal(await page.evaluate(() => scrollY), 500)
       assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).overflow), 'visible')
-      await page.click('#abre-mais')
-      assert.equal((await estado()).lock, false)
+      await page.click('#open-more')
+      assert.equal((await state()).lock, false)
     })
 
-    for (const alto of [true, false]) {
-      it(`scroll lock não desloca o layout (${alto ? 'com' : 'sem'} barra de rolagem)`, async () => {
-        await page.evaluate(alto => document.querySelector('main').classList.toggle('alto', alto), alto)
-        const largura = () => page.evaluate(() => document.body.getBoundingClientRect().width)
-        const antes = await largura()
-        await page.evaluate(() => t.open('sobre'))
-        await esperaLock(true)
-        assert.deepEqual(await largura(), antes)
-        await page.click('#ok-sobre')
-        await esperaLock(false)
-        assert.deepEqual(await largura(), antes)
+    for (const tall of [true, false]) {
+      it(`scroll lock does not shift the layout (${tall ? 'with' : 'without'} scrollbar)`, async () => {
+        await page.evaluate(tall => document.querySelector('main').classList.toggle('tall', tall), tall)
+        const width = () => page.evaluate(() => document.body.getBoundingClientRect().width)
+        const before = await width()
+        await page.evaluate(() => t.open('about'))
+        await waitLock(true)
+        assert.deepEqual(await width(), before)
+        await page.click('#ok-about')
+        await waitLock(false)
+        assert.deepEqual(await width(), before)
       })
     }
 
-    it('foco volta a quem abriu, também via open()', async () => {
-      await page.focus('#fora')
-      await page.evaluate(() => t.open('sobre'))
-      await page.evaluate(() => t.close('sobre'))
-      await esperaAberto('sobre', false)
-      await esperaPops(1)
-      assert.equal((await estado()).foco, 'fora')
-      await voltaAoInicio()
+    it('focus returns to the opener, also via open()', async () => {
+      await page.focus('#outside')
+      await page.evaluate(() => t.open('about'))
+      await page.evaluate(() => t.close('about'))
+      await waitOpen('about', false)
+      await waitPops(1)
+      assert.equal((await state()).focus, 'outside')
+      await backToStart()
     })
 
-    it('confirm() resolve com o value de cada botão ou cancel', async () => {
-      const casos = [
-        ['apagar', () => page.click('#confirma-apagar'), 'ok'],
-        ['apagar', () => page.click('#cancela-apagar'), 'cancel'],
-        ['apagar', () => page.keyboard.press('Escape'), 'cancel'],
-        ['apagar', () => page.goBack(), 'cancel'],
-        ['apagar', () => page.evaluate(() => t.close('apagar')), 'cancel'],
-        ['sobre', () => page.click('#ok-sobre'), 'ok'],
-        ['sobre', () => page.click('#x-sobre'), 'cancel'],
-        ['sobre', () => page.mouse.click(5, 5), 'cancel'],
+    it('confirm() resolves with each button value or cancel', async () => {
+      const cases = [
+        ['delete', () => page.click('#confirm-delete'), 'ok'],
+        ['delete', () => page.click('#cancel-delete'), 'cancel'],
+        ['delete', () => page.keyboard.press('Escape'), 'cancel'],
+        ['delete', () => page.goBack(), 'cancel'],
+        ['delete', () => page.evaluate(() => t.close('delete')), 'cancel'],
+        ['about', () => page.click('#ok-about'), 'ok'],
+        ['about', () => page.click('#x-about'), 'cancel'],
+        ['about', () => page.mouse.click(5, 5), 'cancel'],
       ]
-      for (const [id, fecha, esperado] of casos) {
+      for (const [id, close, expected] of cases) {
         await page.evaluate(id => { self.r = t.confirm(id) }, id)
-        await esperaAberto(id)
-        await fecha()
-        assert.equal(await page.evaluate(() => self.r), esperado)
+        await waitOpen(id)
+        await close()
+        assert.equal(await page.evaluate(() => self.r), expected)
       }
-      await esperaPops(casos.length)
-      assert.equal((await estado()).navegacoes, 0)
-      await voltaAoInicio()
+      await waitPops(cases.length)
+      assert.equal((await state()).navigations, 0)
+      await backToStart()
     })
 
-    it('dropdown abre junto ao botão, alterna e fecha por item, Esc, fora e voltar', async () => {
-      await page.click('#abre-mais')
-      await esperaAberto('mais')
+    it('dropdown opens next to the button, toggles and closes via item, Esc, outside and back', async () => {
+      await page.click('#open-more')
+      await waitOpen('more')
       const pos = await page.evaluate(() => {
-        const b = document.getElementById('abre-mais').getBoundingClientRect()
-        const m = document.getElementById('mais').getBoundingClientRect()
+        const b = document.getElementById('open-more').getBoundingClientRect()
+        const m = document.getElementById('more').getBoundingClientRect()
         return Math.round(m.top - b.bottom)
       })
       assert.equal(pos, 4)
-      assert.equal((await estado()).lock, false)
+      assert.equal((await state()).lock, false)
 
       await page.goBack()
-      await esperaAberto('mais', false)
-      assert.deepEqual(await estado(), { path: '/index.html', navegacoes: 0, lock: false, foco: 'abre-mais' })
+      await waitOpen('more', false)
+      assert.deepEqual(await state(), { path: '/index.html', navigations: 0, lock: false, focus: 'open-more' })
 
       let pops = 1
-      for (const fecha of [
-        () => page.click('#abre-mais'),
+      for (const close of [
+        () => page.click('#open-more'),
         () => page.keyboard.press('Escape'),
-        () => page.click('#fora'),
-        () => page.click('#item-copiar'),
+        () => page.click('#outside'),
+        () => page.click('#item-copy'),
       ]) {
-        await page.click('#abre-mais')
-        await esperaAberto('mais')
-        await fecha()
-        await esperaAberto('mais', false)
-        await esperaPops(++pops)
+        await page.click('#open-more')
+        await waitOpen('more')
+        await close()
+        await waitOpen('more', false)
+        await waitPops(++pops)
       }
-      assert.equal((await estado()).foco, 'abre-mais')
-      assert.equal((await estado()).navegacoes, 0)
-      await voltaAoInicio()
+      assert.equal((await state()).focus, 'open-more')
+      assert.equal((await state()).navigations, 0)
+      await backToStart()
     })
 
-    it('item do dropdown abre o alert e o histórico fica consistente', async () => {
-      await page.click('#abre-mais')
-      await page.click('#item-apagar')
-      await esperaAberto('apagar')
-      await esperaAberto('mais', false)
-      await esperaPops(1)
-      await page.click('#confirma-apagar')
-      await esperaAberto('apagar', false)
-      await esperaPops(2)
-      assert.deepEqual(await estado(), { path: '/index.html', navegacoes: 0, lock: false, foco: 'abre-mais' })
-      await voltaAoInicio()
+    it('dropdown item opens the alert and history stays consistent', async () => {
+      await page.click('#open-more')
+      await page.click('#item-delete')
+      await waitOpen('delete')
+      await waitOpen('more', false)
+      await waitPops(1)
+      await page.click('#confirm-delete')
+      await waitOpen('delete', false)
+      await waitPops(2)
+      assert.deepEqual(await state(), { path: '/index.html', navigations: 0, lock: false, focus: 'open-more' })
+      await backToStart()
     })
 
-    it('confirm() chamado de dentro do dropdown devolve o foco ao gatilho', async () => {
-      await page.click('#abre-mais')
+    it('confirm() called from inside the dropdown returns focus to the trigger', async () => {
+      await page.click('#open-more')
       await page.click('#item-js')
-      await esperaAberto('apagar')
-      await page.click('#confirma-apagar')
-      await esperaPops(2)
+      await waitOpen('delete')
+      await page.click('#confirm-delete')
+      await waitPops(2)
       assert.equal(await page.evaluate(() => self.r), 'ok')
-      assert.deepEqual(await estado(), { path: '/index.html', navegacoes: 0, lock: false, foco: 'abre-mais' })
-      await voltaAoInicio()
+      assert.deepEqual(await state(), { path: '/index.html', navigations: 0, lock: false, focus: 'open-more' })
+      await backToStart()
     })
 
-    it('fechar pela UI não navega nem acumula entradas', async () => {
+    it('closing via UI neither navigates nor piles up entries', async () => {
       for (let i = 0; i < 3; i++) {
-        await page.click('#abre-sobre')
-        await page.click('#ok-sobre')
-        await esperaAberto('sobre', false)
-        await esperaPops(i + 1)
+        await page.click('#open-about')
+        await page.click('#ok-about')
+        await waitOpen('about', false)
+        await waitPops(i + 1)
       }
-      assert.equal((await estado()).navegacoes, 0)
-      await voltaAoInicio()
+      assert.equal((await state()).navigations, 0)
+      await backToStart()
     })
 
-    it('closeAll() fecha tudo sem mexer no histórico', async () => {
-      await page.click('#abre-sobre')
-      await page.click('#abre-detalhes')
-      const r = await page.evaluate(() => { self.r = t.confirm('detalhes'); return t.closeAll() })
+    it('closeAll() closes everything without touching history', async () => {
+      await page.click('#open-about')
+      await page.click('#open-details')
+      const r = await page.evaluate(() => { self.r = t.confirm('details'); return t.closeAll() })
       assert.equal(r, 2)
       assert.equal(await page.evaluate(() => self.r), 'cancel')
-      await esperaAberto('sobre', false)
-      await esperaAberto('detalhes', false)
+      await waitOpen('about', false)
+      await waitOpen('details', false)
       await page.waitForTimeout(100)
       assert.equal(await page.evaluate(() => self.pops), 0)
-      assert.equal((await estado()).lock, false)
+      assert.equal((await state()).lock, false)
     })
 
-    it('id inexistente vai para log.error', async () => {
-      await page.evaluate(() => t.open('nada'))
-      assert.deepEqual(await page.evaluate(() => t.erros), [['overlay não encontrado', { 'pragma.overlay.id': 'nada' }]])
+    it('unknown id goes to log.error', async () => {
+      await page.evaluate(() => t.open('nothing'))
+      assert.deepEqual(await page.evaluate(() => t.errors), [['overlay not found', { 'pragma.overlay.id': 'nothing' }]])
     })
   })
 }

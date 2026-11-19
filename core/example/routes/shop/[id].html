@@ -1,0 +1,25 @@
+<title>Product · Minimart</title>
+
+<div class="flex flex-col gap-6">
+  <a href="/shop" class="text-sm text-muted hover:text-ink">← Back to the shop</a>
+  <if data.product>
+    <article class="card flex max-w-xl flex-col gap-4">
+      <p class="text-sm text-muted" :text="data.product.categoryName"></p>
+      <h1 class="text-3xl font-semibold tracking-tight" :text="data.product.name"></h1>
+      <p class="text-2xl font-semibold tabular-nums" :text="data.product.priceLabel"></p>
+      <p class="text-sm text-muted"><span :text="data.product.stock"></span> in stock</p>
+      <p-add-to-cart :id="data.product.id" :name="data.product.name" :price="data.product.price" :stock="data.product.stock"></p-add-to-cart>
+      <div class="flex items-center gap-3 border-t border-line pt-4 text-sm">
+        <button type="button" class="btn" @click="like" :disabled="$sending">Like</button>
+        <span><span class="tabular-nums" :text="data.product.likes"></span> like(s)</span>
+        <span class="text-danger-600" role="status" :text="$error"></span>
+      </div>
+    </article>
+  </if>
+  <else>
+    <section class="flex flex-col gap-2">
+      <h1 class="text-3xl font-semibold tracking-tight">Product not found</h1>
+      <p class="text-muted">Check the address or go back to the shop.</p>
+    </section>
+  </else>
+</div>

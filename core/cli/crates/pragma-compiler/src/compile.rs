@@ -1,9 +1,10 @@
-//! Saída: HTML final e ops compiladas para SSR (SPEC §3 "Formato compilado").
+//! Output: final HTML and compiled ops for SSR (SPEC §3 "Compiled format").
 use crate::directive::{self, Dir};
-use crate::html::{Element, Node, VOID, is_blank, open_tag, push_attr};
+use crate::html::{Element, Node, VOID, open_tag, push_attr};
+use crate::validate::BLOCKS;
 use serde_json::{Value, json};
 
-/// Serializa nós; `<template>` sai só com o elemento raiz. `compact` reduz espaços entre tags.
+/// Serializes nodes; `<template>` is emitted with only its root element. `compact` collapses whitespace between tags.
 pub fn write_nodes(nodes: &[Node], out: &mut String, compact: bool) {
     for n in nodes {
         match n {
@@ -39,7 +40,7 @@ pub fn write_element(e: &Element, out: &mut String, compact: bool) {
     out.push('>');
 }
 
-/// Raízes que o servidor conhece; as outras (state, shared) ficam para o cliente.
+/// Roots the server knows; the others (state, shared) are left to the client.
 fn server_path(p: &str, vars: &[String]) -> bool {
     let r = directive::root(p);
     matches!(r, "data" | "params" | "query" | "page") || vars.iter().any(|v| v == r)
@@ -47,7 +48,7 @@ fn server_path(p: &str, vars: &[String]) -> bool {
 
 struct Ops {
     ops: Vec<Value>,
-    /// Ops até este índice não podem receber html concatenado.
+    /// Ops up to this index cannot receive concatenated html.
     sealed: usize,
 }
 
@@ -82,18 +83,19 @@ pub fn ops(nodes: &[Node]) -> Value {
     Value::Array(o.ops)
 }
 
-fn block(e: Option<&Element>, vars: &mut Vec<String>) -> Value {
+fn block(e: &Element, vars: &mut Vec<String>) -> Value {
     let mut o = Ops::new();
-    if let Some(root) = e.and_then(|t| t.element_children().next()) {
+    if let Some(root) = e.element_children().next() {
         element_ops(root, &mut o, vars, true);
     }
     Value::Array(o.ops)
 }
 
 fn nodes_ops(nodes: &[Node], o: &mut Ops, vars: &mut Vec<String>, compact: bool) {
-    let mut i = 0;
-    while i < nodes.len() {
-        match &nodes[i] {
+    // tid of the if/for that opens the chain; None when the server does not decide the chain (left to the client).
+    let mut chain: Option<String> = None;
+    for n in nodes {
+        match n {
             Node::Text(t, _) => {
                 if compact && t.trim().is_empty() {
                     o.html(" ");
@@ -102,46 +104,45 @@ fn nodes_ops(nodes: &[Node], o: &mut Ops, vars: &mut Vec<String>, compact: bool)
                 }
             }
             Node::Comment => {}
-            Node::Element(e) if e.is("template") && (e.has("data-if") || e.has("data-for")) => {
+            Node::Element(e) if e.is("template") && BLOCKS.iter().any(|b| e.has(b)) => {
                 let mut s = String::new();
                 write_element(e, &mut s, false);
                 o.html(&s);
-                let mut j = i + 1;
-                while j < nodes.len() && is_blank(&nodes[j]) {
-                    j += 1;
-                }
-                let alt_name = if e.has("data-if") { "data-else" } else { "data-empty" };
-                let alt = match nodes.get(j) {
-                    Some(Node::Element(x)) if x.is("template") && x.has(alt_name) => Some(x),
-                    _ => None,
-                };
-                if let Some(a) = alt {
-                    let mut s = String::new();
-                    write_element(a, &mut s, false);
-                    o.html(&s);
-                    i = j;
-                }
                 let tid = e.value("data-tid").unwrap_or("").to_string();
                 if let Some(v) = e.value("data-if") {
                     let (neg, p) = directive::split_neg(v);
-                    if server_path(p, vars) {
-                        let yes = block(Some(e), vars);
-                        let no = block(alt, vars);
-                        o.op(json!(["if", tid, p, neg, yes, no]));
+                    chain = server_path(p, vars).then(|| tid.clone());
+                    if chain.is_some() {
+                        o.op(json!(["if", tid, p, neg, block(e, vars)]));
                     }
-                } else if let Some((var, path)) = e.value("data-for").and_then(directive::parse_for)
-                    && server_path(path, vars) {
+                } else if let Some(v) = e.value("data-else-if") {
+                    let (neg, p) = directive::split_neg(v);
+                    chain = chain.take().filter(|_| server_path(p, vars));
+                    if let Some(id) = &chain {
+                        o.op(json!(["elif", id, p, neg, block(e, vars)]));
+                    }
+                } else if let Some(v) = e.value("data-for") {
+                    chain = None;
+                    if let Some((var, path)) = directive::parse_for(v)
+                        && server_path(path, vars)
+                    {
                         let key = e.value("data-key").unwrap_or("").to_string();
                         vars.push(var.to_string());
-                        let body = block(Some(e), vars);
+                        let body = block(e, vars);
                         vars.pop();
-                        let empty = block(alt, vars);
-                        o.op(json!(["for", tid, var, path, key, body, empty]));
+                        o.op(json!(["for", tid, var, path, key, body]));
+                        chain = Some(tid);
                     }
+                } else if let Some(id) = chain.take() {
+                    let kind = if e.has("data-else") { "else" } else { "empty" };
+                    o.op(json!([kind, id, block(e, vars)]));
+                }
             }
-            Node::Element(e) => element_ops(e, o, vars, false),
+            Node::Element(e) => {
+                chain = None;
+                element_ops(e, o, vars, false);
+            }
         }
-        i += 1;
     }
 }
 
@@ -215,14 +216,16 @@ mod tests {
 
     #[test]
     fn compiles_ops() {
-        let src = r#"<ul class="a" data-class-on="data.on"><template data-for="x in data.xs" data-key="x.id" data-tid="t1"><li data-text="x.nome">-</li></template><template data-empty data-tid="t2"><li>vazio</li></template></ul><p data-show="!state.ok" data-attr-title="data.t" title="y">z</p>"#;
+        let src = r#"<ul class="a" data-class-on="data.on"><template data-for="x in data.xs" data-key="x.id" data-tid="t1"><li data-text="x.name">-</li></template><template data-empty data-tid="t2"><li>empty</li></template></ul><p data-show="!state.ok" data-attr-title="data.t" title="y">z</p>"#;
         let (nodes, _) = parse(src, 0);
         let v = ops(&nodes);
         let expected = json!([
             ["html", "<ul data-class-on=\"data.on\""],
             ["class", "a", [["on", "data.on", false]]],
-            ["html", "><template data-for=\"x in data.xs\" data-key=\"x.id\" data-tid=\"t1\"><li data-text=\"x.nome\">-</li></template><template data-empty data-tid=\"t2\"><li>vazio</li></template>"],
-            ["for", "t1", "x", "data.xs", "x.id", [["html", "<li"], ["html", " data-text=\"x.nome\">"], ["text", "x.nome"], ["html", "</li>"]], [["html", "<li"], ["html", ">vazio</li>"]]],
+            ["html", "><template data-for=\"x in data.xs\" data-key=\"x.id\" data-tid=\"t1\"><li data-text=\"x.name\">-</li></template>"],
+            ["for", "t1", "x", "data.xs", "x.id", [["html", "<li"], ["html", " data-text=\"x.name\">"], ["text", "x.name"], ["html", "</li>"]]],
+            ["html", "<template data-empty data-tid=\"t2\"><li>empty</li></template>"],
+            ["empty", "t1", [["html", "<li"], ["html", ">empty</li>"]]],
             ["html", "</ul><p data-show=\"!state.ok\" data-attr-title=\"data.t\""],
             ["attr", "title", "data.t"],
             ["html", ">z</p>"]

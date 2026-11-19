@@ -5,8 +5,8 @@
     "modules": [
       "/assets/routes/index.js",
       "/assets/lib/components/card/card.js",
-      "/assets/lib/components/contador/contador.js",
-      "/assets/lib/state/carrinho.js",
+      "/assets/lib/components/counter/counter.js",
+      "/assets/lib/state/cart.js",
       "/assets/core/router.js",
       "/assets/core/log.js",
       "/assets/utils/fmt.js",
@@ -20,8 +20,8 @@
     "html": "/blog/[slug].html",
     "modules": [
       "/assets/routes/blog/[slug].js",
-      "/assets/lib/components/contador/contador.js",
-      "/assets/lib/state/carrinho.js",
+      "/assets/lib/components/counter/counter.js",
+      "/assets/lib/state/cart.js",
       "/assets/core/router.js",
       "/assets/core/log.js",
       "/assets/core/state.js"
@@ -30,11 +30,11 @@
     "ssr": true
   },
   {
-    "pattern": "/loja",
-    "html": "/loja/index.html",
+    "pattern": "/shop",
+    "html": "/shop/index.html",
     "modules": [
-      "/assets/lib/components/contador/contador.js",
-      "/assets/lib/state/carrinho.js",
+      "/assets/lib/components/counter/counter.js",
+      "/assets/lib/state/cart.js",
       "/assets/core/router.js",
       "/assets/core/log.js",
       "/assets/core/state.js"
@@ -43,12 +43,12 @@
     "ssr": false
   },
   {
-    "pattern": "/loja/:id",
-    "html": "/loja/[id].html",
+    "pattern": "/shop/:id",
+    "html": "/shop/[id].html",
     "modules": [
-      "/assets/routes/loja/[id].js",
-      "/assets/lib/components/contador/contador.js",
-      "/assets/lib/state/carrinho.js",
+      "/assets/routes/shop/[id].js",
+      "/assets/lib/components/counter/counter.js",
+      "/assets/lib/state/cart.js",
       "/assets/core/router.js",
       "/assets/core/log.js",
       "/assets/core/state.js"

@@ -62,7 +62,7 @@ pub struct Site {
 }
 
 impl Site {
-    /// Em `Serve`, carrega e pré-comprime os arquivos de texto (bloqueante).
+    /// In `Serve`, loads and precompresses text files (blocking).
     pub fn new(root: PathBuf, mode: Mode) -> Arc<Site> {
         let cache = if mode == Mode::Serve { precompress(&root) } else { HashMap::new() };
         let boot = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
@@ -109,7 +109,7 @@ impl Site {
                 r.segments.len() == parts.len()
                     && r.segments.iter().zip(&parts).all(|(s, p)| s.as_deref().is_none_or(|s| s == *p))
             })
-            // estático vence param, segmento a segmento
+            // static beats param, segment by segment
             .min_by_key(|r| r.segments.iter().map(Option::is_none).collect::<Vec<_>>())
             .cloned()
     }
@@ -153,7 +153,7 @@ async fn handle(site: Arc<Site>, req: Request<Incoming>) -> Result<Response<Body
         }
     }
     let Some(path) = decode_path(&raw) else {
-        return Ok(response(StatusCode::BAD_REQUEST, "text/plain; charset=utf-8", "no-store", Bytes::from_static("caminho inválido".as_bytes())));
+        return Ok(response(StatusCode::BAD_REQUEST, "text/plain; charset=utf-8", "no-store", Bytes::from_static("invalid path".as_bytes())));
     };
     let route = site.match_route(&path);
     if let Some(port) = site.backend()
@@ -170,7 +170,7 @@ async fn handle(site: Arc<Site>, req: Request<Incoming>) -> Result<Response<Body
         return Ok(res);
     }
     if req.method() != Method::GET && req.method() != Method::HEAD {
-        let mut res = response(StatusCode::METHOD_NOT_ALLOWED, "text/plain; charset=utf-8", "no-store", Bytes::from_static("método não permitido".as_bytes()));
+        let mut res = response(StatusCode::METHOD_NOT_ALLOWED, "text/plain; charset=utf-8", "no-store", Bytes::from_static("method not allowed".as_bytes()));
         res.headers_mut().insert(header::ALLOW, HeaderValue::from_static("GET, HEAD"));
         return Ok(res);
     }
@@ -230,7 +230,7 @@ async fn file_response(site: &Site, rel: &str, status: StatusCode, headers: &Hea
     let body = match tokio::fs::read(&full).await {
         Ok(body) => body,
         Err(_) if rel == "_404.html" => {
-            let page = "<!doctype html><meta charset=\"utf-8\"><title>404</title><p>Página não encontrada.</p>";
+            let page = "<!doctype html><meta charset=\"utf-8\"><title>404</title><p>Page not found.</p>";
             let page = if site.mode == Mode::Dev { inject_dev(page.as_bytes()) } else { Bytes::from_static(page.as_bytes()) };
             return response(StatusCode::NOT_FOUND, "text/html; charset=utf-8", cache_control, page);
         }
@@ -379,8 +379,8 @@ fn compressible(path: &str) -> bool {
     mime.starts_with("text/") || mime.contains("json") || mime.contains("xml") || mime == "application/wasm"
 }
 
-// `serve` roda sobre um dist imutável: comprimir uma vez no startup, em qualidade máxima e em paralelo,
-// tira a CPU do caminho do request e evita cache/locks; arquivos maiores que isso vão direto do disco.
+// `serve` runs on an immutable dist: compressing once at startup, at max quality and in parallel,
+// keeps CPU off the request path and avoids cache/locks; larger files are served from disk.
 const MAX_CACHED: u64 = 8 * 1024 * 1024;
 
 fn precompress(root: &Path) -> HashMap<String, Cached> {
@@ -446,7 +446,7 @@ impl hyper::body::Body for ChannelBody {
 }
 
 fn sse_frame(event: &Event) -> Bytes {
-    // evento SSE sem `data` não é disparado no navegador
+    // the browser does not fire an SSE event without `data`
     let (name, data) = match event {
         Event::Css(href) => ("css", href.as_str()),
         Event::Reload => ("reload", "1"),
@@ -497,13 +497,13 @@ async fn proxy(site: &Site, port: u16, req: Request<Incoming>) -> Response<Body>
     let target = parts.uri.path_and_query().map_or("/", |p| p.as_str());
     parts.uri = match format!("http://127.0.0.1:{port}{target}").parse() {
         Ok(uri) => uri,
-        Err(_) => return bad_gateway("URL inválida"),
+        Err(_) => return bad_gateway("invalid URL"),
     };
     for name in HOP_BY_HOP {
         parts.headers.remove(name);
     }
     if site.mode == Mode::Dev {
-        // o HTML volta sem compressão para receber o script de dev
+        // HTML comes back uncompressed so the dev script can be injected
         parts.headers.remove(header::ACCEPT_ENCODING);
     }
     let req = Request::from_parts(parts, body.map_err(std::io::Error::other).boxed());
@@ -532,7 +532,7 @@ async fn proxy(site: &Site, port: u16, req: Request<Incoming>) -> Response<Body>
 }
 
 fn bad_gateway(detail: &str) -> Response<Body> {
-    let text = format!("o servidor node não respondeu ({detail}); veja o terminal");
+    let text = format!("node server did not respond ({detail}); see the terminal");
     response(StatusCode::BAD_GATEWAY, "text/plain; charset=utf-8", "no-store", Bytes::from(text))
 }
 
@@ -542,7 +542,7 @@ mod tests {
 
     #[test]
     fn decodes_and_rejects_traversal() {
-        assert_eq!(decode_path("/loja/caf%C3%A9").as_deref(), Some("/loja/café"));
+        assert_eq!(decode_path("/shop/caf%C3%A9").as_deref(), Some("/shop/café"));
         assert_eq!(decode_path("/a/../b"), None);
         assert_eq!(decode_path("/a/%2e%2e/b"), None);
         assert_eq!(decode_path("/a%zz"), None);

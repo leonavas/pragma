@@ -1,4 +1,4 @@
-//! Leitura leve de JS: só o necessário para achar imports e alguns exports.
+//! Lightweight JS reading: just enough to find imports and some exports.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Kind {
@@ -17,11 +17,11 @@ struct Tok {
 
 #[derive(Debug, Clone)]
 pub struct Import {
-    /// Intervalo do conteúdo da string (sem aspas).
+    /// Range of the string content (without quotes).
     pub start: usize,
     pub end: usize,
     pub spec: String,
-    /// `import('x')`: carregado sob demanda, fora do modulepreload.
+    /// `import('x')`: loaded on demand, outside modulepreload.
     pub dynamic: bool,
 }
 
@@ -32,7 +32,7 @@ const REGEX_AFTER: &[&str] = &[
 fn tokens(src: &str) -> Vec<Tok> {
     let b = src.as_bytes();
     let mut out: Vec<Tok> = Vec::new();
-    // profundidade de chaves de cada `${` aberto
+    // brace depth of each open `${`
     let mut tpl: Vec<u32> = Vec::new();
     let mut depth: u32 = 0;
     let mut i = 0;
@@ -200,7 +200,7 @@ pub fn has_module_syntax(src: &str) -> bool {
     })
 }
 
-/// Nome exportado diretamente: `export [async] function n`, `export const|let|var n`.
+/// Directly exported name: `export [async] function n`, `export const|let|var n`.
 pub fn exports(src: &str) -> Vec<(String, Option<String>)> {
     let toks = tokens(src);
     let mut out = Vec::new();

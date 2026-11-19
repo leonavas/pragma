@@ -86,22 +86,22 @@ async fn serves_static_files_with_mime() {
 #[tokio::test]
 async fn routes_by_manifest() {
     let (addr, _) = start(Mode::Serve).await;
-    let res = get(addr, "/loja/42").await;
-    assert_eq!((res.status, res.text()), (200, fixture("loja/[id].html")));
-    let res = get(addr, "/loja/caf%C3%A9").await;
-    assert_eq!((res.status, res.text()), (200, fixture("loja/[id].html")));
-    // estático vence param, mesmo vindo depois no manifesto
-    assert_eq!(get(addr, "/loja/novo").await.text(), fixture("loja/novo.html"));
-    assert_eq!(get(addr, "/loja").await.text(), fixture("loja/index.html"));
-    assert_eq!(get(addr, "/loja/").await.text(), fixture("loja/index.html"));
-    // ssr sem servidor node: cai no HTML pré-gerado
-    assert_eq!(get(addr, "/sobre").await.text(), fixture("sobre/index.html"));
+    let res = get(addr, "/shop/42").await;
+    assert_eq!((res.status, res.text()), (200, fixture("shop/[id].html")));
+    let res = get(addr, "/shop/caf%C3%A9").await;
+    assert_eq!((res.status, res.text()), (200, fixture("shop/[id].html")));
+    // static beats param, even when listed later in the manifest
+    assert_eq!(get(addr, "/shop/new").await.text(), fixture("shop/new.html"));
+    assert_eq!(get(addr, "/shop").await.text(), fixture("shop/index.html"));
+    assert_eq!(get(addr, "/shop/").await.text(), fixture("shop/index.html"));
+    // ssr without a node server: falls back to the prebuilt HTML
+    assert_eq!(get(addr, "/about").await.text(), fixture("about/index.html"));
 }
 
 #[tokio::test]
 async fn unknown_paths_get_404_page() {
     let (addr, _) = start(Mode::Serve).await;
-    for path in ["/nada", "/loja/1/extra", "/assets/sumiu.js", "/a/../../Cargo.toml"] {
+    for path in ["/nothing", "/shop/1/extra", "/assets/gone.js", "/a/../../Cargo.toml"] {
         let res = get(addr, path).await;
         assert!(res.status == 404 || res.status == 400, "{path}: {}", res.status);
         if res.status == 404 {
@@ -117,13 +117,13 @@ async fn serve_cache_headers_and_conditional_requests() {
     let (addr, _) = start(Mode::Serve).await;
     let css = get(addr, "/assets/app-3f2a91.css").await;
     assert_eq!(css.header("cache-control"), "public, max-age=31536000, immutable");
-    let html = get(addr, "/loja/7").await;
+    let html = get(addr, "/shop/7").await;
     assert_eq!(html.header("cache-control"), "no-cache");
-    assert_eq!(get(addr, "/nada").await.header("cache-control"), "no-cache");
+    assert_eq!(get(addr, "/nothing").await.header("cache-control"), "no-cache");
 
     let etag = html.header("etag").to_owned();
     assert!(!etag.is_empty());
-    let res = request(addr, "GET", "/loja/7", &[("if-none-match", &etag)]).await;
+    let res = request(addr, "GET", "/shop/7", &[("if-none-match", &etag)]).await;
     assert_eq!(res.status, 304);
     assert!(res.body.is_empty());
 
@@ -160,11 +160,11 @@ async fn serve_compresses_text() {
 #[tokio::test]
 async fn dev_disables_cache_and_injects_client() {
     let (addr, _) = start(Mode::Dev).await;
-    let res = get(addr, "/loja/1").await;
+    let res = get(addr, "/shop/1").await;
     assert_eq!(res.header("cache-control"), "no-store");
     assert!(res.text().contains("<script type=\"module\" src=\"/_pragma/dev.js\"></script></head>"));
     assert_eq!(get(addr, "/assets/app-3f2a91.css").await.header("cache-control"), "no-store");
-    let missing = get(addr, "/nada").await;
+    let missing = get(addr, "/nothing").await;
     assert_eq!(missing.status, 404);
     assert!(missing.text().contains("/_pragma/dev.js"));
 
@@ -173,7 +173,7 @@ async fn dev_disables_cache_and_injects_client() {
     assert_eq!(js.header("content-type"), "text/javascript; charset=utf-8");
     assert!(js.text().contains("EventSource('/_pragma/reload')"));
 
-    let logs = r#"{"logs":[{"severityText":"INFO","body":"oi"}]}"#;
+    let logs = r#"{"logs":[{"severityText":"INFO","body":"hi"}]}"#;
     let len = logs.len().to_string();
     let mut stream = TcpStream::connect(addr).await.unwrap();
     let head = format!("POST /_otel HTTP/1.1\r\nhost: x\r\ncontent-length: {len}\r\nconnection: close\r\n\r\n{logs}");
@@ -192,9 +192,9 @@ async fn read_until(stream: &mut TcpStream, buf: &mut String, needle: &str) {
         let mut chunk = [0u8; 1024];
         let n = tokio::time::timeout_at(deadline, stream.read(&mut chunk))
             .await
-            .unwrap_or_else(|_| panic!("esperava {needle:?}, veio {buf:?}"))
+            .unwrap_or_else(|_| panic!("expected {needle:?}, got {buf:?}"))
             .unwrap();
-        assert!(n > 0, "conexão fechou; veio {buf:?}");
+        assert!(n > 0, "connection closed; got {buf:?}");
         buf.push_str(&String::from_utf8_lossy(&chunk[..n]));
     }
 }
@@ -215,7 +215,7 @@ async fn sse_emits_reload_events() {
     site.send(Event::Error(r#"[{"file":"routes/index.html","line":1}]"#.into()));
     read_until(&mut stream, &mut buf, "event: error\ndata: [{\"file\":\"routes/index.html\",\"line\":1}]\n\n").await;
 
-    // quem conecta depois de um build com erro recebe o erro na hora
+    // a client connecting after a failed build gets the error right away
     let mut late = TcpStream::connect(addr).await.unwrap();
     late.write_all(b"GET /_pragma/reload HTTP/1.1\r\nhost: localhost\r\n\r\n").await.unwrap();
     let mut buf = String::new();
@@ -239,7 +239,7 @@ async fn fake_node() -> u16 {
                     buf.extend_from_slice(&chunk[..n]);
                 }
                 let line = String::from_utf8_lossy(&buf).lines().next().unwrap().to_owned();
-                let (mime, body) = if line.contains("/sobre") {
+                let (mime, body) = if line.contains("/about") {
                     ("text/html", "<html><head></head><body>ssr</body></html>".to_owned())
                 } else {
                     ("application/json", format!("{{\"data\":\"{line}\"}}"))
@@ -256,15 +256,15 @@ async fn fake_node() -> u16 {
 async fn proxies_server_paths_to_node() {
     let (addr, site) = start(Mode::Dev).await;
     site.set_backend(Some(fake_node().await));
-    let data = get(addr, "/_data/loja/1?x=2").await;
-    assert_eq!(data.text(), r#"{"data":"GET /_data/loja/1?x=2 HTTP/1.1"}"#);
-    assert_eq!(request(addr, "POST", "/_action/loja/1/salvar", &[("content-length", "0")]).await.status, 200);
-    let ssr = get(addr, "/sobre").await;
+    let data = get(addr, "/_data/shop/1?x=2").await;
+    assert_eq!(data.text(), r#"{"data":"GET /_data/shop/1?x=2 HTTP/1.1"}"#);
+    assert_eq!(request(addr, "POST", "/_action/shop/1/save", &[("content-length", "0")]).await.status, 200);
+    let ssr = get(addr, "/about").await;
     assert_eq!(ssr.text(), "<html><head><script type=\"module\" src=\"/_pragma/dev.js\"></script></head><body>ssr</body></html>");
-    assert_eq!(get(addr, "/loja/1").await.text(), r#"{"data":"GET /loja/1 HTTP/1.1"}"#);
-    // O HTML pré-gerado que o router busca é arquivo, mesmo casando com a rota SSR /loja/:id.
-    assert!(get(addr, "/loja/index.html").await.text().contains("<title>Loja</title>"));
+    assert_eq!(get(addr, "/shop/1").await.text(), r#"{"data":"GET /shop/1 HTTP/1.1"}"#);
+    // The prebuilt HTML the router fetches is a file, even when it matches the SSR route /shop/:id.
+    assert!(get(addr, "/shop/index.html").await.text().contains("<title>Shop</title>"));
 
     site.set_backend(None);
-    assert!(get(addr, "/sobre").await.text().contains("<h1>sobre</h1>"));
+    assert!(get(addr, "/about").await.text().contains("<h1>about</h1>"));
 }

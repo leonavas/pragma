@@ -1,3 +1,3 @@
-export function formatar(valor) {
-  return `R$ ${valor.toFixed(2)}`
+export function format(value) {
+  return `$${value.toFixed(2)}`
 }

@@ -1,0 +1,49 @@
+<title>Dashboard · Minimart</title>
+
+<div class="flex flex-col gap-10">
+  <header class="flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-3xl font-semibold tracking-tight">Dashboard</h1>
+      <p class="mt-1 text-muted">The time is <c-clock></c-clock>.</p>
+    </div>
+    <div class="flex gap-2">
+      <c-theme-toggle></c-theme-toggle>
+      <button type="button" class="btn" @open="about">About the app</button>
+    </div>
+  </header>
+
+  <section class="flex flex-col gap-4" aria-labelledby="summary">
+    <h2 id="summary" class="text-lg font-semibold">Summary</h2>
+    <div class="grid gap-4 sm:grid-cols-3">
+      <c-indicator title="Pending tasks" hint="See Tasks" :value="shared.tasks.pending" :tone="$taskTone"></c-indicator>
+      <c-indicator title="Items in cart" :value="shared.cart.count" :tone="$cartTone"></c-indicator>
+      <c-indicator title="Cart total" hint="Shop prices" :value="shared.cart.total" :tone="$cartTone"></c-indicator>
+    </div>
+  </section>
+
+  <section class="flex flex-col gap-4" aria-labelledby="counters">
+    <h2 id="counters" class="text-lg font-semibold">Counters</h2>
+    <div class="flex flex-wrap gap-8">
+      <c-counter label="Clicks" start="0" step="1"></c-counter>
+      <c-counter label="Fives" start="10" step="5" min="0" max="50"></c-counter>
+    </div>
+  </section>
+
+  <section class="flex flex-col gap-4" aria-labelledby="more">
+    <h2 id="more" class="text-lg font-semibold">More</h2>
+    <c-tabs label="Details" a="About" b="Shortcuts" c="Counter">
+      <p slot="a" class="text-muted">Dashboard, tasks and a shop in one app of native HTML, CSS and JS. Your data stays in your browser.</p>
+      <ul slot="b" class="list-disc pl-5 text-muted">
+        <li>← and → switch tabs.</li>
+        <li>Esc or Back closes the modal.</li>
+        <li>Double-click edits a task.</li>
+      </ul>
+      <div slot="c"><c-counter label="In tab" start="3" step="3"></c-counter></div>
+    </c-tabs>
+  </section>
+</div>
+
+<c-modal id="about" title="About Minimart">
+  <p>The pragma example app: every page is ready-made HTML, JS only wires up behavior, and the cart and tasks survive a refresh.</p>
+  <button slot="actions" type="button" class="btn btn-primary" @close value="ok">Close</button>
+</c-modal>

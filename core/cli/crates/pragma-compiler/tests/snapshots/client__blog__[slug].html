@@ -1,36 +1,36 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Post</title>
-<meta name="description" content="Loja de teste">
+<meta name="description" content="Test shop">
 <link rel="icon" href="/img/icon.svg">
 <link rel="stylesheet" href="/assets/app.css">
 <script>self.__pragmaDev=true</script>
 <link rel="modulepreload" href="/assets/routes/blog/[slug].js">
-<link rel="modulepreload" href="/assets/lib/components/contador/contador.js">
-<link rel="modulepreload" href="/assets/lib/state/carrinho.js">
+<link rel="modulepreload" href="/assets/lib/components/counter/counter.js">
+<link rel="modulepreload" href="/assets/lib/state/cart.js">
 <link rel="modulepreload" href="/assets/core/router.js">
 <link rel="modulepreload" href="/assets/core/log.js">
 <link rel="modulepreload" href="/assets/core/state.js">
-<script type="application/json" id="pragma-route">{"pattern":"/blog/:slug","page":"/assets/routes/blog/[slug].js","components":{"contador":"/assets/lib/components/contador/contador.js"},"stores":{"carrinho":"/assets/lib/state/carrinho.js"},"loader":true,"ssr":true}</script>
+<script type="application/json" id="pragma-route">{"pattern":"/blog/:slug","page":"/assets/routes/blog/[slug].js","components":{"counter":"/assets/lib/components/counter/counter.js"},"stores":{"cart":"/assets/lib/state/cart.js"},"loader":true,"ssr":true}</script>
 <script type="module" src="/assets/core/boot.js"></script>
 <script type="module" src="/_pragma/dev.js"></script>
 </head>
 <body>
 <header class="flex items-center gap-4 p-4">
-  <a href="/">Início</a>
-  <button data-c="contador" class="btn" data-on-click="somar"><span data-text="state.n">0</span></button>
-  <span data-text="shared.carrinho.total">0</span>
+  <a href="/">Home</a>
+  <button data-c="counter" class="btn" data-on-click="add"><span data-text="state.n">0</span></button>
+  <span data-text="shared.cart.total">0</span>
 </header>
 <main data-page>
 <article class="p-4">
-  <h1 data-text="data.post.titulo">Título</h1>
+  <h1 data-text="data.post.heading">Title</h1>
   <ul>
-    <template data-for="t in data.post.tags" data-key="t.id" data-tid="tea69c8b"><li data-class-ativo="t.ativo" class="tag" data-text="t.nome"></li></template>
+    <template data-for="t in data.post.tags" data-key="t.id" data-tid="tea69c8b"><li data-class-active="t.active" class="tag" data-text="t.name"></li></template>
   </ul>
-  <p data-show="state.lido">lido</p>
+  <p data-show="state.read">read</p>
 </article>
 </main>
 <footer class="text-sm text-neutral-500" data-text="query.ref"></footer>

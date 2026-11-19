@@ -4,12 +4,12 @@ mod embedded {
     include!(concat!(env!("OUT_DIR"), "/embedded.rs"));
 }
 
-/// Cria o app em `dir`; devolve quantos arquivos escreveu.
+/// Creates the app in `dir`; returns how many files were written.
 pub fn create(dir: &Path) -> Result<usize, String> {
     if dir.exists() {
-        let mut entries = std::fs::read_dir(dir).map_err(|_| format!("'{}' existe e não é um diretório", dir.display()))?;
+        let mut entries = std::fs::read_dir(dir).map_err(|_| format!("'{}' exists and is not a directory", dir.display()))?;
         if entries.next().is_some() {
-            return Err(format!("o diretório '{}' não está vazio", dir.display()));
+            return Err(format!("directory '{}' is not empty", dir.display()));
         }
     }
     let name = std::path::absolute(dir)
@@ -29,14 +29,14 @@ pub fn create(dir: &Path) -> Result<usize, String> {
 }
 
 fn write(path: &Path, content: &[u8]) -> Result<(), String> {
-    let fail = |e: std::io::Error| format!("não foi possível escrever '{}': {e}", path.display());
+    let fail = |e: std::io::Error| format!("cannot write '{}': {e}", path.display());
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(fail)?;
     }
     std::fs::write(path, content).map_err(fail)
 }
 
-/// Troca só o valor de "name", preservando a formatação do pragma.json do starter.
+/// Replaces only the "name" value, keeping the starter pragma.json formatting.
 fn rename(json: &[u8], name: &str) -> Vec<u8> {
     let text = String::from_utf8_lossy(json);
     let Some(key) = text.find("\"name\"") else { return json.to_vec() };
@@ -55,7 +55,7 @@ fn rename(json: &[u8], name: &str) -> Vec<u8> {
 mod tests {
     #[test]
     fn renames_only_name_value() {
-        let out = super::rename(b"{\n  \"name\": \"starter\",\n  \"budgets\": {}\n}", "minha \"loja\"");
-        assert_eq!(String::from_utf8(out).unwrap(), "{\n  \"name\": \"minha \\\"loja\\\"\",\n  \"budgets\": {}\n}");
+        let out = super::rename(b"{\n  \"name\": \"starter\",\n  \"budgets\": {}\n}", "my \"shop\"");
+        assert_eq!(String::from_utf8(out).unwrap(), "{\n  \"name\": \"my \\\"shop\\\"\",\n  \"budgets\": {}\n}");
     }
 }

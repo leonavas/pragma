@@ -1,9 +1,9 @@
-//! Tabela única de utilitários: o gerador e a doc leem daqui.
+//! Single utility table: the generator and the doc read from here.
 //!
-//! Cada regra tem nomes (prefixo, declarações com `$` no lugar do valor) e conjuntos de
-//! valores. Classe = `prefixo-valor`; prefixo vazio = o valor é a classe; valor vazio = o
-//! prefixo sozinho. A ordem da tabela é a ordem de saída do CSS: dentro de uma regra, os
-//! atalhos (`p`) vêm antes dos específicos (`px`, `pt`) para que estes vençam.
+//! Each rule has names (prefix, declarations with `$` in place of the value) and value
+//! sets. Class = `prefix-value`; empty prefix = the value is the class; empty value = the
+//! prefix alone. Table order is CSS output order: within a rule, shorthands (`p`) come
+//! before specifics (`px`, `pt`) so the latter win.
 
 pub enum Vals {
     Spacing,
@@ -23,14 +23,14 @@ pub struct Rule {
 
 pub const CATS: &[&str] = &[
     "Layout",
-    "Flex e grid",
-    "Espaçamento",
-    "Tamanho",
-    "Tipografia",
-    "Cor",
-    "Borda e efeitos",
-    "Interação e acessibilidade",
-    "Transição e mídia",
+    "Flex and grid",
+    "Spacing",
+    "Sizing",
+    "Typography",
+    "Color",
+    "Borders and effects",
+    "Interaction and accessibility",
+    "Transitions and media",
 ];
 
 #[rustfmt::skip]
@@ -55,7 +55,7 @@ pub const TONES: &[&str] = &[
     "50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950",
 ];
 
-// Tons do Tailwind v4: primary = blue, danger = red, success = green, warning = amber.
+// Tailwind v4 tones: primary = blue, danger = red, success = green, warning = amber.
 #[rustfmt::skip]
 pub const PALETTE: &[(&str, [&str; 11])] = &[
     (
@@ -112,7 +112,7 @@ pub const BREAKPOINTS: &[(&str, &str)] = &[
     ("2xl", "96rem"),
 ];
 
-/// Pseudo-variantes na ordem de saída. `group-hover` usa o seletor do pai `.group`.
+/// Pseudo-variants in output order. `group-hover` uses the parent selector `.group`.
 pub const PSEUDOS: &[(&str, &str)] = &[
     ("group-hover", ":is(:where(.group):hover *)"),
     ("hover", ":hover"),
@@ -124,12 +124,12 @@ pub const PSEUDOS: &[(&str, &str)] = &[
 
 pub const DARK_SEL: &str = r#":where([data-theme="dark"], [data-theme="dark"] *)"#;
 
-/// Classes reconhecidas que não geram CSS de utilitário.
+/// Recognized classes that generate no utility CSS.
 pub const MARKERS: &[(&str, &str)] = &[
-    ("group", "marca o pai para `group-hover:`"),
+    ("group", "marks the parent for `group-hover:`"),
     (
         "skeleton",
-        "bloco pulsante de carregamento (vem do `base.css`)",
+        "pulsing loading block (from `base.css`)",
     ),
 ];
 
@@ -199,7 +199,7 @@ pub static RULES: &[Rule] = &[
         ("auto", "auto"), ("hidden", "hidden"), ("clip", "clip"), ("visible", "visible"), ("scroll", "scroll"),
     ])]),
     r(0, &[("", "visibility:$")], &[List(&[("visible", "visible"), ("invisible", "hidden")])]),
-    // Flex e grid
+    // Flex and grid
     r(1, &[("flex", "flex-direction:$")], &[List(&[
         ("row", "row"), ("row-reverse", "row-reverse"), ("col", "column"), ("col-reverse", "column-reverse"),
     ])]),
@@ -230,7 +230,7 @@ pub static RULES: &[Rule] = &[
     r(1, &[("place-items", "place-items:$")], &[List(&[
         ("start", "start"), ("end", "end"), ("center", "center"), ("stretch", "stretch"),
     ])]),
-    // Espaçamento
+    // Spacing
     r(2, &[
         ("p", "padding:$"), ("px", "padding-inline:$"), ("py", "padding-block:$"), ("pt", "padding-top:$"),
         ("pr", "padding-right:$"), ("pb", "padding-bottom:$"), ("pl", "padding-left:$"),
@@ -244,9 +244,9 @@ pub static RULES: &[Rule] = &[
         names: &[("space-x", "margin-inline-end:$"), ("space-y", "margin-block-end:$")],
         vals: &[Spacing],
         sel: CHILDREN,
-        note: "espaço entre filhos",
+        note: "space between children",
     },
-    // Tamanho
+    // Sizing
     r(3, &[("size", "width:$;height:$")], &[Spacing, Fractions, AUTO_FULL, List(&[("fit", "fit-content")])]),
     r(3, &[("w", "width:$")], &[Spacing, Fractions, AUTO_FULL, List(&[
         ("screen", "100vw"), ("fit", "fit-content"), ("min", "min-content"), ("max", "max-content"),
@@ -271,7 +271,7 @@ pub static RULES: &[Rule] = &[
     r(3, &[("max-h", "max-height:$")], &[Spacing, List(&[
         ("full", "100%"), ("screen", "100vh"), ("dvh", "100dvh"), ("fit", "fit-content"), ("none", "none"),
     ])]),
-    // Tipografia
+    // Typography
     r(4, &[("font", "font-family:$")], &[List(&[
         ("sans", "var(--font-sans)"), ("serif", "var(--font-serif)"), ("mono", "var(--font-mono)"),
     ])]),
@@ -285,7 +285,7 @@ pub static RULES: &[Rule] = &[
         ("3xl", "font-size:var(--text-3xl);line-height:var(--tw-leading, var(--text-3xl--line-height))"),
         ("4xl", "font-size:var(--text-4xl);line-height:var(--tw-leading, var(--text-4xl--line-height))"),
         ("5xl", "font-size:var(--text-5xl);line-height:var(--tw-leading, var(--text-5xl--line-height))"),
-    ])], "tamanho com altura de linha"),
+    ])], "size with line height"),
     r(4, &[("font", "font-weight:$")], &[List(&[
         ("thin", "100"), ("extralight", "200"), ("light", "300"), ("normal", "400"), ("medium", "500"),
         ("semibold", "600"), ("bold", "700"), ("extrabold", "800"), ("black", "900"),
@@ -316,14 +316,14 @@ pub static RULES: &[Rule] = &[
     r(4, &[("", "$")], &[List(&[("truncate", "overflow:hidden;text-overflow:ellipsis;white-space:nowrap")])]),
     r(4, &[("line-clamp", "overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:$")], &[Int(1, 3, "#")]),
     r(4, &[("list", "list-style-type:$")], &[List(&[("none", "none"), ("disc", "disc"), ("decimal", "decimal")])]),
-    // Cor
+    // Color
     r(5, &[("text", "color:$")], &[Colors]),
     r(5, &[("bg", "background-color:$")], &[Colors]),
     r(5, &[("border", "border-color:$")], &[Colors]),
     r(5, &[("ring", "--tw-ring-color:$")], &[Colors]),
     Rule { cat: 5, names: &[("divide", "border-color:$")], vals: &[Colors], sel: CHILDREN, note: "" },
     r(5, &[("fill", "fill:$"), ("stroke", "stroke:$")], &[Colors]),
-    // Borda e efeitos
+    // Border and effects
     r(6, &[
         ("border", "border-width:$"), ("border-x", "border-inline-width:$"), ("border-y", "border-block-width:$"),
         ("border-t", "border-top-width:$"), ("border-r", "border-right-width:$"),
@@ -340,7 +340,7 @@ pub static RULES: &[Rule] = &[
         ],
         vals: &[BORDER_W],
         sel: CHILDREN,
-        note: "borda entre filhos",
+        note: "border between children",
     },
     r(6, &[
         ("rounded", "border-radius:$"),
@@ -355,7 +355,7 @@ pub static RULES: &[Rule] = &[
     ])]),
     rn(6, &[("ring", "--tw-ring-shadow:0 0 0 $ var(--tw-ring-color, currentColor);box-shadow:var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000)")],
         &[List(&[("", "1px"), ("0", "0px"), ("1", "1px"), ("2", "2px"), ("4", "4px"), ("8", "8px")])],
-        "anel via box-shadow; cor com `ring-C`"),
+        "box-shadow ring; color with `ring-C`"),
     r(6, &[("shadow", "--tw-shadow:$;box-shadow:var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow, 0 0 #0000)")], &[List(&[
         ("", "var(--shadow-sm)"), ("2xs", "var(--shadow-2xs)"), ("xs", "var(--shadow-xs)"),
         ("sm", "var(--shadow-sm)"), ("md", "var(--shadow-md)"), ("lg", "var(--shadow-lg)"),
@@ -369,7 +369,7 @@ pub static RULES: &[Rule] = &[
     r(6, &[("outline", "$")], &[List(&[
         ("none", "outline-style:none"), ("hidden", "outline:2px solid transparent;outline-offset:2px"),
     ])]),
-    // Interação e acessibilidade
+    // Interaction and accessibility
     r(7, &[("cursor", "cursor:$")], &[List(&[
         ("auto", "auto"), ("default", "default"), ("pointer", "pointer"), ("wait", "wait"), ("text", "text"),
         ("move", "move"), ("not-allowed", "not-allowed"), ("grab", "grab"), ("grabbing", "grabbing"),
@@ -382,7 +382,7 @@ pub static RULES: &[Rule] = &[
         ("sr-only", "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border-width:0"),
         ("not-sr-only", "position:static;width:auto;height:auto;padding:0;margin:0;overflow:visible;clip-path:none;white-space:normal"),
     ])]),
-    // Transição e mídia
+    // Transition and media
     r(8, &[("transition", "transition-property:$;transition-timing-function:cubic-bezier(0.4, 0, 0.2, 1);transition-duration:var(--tw-duration, 150ms)")], &[List(&[
         ("", "color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, translate, scale, rotate, filter, backdrop-filter"),
         ("all", "all"),

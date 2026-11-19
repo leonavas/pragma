@@ -14,7 +14,7 @@ export async function load(p, doc, pending) {
     try {
       const res = await (pending ?? fetchData(p.url))
       r = await res.json().catch(() => ({}))
-      if (!res.ok && !r.error) r = { error: { message: `Falha ao carregar os dados (HTTP ${res.status})` } }
+      if (!res.ok && !r.error) r = { error: { message: `Failed to load data (HTTP ${res.status})` } }
     } catch (e) {
       r = { error: { message: e.message } }
     }
@@ -22,7 +22,7 @@ export async function load(p, doc, pending) {
   p.data = r.data
   p.page.error = r.error ?? null
   p.page.loading = false
-  if (r.error) log.error('falha no loader', { 'url.path': p.url.pathname, 'error.message': r.error.message })
+  if (r.error) log.error('loader failed', { 'url.path': p.url.pathname, 'error.message': r.error.message })
 }
 
 export async function call(url, name, input) {
@@ -32,6 +32,6 @@ export async function call(url, name, input) {
     body: JSON.stringify(input ?? null),
   })
   const r = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(r?.error?.message ?? `Falha na action "${name}" (HTTP ${res.status})`)
+  if (!res.ok) throw new Error(r?.error?.message ?? `Action "${name}" failed (HTTP ${res.status})`)
   return r
 }

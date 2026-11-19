@@ -6,16 +6,16 @@ export function escape(value) {
 
 export function resolve(scope, path) {
   const parts = path.split('.')
-  if (!Object.hasOwn(scope, parts[0])) throw new Error(`caminho inexistente: ${path}`)
+  if (!Object.hasOwn(scope, parts[0])) throw new Error(`unknown path: ${path}`)
   let value = scope[parts[0]]
   for (let i = 1; i < parts.length; i++) {
-    if (value == null || !(parts[i] in Object(value))) throw new Error(`caminho inexistente: ${path}`)
+    if (value == null || !(parts[i] in Object(value))) throw new Error(`unknown path: ${path}`)
     value = value[parts[i]]
   }
   return value
 }
 
-const PATH_AT = { text: 1, attr: 2, show: 1, if: 2, for: 3 }
+const PATH_AT = { text: 1, attr: 2, show: 1, if: 2, elif: 2, for: 3 }
 const CLIENT_ROOTS = new Set(['state', 'shared'])
 
 export function clientOnly(scope, path) {
@@ -27,8 +27,13 @@ const test = (scope, path, neg) => Boolean(resolve(scope, path)) !== Boolean(neg
 
 export function render(ops, scope) {
   let out = ''
+  // if/elif/else and for/empty chain: true = a branch was rendered, false = none, null = decided on the client.
+  let done = null
   for (const op of ops) {
-    if (op[0] in PATH_AT && clientOnly(scope, op[PATH_AT[op[0]]])) continue
+    if (op[0] in PATH_AT && clientOnly(scope, op[PATH_AT[op[0]]])) {
+      if (op[0] !== 'text' && op[0] !== 'attr' && op[0] !== 'show') done = null
+      continue
+    }
     switch (op[0]) {
       case 'html':
         out += op[1]
@@ -53,32 +58,38 @@ export function render(ops, scope) {
       case 'show':
         if (!test(scope, op[1], op[2])) out += ' hidden'
         break
-      case 'if': {
-        const [, tid, path, neg, yes, no] = op
-        const branch = test(scope, path, neg) ? yes : no
-        if (branch?.length) out += instance(render(branch, scope), tid)
+      case 'if':
+      case 'elif': {
+        const [kind, tid, path, neg, body] = op
+        if (kind === 'elif' && done !== false) break
+        done = test(scope, path, neg)
+        if (done && body.length) out += instance(render(body, scope), tid)
+        break
+      }
+      case 'else':
+      case 'empty': {
+        const [, tid, body] = op
+        if (done === false && body.length) out += instance(render(body, scope), tid)
+        done = null
         break
       }
       case 'for': {
-        const [, tid, name, path, keyPath, body, empty] = op
+        const [, tid, name, path, keyPath, body] = op
         const list = resolve(scope, path) ?? []
-        if (!Array.isArray(list)) throw new Error(`data-for espera uma lista: ${path}`)
-        if (!list.length) {
-          if (empty?.length) out += instance(render(empty, scope), tid)
-          break
-        }
+        if (!Array.isArray(list)) throw new Error(`<for> expects a list: ${path}`)
         const seen = new Set()
         for (const item of list) {
           const inner = { ...scope, [name]: item }
           const key = String(resolve(inner, keyPath))
-          if (seen.has(key)) throw new Error(`data-key repetido em ${path}: ${key}`)
+          if (seen.has(key)) throw new Error(`duplicate key in ${path}: ${key}`)
           seen.add(key)
           out += instance(render(body, inner), tid, key)
         }
+        done = list.length > 0
         break
       }
       default:
-        throw new Error(`op desconhecida: ${op[0]}`)
+        throw new Error(`unknown op: ${op[0]}`)
     }
   }
   return out
@@ -87,7 +98,7 @@ export function render(ops, scope) {
 function instance(html, tid, key) {
   const root = html.trim()
   const m = /^<[a-zA-Z][^\s/>]*/.exec(root)
-  if (!m) throw new Error(`bloco ${tid} sem elemento raiz`)
+  if (!m) throw new Error(`block ${tid} has no root element`)
   const marks = ` data-of="${escape(tid)}"` + (key === undefined ? '' : ` data-key="${escape(key)}"`)
   return m[0] + marks + root.slice(m[0].length)
 }

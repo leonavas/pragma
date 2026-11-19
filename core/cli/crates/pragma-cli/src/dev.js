@@ -15,16 +15,16 @@ source.addEventListener('css', (event) => {
     const url = new URL(link.href, location.href)
     if (url.origin !== location.origin || !url.pathname.endsWith('.css')) continue
     const next = link.cloneNode()
-    // Em dev o nome do CSS não muda (/assets/app.css): sem o ?t= o browser não rebaixa.
+    // In dev the CSS name does not change (/assets/app.css): without ?t= the browser does not refetch.
     next.href = (event.data && url.pathname.startsWith('/assets/') ? event.data : url.pathname) + '?t=' + Date.now()
-    // a folha antiga só sai depois que a nova carregou, para não piscar sem estilo
+    // the old sheet is removed only after the new one loads, to avoid a flash of unstyled content
     next.addEventListener('load', () => link.remove(), { once: true })
     next.addEventListener('error', () => next.remove(), { once: true })
     link.after(next)
   }
 })
 
-// conexão caída também dispara 'error', mas como Event simples, sem dados
+// a dropped connection also fires 'error', but as a plain Event without data
 source.addEventListener('error', (event) => {
   if (event instanceof MessageEvent) showOverlay(JSON.parse(event.data))
 })
@@ -34,10 +34,10 @@ function showOverlay(diagnostics) {
   overlay = document.createElement('div')
   overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;overflow:auto;padding:24px;background:rgba(20,20,24,.94);color:#f4f4f5;font:14px/1.5 ui-monospace,monospace'
   const title = document.createElement('strong')
-  title.textContent = 'pragma: erro de build'
+  title.textContent = 'pragma: build error'
   title.style.cssText = 'display:block;margin-bottom:12px;color:#f87171;font-size:16px'
   const close = document.createElement('button')
-  close.textContent = 'fechar'
+  close.textContent = 'close'
   close.style.cssText = 'position:absolute;top:16px;right:16px;font:inherit'
   close.addEventListener('click', hideOverlay)
   const list = document.createElement('pre')

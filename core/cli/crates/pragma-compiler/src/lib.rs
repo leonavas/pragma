@@ -1,5 +1,6 @@
-//! Build, análise e diretivas. Contrato: core/SPEC.md §2, §3, §5, §9, §10.
+//! Build, analysis and directives. Contract: core/SPEC.md §2, §3, §5, §9, §10.
 mod a11y;
+mod bundle;
 mod compile;
 mod deps;
 mod directive;
@@ -100,7 +101,7 @@ fn sort_diags(mut d: Vec<Diagnostic>) -> Vec<Diagnostic> {
     d
 }
 
-/// Escreve só o que mudou e lembra o que foi escrito, para apagar o resto no fim.
+/// Writes only what changed and remembers what was written, to delete the rest at the end.
 struct Writer {
     root: PathBuf,
     written: HashSet<PathBuf>,
@@ -161,9 +162,15 @@ struct Module {
     imports: Vec<(js::Import, Option<PathBuf>)>,
 }
 
-/// Grafo de módulos a partir das entradas. `client` proíbe importar `.server.js` e segue os
-/// pacotes de node_modules; no servidor o pacote só precisa estar no package.json.
-fn module_graph(root: &Path, entries: &[PathBuf], client: bool, sources: &HashMap<PathBuf, String>, deps: &deps::Deps, diags: &mut Vec<Diagnostic>) -> BTreeMap<PathBuf, Module> {
+fn module_graph(
+    root: &Path,
+    entries: &[PathBuf],
+    client: bool,
+    sources: &HashMap<PathBuf, String>,
+    deps: &deps::Deps,
+    requests: &mut BTreeMap<String, bundle::Request>,
+    diags: &mut Vec<Diagnostic>,
+) -> BTreeMap<PathBuf, Module> {
     let mut mods = BTreeMap::new();
     let mut queue: VecDeque<PathBuf> = entries.iter().cloned().collect();
     while let Some(path) = queue.pop_front() {
@@ -171,42 +178,35 @@ fn module_graph(root: &Path, entries: &[PathBuf], client: bool, sources: &HashMa
             continue;
         }
         let Some(src) = sources.get(&path).cloned().or_else(|| fs::read_to_string(root.join(&path)).ok()) else { continue };
-        let in_package = deps::is_package_file(&path);
-        if in_package && deps::looks_commonjs(&src) {
-            diags.push(Diagnostic::error(&path, 1, 1, "app/pacote", "pacote CommonJS não funciona no pragma; use um pacote ES module (JS puro)"));
-            mods.insert(path, Module { src, imports: Vec::new() });
-            continue;
-        }
-        let src = if in_package { deps.prepare(src) } else { src };
         let lines = html::LineIndex::new(&src);
+        let mut bindings: Option<Vec<(String, pragma_jslint::Imported)>> = None;
         let mut imports = Vec::new();
         for imp in js::imports(&src) {
             let is_rel = imp.spec.starts_with("./") || imp.spec.starts_with("../") || imp.spec.starts_with('/');
             let dir = path.parent().unwrap_or(Path::new(""));
             let pos = lines.pos(&src, imp.start, 0);
             let mut ok = None;
-            let is_pkg = pragma_jslint::is_package(&imp.spec);
-            if is_pkg || (in_package && is_rel) {
-                let listed = if in_package { Ok(()) } else { deps.check_listed(&imp.spec, client).map_err(|e| (deps::RULE_IMPORT, e)) };
-                let resolved = match listed {
-                    Err(e) => Err(e),
+            if pragma_jslint::is_package(&imp.spec) {
+                let resolved = match deps.check_listed(&imp.spec, client) {
+                    Err(e) => Err((deps::RULE_IMPORT, e)),
                     Ok(()) if client => deps.resolve(dir, &imp.spec).map(Some),
                     Ok(()) => Ok(None),
                 };
                 match resolved {
-                    Ok(Some(t)) => {
-                        queue.push_back(t.clone());
-                        ok = Some(t);
+                    Ok(Some(full)) => {
+                        let all = bindings.get_or_insert_with(|| pragma_jslint::imported_bindings(&src));
+                        let req = requests.entry(imp.spec.clone()).or_insert_with(|| bundle::Request::new(full, (path.clone(), pos.line, pos.col)));
+                        let mut seen = false;
+                        for (_, what) in all.iter().filter(|(s, _)| *s == imp.spec) {
+                            req.add(what);
+                            seen = true;
+                        }
+                        if !seen {
+                            req.add(if imp.dynamic { &pragma_jslint::Imported::All } else { &pragma_jslint::Imported::Bare });
+                        }
                     }
                     Ok(None) => {}
-                    Err((rule, e)) => diags.push(Diagnostic::error(&path, pos.line, pos.col, if in_package { deps::RULE_PACKAGE } else { rule }, e)),
-                }
-                imports.push((imp, ok));
-                continue;
-            }
-            if in_package {
-                if client {
-                    diags.push(Diagnostic::error(&path, pos.line, pos.col, "app/pacote", format!("o pacote importa \"{}\", que não roda no navegador", imp.spec)));
+                    Err((rule, e)) => diags.push(Diagnostic::error(&path, pos.line, pos.col, rule, e)),
                 }
                 imports.push((imp, None));
                 continue;
@@ -215,13 +215,13 @@ fn module_graph(root: &Path, entries: &[PathBuf], client: bool, sources: &HashMa
             match target {
                 Some(t) if root.join(&t).is_file() => {
                     if client && rel_str(&t).ends_with(".server.js") {
-                        diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", format!("módulo de cliente não pode importar {} (código de servidor)", imp.spec)));
+                        diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", format!("client module cannot import {} (server code)", imp.spec)));
                     } else {
                         queue.push_back(t.clone());
                         ok = Some(t);
                     }
                 }
-                _ if is_rel => diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", format!("import \"{}\" não encontrado", imp.spec))),
+                _ if is_rel => diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", format!("import \"{}\" not found", imp.spec))),
                 _ => {}
             }
             imports.push((imp, ok));
@@ -231,7 +231,42 @@ fn module_graph(root: &Path, entries: &[PathBuf], client: bool, sources: &HashMa
     mods
 }
 
-/// Módulos alcançáveis; `dynamic` segue também os `import()`.
+fn npm_path(file: &str) -> PathBuf {
+    PathBuf::from("node_modules").join(file)
+}
+
+fn link_packages(mods: &mut BTreeMap<PathBuf, Module>, b: &bundle::Bundle, diags: &mut Vec<Diagnostic>) {
+    for (path, m) in mods.iter_mut() {
+        if m.imports.iter().any(|(imp, _)| b.aliases.contains_key(&imp.spec)) {
+            match pragma_jslint::alias_package_imports(&m.src, |s| b.aliases.get(s).copied()) {
+                Ok(src) => {
+                    let old: HashMap<String, Option<PathBuf>> = m.imports.drain(..).map(|(i, t)| (i.spec, t)).collect();
+                    m.imports = js::imports(&src).into_iter().map(|i| (old.get(&i.spec).cloned().flatten(), i)).map(|(t, i)| (i, t)).collect();
+                    m.src = src;
+                }
+                Err(e) => diags.push(Diagnostic::error(path, 1, 1, deps::RULE_IMPORT, e)),
+            }
+        }
+        for (imp, t) in m.imports.iter_mut() {
+            if let Some(f) = b.entries.get(&imp.spec) {
+                *t = Some(npm_path(f));
+            }
+        }
+    }
+    let names: HashSet<&str> = b.files.iter().map(|f| f.0.as_str()).collect();
+    for (file, code) in &b.files {
+        let imports = js::imports(code)
+            .into_iter()
+            .map(|imp| {
+                let t = imp.spec.strip_prefix("./").filter(|n| names.contains(n)).map(npm_path);
+                (imp, t)
+            })
+            .collect();
+        mods.insert(npm_path(file), Module { src: code.clone(), imports });
+    }
+}
+
+/// Reachable modules; `dynamic` also follows `import()`.
 fn closure(mods: &BTreeMap<PathBuf, Module>, entries: &[PathBuf], dynamic: bool) -> Vec<PathBuf> {
     let mut seen = HashSet::new();
     let mut order = Vec::new();
@@ -268,7 +303,7 @@ fn any_element(nodes: &[html::Node], f: &impl Fn(&html::Element) -> bool) -> boo
     nodes.iter().any(|n| matches!(n, html::Node::Element(e) if f(e) || any_element(&e.children, f)))
 }
 
-/// `aria-current="page"` nos links `href="/caminho"` da própria página (o router mantém depois).
+/// `aria-current="page"` on links `href="/path"` to the page itself (the router keeps it updated).
 fn mark_current(nodes: &mut [html::Node], path: &str) {
     for n in nodes {
         if let html::Node::Element(e) = n {
@@ -301,7 +336,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let theme_src = p.theme_css.clone().unwrap_or_default();
     let css_comment = |path: &Path, src: &str, diags: &mut Vec<Diagnostic>| {
         for (line, col) in project::comment_positions(src, "/*") {
-            diags.push(Diagnostic::error(path, line, col, "css/comentario", "comentário é proibido; o código é a documentação"));
+            diags.push(Diagnostic::error(path, line, col, "css/comment", "comments are not allowed; the code is the documentation"));
         }
     };
     css_comment(Path::new("lib/theme.css"), &theme_src, &mut diags);
@@ -380,11 +415,11 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         outs.push(PageOut { page, exp, loader, ssr, stores: sc.stores, is_404, overlays });
     }
 
-    // JS de cliente
+    // client JS
     let boot = PathBuf::from("core/boot.js");
     let overlay = PathBuf::from("core/overlay.js");
     if !opts.root.join(&boot).is_file() {
-        diags.push(Diagnostic::error("core/boot.js", 1, 1, "app/estrutura", "core/boot.js não encontrado; o framework fica em core/ (gerado pelo pragma new)"));
+        diags.push(Diagnostic::error("core/boot.js", 1, 1, "app/structure", "core/boot.js not found; the framework lives in core/ (created by pragma new)"));
     }
     let page_entries = |o: &PageOut| -> Vec<PathBuf> {
         let mut e = vec![boot.clone()];
@@ -397,8 +432,13 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         e
     };
     let all_entries: Vec<PathBuf> = outs.iter().flat_map(page_entries).collect();
-    let deps = deps::Deps::new(&opts.root, prod, &mut diags);
-    let mods = module_graph(&opts.root, &all_entries, true, &sources, &deps, &mut diags);
+    let deps = deps::Deps::new(&opts.root, &mut diags);
+    let mut requests = BTreeMap::new();
+    let mut mods = module_graph(&opts.root, &all_entries, true, &sources, &deps, &mut requests, &mut diags);
+    let out_abs = std::path::absolute(&opts.out_dir).unwrap_or_else(|_| opts.out_dir.clone());
+    if let Some(b) = bundle::bundle(&opts.root, &out_abs.join(".cache/npm"), prod, &requests, &mut diags) {
+        link_packages(&mut mods, &b, &mut diags);
+    }
     let content_hash: HashMap<&PathBuf, u64> = mods
         .iter()
         .map(|(k, m)| {
@@ -432,11 +472,11 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let mut gz: HashMap<PathBuf, u64> = HashMap::new();
     for (path, m) in &mods {
         let map: HashMap<&str, &str> = m.imports.iter().filter_map(|(imp, t)| t.as_ref().map(|t| (imp.spec.as_str(), urls[t].as_str()))).collect();
-        let code = if prod {
+        let code = if prod && !path.starts_with("node_modules") {
             match pragma_jslint::minify_with_imports(&m.src, |s| map.get(s).map(|u| u.to_string())) {
                 Ok(c) => c,
                 Err(e) => {
-                    diags.push(Diagnostic::error(path, 1, 1, "js/sintaxe", format!("não foi possível minificar: {e}")));
+                    diags.push(Diagnostic::error(path, 1, 1, "js/syntax", format!("cannot minify: {e}")));
                     m.src.clone()
                 }
             }
@@ -464,14 +504,14 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     if prod {
         match pragma_css::minify(&css) {
             Ok(m) => css = m,
-            Err(e) => diags.push(Diagnostic::error("lib/theme.css", 1, 1, "css/sintaxe", e)),
+            Err(e) => diags.push(Diagnostic::error("lib/theme.css", 1, 1, "css/syntax", e)),
         }
     }
     let css_url = if prod { format!("/assets/app-{}.css", hash8(css.as_bytes())) } else { "/assets/app.css".to_string() };
     w.write(&format!("client{css_url}"), css.as_bytes());
     report.css_gzip_bytes = gzip_len(css.as_bytes());
 
-    // páginas
+    // pages
     let theme_js = mods.contains_key(Path::new("core/theme.js"));
     let mut manifest = Vec::new();
     let mut server_routes = Vec::new();
@@ -502,7 +542,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             })
         });
         let mut doc = String::with_capacity(4096);
-        doc.push_str("<!doctype html>\n<html lang=\"pt-BR\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
+        doc.push_str(&format!("<!doctype html>\n<html lang=\"{}\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n", html::escape_attr(&p.config.lang)));
         doc.push_str(&format!("<title>{}</title>\n", title.unwrap_or_else(|| html::escape_text(&p.config.name))));
         let extras: Vec<html::Node> = o.exp.head.iter().filter(|n| !matches!(n, html::Node::Element(e) if e.is("title"))).cloned().collect();
         let mut ex = String::new();
@@ -560,14 +600,14 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             server_routes.push((o.page.pattern.clone(), server.clone(), o.ssr, template, shell));
         }
     }
-    budget(&p, "cssKb", p.config.budgets.css_kb, report.css_gzip_bytes, "CSS global", &mut diags);
+    budget(&p, "cssKb", p.config.budgets.css_kb, report.css_gzip_bytes, "global CSS", &mut diags);
     w.write("client/_pragma/manifest.json", serde_json::to_string_pretty(&Value::Array(manifest)).unwrap().as_bytes());
 
     for f in &p.public_files {
         let rel = rel_str(f.strip_prefix("public").unwrap());
         let target = format!("client/{rel}");
         if w.has(&target) {
-            diags.push(Diagnostic::error(f, 1, 1, "app/estrutura", format!("public/{rel} conflita com um arquivo gerado pelo build")));
+            diags.push(Diagnostic::error(f, 1, 1, "app/structure", format!("public/{rel} conflicts with a file generated by the build")));
             continue;
         }
         if let Ok(bytes) = fs::read(opts.root.join(f)) {
@@ -581,7 +621,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         let mut entries = vec![handler.clone(), PathBuf::from("core/server/node.mjs")];
         entries.extend(server_routes.iter().map(|r| r.1.clone()));
         entries.retain(|e| opts.root.join(e).is_file());
-        let smods = module_graph(&opts.root, &entries, false, &sources, &deps, &mut diags);
+        let smods = module_graph(&opts.root, &entries, false, &sources, &deps, &mut BTreeMap::new(), &mut diags);
         for (path, m) in &smods {
             w.write(&format!("server/{}", rel_str(path)), m.src.as_bytes());
         }
@@ -609,14 +649,14 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         });
         w.write("server/wrangler.jsonc", serde_json::to_string_pretty(&wrangler).unwrap().as_bytes());
     } else if report.has_server {
-        diags.push(Diagnostic::error("core/server/handler.js", 1, 1, "app/estrutura", "core/server/handler.js não encontrado; necessário para *.server.js"));
+        diags.push(Diagnostic::error("core/server/handler.js", 1, 1, "app/structure", "core/server/handler.js not found; required by *.server.js"));
     }
 
     for d in ["client", "server", "templates"] {
         w.prune(&opts.out_dir.join(d));
     }
     if !prod {
-        for d in diags.iter_mut().filter(|d| d.rule == "app/orcamento") {
+        for d in diags.iter_mut().filter(|d| d.rule == "app/budget") {
             d.severity = Severity::Warning;
         }
     }
@@ -653,6 +693,6 @@ fn budget(p: &Project, key: &'static str, limit: Option<f64>, bytes: u64, what: 
     let kb = bytes as f64 / 1024.0;
     if kb > limit {
         let line = p.config.budget_lines.get(key).copied().unwrap_or(1);
-        diags.push(Diagnostic::error("pragma.json", line, 1, "app/orcamento", format!("{key} excedido em {what}: {kb:.1} kB gzip > {limit} kB")));
+        diags.push(Diagnostic::error("pragma.json", line, 1, "app/budget", format!("{key} exceeded in {what}: {kb:.1} kB gzip > {limit} kB")));
     }
 }

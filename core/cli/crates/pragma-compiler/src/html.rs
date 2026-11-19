@@ -1,4 +1,4 @@
-//! Parser de HTML do dialeto: estrito (toda tag não-void fecha), com posição em cada nó.
+//! HTML dialect parser: strict (every non-void tag closes), with a position on each node.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct Pos {
@@ -124,7 +124,7 @@ impl Parser<'_> {
     }
 
     fn run(&mut self) -> Vec<Node> {
-        // pilha de (elemento, offset da tag de abertura)
+        // stack of (element, opening tag offset)
         let mut stack: Vec<(Element, usize)> = Vec::new();
         let mut root: Vec<Node> = Vec::new();
         macro_rules! push {
@@ -150,7 +150,7 @@ impl Parser<'_> {
                 match self.src[start + 4..].find("-->") {
                     Some(k) => self.i = start + 4 + k + 3,
                     None => {
-                        self.err(start, "comentário não fechado".into());
+                        self.err(start, "unclosed comment".into());
                         self.i = self.b.len();
                     }
                 }
@@ -159,7 +159,7 @@ impl Parser<'_> {
             }
             if self.b[start + 1] == b'!' || self.b[start + 1] == b'?' {
                 if !self.src[start..].get(..9).is_some_and(|s| s.eq_ignore_ascii_case("<!doctype")) {
-                    self.err(start, "declaração inesperada".into());
+                    self.err(start, "unexpected declaration".into());
                 }
                 self.i = self.src[start..].find('>').map_or(self.b.len(), |k| start + k + 1);
                 continue;
@@ -175,13 +175,13 @@ impl Parser<'_> {
                     Some(idx) => {
                         while stack.len() > idx + 1 {
                             let (e, at) = stack.pop().unwrap();
-                            self.err(at, format!("<{}> não foi fechado", e.name));
+                            self.err(at, format!("<{}> is not closed", e.name));
                             push!(Node::Element(e));
                         }
                         let (e, _) = stack.pop().unwrap();
                         push!(Node::Element(e));
                     }
-                    None => self.err(start, format!("</{name}> sem tag de abertura")),
+                    None => self.err(start, format!("</{name}> has no opening tag")),
                 }
                 continue;
             }
@@ -201,7 +201,7 @@ impl Parser<'_> {
                         self.i = self.src[k..].find('>').map_or(self.b.len(), |m| k + m + 1);
                     }
                     None => {
-                        self.err(start, format!("<{}> não foi fechado", el.name));
+                        self.err(start, format!("<{}> is not closed", el.name));
                         self.i = self.b.len();
                     }
                 }
@@ -211,7 +211,7 @@ impl Parser<'_> {
             }
         }
         while let Some((e, at)) = stack.pop() {
-            self.err(at, format!("<{}> não foi fechado", e.name));
+            self.err(at, format!("<{}> is not closed", e.name));
             push!(Node::Element(e));
         }
         root
@@ -230,7 +230,7 @@ impl Parser<'_> {
                 self.i += 1;
             }
             if self.i >= self.b.len() {
-                self.err(start, format!("tag <{}> incompleta", el.name));
+                self.err(start, format!("incomplete tag <{}>", el.name));
                 return (el, true);
             }
             match self.b[self.i] {
@@ -254,7 +254,7 @@ impl Parser<'_> {
                 k += 1;
             }
             if k == a_start {
-                self.err(a_start, "caractere inesperado na tag".into());
+                self.err(a_start, "unexpected character in tag".into());
                 self.i += 1;
                 continue;
             }
@@ -277,7 +277,7 @@ impl Parser<'_> {
                             self.i = w + 1 + e + 1;
                         }
                         None => {
-                            self.err(w, "aspas não fechadas".into());
+                            self.err(w, "unclosed quotes".into());
                             value = Some(self.src[w + 1..].to_string());
                             self.i = self.b.len();
                         }
@@ -293,7 +293,7 @@ impl Parser<'_> {
                 }
             }
             if el.attrs.iter().any(|a| a.name.eq_ignore_ascii_case(&name)) {
-                self.err(a_start, format!("atributo {name} repetido"));
+                self.err(a_start, format!("duplicate attribute {name}"));
                 continue;
             }
             let pos = self.pos(a_start);
@@ -386,7 +386,7 @@ mod tests {
 
     #[test]
     fn positions_and_structure() {
-        let src = "<div class=\"a\">\n  <p data-text=\"data.x\">oi</p>\n  <br>\n  <c-card titulo='X' />\n</div>";
+        let src = "<div class=\"a\">\n  <p data-text=\"data.x\">hi</p>\n  <br>\n  <c-card title='X' />\n</div>";
         let (nodes, errs) = parse(src, 0);
         assert!(errs.is_empty());
         let Node::Element(div) = &nodes[0] else { panic!() };
@@ -394,17 +394,17 @@ mod tests {
         assert_eq!(kids.len(), 3);
         assert_eq!((kids[0].pos.line, kids[0].pos.col), (2, 3));
         assert_eq!((kids[0].attrs[0].pos.line, kids[0].attrs[0].pos.col), (2, 6));
-        assert_eq!(kids[2].value("titulo"), Some("X"));
+        assert_eq!(kids[2].value("title"), Some("X"));
         let mut out = String::new();
         serialize(&nodes, &mut out);
-        assert!(out.contains("<c-card titulo=\"X\"></c-card>"));
+        assert!(out.contains("<c-card title=\"X\"></c-card>"));
     }
 
     #[test]
     fn unclosed_and_stray() {
         let (_, errs) = parse("<div><span></div></p>", 0);
         let msgs: Vec<_> = errs.iter().map(|e| e.message.as_str()).collect();
-        assert_eq!(msgs, ["<span> não foi fechado", "</p> sem tag de abertura"]);
+        assert_eq!(msgs, ["<span> is not closed", "</p> has no opening tag"]);
     }
 
     #[test]

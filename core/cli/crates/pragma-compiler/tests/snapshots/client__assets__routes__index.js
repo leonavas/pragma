@@ -1,10 +1,10 @@
-import { carrinho } from '/assets/lib/state/carrinho.js'
-import { formatar } from '/assets/utils/fmt.js'
+import { cart } from '/assets/lib/state/cart.js'
+import { format } from '/assets/utils/fmt.js'
 
-export const state = () => ({ aberto: false, itens: [] })
+export const state = () => ({ open: false, items: [] })
 export const actions = {
-  alternar(ctx) {
-    ctx.$.aberto = !ctx.$.aberto
-    ctx.log.info(formatar(carrinho.total))
+  toggle(ctx) {
+    ctx.$.open = !ctx.$.open
+    ctx.log.info(format(cart.total))
   },
 }

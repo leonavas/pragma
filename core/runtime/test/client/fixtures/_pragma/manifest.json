@@ -1,12 +1,12 @@
 [
-  { "pattern": "/a", "html": "/a.html", "modules": ["/assets/a.js", "/assets/carrinho.js"], "loader": false, "ssr": false },
-  { "pattern": "/b", "html": "/b.html", "modules": ["/assets/carrinho.js"], "loader": false, "ssr": false },
-  { "pattern": "/diretivas", "html": "/diretivas.html", "modules": ["/assets/diretivas.js", "/assets/contador.js", "/assets/carrinho.js"], "loader": false, "ssr": false },
-  { "pattern": "/lista", "html": "/lista.html", "modules": ["/assets/lista.js", "/assets/carrinho.js"], "loader": false, "ssr": false },
-  { "pattern": "/produto/novo", "html": "/produto/novo.html", "modules": ["/assets/carrinho.js"], "loader": false, "ssr": false },
-  { "pattern": "/produto/:id", "html": "/produto/[id].html", "modules": ["/assets/carrinho.js"], "loader": true, "ssr": false },
-  { "pattern": "/erro", "html": "/erro.html", "modules": ["/assets/carrinho.js"], "loader": true, "ssr": false },
-  { "pattern": "/ssr", "html": "/ssr.html", "modules": ["/assets/ssr.js", "/assets/carrinho.js"], "loader": true, "ssr": true },
-  { "pattern": "/slot", "html": "/slot.html", "modules": ["/assets/slot.js", "/assets/caixa.js", "/assets/contador.js", "/assets/conta.js"], "loader": false, "ssr": false },
-  { "pattern": "/overlay", "html": "/overlay.html", "modules": ["/assets/overlay.js", "/assets/carrinho.js"], "loader": false, "ssr": false }
+  { "pattern": "/a", "html": "/a.html", "modules": ["/assets/a.js", "/assets/cart.js"], "loader": false, "ssr": false },
+  { "pattern": "/b", "html": "/b.html", "modules": ["/assets/cart.js"], "loader": false, "ssr": false },
+  { "pattern": "/directives", "html": "/directives.html", "modules": ["/assets/directives.js", "/assets/counter.js", "/assets/cart.js"], "loader": false, "ssr": false },
+  { "pattern": "/list", "html": "/list.html", "modules": ["/assets/list.js", "/assets/cart.js"], "loader": false, "ssr": false },
+  { "pattern": "/product/new", "html": "/product/new.html", "modules": ["/assets/cart.js"], "loader": false, "ssr": false },
+  { "pattern": "/product/:id", "html": "/product/[id].html", "modules": ["/assets/cart.js"], "loader": true, "ssr": false },
+  { "pattern": "/error", "html": "/error.html", "modules": ["/assets/cart.js"], "loader": true, "ssr": false },
+  { "pattern": "/ssr", "html": "/ssr.html", "modules": ["/assets/ssr.js", "/assets/cart.js"], "loader": true, "ssr": true },
+  { "pattern": "/slot", "html": "/slot.html", "modules": ["/assets/slot.js", "/assets/box.js", "/assets/counter.js", "/assets/account.js"], "loader": false, "ssr": false },
+  { "pattern": "/overlay", "html": "/overlay.html", "modules": ["/assets/overlay.js", "/assets/cart.js"], "loader": false, "ssr": false }
 ]

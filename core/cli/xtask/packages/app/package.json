@@ -1,0 +1,14 @@
+{
+  "name": "packages",
+  "private": true,
+  "dependencies": {
+    "@date-fns/tz": "1.5.0",
+    "chart.js": "4.6.1",
+    "date-fns": "4.4.0",
+    "dayjs": "1.11.23",
+    "es-toolkit": "1.53.2",
+    "fuse.js": "7.5.0",
+    "lodash": "4.18.1",
+    "valibot": "1.5.0"
+  }
+}

@@ -1,21 +1,21 @@
-<title>Início</title>
+<title>Home</title>
 <section class="p-4">
-  <h1 class="text-2xl font-bold">Produtos</h1>
-  <button class="btn" @click="alternar" @open="sobre">Alternar</button>
-  <c-card titulo="Destaque" destaque class="mt-4">
-    <p>Corpo do card</p>
-    <button slot="acoes" class="btn" @click="alternar" :text="$aberto">Alternar</button>
+  <h1 class="text-2xl font-bold">Products</h1>
+  <button class="btn" @click="toggle" @open="about">Toggle</button>
+  <c-card heading="Featured" featured class="mt-4">
+    <p>Card body</p>
+    <button slot="aside" class="btn" @click="toggle" :text="$open">Toggle</button>
   </c-card>
-  <ul :show="$aberto">
-    <template :for="item in $itens" :key="item.id">
+  <ul :show="$open">
+    <for item in $items key=item.id>
       <li>
-        <span :text="item.nome">nome</span>
-        <template :if="item.promo">
-          <c-card titulo="Promo"><b>promo</b></c-card>
-        </template>
-        <template :else><i>normal</i></template>
+        <span :text="item.name">name</span>
+        <if item.promo>
+          <c-card heading="Promo"><b>promo</b></c-card>
+        </if>
+        <else><i>normal</i></else>
       </li>
-    </template>
-    <template :empty><li>Nada</li></template>
+    </for>
+    <empty><li>Nothing</li></empty>
   </ul>
 </section>

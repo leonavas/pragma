@@ -1,5 +1,5 @@
 const D = Symbol(), S = Symbol(), NONE = { b: [] }
-// Escopo de fora de cada componente aberto; conteúdo de slot (data-slot="n") usa o de n níveis acima.
+// Outer scope of each open component; slot content (data-slot="n") uses the one n levels up.
 const outer = []
 let auto = 0
 
@@ -14,7 +14,7 @@ export function get(s, p) {
   let v = s
   for (const k of p) {
     if (v == null || !(k in Object(v))) {
-      if (self.__pragmaDev && p[0] !== 'query') fail(`caminho inexistente "${p.join('.')}"`)
+      if (self.__pragmaDev && p[0] !== 'query') fail(`unknown path "${p.join('.')}"`)
       return
     }
     v = v[k]
@@ -29,8 +29,9 @@ function parse(el) {
     if ((v = el.getAttribute('data-if')) != null) [d.p, d.n] = cond(v), (d.t = 1)
     else if ((v = el.getAttribute('data-for')) != null) {
       const [x, , p] = v.trim().split(/\s+/)
-      Object.assign(d, { t: 2, v: x, p: path(p), k: path(el.getAttribute('data-key') ?? fail(`data-for sem data-key: "${v}"`)) })
+      Object.assign(d, { t: 2, v: x, p: path(p), k: path(el.getAttribute('data-key') ?? fail(`<for> without key: "${v}"`)) })
     } else if (el.hasAttribute('data-else') || el.hasAttribute('data-empty')) d.t = 3
+    else if ((v = el.getAttribute('data-else-if')) != null) [d.p, d.n] = cond(v), (d.t = 4)
     d.u = +el.getAttribute('data-slot')
     if (d.t < 3) d.id = el.getAttribute('data-tid') ?? (el.setAttribute('data-tid', (v = 't' + auto++)), v)
     return (el[D] = d.t ? d : NONE)
@@ -48,7 +49,7 @@ function parse(el) {
       case 'on-': hooks.on(a); d.e = 1; break
       case 'model':
         d.m = path(value)
-        if (self.__pragmaDev && d.m[0] !== 'state' && d.m[0] !== 'shared') fail(`data-model só aceita state ou shared: "${value}"`)
+        if (self.__pragmaDev && d.m[0] !== 'state' && d.m[0] !== 'shared') fail(`data-model only accepts state or shared: "${value}"`)
         hooks.on('input'); d.e = 1; break
       case 'c': d.x = 1; break
       case 'page': d.x = 2; break
@@ -66,7 +67,7 @@ function bind(el, [t, p, n, a], s) {
   } else if (t === 2) {
     v = v === false || v == null ? null : v === true ? '' : String(v)
     if (el.getAttribute(a) !== v) v == null ? el.removeAttribute(a) : el.setAttribute(a, v)
-    // Depois de mexido pelo usuário, o atributo não muda mais o estado: liga a propriedade.
+    // Once the user touches it, the attribute no longer drives the state: set the property.
     if ((a === 'checked' || a === 'selected') && el[a] !== (v != null)) el[a] = v != null
   } else {
     v = !v === n
@@ -106,7 +107,7 @@ function visit(el, s, d = el[D] ?? parse(el)) {
   }
   if (d.x === 1) {
     outer.push(s)
-    // data-* da raiz são as props do JS do componente: precisam existir antes do state(ctx).
+    // Root data-* are the component JS props: they must exist before state(ctx).
     for (const b of d.b) if (b[0] === 2 && b[3].startsWith('data-') && b[1][0] !== 'state') bind(el, b, s)
   }
   if (d.x) s = hooks.enter(el, s, d.x)
@@ -137,15 +138,17 @@ function drop(n) {
   n.remove()
 }
 
-// else/empty não têm tid próprio: as instâncias usam o tid do if/for anterior (igual ao SSR).
+// else-if/else/empty have no tid of their own: instances use the tid of the if/for opening the chain (same as SSR).
+// `last`: an earlier branch of the chain is already on.
 function block(t, d, s, last, id) {
   if (d.t === 2) return list(t, d, s)
-  const on = d.t === 1 ? !get(s, d.p) === d.n : !last
+  const chained = d.t > 2 && last
+  const on = !chained && (d.t === 3 || !get(s, d.p) === d.n)
   let n = t.nextElementSibling
   if (n?.getAttribute('data-of') !== id) n = null
   if (!on) {
     if (n) drop(n)
-    return [t, false, id]
+    return [t, chained, id]
   }
   if (n) visit(n, s)
   else {
@@ -165,7 +168,7 @@ function list(t, d, s) {
     keys.push(String(get(c, d.k)))
   }
   const keep = new Set(keys)
-  if (self.__pragmaDev && keep.size < keys.length) fail(`data-key repetido em "${d.v} in ${d.p.join('.')}"`)
+  if (self.__pragmaDev && keep.size < keys.length) fail(`duplicate key in <for ${d.v} in ${d.p.join('.')}>`)
   for (const [k, n] of old) if (!keep.has(k)) drop(n)
   let ref = t
   for (let i = 0; i < keys.length; i++) {

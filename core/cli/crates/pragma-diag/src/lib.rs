@@ -30,8 +30,8 @@ impl Diagnostic {
 impl fmt::Display for Diagnostic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let level = match self.severity {
-            Severity::Error => "erro",
-            Severity::Warning => "aviso",
+            Severity::Error => "error",
+            Severity::Warning => "warning",
         };
         write!(f, "{}:{}:{} {} [{}] {}", self.file.display(), self.line, self.column, level, self.rule, self.message)
     }

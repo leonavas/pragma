@@ -20,14 +20,14 @@ pub async fn run(root: PathBuf, host: &str, port: u16) -> i32 {
     let listener = match TcpListener::bind((host, port)).await {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("{} não foi possível abrir {host}:{port}: {e}", red("erro"));
+            eprintln!("{} cannot listen on {host}:{port}: {e}", red("error"));
             return 1;
         }
     };
     let mut node = Node::new(out.join("server/node.mjs"), root.clone());
     node.sync(&site).await;
     tokio::spawn(server::serve(listener, site.clone()));
-    println!("pragma dev em http://{}:{port}", display_host(host));
+    println!("pragma dev at http://{}:{port}", display_host(host));
 
     let ctrl_c = crate::shutdown();
     tokio::pin!(ctrl_c);
@@ -35,7 +35,7 @@ pub async fn run(root: PathBuf, host: &str, port: u16) -> i32 {
     let _watcher = match watch(&root, tx) {
         Ok(w) => w,
         Err(e) => {
-            eprintln!("{} não foi possível observar '{}': {e}", red("erro"), root.display());
+            eprintln!("{} cannot watch '{}': {e}", red("error"), root.display());
             node.stop().await;
             return 1;
         }
@@ -46,13 +46,13 @@ pub async fn run(root: PathBuf, host: &str, port: u16) -> i32 {
                 let Some(batch) = batch else { break };
                 let css_only = batch.iter().all(|p| p.extension().is_some_and(|e| e == "css"));
                 let names: Vec<_> = batch.iter().map(|p| p.strip_prefix(&root).unwrap_or(p).display().to_string()).collect();
-                println!("{}", dim(&format!("mudou: {}", names.join(", "))));
+                println!("{}", dim(&format!("changed: {}", names.join(", "))));
                 if !rebuild(&root, &out, &site).await {
                     failed = true;
                     continue;
                 }
                 node.sync(&site).await;
-                // depois de um erro a página pode estar velha em mais do que o CSS
+                // after an error the page may be stale beyond the CSS
                 if css_only && !failed {
                     site.send(Event::Css(newest_css(&out.join("client/assets"))));
                 } else {
@@ -77,12 +77,12 @@ async fn rebuild(root: &Path, out: &Path, site: &Site) -> bool {
     let result = tokio::task::spawn_blocking(move || pragma_compiler::build(&opts)).await;
     let result: Result<BuildReport, Vec<Diagnostic>> = match result {
         Ok(r) => r,
-        Err(e) => Err(vec![Diagnostic::error(root, 0, 0, "interno", format!("o compilador falhou: {e}"))]),
+        Err(e) => Err(vec![Diagnostic::error(root, 0, 0, "internal", format!("compiler crashed: {e}"))]),
     };
     match result {
         Ok(report) => {
             print_diagnostics(root, &report.warnings);
-            println!("{}", dim(&format!("compilado em {} ms", started.elapsed().as_millis())));
+            println!("{}", dim(&format!("compiled in {} ms", started.elapsed().as_millis())));
             site.reload_manifest();
             true
         }
@@ -144,7 +144,7 @@ fn ignored(root: &Path, path: &Path) -> bool {
         return true;
     }
     let name = rel.file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
-    // arquivos temporários de editores
+    // editor temp files
     name.ends_with('~') || name.ends_with(".swp") || name.ends_with(".swx") || name.starts_with(".#") || name == "4913"
 }
 

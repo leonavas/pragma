@@ -3,7 +3,7 @@ use std::fmt::Write;
 
 const PREFLIGHT: &str = include_str!("../assets/preflight.css");
 
-const LICENSE: &str = "/*! pragma base.css | inclui o preflight do Tailwind CSS v4 (MIT, Copyright (c) Tailwind Labs, Inc.) */\n";
+const LICENSE: &str = "/*! pragma base.css | includes Tailwind CSS v4 Preflight (MIT, Copyright (c) Tailwind Labs, Inc.) */\n";
 
 const TOKENS_ROOT: &str = r#"    --spacing: 0.25rem;
     --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
@@ -60,8 +60,8 @@ const TOKENS_ROOT: &str = r#"    --spacing: 0.25rem;
   }
 "#;
 
-// A paleta não muda no escuro (semântica do Tailwind: `dark:` escolhe outro tom); mudam
-// as superfícies da página e a força das sombras.
+// The palette does not change in dark mode (Tailwind semantics: `dark:` picks another tone); page
+// surfaces and shadow strength do.
 const TOKENS_DARK: &str = r#"  [data-theme="dark"] {
     color-scheme: dark;
     --page-bg: var(--color-neutral-950);
@@ -118,7 +118,7 @@ const BASE: &str = r#"@layer base {
 }
 "#;
 
-// Sem herança: o anel/sombra do pai não pode vazar para os filhos.
+// No inheritance: the parent ring/shadow must not leak into children.
 const PROPERTIES: &str = r#"@property --tw-ring-color {
   syntax: "*";
   inherits: false;

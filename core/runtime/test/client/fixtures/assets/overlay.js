@@ -1,3 +1,3 @@
 export const actions = {
-  abrir(ctx) { ctx.open('m') },
+  open(ctx) { ctx.open('m') },
 }

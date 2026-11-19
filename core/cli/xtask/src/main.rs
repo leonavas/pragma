@@ -3,29 +3,30 @@ use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
 const PLAYWRIGHT: &str = "1.65.1";
-const ALVOS: &str = "rapido | rust | servidor | cliente | overlays | e2e | tudo";
+const TARGETS: &str = "quick | rust | server | client | overlays | e2e | packages | all";
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
-    let alvo = match args.as_slice() {
-        [cmd] if cmd == "test" => "rapido",
-        [cmd, alvo] if cmd == "test" => alvo.as_str(),
-        _ => return uso(),
+    let target = match args.as_slice() {
+        [cmd] if cmd == "test" => "quick",
+        [cmd, target] if cmd == "test" => target.as_str(),
+        _ => return usage(),
     };
     let ctx = Ctx::new();
-    let passos: &[fn(&Ctx) -> bool] = match alvo {
-        "rapido" => &[rust, servidor],
+    let steps: &[fn(&Ctx) -> bool] = match target {
+        "quick" => &[rust, server],
         "rust" => &[rust],
-        "servidor" => &[servidor],
-        "cliente" => &[cliente],
+        "server" => &[server],
+        "client" => &[client],
         "overlays" => &[overlays],
         "e2e" => &[e2e],
-        "tudo" => &[rust, servidor, cliente, overlays, e2e],
-        _ => return uso(),
+        "packages" => &[packages],
+        "all" => &[rust, server, client, overlays, e2e],
+        _ => return usage(),
     };
-    for passo in passos {
-        if !passo(&ctx) {
-            eprintln!("✗ falhou");
+    for step in steps {
+        if !step(&ctx) {
+            eprintln!("✗ failed");
             return ExitCode::FAILURE;
         }
     }
@@ -33,8 +34,8 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-fn uso() -> ExitCode {
-    eprintln!("uso: cargo xtask test [{ALVOS}]");
+fn usage() -> ExitCode {
+    eprintln!("usage: cargo xtask test [{TARGETS}]");
     ExitCode::from(2)
 }
 
@@ -49,7 +50,7 @@ impl Ctx {
         let cli = PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf();
         let core = cli.parent().unwrap().to_path_buf();
         let tools = env::var_os("PRAGMA_TOOLS_DIR").map(PathBuf::from).unwrap_or_else(|| {
-            PathBuf::from(env::var_os("HOME").expect("HOME não definido")).join(".cache/pragma-tools")
+            PathBuf::from(env::var_os("HOME").expect("HOME not set")).join(".cache/pragma-tools")
         });
         Self { core, cli, tools }
     }
@@ -59,29 +60,29 @@ impl Ctx {
     }
 }
 
-fn run(titulo: &str, cmd: &mut Command) -> bool {
-    println!("› {titulo}");
+fn run(title: &str, cmd: &mut Command) -> bool {
+    println!("› {title}");
     match cmd.status() {
         Ok(status) => status.success(),
         Err(err) => {
-            eprintln!("não consegui executar {:?}: {err}", cmd.get_program());
+            eprintln!("could not run {:?}: {err}", cmd.get_program());
             false
         }
     }
 }
 
-fn ferramentas(ctx: &Ctx) -> bool {
+fn tools(ctx: &Ctx) -> bool {
     if ctx.playwright().join("index.mjs").exists() {
         return true;
     }
     let tools = ctx.tools.to_string_lossy().into_owned();
     std::fs::create_dir_all(&ctx.tools).is_ok()
         && run(
-            &format!("instalando Playwright {PLAYWRIGHT} em {tools} (só na primeira vez)"),
+            &format!("installing Playwright {PLAYWRIGHT} in {tools} (first run only)"),
             Command::new("npm").args(["install", "--prefix", &tools, "--no-save", "--silent"]).arg(format!("playwright@{PLAYWRIGHT}")),
         )
         && run(
-            "instalando Chromium e Firefox",
+            "installing Chromium and Firefox",
             Command::new(ctx.tools.join("node_modules/.bin/playwright")).args(["install", "chromium", "firefox"]),
         )
 }
@@ -93,27 +94,27 @@ fn rust(ctx: &Ctx) -> bool {
     )
 }
 
-fn servidor(ctx: &Ctx) -> bool {
+fn server(ctx: &Ctx) -> bool {
     let dir = ctx.core.join("runtime/test/server");
-    let mut arquivos: Vec<PathBuf> = std::fs::read_dir(&dir)
+    let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
         .map(|it| it.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.to_string_lossy().ends_with(".test.js")).collect())
         .unwrap_or_default();
-    arquivos.sort();
-    run("runtime do servidor (node --test)", Command::new("node").arg("--test").args(&arquivos))
+    files.sort();
+    run("server runtime (node --test)", Command::new("node").arg("--test").args(&files))
 }
 
-fn cliente(ctx: &Ctx) -> bool {
-    ferramentas(ctx)
+fn client(ctx: &Ctx) -> bool {
+    tools(ctx)
         && run(
-            "runtime do cliente (Chromium)",
+            "client runtime (Chromium)",
             Command::new("node").arg("--test").arg(ctx.core.join("runtime/test/client/")).env("PRAGMA_TOOLS", &ctx.tools),
         )
 }
 
 fn overlays(ctx: &Ctx) -> bool {
-    ferramentas(ctx)
+    tools(ctx)
         && run(
-            "overlays (Chromium e Firefox)",
+            "overlays (Chromium and Firefox)",
             Command::new("node")
                 .args(["--test", "--test-concurrency=1"])
                 .arg(ctx.core.join("runtime/test/overlay/overlay.test.mjs"))
@@ -121,17 +122,35 @@ fn overlays(ctx: &Ctx) -> bool {
         )
 }
 
+fn pragma_release(ctx: &Ctx) -> bool {
+    run("building pragma (release)", Command::new("cargo").args(["build", "--release", "--quiet", "-p", "pragma-cli"]).current_dir(&ctx.cli))
+}
+
 fn e2e(ctx: &Ctx) -> bool {
     let bin = ctx.cli.join("target/release/pragma");
-    ferramentas(ctx)
-        && run("compilando pragma (release)", Command::new("cargo").args(["build", "--release", "--quiet", "-p", "pragma-cli"]).current_dir(&ctx.cli))
+    tools(ctx)
+        && pragma_release(ctx)
         && run(
-            "app de exemplo de ponta a ponta (Chromium e Firefox)",
+            "example app end to end (Chromium and Firefox)",
             Command::new("node")
                 .args(["--test", "--test-concurrency=1"])
-                .current_dir(ctx.core.join("exemplo/e2e"))
+                .current_dir(ctx.core.join("example/e2e"))
                 .env("PRAGMA", &bin)
                 .env("PLAYWRIGHT_DIR", ctx.tools.join("node_modules")),
         )
 }
 
+fn packages(ctx: &Ctx) -> bool {
+    let bin = ctx.cli.join("target/release/pragma");
+    tools(ctx)
+        && pragma_release(ctx)
+        && run(
+            "real npm packages: check, build, tree-shaking and Chromium",
+            Command::new("node")
+                .args(["--test", "--test-concurrency=1"])
+                .arg(ctx.cli.join("xtask/packages/packages.test.mjs"))
+                .env("PRAGMA", &bin)
+                .env("PRAGMA_TOOLS", &ctx.tools)
+                .env("PLAYWRIGHT_DIR", ctx.tools.join("node_modules")),
+        )
+}

@@ -3,7 +3,7 @@ use pragma_cli::new::create;
 #[test]
 fn creates_app_from_embedded_files() {
     let tmp = tempfile::tempdir().unwrap();
-    let dir = tmp.path().join("loja");
+    let dir = tmp.path().join("shop");
     let count = create(&dir).unwrap();
     assert!(count > 1);
     let base = std::fs::read_to_string(dir.join("core/base.css")).unwrap();
@@ -19,10 +19,10 @@ fn creates_app_from_embedded_files() {
             }
         }
     }
-    assert!(!dir.join("core/test").exists(), "testes do runtime não vão para o app");
+    assert!(!dir.join("core/test").exists(), "runtime tests are not copied to the app");
     if let Ok(json) = std::fs::read_to_string(dir.join("pragma.json")) {
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
-        assert_eq!(value["name"], "loja");
+        assert_eq!(value["name"], "shop");
     }
 }
 
@@ -31,9 +31,9 @@ fn accepts_empty_dir_and_refuses_non_empty() {
     let tmp = tempfile::tempdir().unwrap();
     create(tmp.path()).unwrap();
     let err = create(tmp.path()).unwrap_err();
-    assert!(err.contains("não está vazio"), "{err}");
+    assert!(err.contains("is not empty"), "{err}");
 
-    let file = tmp.path().join("arquivo.txt");
+    let file = tmp.path().join("file.txt");
     std::fs::write(&file, "x").unwrap();
     assert!(create(&file).is_err());
 }

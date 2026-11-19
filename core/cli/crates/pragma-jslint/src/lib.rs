@@ -1,4 +1,4 @@
-//! Regras de JS do dialeto. Contrato: core/SPEC.md §10.
+//! JS rules of the dialect. Contract: core/SPEC.md §10.
 use oxc_allocator::Allocator;
 use oxc_ast::Comment;
 use oxc_ast::ast::{
@@ -11,7 +11,7 @@ use oxc_codegen::{Codegen, CodegenOptions};
 use oxc_minifier::{CompressOptions, MangleOptions, Minifier, MinifierOptions};
 use oxc_parser::{Parser, ParserReturn};
 use oxc_span::{GetSpan, SourceType, Span};
-use oxc_syntax::module_record::ExportExportName;
+use oxc_syntax::module_record::{ExportExportName, ExportImportName, ImportImportName};
 use pragma_diag::Diagnostic;
 use std::path::{Component, Path};
 
@@ -19,19 +19,19 @@ pub struct LintContext {
     pub is_core: bool,
 }
 
-pub const RULE_SYNTAX: &str = "js/sintaxe";
-pub const RULE_HTML: &str = "js/html-em-js";
+pub const RULE_SYNTAX: &str = "js/syntax";
+pub const RULE_HTML: &str = "js/html-in-js";
 pub const RULE_CONSOLE: &str = "js/console";
-pub const RULE_JSDOC: &str = "js/jsdoc-tipos";
+pub const RULE_JSDOC: &str = "js/jsdoc-types";
 pub const RULE_IMPORT: &str = "js/import";
-pub const RULE_COMMENT: &str = "js/comentario";
-pub const RULE_NAME: &str = "js/nome-vago";
+pub const RULE_COMMENT: &str = "js/comment";
+pub const RULE_NAME: &str = "js/vague-name";
 pub const RULE_CTX: &str = "js/ctx";
 
 const SHORT_OK: &[&str] = &["$", "i", "j", "k", "id", "ok", "el", "ctx", "url", "log"];
 const VAGUE: &[&str] = &[
     "tmp", "temp", "aux", "foo", "bar", "baz", "qux", "obj", "arr", "val", "res", "ret", "fn", "func", "cb",
-    "data", "dado", "dados", "info", "stuff", "thing", "things", "coisa", "coisas", "algo", "teste", "test",
+    "data", "dado", "dados", "info", "stuff", "thing", "things", "coisa", "coisas", "algo", "something", "whatever", "teste", "test",
     "handle", "handler", "helper", "util", "utils", "misc", "doit", "fazer", "processar", "process",
 ];
 const DIGIT_OK: &[&str] = &["base64", "sha1", "sha256", "md5", "utf8", "i18n"];
@@ -57,7 +57,7 @@ pub fn lint(path: &Path, source: &str, ctx: &LintContext) -> Vec<Diagnostic> {
         found.push((
             offset,
             RULE_SYNTAX,
-            format!("não é JS puro (ES module): {}", err.message),
+            format!("not plain JS (ES module): {}", err.message),
         ));
     }
 
@@ -99,7 +99,7 @@ fn is_server_file(path: &Path, ctx: &LintContext) -> bool {
             _ => None,
         })
         .collect();
-    // No app o runtime de servidor fica em core/server/; no repositório, em core/runtime/server/.
+    // In the app the server runtime lives in core/server/; in the repo, in core/runtime/server/.
     parts.windows(2).any(|w| w == ["core", "server"]) || (ctx.is_core && parts.contains(&"server"))
 }
 
@@ -114,7 +114,7 @@ struct Linter<'c> {
 impl Linter<'_> {
     fn check_name(&mut self, name: &str, span: Span) {
         if !self.ctx.is_core && vague_name(name, self.short_ok) {
-            self.report(span, RULE_NAME, format!("nome `{name}` não diz o que é nem o que faz; use um nome que se explique (ex.: `produto`, `totalItens`, `adicionarAoCarrinho`)"));
+            self.report(span, RULE_NAME, format!("name `{name}` does not say what it is or does; use a self-explanatory name (e.g. `product`, `totalItems`, `addToCart`)"));
         }
     }
 
@@ -132,22 +132,22 @@ impl Linter<'_> {
             | "createContextualFragment" | "parseFromString" => self.report(
                 span,
                 RULE_HTML,
-                format!("`{name}` monta HTML em JS; a marcação vive no .html (use <template> e diretivas)"),
+                format!("`{name}` builds HTML in JS; markup lives in .html (use <template> and directives)"),
             ),
             "write" | "writeln" if object_name == Some("document") => self.report(
                 span,
                 RULE_HTML,
-                format!("`document.{name}` monta HTML em JS; a marcação vive no .html"),
+                format!("`document.{name}` builds HTML in JS; markup lives in .html"),
             ),
             "createElement" | "createElementNS" | "createTextNode" if !self.ctx.is_core => self.report(
                 span,
                 RULE_HTML,
-                format!("`{name}` só é permitido no runtime (core/); a marcação vive no .html"),
+                format!("`{name}` is only allowed in the runtime (core/); markup lives in .html"),
             ),
             "state" | "props" if object_name == Some("ctx") && !self.ctx.is_core => self.report(
                 span,
                 RULE_CTX,
-                format!("`ctx.{name}` não existe; use `ctx.$` (estado e props)"),
+                format!("`ctx.{name}` does not exist; use `ctx.$` (state and props)"),
             ),
             "console" if matches!(object_name, Some("globalThis" | "window" | "self")) => {
                 self.report(span, RULE_CONSOLE, console_message());
@@ -167,20 +167,20 @@ impl Linter<'_> {
             if self.server {
                 return;
             }
-            format!("`node:{rest}` só pode ser importado em *.server.js e core/server/")
+            format!("`node:{rest}` can only be imported in *.server.js and core/server/")
         } else if specifier.starts_with("http:")
             || specifier.starts_with("https:")
             || specifier.starts_with("//")
         {
-            format!("import remoto `{specifier}` é proibido; instale o pacote (npm i, bun add) ou copie o código para o projeto")
+            format!("remote import `{specifier}` is not allowed; install the package (npm i, bun add) or copy the code into the project")
         } else if is_package(specifier) {
             if literal {
                 return;
             }
-            format!("import de pacote `{specifier}` deve usar aspas, não template literal")
+            format!("package import `{specifier}` must use quotes, not a template literal")
         } else {
             format!(
-                "import `{specifier}` é proibido; use caminho relativo (./, ../), /core/ ou um pacote do package.json"
+                "import `{specifier}` is not allowed; use a relative path (./, ../), /core/ or a package from package.json"
             )
         };
         self.report(span, RULE_IMPORT, message);
@@ -213,7 +213,7 @@ pub fn package_name(specifier: &str) -> &str {
 }
 
 fn console_message() -> String {
-    "`console` é proibido; use `ctx.log` (ou `log` de core/log.js)".to_string()
+    "`console` is not allowed; use `ctx.log` (or `log` from core/log.js)".to_string()
 }
 
 impl<'a> Visit<'a> for Linter<'_> {
@@ -266,7 +266,7 @@ impl<'a> Visit<'a> for Linter<'_> {
             self.report(
                 it.span,
                 RULE_HTML,
-                "string com marcação HTML; a marcação vive no .html".to_string(),
+                "string with HTML markup; markup lives in .html".to_string(),
             );
         }
     }
@@ -276,7 +276,7 @@ impl<'a> Visit<'a> for Linter<'_> {
             self.report(
                 quasi.span,
                 RULE_HTML,
-                "template literal com marcação HTML; a marcação vive no .html".to_string(),
+                "template literal with HTML markup; markup lives in .html".to_string(),
             );
         }
         walk::walk_template_literal(self, it);
@@ -308,7 +308,7 @@ impl<'a> Visit<'a> for Linter<'_> {
     }
 }
 
-/// Heurística de marcação: `<tag` seguido de espaço, `>` ou `/`; `</tag`; `<!--`; `<!doctype`.
+/// Markup heuristic: `<tag` followed by space, `>` or `/`; `</tag`; `<!--`; `<!doctype`.
 fn has_markup(s: &str) -> bool {
     let b = s.as_bytes();
     (0..b.len()).any(|i| {
@@ -381,7 +381,7 @@ fn check_comment(source: &str, comment: &Comment, found: &mut Vec<(u32, &'static
             found.push((
                 span.start + i as u32,
                 RULE_JSDOC,
-                format!("JSDoc de tipos (`@{tag}`) é proibido; o pragma é JS puro, sem tipos"),
+                format!("type JSDoc (`@{tag}`) is not allowed; pragma is plain JS, without types"),
             ));
         }
     }
@@ -391,7 +391,7 @@ fn check_comment(source: &str, comment: &Comment, found: &mut Vec<(u32, &'static
 }
 
 fn comment_message() -> String {
-    "comentário é proibido; o código é a documentação: nomes claros e funções pequenas".to_string()
+    "comments are not allowed; the code is the documentation: clear names and small functions".to_string()
 }
 
 struct LineIndex {
@@ -406,7 +406,7 @@ impl LineIndex {
         Self { starts }
     }
 
-    /// Linha e coluna 1-based; coluna em caracteres, não bytes.
+    /// 1-based line and column; column in characters, not bytes.
     fn position(&self, source: &str, offset: u32) -> (u32, u32) {
         let offset = (offset as usize).min(source.len());
         let line = self.starts.partition_point(|&s| s <= offset) - 1;
@@ -415,8 +415,8 @@ impl LineIndex {
     }
 }
 
-/// Nomes exportados pelo módulo (`state`, `actions`, `mount`, `load`, `ssr`, `default`…), na ordem
-/// do código. Vazio se o arquivo não parseia.
+/// Names exported by the module (`state`, `actions`, `mount`, `load`, `ssr`, `default`…), in source
+/// order. Empty if the file does not parse.
 pub fn exported_names(source: &str) -> Vec<String> {
     let allocator = Allocator::default();
     let ret = parse(&allocator, source);
@@ -439,9 +439,134 @@ pub fn exported_names(source: &str) -> Vec<String> {
     names.into_iter().map(|n| n.1).collect()
 }
 
-/// Chaves de `export const actions = { ... }` (propriedades, métodos e atalhos), na ordem do
-/// código. Também aceita `const x = {...}; export { x as actions }`. Spreads e chaves computadas
-/// não estáticas são ignorados.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Imported {
+    Name(String),
+    All,
+    Bare,
+}
+
+pub fn imported_bindings(source: &str) -> Vec<(String, Imported)> {
+    let allocator = Allocator::default();
+    let ret = parse(&allocator, source);
+    if ret.diagnostics.has_errors() {
+        return Vec::new();
+    }
+    let record = &ret.module_record;
+    let mut out: Vec<(String, Imported)> = Vec::new();
+    for e in record.import_entries.iter().filter(|e| !e.is_type) {
+        let what = match &e.import_name {
+            ImportImportName::Name(n) => Imported::Name(n.name.to_string()),
+            ImportImportName::NamespaceObject => Imported::All,
+            ImportImportName::Default(_) => Imported::Name("default".into()),
+        };
+        out.push((e.module_request.name.to_string(), what));
+    }
+    for e in record.indirect_export_entries.iter().chain(&record.star_export_entries).filter(|e| !e.is_type) {
+        let Some(req) = &e.module_request else { continue };
+        let what = match &e.import_name {
+            ExportImportName::Name(n) => Imported::Name(n.name.to_string()),
+            ExportImportName::All | ExportImportName::AllButDefault => Imported::All,
+            ExportImportName::Null => continue,
+        };
+        out.push((req.name.to_string(), what));
+    }
+    for (spec, reqs) in &record.requested_modules {
+        if reqs.iter().any(|r| r.is_import && !r.is_type) && !out.iter().any(|(s, _)| s == spec.as_str()) {
+            out.push((spec.to_string(), Imported::Bare));
+        }
+    }
+    for d in &record.dynamic_imports {
+        let raw = d.module_request.source_text(source);
+        let quoted = raw.len() >= 2 && (raw.starts_with('"') || raw.starts_with('\'')) && raw.ends_with(&raw[..1]);
+        if quoted {
+            out.push((raw[1..raw.len() - 1].to_string(), Imported::All));
+        }
+    }
+    out.sort();
+    out.dedup();
+    out
+}
+
+pub fn package_alias(index: u32, name: Option<&str>) -> String {
+    format!("${index}${}", name.unwrap_or_default())
+}
+
+pub fn alias_package_imports(source: &str, alias: impl Fn(&str) -> Option<u32>) -> Result<String, String> {
+    let allocator = Allocator::default();
+    let ret = parse(&allocator, source);
+    if ret.diagnostics.has_errors() {
+        return Ok(source.to_string());
+    }
+    let record = &ret.module_record;
+    let mut statements: Vec<(Span, &'static str, String, Vec<String>)> = Vec::new();
+    let mut push = |span: Span, kind: &'static str, spec: &str, part: String| match statements.iter_mut().find(|s| s.0 == span) {
+        Some(s) => s.3.push(part),
+        None => statements.push((span, kind, spec.to_string(), vec![part])),
+    };
+    for e in &record.import_entries {
+        let spec = e.module_request.name.as_str();
+        let Some(k) = alias(spec) else { continue };
+        let local = e.local_name.name.as_str();
+        let imported = match &e.import_name {
+            ImportImportName::Name(n) => package_alias(k, Some(n.name.as_str())),
+            ImportImportName::Default(_) => package_alias(k, Some("default")),
+            ImportImportName::NamespaceObject => package_alias(k, None),
+        };
+        push(e.statement_span, "import", spec, format!("{imported} as {local}"));
+    }
+    for e in &record.indirect_export_entries {
+        let Some(req) = &e.module_request else { continue };
+        let spec = req.name.as_str();
+        let Some(k) = alias(spec) else { continue };
+        let imported = match &e.import_name {
+            ExportImportName::Name(n) => package_alias(k, Some(n.name.as_str())),
+            ExportImportName::All => package_alias(k, None),
+            _ => continue,
+        };
+        let exported = match &e.export_name {
+            ExportExportName::Name(n) => n.name.to_string(),
+            ExportExportName::Default(_) => "default".to_string(),
+            ExportExportName::Null => continue,
+        };
+        push(e.statement_span, "export", spec, format!("{imported} as {exported}"));
+    }
+    for e in &record.star_export_entries {
+        if let Some(req) = &e.module_request
+            && alias(req.name.as_str()).is_some()
+        {
+            return Err(format!("`export * from '{}'` does not work alongside another import of the same package; re-export by name", req.name));
+        }
+    }
+    let mut edits: Vec<(u32, u32, String)> = statements
+        .into_iter()
+        .map(|(span, kind, spec, parts)| {
+            let lines = span.source_text(source).matches('\n').count();
+            (span.start, span.end, format!("{kind} {{ {} }} from '{spec}';{}", parts.join(", "), "\n".repeat(lines)))
+        })
+        .collect();
+    for d in &record.dynamic_imports {
+        let raw = d.module_request.source_text(source);
+        let quoted = raw.len() >= 2 && (raw.starts_with('"') || raw.starts_with('\'')) && raw.ends_with(&raw[..1]);
+        if !quoted {
+            continue;
+        }
+        if let Some(k) = alias(&raw[1..raw.len() - 1]) {
+            let text = format!("{}.then((m) => m.{})", d.span.source_text(source), package_alias(k, None));
+            edits.push((d.span.start, d.span.end, text));
+        }
+    }
+    edits.sort_by_key(|e| std::cmp::Reverse(e.0));
+    let mut out = source.to_string();
+    for (start, end, text) in edits {
+        out.replace_range(start as usize..end as usize, &text);
+    }
+    Ok(out)
+}
+
+/// Keys of `export const actions = { ... }` (properties, methods and shorthands), in source
+/// order. Also accepts `const x = {...}; export { x as actions }`. Spreads and non-static
+/// computed keys are ignored.
 pub fn exported_actions(source: &str) -> Vec<String> {
     let allocator = Allocator::default();
     let ret = parse(&allocator, source);
@@ -498,8 +623,8 @@ pub fn minify(source: &str) -> Result<String, String> {
     minify_with_imports(source, |_| None)
 }
 
-/// Minifica e troca especificadores de import/export/`import()` literais: `rewrite` devolve o
-/// novo especificador ou `None` para manter. Nomes exportados são preservados.
+/// Minifies and rewrites literal import/export/`import()` specifiers: `rewrite` returns the
+/// new specifier or `None` to keep it. Exported names are preserved.
 pub fn minify_with_imports(
     source: &str,
     rewrite: impl Fn(&str) -> Option<String>,

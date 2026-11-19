@@ -9,18 +9,18 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-const HELP: &str = "pragma — framework de HTML, CSS e JS sem framework
+const HELP: &str = "pragma — HTML, CSS and JS without a framework
 
-uso:
-  pragma new <dir>                              cria um app em <dir> (vazio ou inexistente)
-  pragma dev [--port 5180] [--host 127.0.0.1]   servidor de desenvolvimento com live reload
-  pragma build                                  gera dist/ para produção
-  pragma check [--strict]                       valida HTML, CSS, JS e orçamentos (--strict: avisos viram erro)
-  pragma serve [--port 3000] [--host 127.0.0.1] serve dist/ como em produção
+usage:
+  pragma new <dir>                              create an app in <dir> (empty or missing)
+  pragma dev [--port 5180] [--host 127.0.0.1]   dev server with live reload
+  pragma build                                  build dist/ for production
+  pragma check [--strict]                       check HTML, CSS, JS and budgets (--strict: warnings become errors)
+  pragma serve [--port 3000] [--host 127.0.0.1] serve dist/ as in production
 
-opções:
-  -h, --help      mostra esta ajuda
-  -V, --version   mostra a versão";
+options:
+  -h, --help      show this help
+  -V, --version   show the version";
 
 pub fn run(args: Vec<String>) -> i32 {
     let Some((command, rest)) = args.split_first() else {
@@ -49,10 +49,10 @@ pub fn run(args: Vec<String>) -> i32 {
             parse(&rest, &[]).and_then(|a| no_positional(&a)).and_then(|_| cmd_check(strict))
         }
         "serve" => cmd_serve(rest),
-        other => Err(format!("comando desconhecido '{other}'; veja `pragma --help`")),
+        other => Err(format!("unknown command '{other}'; see `pragma --help`")),
     };
     result.unwrap_or_else(|message| {
-        eprintln!("{} {message}", red("erro:"));
+        eprintln!("{} {message}", red("error:"));
         1
     })
 }
@@ -64,7 +64,7 @@ struct Args {
 
 impl Args {
     fn port(&self, default: u16) -> Result<u16, String> {
-        self.options.get("port").map_or(Ok(default), |p| p.parse().map_err(|_| format!("porta inválida: '{p}'")))
+        self.options.get("port").map_or(Ok(default), |p| p.parse().map_err(|_| format!("invalid port: '{p}'")))
     }
 
     fn host(&self) -> String {
@@ -78,17 +78,17 @@ fn parse(args: &[String], allowed: &[&str]) -> Result<Args, String> {
     while let Some(arg) = it.next() {
         let Some(option) = arg.strip_prefix("--") else {
             if arg.starts_with('-') && arg.len() > 1 {
-                return Err(format!("opção desconhecida '{arg}'"));
+                return Err(format!("unknown option '{arg}'"));
             }
             out.positional.push(arg.clone());
             continue;
         };
         let (name, value) = match option.split_once('=') {
             Some((n, v)) => (n.to_owned(), v.to_owned()),
-            None => (option.to_owned(), it.next().cloned().ok_or_else(|| format!("falta o valor de '--{option}'"))?),
+            None => (option.to_owned(), it.next().cloned().ok_or_else(|| format!("missing value for '--{option}'"))?),
         };
         if !allowed.contains(&name.as_str()) {
-            return Err(format!("opção desconhecida '--{name}'"));
+            return Err(format!("unknown option '--{name}'"));
         }
         out.options.insert(name, value);
     }
@@ -96,24 +96,24 @@ fn parse(args: &[String], allowed: &[&str]) -> Result<Args, String> {
 }
 
 fn app_root() -> Result<PathBuf, String> {
-    let root = std::env::current_dir().map_err(|e| format!("diretório atual inacessível: {e}"))?;
+    let root = std::env::current_dir().map_err(|e| format!("cannot access current directory: {e}"))?;
     if !root.join("pragma.json").is_file() {
-        return Err("pragma.json não encontrado; rode o comando na raiz de um app pragma".into());
+        return Err("pragma.json not found; run the command from the root of a pragma app".into());
     }
     Ok(root)
 }
 
 fn runtime() -> Result<tokio::runtime::Runtime, String> {
-    tokio::runtime::Runtime::new().map_err(|e| format!("falha ao iniciar o runtime: {e}"))
+    tokio::runtime::Runtime::new().map_err(|e| format!("failed to start the async runtime: {e}"))
 }
 
 fn cmd_new(args: &[String]) -> Result<i32, String> {
     let args = parse(args, &[])?;
     let [dir] = args.positional.as_slice() else {
-        return Err("uso: pragma new <dir>".into());
+        return Err("usage: pragma new <dir>".into());
     };
     let count = new::create(Path::new(dir))?;
-    println!("app criado em {dir} ({count} arquivos)\n\n  cd {dir}\n  pragma dev");
+    println!("app created in {dir} ({count} files)\n\n  cd {dir}\n  pragma dev");
     Ok(0)
 }
 
@@ -133,7 +133,7 @@ fn cmd_build() -> Result<i32, String> {
         Ok(report) => {
             print_diagnostics(&root, &report.warnings);
             print_summary(&report);
-            println!("{}", dim(&format!("dist/ gerado em {} ms", started.elapsed().as_millis())));
+            println!("{}", dim(&format!("dist/ built in {} ms", started.elapsed().as_millis())));
             Ok(0)
         }
         Err(diagnostics) => {
@@ -149,12 +149,12 @@ fn cmd_check(strict: bool) -> Result<i32, String> {
     let status = check_status(&mut diagnostics, strict);
     print_diagnostics(&root, &diagnostics);
     if diagnostics.is_empty() {
-        println!("nenhum problema encontrado");
+        println!("no problems found");
     }
     Ok(status)
 }
 
-/// Avisos não falham o check, exceto com `--strict`.
+/// Warnings do not fail the check, except with `--strict`.
 fn check_status(diagnostics: &mut [pragma_diag::Diagnostic], strict: bool) -> i32 {
     if strict {
         for d in diagnostics.iter_mut() {
@@ -164,7 +164,7 @@ fn check_status(diagnostics: &mut [pragma_diag::Diagnostic], strict: bool) -> i3
     diagnostics.iter().any(|d| d.severity == pragma_diag::Severity::Error) as i32
 }
 
-/// Ctrl+C ou SIGTERM: em ambos o processo node filho precisa ser encerrado.
+/// Ctrl+C or SIGTERM: both must stop the child node process.
 pub async fn shutdown() {
     #[cfg(unix)]
     {
@@ -197,20 +197,20 @@ fn cmd_serve(args: &[String]) -> Result<i32, String> {
     no_positional(&args)?;
     let port = args.port(3000)?;
     let host = args.host();
-    let root = std::env::current_dir().map_err(|e| format!("diretório atual inacessível: {e}"))?;
+    let root = std::env::current_dir().map_err(|e| format!("cannot access current directory: {e}"))?;
     let client = root.join("dist/client");
     if !client.is_dir() {
-        return Err("dist/client não existe; rode `pragma build` antes".into());
+        return Err("dist/client does not exist; run `pragma build` first".into());
     }
     runtime()?.block_on(async move {
         let started = Instant::now();
         let site = tokio::task::spawn_blocking(move || server::Site::new(client, server::Mode::Serve)).await.map_err(|e| e.to_string())?;
-        println!("{}", dim(&format!("arquivos comprimidos em {} ms", started.elapsed().as_millis())));
-        let listener = tokio::net::TcpListener::bind((host.as_str(), port)).await.map_err(|e| format!("não foi possível abrir {host}:{port}: {e}"))?;
+        println!("{}", dim(&format!("files compressed in {} ms", started.elapsed().as_millis())));
+        let listener = tokio::net::TcpListener::bind((host.as_str(), port)).await.map_err(|e| format!("cannot listen on {host}:{port}: {e}"))?;
         let mut node = node::Node::new(root.join("dist/server/node.mjs"), root.clone());
         node.sync(&site).await;
         tokio::spawn(server::serve(listener, site));
-        println!("pragma serve em http://{}:{port}", dev::display_host(&host));
+        println!("pragma serve at http://{}:{port}", dev::display_host(&host));
         shutdown().await;
         node.stop().await;
         Ok(0)
@@ -219,7 +219,7 @@ fn cmd_serve(args: &[String]) -> Result<i32, String> {
 
 fn no_positional(args: &Args) -> Result<(), String> {
     match args.positional.first() {
-        Some(extra) => Err(format!("argumento inesperado '{extra}'")),
+        Some(extra) => Err(format!("unexpected argument '{extra}'")),
         None => Ok(()),
     }
 }

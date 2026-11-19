@@ -1,7 +1,7 @@
 /*
-  Preflight do Tailwind CSS v4.3.5 (MIT, ver preflight.LICENSE).
-  Adaptado: --theme(...) trocado por var(...) para funcionar como CSS puro.
-  Para trocar fontes, defina --default-font-family / --default-mono-font-family.
+  Tailwind CSS v4.3.5 Preflight (MIT, see preflight.LICENSE).
+  Adapted: --theme(...) replaced by var(...) so it works as plain CSS.
+  To change fonts, set --default-font-family / --default-mono-font-family.
 */
 /*
   1. Prevent padding and border from affecting element width. (https://github.com/mozdevs/cssremedy/issues/4)

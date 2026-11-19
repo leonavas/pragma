@@ -1,4 +1,4 @@
-//! Avisos de acessibilidade sobre a página expandida (layout + página + componentes).
+//! Accessibility warnings on the expanded page (layout + page + components).
 use crate::html::{Element, Node, Pos};
 use pragma_diag::Diagnostic;
 use std::collections::{HashMap, HashSet};
@@ -16,7 +16,7 @@ struct A11y<'a> {
     h1: bool,
 }
 
-/// Atributo estático ou ligado em runtime por `data-attr-<nome>`.
+/// Static attribute or bound at runtime by `data-attr-<name>`.
 fn has(e: &Element, name: &str) -> bool {
     e.has(name) || e.has(&format!("data-attr-{name}"))
 }
@@ -52,52 +52,59 @@ impl A11y<'_> {
     }
 
     fn nodes(&mut self, nodes: &[Node], in_label: bool) {
-        // data-else/data-empty excluem o bloco anterior: cada ramo conta a partir do mesmo ponto.
         let mut before: Option<(bool, Option<u8>)> = None;
+        let mut seen_h1 = false;
         for n in nodes {
             let Node::Element(e) = n else { continue };
-            let other_branch = e.is("template") && (e.has("data-else") || e.has("data-empty"));
-            let mut after_first = None;
-            if let (true, Some((h1, heading))) = (other_branch, before) {
-                after_first = Some(self.h1);
-                (self.h1, self.heading) = (h1, heading);
+            let tpl = e.is("template");
+            let other_branch = tpl && (e.has("data-else-if") || e.has("data-else") || e.has("data-empty"));
+            match before {
+                Some((h1, heading)) if other_branch => {
+                    seen_h1 |= self.h1;
+                    (self.h1, self.heading) = (h1, heading);
+                }
+                _ => {
+                    self.h1 |= seen_h1;
+                    seen_h1 = false;
+                    before = None;
+                }
             }
-            before = (e.is("template") && (e.has("data-if") || e.has("data-for"))).then_some((self.h1, self.heading));
+            if tpl && (e.has("data-if") || e.has("data-for")) {
+                before = Some((self.h1, self.heading));
+            }
             self.element(e, in_label);
-            if let Some(h1) = after_first {
-                self.h1 |= h1;
-            }
         }
+        self.h1 |= seen_h1;
     }
 
     fn element(&mut self, e: &Element, in_label: bool) {
         let name = e.name.to_ascii_lowercase();
         match name.as_str() {
-            "img" if !has(e, "alt") => self.warn(e.pos, "a11y/img-alt", "<img> sem alt; use alt=\"\" se a imagem for decorativa"),
-            "a" if !has(e, "href") => self.warn(e.pos, "a11y/a-sem-href", "<a> sem href; para ação use <button>"),
-            "dialog" if !has(e, "aria-label") && !has(e, "aria-labelledby") => self.warn(e.pos, "a11y/dialog-nome", "<dialog> sem nome: use aria-label ou aria-labelledby"),
-            "iframe" if !has(e, "title") => self.warn(e.pos, "a11y/iframe-title", "<iframe> sem title"),
+            "img" if !has(e, "alt") => self.warn(e.pos, "a11y/img-alt", "<img> without alt; use alt=\"\" if the image is decorative"),
+            "a" if !has(e, "href") => self.warn(e.pos, "a11y/a-no-href", "<a> without href; use <button> for actions"),
+            "dialog" if !has(e, "aria-label") && !has(e, "aria-labelledby") => self.warn(e.pos, "a11y/dialog-name", "<dialog> without a name: use aria-label or aria-labelledby"),
+            "iframe" if !has(e, "title") => self.warn(e.pos, "a11y/iframe-title", "<iframe> without title"),
             "input" | "select" | "textarea" => {
                 let kind = e.value("type").unwrap_or("").to_ascii_lowercase();
                 let by_id = e.value("id").is_some_and(|id| self.label_for.contains(id)) || e.has("data-attr-id");
                 if !NO_LABEL.contains(&kind.as_str()) && !in_label && !by_id && !has(e, "aria-label") && !has(e, "aria-labelledby") {
-                    self.warn(e.pos, "a11y/label", format!("<{name}> sem label: use <label for>, envolva num <label> ou dê aria-label"));
+                    self.warn(e.pos, "a11y/label", format!("<{name}> without label: use <label for>, wrap it in a <label> or add aria-label"));
                 }
             }
             _ => {}
         }
         if (name == "a" || name == "button") && !named(e) && !e.has("data-text") && !has_text(&e.children) {
-            self.warn(e.pos, "a11y/nome-acessivel", format!("<{name}> sem nome acessível: dê um texto, :text ou aria-label"));
+            self.warn(e.pos, "a11y/accessible-name", format!("<{name}> without an accessible name: add text, :text or aria-label"));
         }
         if e.has("data-on-click") && !INTERACTIVE.contains(&name.as_str()) && !(e.has("role") && has(e, "tabindex")) {
-            self.warn(e.pos, "a11y/clique-nao-interativo", format!("@click em <{name}>: use <button>, ou dê role e tabindex"));
+            self.warn(e.pos, "a11y/click-non-interactive", format!("@click on <{name}>: use <button>, or add role and tabindex"));
         }
         if e.value("tabindex").and_then(|t| t.trim().parse::<i32>().ok()).is_some_and(|t| t > 0) {
-            self.warn(e.pos, "a11y/tabindex", "tabindex maior que 0 bagunça a ordem do foco; use 0 ou -1");
+            self.warn(e.pos, "a11y/tabindex", "tabindex greater than 0 breaks focus order; use 0 or -1");
         }
         if let Some(id) = e.value("id") {
             match self.ids.get(id) {
-                Some(_) => self.warn(e.pos, "a11y/id-duplicado", format!("id \"{id}\" repetido na página")),
+                Some(_) => self.warn(e.pos, "a11y/duplicate-id", format!("id \"{id}\" repeated on the page")),
                 None => {
                     self.ids.insert(id.to_string(), e.pos);
                 }
@@ -105,10 +112,10 @@ impl A11y<'_> {
         }
         if let Some(level) = name.strip_prefix('h').and_then(|l| l.parse::<u8>().ok()).filter(|l| (1..=6).contains(l)) {
             if level == 1 && std::mem::replace(&mut self.h1, true) {
-                self.warn(e.pos, "a11y/h1-unico", "mais de um <h1> na página");
+                self.warn(e.pos, "a11y/single-h1", "more than one <h1> on the page");
             }
             if let Some(prev) = self.heading.filter(|p| level > p + 1) {
-                self.warn(e.pos, "a11y/heading", format!("nível de heading pulado: <h{prev}> seguido de <h{level}>"));
+                self.warn(e.pos, "a11y/heading", format!("skipped heading level: <h{prev}> followed by <h{level}>"));
             }
             self.heading = Some(level);
         }

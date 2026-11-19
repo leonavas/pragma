@@ -1,27 +1,29 @@
 # pragma
 
-Framework agêntico e opinativo para apps web com HTML, CSS e JS nativos: páginas `.html`
-pré-geradas, diretivas fechadas, bundle mínimo, sem framework de UI, e um CLI em Rust
-(`pragma new|dev|build|check|serve`) com regras, docs e checks feitos para agentes.
+Agentic, opinionated framework for web apps in native HTML, CSS and JS: prebuilt `.html` pages,
+closed directives, minimal bundle, no UI framework, and a Rust CLI
+(`pragma new|dev|build|check|serve`) with rules, docs and checks built for agents.
 
-- Contrato da v0: [SPEC.md](SPEC.md). Decisões e motivos: [DECISOES.md](DECISOES.md).
+- v0 contract: [SPEC.md](SPEC.md). Decisions and rationale: [DECISIONS.md](DECISIONS.md).
+- Tests: [TESTING.md](TESTING.md). Agent team rules: [TEAM.md](TEAM.md).
 
-## Pastas do repositório
+## Repository layout
 
 ```
 pragma/
   core/
-    SPEC.md  DECISOES.md  EQUIPE.md  README.md
-    docs/        docs para LLMs; copiadas para <app>/core/docs/
-    runtime/     JS do framework; copiado para <app>/core/
-      server/    handler fetch, SSR, adaptador Node, logs do servidor
-    starter/     esqueleto de app usado por `pragma new` (AGENTS.md, routes/, lib/…)
-    cli/         workspace Rust
-      crates/pragma-diag      diagnósticos compartilhados
-      crates/pragma-css       subconjunto do Tailwind v4 + base CSS
-      crates/pragma-jslint    regras de JS (oxc)
-      crates/pragma-compiler  build, análise, diretivas
-      crates/pragma-cli       binário `pragma`
-    exemplo/     app de exemplo gerado com `pragma new`
-  tests_1/       experimento: SvelteKit × astra × fable (ver COMPARACAO.md)
+    SPEC.md  DECISIONS.md  TEAM.md  TESTING.md  README.md
+    docs/        LLM docs; copied to <app>/core/docs/
+    runtime/     framework JS; copied to <app>/core/
+      server/    fetch handler, SSR, Node adapter, server logs
+    starter/     app skeleton used by `pragma new` (AGENTS.md, routes/, lib/…)
+    cli/         Rust workspace
+      crates/pragma-diag      shared diagnostics
+      crates/pragma-css       Tailwind v4 subset + base CSS
+      crates/pragma-jslint    JS rules (oxc)
+      crates/pragma-compiler  build, analysis, directives
+      crates/pragma-cli       `pragma` binary
+    example/     example app generated with `pragma new`
 ```
+
+The SvelteKit × astra × fable experiment moved out of the repo to `../pragma-tests_1/`.

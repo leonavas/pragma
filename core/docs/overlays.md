@@ -1,54 +1,53 @@
 # Overlays: modal, alert, dropdown
 
-Sempre `c-modal`, `c-alert`, `c-dropdown`. O runtime cuida de abrir, fechar, Esc, voltar, foco
-e trava de scroll.
+Always use `c-modal`, `c-alert`, `c-dropdown`. The runtime handles open, close, Esc, Back, focus
+and scroll lock.
 
 ```html
-<button type="button" class="btn" @open="sobre">Sobre</button>
-<c-modal id="sobre" titulo="Sobre o app">
-  <p>Conteúdo.</p>
-  <button slot="acoes" type="button" class="btn btn-primary" @close value="ok">Fechar</button>
+<button type="button" class="btn" @open="about">About</button>
+<c-modal id="about" title="About the app">
+  <p>Content.</p>
+  <button slot="actions" type="button" class="btn btn-primary" @close value="ok">Close</button>
 </c-modal>
 
-<button type="button" class="btn" @click="apagar">Apagar</button>
-<c-alert id="apagar" titulo="Apagar projeto?">
-  <p>Essa ação não pode ser desfeita.</p>
-  <button slot="acoes" type="button" class="btn" @close value="cancel" autofocus>Cancelar</button>
-  <button slot="acoes" type="button" class="btn btn-danger" @close value="ok">Apagar</button>
+<button type="button" class="btn" @click="remove">Delete</button>
+<c-alert id="remove" title="Delete project?">
+  <p>This cannot be undone.</p>
+  <button slot="actions" type="button" class="btn" @close value="cancel" autofocus>Cancel</button>
+  <button slot="actions" type="button" class="btn btn-danger" @close value="ok">Delete</button>
 </c-alert>
 
-<c-dropdown id="conta" rotulo="Conta">
-  <a href="/perfil">Perfil</a>
+<c-dropdown id="account" label="Account">
+  <a href="/profile">Profile</a>
   <hr>
-  <button type="button" @click="sair">Sair</button>
+  <button type="button" @click="logout">Log out</button>
 </c-dropdown>
 ```
 
 ```js
 export const actions = {
-  async apagar(ctx) {
-    if (await ctx.confirm('apagar') !== 'ok') return
-    await ctx.call('apagar', { id: ctx.params.id })
+  async remove(ctx) {
+    if (await ctx.confirm('remove') !== 'ok') return
+    await ctx.call('remove', { id: ctx.params.id })
   },
 }
 ```
 
-| Componente | Props | Slots | Fecha com |
+| Component | Props | Slots | Closes on |
 |---|---|---|---|
-| `c-modal` | `id`, `titulo` | padrão, `acoes` | Esc, fundo, ×, `@close`, voltar |
-| `c-alert` | `id`, `titulo` | padrão, `acoes` | Esc, `@close`, voltar |
-| `c-dropdown` | `id`, `rotulo` | padrão (`<a>`, `<button>`, `<hr>`) | clique fora, Esc, `@close`, voltar |
+| `c-modal` | `id`, `title` | default, `actions` | Esc, backdrop, ×, `@close`, Back |
+| `c-alert` | `id`, `title` | default, `actions` | Esc, `@close`, Back |
+| `c-dropdown` | `id`, `label` | default (`<a>`, `<button>`, `<hr>`) | outside click, Esc, `@close`, Back |
 
-| JS | Efeito |
+| JS | Effect |
 |---|---|
-| `ctx.open(id)` / `ctx.close(id)` | abre / fecha |
-| `await ctx.confirm(id)` | abre e resolve com o `value` do `@close` clicado, ou `'cancel'` |
+| `ctx.open(id)` / `ctx.close(id)` | open / close |
+| `await ctx.confirm(id)` | opens; resolves with the `value` of the clicked `@close` button, or `'cancel'` |
 
-## Regras
+## Rules
 
-- Voltar fecha o overlay do topo, não a página. Overlays empilham.
-- Modal e alert travam o scroll; dropdown não. O foco volta a quem abriu.
-- Ação destrutiva: `autofocus` no botão seguro.
-- Abra só em resposta a clique do usuário.
-- Não crie `<dialog>`/`[popover]` à mão, não chame `showModal()`, não use `window.confirm`,
-  não guarde "aberto" no estado, não use `role="menu"`, não importe `core/overlay.js`.
+- Back closes the top overlay, not the page. Overlays stack.
+- Modal and alert lock scroll; dropdown does not. Focus returns to the opener.
+- Destructive action: put `autofocus` on the safe button.
+- Open only in response to a user click.
+- Never create `<dialog>`/`[popover]` by hand, call `showModal()`, use `window.confirm`, keep "open" in state, use `role="menu"`, or import `core/overlay.js`.

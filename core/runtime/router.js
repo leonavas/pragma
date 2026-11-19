@@ -85,7 +85,7 @@ export async function navigate(to, pop) {
       mods = await importRoute(route)
     }
   } catch (err) {
-    log.error('falha na navegação', { 'url.path': url.pathname, 'error.message': err.message })
+    log.error('navigation failed', { 'url.path': url.pathname, 'error.message': err.message })
     e = null
   }
   if (n !== seq) return
@@ -113,7 +113,7 @@ export async function navigate(to, pop) {
   }
   if (document.startViewTransition) await document.startViewTransition(swap).updateCallbackDone
   else swap()
-  log.info('navegação', { 'url.path': url.pathname, 'pragma.route': route.pattern, 'pragma.navigation': pop ? 'pop' : 'push', 'duration_ms': Math.round(performance.now() - t0) })
+  log.info('navigation', { 'url.path': url.pathname, 'pragma.route': route.pattern, 'pragma.navigation': pop ? 'pop' : 'push', 'duration_ms': Math.round(performance.now() - t0) })
   observe()
 }
 

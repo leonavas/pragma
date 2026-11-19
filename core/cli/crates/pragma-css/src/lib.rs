@@ -1,4 +1,4 @@
-//! Subconjunto fechado do Tailwind v4 + CSS base. Contrato: core/SPEC.md §8.
+//! Closed subset of Tailwind v4 + base CSS. Contract: core/SPEC.md §8.
 
 mod base;
 mod doc;
@@ -24,7 +24,7 @@ pub struct Generated {
     pub unknown: Vec<String>,
 }
 
-/// Lê as cores declaradas (`--color-<nome>: …`) num CSS de tema. Usos em `var()` não contam.
+/// Reads declared colors (`--color-<name>: …`) from a theme CSS. Uses in `var()` do not count.
 pub fn parse_theme(theme_css: &str) -> Theme {
     let css = strip_comments(theme_css);
     let mut found = BTreeSet::new();
@@ -46,7 +46,7 @@ pub fn parse_theme(theme_css: &str) -> Theme {
     }
 }
 
-/// Classe com valor arbitrário (`w-[37px]`): o check reporta com regra própria.
+/// Class with an arbitrary value (`w-[37px]`): check reports it with its own rule.
 pub fn is_arbitrary(class: &str) -> bool {
     class.contains('[') || class.contains(']')
 }
@@ -88,7 +88,7 @@ pub fn classes_doc(theme: &Theme) -> String {
 pub fn minify(css: &str) -> Result<String, String> {
     use lightningcss::stylesheet::{MinifyOptions, ParserOptions, PrinterOptions, StyleSheet};
     let mut sheet = StyleSheet::parse(css, ParserOptions::default())
-        .map_err(|e| format!("CSS inválido: {e}"))?;
+        .map_err(|e| format!("invalid CSS: {e}"))?;
     sheet
         .minify(MinifyOptions::default())
         .map_err(|e| format!("falha ao minificar CSS: {e}"))?;
@@ -101,7 +101,7 @@ pub fn minify(css: &str) -> Result<String, String> {
     Ok(out.code)
 }
 
-/// Paleta padrão (seção 16) seguida das cores novas do tema, em ordem alfabética.
+/// Default palette (section 16) followed by new theme colors, in alphabetical order.
 fn all_colors(theme: &Theme) -> Vec<String> {
     let mut colors: Vec<String> = BASE_COLORS.iter().map(|c| c.to_string()).collect();
     for (name, _) in PALETTE {
@@ -141,7 +141,7 @@ fn strip_comments(css: &str) -> String {
     out
 }
 
-/// Ordem de saída: escuro, breakpoint, pseudo-variantes, regra da tabela, nome, valor, opacidade.
+/// Output order: dark, breakpoint, pseudo-variants, table rule, name, value, opacity.
 type Key = (bool, usize, u8, usize, usize, usize, usize);
 
 struct Util {
@@ -152,7 +152,7 @@ struct Util {
     decls: String,
 }
 
-/// `None` = desconhecida; `Some(None)` = conhecida sem CSS (marcadores).
+/// `None` = unknown; `Some(None)` = known without CSS (markers).
 fn parse(class: &str, colors: &[String]) -> Option<Option<Util>> {
     let mut parts: Vec<&str> = class.split(':').collect();
     let util = parts.pop()?;
@@ -194,7 +194,7 @@ fn parse(class: &str, colors: &[String]) -> Option<Option<Util>> {
     if bp > 0 {
         media.push(format!("(width >= {})", BREAKPOINTS[bp - 1].1));
     }
-    // Como no Tailwind v4: hover só em dispositivos com hover real (sem hover grudado no toque).
+    // As in Tailwind v4: hover only on devices with real hover (no sticky hover on touch).
     if mask & 0b11 != 0 {
         media.push("(hover: hover)".to_string());
     }
@@ -323,7 +323,7 @@ fn color_value(name: &str, opacity: Option<usize>) -> Option<String> {
     })
 }
 
-/// Escapa um nome de classe para seletor CSS (`md:p-0.5` → `md\:p-0\.5`, `2xl:` → `\32 xl\:`).
+/// Escapes a class name for a CSS selector (`md:p-0.5` → `md\:p-0\.5`, `2xl:` → `\32 xl\:`).
 fn escape(class: &str) -> String {
     let mut out = String::with_capacity(class.len() + 4);
     for (i, c) in class.chars().enumerate() {

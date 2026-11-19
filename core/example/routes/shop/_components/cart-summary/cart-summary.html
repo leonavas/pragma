@@ -1,0 +1,31 @@
+<aside class="card flex flex-col gap-4" aria-labelledby="cart-title">
+  <h2 id="cart-title" class="text-lg font-semibold">Cart</h2>
+  <ul class="flex flex-col gap-3">
+    <for item in shared.cart.items key=item.id>
+      <li class="flex flex-col gap-1">
+        <div class="flex justify-between gap-2 text-sm">
+          <span :text="item.name"></span>
+          <span class="font-medium tabular-nums" :text="item.subtotal"></span>
+        </div>
+        <div class="flex items-center gap-1">
+          <button type="button" class="btn btn-icon" @click="decrement"><span aria-hidden="true">−</span><span class="sr-only">Decrease</span></button>
+          <output class="w-8 text-center tabular-nums" :text="item.quantity"></output>
+          <button type="button" class="btn btn-icon" @click="increment" :disabled="item.full"><span aria-hidden="true">+</span><span class="sr-only">Increase</span></button>
+          <button type="button" class="ml-auto text-sm text-danger-600 hover:underline" @click="remove">Remove</button>
+        </div>
+      </li>
+    </for>
+    <empty>
+      <li class="text-sm text-muted">Your cart is empty.</li>
+    </empty>
+  </ul>
+  <p class="flex justify-between border-t border-line pt-3 font-semibold">
+    <span>Total</span><span class="tabular-nums" :text="shared.cart.total"></span>
+  </p>
+  <button type="button" class="btn" @click="clear" :disabled="shared.cart.empty">Empty cart</button>
+  <c-alert id="empty-cart" title="Empty the cart?">
+    <p>All items will be removed.</p>
+    <button slot="actions" type="button" class="btn" @close value="cancel" autofocus>Cancel</button>
+    <button slot="actions" type="button" class="btn btn-danger" @close value="ok">Empty cart</button>
+  </c-alert>
+</aside>

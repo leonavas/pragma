@@ -1,7 +1,7 @@
-<div class="card p-4" .destaque="$destaque">
-  <h2 class="text-lg" :text="$titulo">Título</h2>
-  <template :if="$destaque"><span class="badge">★</span></template>
-  <template :else><span>-</span></template>
+<div class="card p-4" .featured="$featured">
+  <h2 class="text-lg" :text="$heading">Title</h2>
+  <if $featured><span class="badge">★</span></if>
+  <else><span>-</span></else>
   <slot></slot>
-  <footer><button class="btn" @click="comprar">Comprar</button><slot name="acoes"><small>sem ações</small></slot></footer>
+  <footer><button class="btn" @click="buy">Buy</button><slot name="aside"><small>no actions</small></slot></footer>
 </div>

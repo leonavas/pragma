@@ -6,7 +6,7 @@ let pushes = 0
 const get = id => typeof id == 'string' ? document.getElementById(id) : id
 const entry = el => stack.find(e => e.el == el)
 const hide = el => el.popover ? el.hidePopover() : el.close()
-// Só reserva o espaço da barra se ela existia: sem barra, o gutter empurraria o layout.
+// Reserve the scrollbar gutter only if there was a scrollbar; otherwise it would shift the layout.
 function lock() {
   const h = document.documentElement, on = stack.some(e => !e.el.popover)
   if (on == h.hasAttribute('data-scroll-lock')) return
@@ -14,8 +14,8 @@ function lock() {
   else h.removeAttribute('data-scroll-lock')
 }
 
-// Cada overlay aberto tem uma entrada no histórico. Um history.back() é assíncrono;
-// um pushState feito antes do popstate dele seria desfeito, então fica para depois.
+// Each open overlay has a history entry. history.back() is async;
+// a pushState before its popstate would be undone, so it is deferred.
 const push = () => backs ? pushes++ : history.pushState(history.state, '')
 const back = () => {
   if (pushes) pushes--
@@ -60,7 +60,7 @@ function onClick(ev) {
   const el = get(id)
   if (el?.popover) {
     ev.preventDefault()
-    // Como invocador, o botão não dispara o light dismiss do próprio popover.
+    // As the invoker, the button does not trigger its own popover's light dismiss.
     b.popoverTargetElement = el
     if (el.matches(':popover-open')) return close(el)
   }
@@ -82,14 +82,14 @@ export function initOverlays(o = {}) {
 
 export function open(id, o = document.activeElement) {
   const el = get(id)
-  if (!el) return log?.error('overlay não encontrado', { 'pragma.overlay.id': id })
+  if (!el) return log?.error('overlay not found', { 'pragma.overlay.id': id })
   if (el.popover) {
     if (el.matches(':popover-open')) return
     opener = o
     el.showPopover()
     if (o && o != document.body) place(el, o)
   } else if (!el.open) {
-    // showModal fecha os popovers; o foco deve voltar ao gatilho deles.
+    // showModal closes popovers; focus must return to their trigger.
     o = entry(o?.closest('[popover]'))?.o || o
     el.returnValue = ''
     el.showModal()
@@ -126,8 +126,8 @@ export function handlePopState() {
   return true
 }
 
-// Para o router: fecha tudo sem mexer no histórico. Retorna quantas entradas de overlay
-// ficaram no topo do histórico (o router pode usar replaceState em vez de pushState).
+// For the router: closes everything without touching history. Returns how many overlay entries
+// remain on top of history (the router may use replaceState instead of pushState).
 export function closeAll() {
   const n = stack.length - pushes
   const all = stack

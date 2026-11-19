@@ -1,56 +1,56 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Início</title>
-<meta name="description" content="Loja de teste">
+<title>Home</title>
+<meta name="description" content="Test shop">
 <link rel="icon" href="/img/icon.svg">
 <link rel="stylesheet" href="/assets/app.css">
 <script>self.__pragmaDev=true</script>
 <link rel="modulepreload" href="/assets/routes/index.js">
 <link rel="modulepreload" href="/assets/lib/components/card/card.js">
-<link rel="modulepreload" href="/assets/lib/components/contador/contador.js">
-<link rel="modulepreload" href="/assets/lib/state/carrinho.js">
+<link rel="modulepreload" href="/assets/lib/components/counter/counter.js">
+<link rel="modulepreload" href="/assets/lib/state/cart.js">
 <link rel="modulepreload" href="/assets/core/router.js">
 <link rel="modulepreload" href="/assets/core/log.js">
 <link rel="modulepreload" href="/assets/utils/fmt.js">
 <link rel="modulepreload" href="/assets/core/state.js">
-<script type="application/json" id="pragma-route">{"pattern":"/","page":"/assets/routes/index.js","components":{"card":"/assets/lib/components/card/card.js","contador":"/assets/lib/components/contador/contador.js"},"stores":{"carrinho":"/assets/lib/state/carrinho.js"},"loader":false,"ssr":false}</script>
+<script type="application/json" id="pragma-route">{"pattern":"/","page":"/assets/routes/index.js","components":{"card":"/assets/lib/components/card/card.js","counter":"/assets/lib/components/counter/counter.js"},"stores":{"cart":"/assets/lib/state/cart.js"},"loader":false,"ssr":false}</script>
 <script type="module" src="/assets/core/boot.js"></script>
 <script type="module" src="/_pragma/dev.js"></script>
 </head>
 <body>
 <header class="flex items-center gap-4 p-4">
-  <a href="/" aria-current="page">Início</a>
-  <button data-c="contador" class="btn" data-on-click="somar"><span data-text="state.n">0</span></button>
-  <span data-text="shared.carrinho.total">0</span>
+  <a href="/" aria-current="page">Home</a>
+  <button data-c="counter" class="btn" data-on-click="add"><span data-text="state.n">0</span></button>
+  <span data-text="shared.cart.total">0</span>
 </header>
 <main data-page>
 <section class="p-4">
-  <h1 class="text-2xl font-bold">Produtos</h1>
-  <button class="btn" data-on-click="alternar" data-open="sobre">Alternar</button>
-  <div data-c="card" class="card p-4 destaque mt-4" data-titulo="Destaque" data-destaque="">
-  <h2 class="text-lg">Destaque</h2>
+  <h1 class="text-2xl font-bold">Products</h1>
+  <button class="btn" data-on-click="toggle" data-open="about">Toggle</button>
+  <div data-c="card" class="card p-4 featured mt-4" data-heading="Featured" data-featured="">
+  <h2 class="text-lg">Featured</h2>
   <span class="badge">★</span>
   
-    <p>Corpo do card</p>
+    <p>Card body</p>
     
   
-  <footer><button class="btn" data-on-click="comprar">Comprar</button><button class="btn" data-on-click="alternar" data-text="state.aberto" data-slot="1">Alternar</button></footer>
+  <footer><button class="btn" data-on-click="buy">Buy</button><button class="btn" data-on-click="toggle" data-text="state.open" data-slot="1">Toggle</button></footer>
 </div>
-  <ul data-show="state.aberto">
-    <template data-for="item in state.itens" data-key="item.id" data-tid="t132a051"><li>
-        <span data-text="item.nome">nome</span>
-        <template data-if="item.promo" data-tid="t097d4db"><div data-c="card" class="card p-4" data-titulo="Promo">
+  <ul data-show="state.open">
+    <template data-for="item in state.items" data-key="item.id" data-tid="t132a051"><li>
+        <span data-text="item.name">name</span>
+        <template data-if="item.promo" data-tid="t097d4db"><div data-c="card" class="card p-4" data-heading="Promo">
   <h2 class="text-lg">Promo</h2>
   <span>-</span>
   <b>promo</b>
-  <footer><button class="btn" data-on-click="comprar">Comprar</button><small>sem ações</small></footer>
+  <footer><button class="btn" data-on-click="buy">Buy</button><small>no actions</small></footer>
 </div></template>
         <template data-else data-tid="tfe24ed6"><i>normal</i></template>
       </li></template>
-    <template data-empty data-tid="t26a3a4d"><li>Nada</li></template>
+    <template data-empty data-tid="t26a3a4d"><li>Nothing</li></template>
   </ul>
 </section>
 </main>

@@ -20,13 +20,13 @@ function send(res, status, body, type = 'application/json') {
 }
 
 async function data(path) {
-  if (path.startsWith('/produto/')) {
+  if (path.startsWith('/product/')) {
     await wait(300)
     const id = path.split('/')[2]
-    return [200, { data: { produto: { id, nome: 'Produto ' + id } } }]
+    return [200, { data: { product: { id, name: 'Product ' + id } } }]
   }
-  if (path === '/erro') return [500, { error: { message: 'Deu ruim no load' } }]
-  return [404, { error: { message: 'Rota sem dados' } }]
+  if (path === '/error') return [500, { error: { message: 'Load went wrong' } }]
+  return [404, { error: { message: 'Route has no data' } }]
 }
 
 export function start() {
@@ -41,8 +41,8 @@ export function start() {
         for await (const c of req) body += c
         const name = path.slice(path.lastIndexOf('/') + 1)
         await wait(100)
-        if (name === 'falhar') return send(res, 500, { error: { message: 'Falhou' } })
-        return send(res, 200, { nome: name, rota: path.slice(8, path.lastIndexOf('/')) || '/', input: JSON.parse(body) })
+        if (name === 'fail') return send(res, 500, { error: { message: 'Failed' } })
+        return send(res, 200, { name: name, route: path.slice(8, path.lastIndexOf('/')) || '/', input: JSON.parse(body) })
       }
       let file
       if (path.startsWith('/core/')) file = join(runtime, path.slice(6))
@@ -50,12 +50,12 @@ export function start() {
       else {
         const manifest = JSON.parse(await readFile(join(fixtures, '_pragma/manifest.json'), 'utf8'))
         const e = manifest.find(e => !e.pattern.includes(':') && e.pattern === path) ?? manifest.find(e => match(e.pattern, path))
-        if (!e) return send(res, 404, 'não encontrado', 'text/plain')
+        if (!e) return send(res, 404, 'not found', 'text/plain')
         file = join(fixtures, e.html)
       }
       send(res, 200, await readFile(file), mime[extname(file)] ?? 'application/octet-stream')
     } catch {
-      send(res, 404, 'não encontrado', 'text/plain')
+      send(res, 404, 'not found', 'text/plain')
     }
   })
   return new Promise(r => server.listen(0, '127.0.0.1', () => r({ url: `http://127.0.0.1:${server.address().port}`, close: () => server.close() })))

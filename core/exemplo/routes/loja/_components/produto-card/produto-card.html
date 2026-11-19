@@ -1,9 +1,0 @@
-<article class="card flex h-full flex-col gap-3">
-  <div class="flex items-start justify-between gap-2">
-    <h2 class="font-semibold leading-snug"><a class="hover:underline" :href="$produto.url" :text="$produto.nome"></a></h2>
-    <span class="rounded-full bg-danger-100 px-2 py-0.5 text-xs font-medium text-danger-700" :show="$produto.esgotado">Esgotado</span>
-  </div>
-  <p class="text-sm text-muted" :text="$produto.categoriaNome"></p>
-  <p class="text-lg font-semibold tabular-nums" :text="$produto.precoBRL"></p>
-  <p-comprar class="mt-auto" :id="$produto.id" :nome="$produto.nome" :preco="$produto.preco" :estoque="$produto.estoque"></p-comprar>
-</article>

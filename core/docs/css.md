@@ -1,24 +1,24 @@
 # CSS
 
-Utilitários primeiro (`classes.md`). Classe custom só quando eles não bastam.
+Use utilities (classes.md) first. Write a custom class only when they are not enough.
 
-| Arquivo | Conteúdo |
+| File | Contains |
 |---|---|
-| `core/base.css` | preflight, camadas, `.skeleton`, `[hidden]`, scroll lock. Não edite. |
-| `lib/theme.css` | tokens e classes custom globais (`@layer components`) |
-| `<nome>.css` do componente | só daquele componente, escopo `[data-c="<nome>"]` |
+| `core/base.css` | preflight, layers, `.skeleton`, `[hidden]`, scroll lock. Do not edit. |
+| `lib/theme.css` | tokens and global custom classes (`@layer components`) |
+| component `<name>.css` | that component only; scope selectors with `[data-c="<name>"]` |
 
-O starter já traz `bg-surface`, `text-ink`, `text-muted`, `border-line` (claro e escuro) e
-`.card`, `.btn`, `.btn-primary`, `.btn-danger`, `.dialog`.
+The starter ships the theme-aware tokens `bg-surface`, `text-ink`, `text-muted`, `border-line`
+(they switch in dark mode) and the classes `.card`, `.btn`, `.btn-primary`, `.btn-danger`, `.dialog`.
 
 ```css
 @layer tokens {
   :root {
     --color-primary-600: oklch(0.55 0.2 260);
-    --color-marca: oklch(0.7 0.15 150);
+    --color-brand: oklch(0.7 0.15 150);
   }
   [data-theme="dark"] {
-    --color-marca: oklch(0.6 0.12 150);
+    --color-brand: oklch(0.6 0.12 150);
   }
 }
 
@@ -27,31 +27,31 @@ O starter já traz `bg-surface`, `text-ink`, `text-muted`, `border-line` (claro 
 }
 ```
 
-- `--color-<nome>` cria `bg-<nome>`, `text-<nome>`… Redefinir `--color-primary-*` troca a marca.
-- Prefira token que muda no `[data-theme="dark"]` a pares `dark:`.
+- `--color-<name>` or `--color-<name>-<shade>` creates `bg-<name>`, `text-<name>-<shade>`, etc. Redefining `--color-primary-*` changes the brand.
+- Redefinable tokens: `--color-*`, `--font-{sans,serif,mono}`, `--radius-*`, `--shadow-*`, `--spacing`.
+- Dark mode: `[data-theme="dark"]` on `<html>`. Use tokens redefined under `[data-theme="dark"]` (like `bg-surface`). Palette colors (`neutral-*`, `primary-*`…) do not switch: pair them with `dark:` (`bg-white dark:bg-neutral-900`).
 
-## Tema
+## Theme toggle
 
 ```js
 import { theme, setTheme } from '../../../core/theme.js'
 
 export const state = () => ({
-  escuro: theme() === 'dark',
-  get rotulo() { return this.escuro ? 'Tema claro' : 'Tema escuro' },
+  dark: theme() === 'dark',
+  get label() { return this.dark ? 'Light theme' : 'Dark theme' },
 })
 
 export const actions = {
-  alternar(ctx) {
-    ctx.$.escuro = !ctx.$.escuro
-    setTheme(ctx.$.escuro ? 'dark' : 'light')
+  toggle(ctx) {
+    ctx.$.dark = !ctx.$.dark
+    setTheme(ctx.$.dark ? 'dark' : 'light')
   },
 }
 ```
 
-Não escreva `data-theme` nem leia `localStorage` para o tema: use `core/theme.js`.
+Never write `data-theme` or read `localStorage` for the theme: use `core/theme.js`.
 
-## Classe custom
+## Custom class
 
-- Mesma combinação em 3+ lugares, ou algo fora do subconjunto (seletor de estado, animação).
-- Proibido: `style="..."`, valor arbitrário (`w-[37px]`), classe inventada, `!important`, ID
-  como seletor, `@import` externo, classe custom de uso único.
+- Create one only when the same combination repeats in 3+ places, or it needs something utilities lack (state selector, animation).
+- Forbidden: `style="..."`, arbitrary values (`w-[37px]`), negative utilities (`-mt-2`), undefined classes, `!important`, ID selectors, external `@import`, single-use custom classes.

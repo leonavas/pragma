@@ -9,7 +9,7 @@ fn run_with(classes: &[&str], theme: &Theme) -> Generated {
     generate(&classes, theme)
 }
 
-/// Todas as classes que a tabela aceita (sem variantes).
+/// Every class the table accepts (without variants).
 fn every_class(colors: &[String]) -> Vec<String> {
     let mut out = Vec::new();
     for rule in RULES {
@@ -187,13 +187,13 @@ fn responsive_and_order() {
     ]);
     assert!(g.unknown.is_empty(), "{:?}", g.unknown);
     let css = &g.css;
-    let pos = |s: &str| css.find(s).unwrap_or_else(|| panic!("falta {s} em\n{css}"));
+    let pos = |s: &str| css.find(s).unwrap_or_else(|| panic!("missing {s} in\n{css}"));
     assert!(css.contains("@media (width >= 48rem) {\n    .md\\:p-4 {"));
     assert!(
         css.contains("@media (width >= 64rem) and (hover: hover) {\n    .lg\\:hover\\:p-3:hover {")
     );
     assert!(css.contains(r".\32 xl\:flex { display: flex; }"));
-    // atalho antes do específico; base antes de breakpoints crescentes; escuro por último
+    // shorthand before specific; base before increasing breakpoints; dark last
     assert!(pos(".p-2 ") < pos(".px-2 "));
     assert!(pos(".px-2 ") < pos(".pt-1 "));
     assert!(pos(".pt-1 ") < pos(r".sm\:p-1"));
@@ -264,7 +264,7 @@ fn theme_colors_are_recognized() {
     assert!(is_utility("fill-brand", &theme));
     assert!(!is_utility("fill-brand", &Theme::default()));
     let doc = classes_doc(&theme);
-    assert!(doc.contains("brand"), "a doc lista as cores do tema");
+    assert!(doc.contains("brand"), "the doc lists the theme colors");
     assert!(doc.contains("surface-2"));
 }
 
@@ -303,11 +303,11 @@ fn every_table_class_is_valid_and_minifies() {
         "{:?}",
         &g.unknown[..g.unknown.len().min(20)]
     );
-    let min = minify(&g.css).expect("lightningcss aceita a saída");
+    let min = minify(&g.css).expect("lightningcss accepts the output");
     assert!(min.contains("@layer utilities{"));
-    // nomes únicos: nenhuma classe casa com duas regras de forma ambígua para o gerador
+    // unique names: no class matches two rules ambiguously for the generator
     let unique: BTreeSet<&String> = all.iter().collect();
-    assert_eq!(unique.len(), all.len(), "classe repetida na tabela");
+    assert_eq!(unique.len(), all.len(), "duplicate class in the table");
 }
 
 #[test]
@@ -318,7 +318,7 @@ fn base_css_has_layers_tokens_and_runtime_rules() {
         first_rule,
         "@layer reset, tokens, base, components, utilities;"
     );
-    assert!(css.contains("@layer reset {\n/*\n  Preflight do Tailwind CSS"));
+    assert!(css.contains("@layer reset {\n/*\n  Tailwind CSS v4.3.5 Preflight"));
     assert!(css.contains("MIT"));
     for needle in [
         "--color-white: #fff;",
@@ -338,10 +338,10 @@ fn base_css_has_layers_tokens_and_runtime_rules() {
         ".skeleton {",
         "@media (prefers-reduced-motion: reduce) {\n    .skeleton {\n      animation: none;",
     ] {
-        assert!(css.contains(needle), "falta {needle}");
+        assert!(css.contains(needle), "missing {needle}");
     }
-    let min = minify(css).expect("base.css válido");
-    assert!(min.starts_with("/*!"), "comentário de licença preservado");
+    let min = minify(css).expect("valid base.css");
+    assert!(min.starts_with("/*!"), "license comment preserved");
     assert!(
         min.contains("html[data-scroll-lock]{overflow:hidden}html[data-scroll-lock=gutter]{scrollbar-gutter:stable}"),
         "{min}"
@@ -362,7 +362,7 @@ fn every_used_token_is_defined() {
         if !name.starts_with("--tw-") {
             assert!(
                 base.contains(&format!("{name}:")),
-                "token {name} não definido no base.css"
+                "token {name} not defined in base.css"
             );
         }
         rest = &after[end..];
@@ -381,13 +381,13 @@ fn doc_is_compact_and_complete() {
         "`{text,bg,border,ring,divide,fill,stroke}-C`",
         "{neutral,primary,danger,success,warning}-{50,100,200,300,400,500,600,700,800,900,950}",
         "`md:` ≥48rem",
-        "[data-c=\"nome\"]",
+        "css.md",
         "w-[37px]",
         "`group`",
     ] {
-        assert!(doc.contains(needle), "falta {needle} em\n{doc}");
+        assert!(doc.contains(needle), "missing {needle} in\n{doc}");
     }
-    assert!(doc.len() < 9000, "doc enxuta: {} bytes", doc.len());
+    assert!(doc.len() < 9000, "compact doc: {} bytes", doc.len());
 }
 
 #[test]
@@ -396,6 +396,6 @@ fn docs_classes_md_is_up_to_date() {
     let on_disk = std::fs::read_to_string(path).unwrap_or_default();
     assert!(
         on_disk == classes_doc(&Theme::default()),
-        "core/docs/classes.md desatualizado: rode `cargo run -p pragma-css --example classes_doc`"
+        "core/docs/classes.md is stale: run `cargo run -p pragma-css --example classes_doc`"
     );
 }

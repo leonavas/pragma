@@ -1,0 +1,58 @@
+<title>Tasks · Minimart</title>
+
+<div class="flex flex-col gap-6">
+  <header class="flex flex-wrap items-center justify-between gap-4">
+    <h1 class="text-3xl font-semibold tracking-tight">Tasks</h1>
+    <c-dropdown id="task-actions" label="Actions">
+      <button type="button" @close @click="completeAll">Complete all</button>
+      <hr>
+      <button type="button" class="text-danger-600" @click="clearCompleted">Clear completed…</button>
+    </c-dropdown>
+  </header>
+
+  <section class="grid gap-4 sm:grid-cols-3" aria-labelledby="task-summary">
+    <h2 id="task-summary" class="sr-only">Summary</h2>
+    <c-indicator title="Completed" :value="shared.tasks.summary" :tone="$tone"></c-indicator>
+  </section>
+
+  <form class="flex flex-col gap-1" novalidate @submit="add">
+    <div class="flex gap-2">
+      <input id="new-task" name="title" class="field flex-1" placeholder="New task" autocomplete="off" aria-label="New task" aria-describedby="task-error" :model="$newTitle" :aria-invalid="$invalid">
+      <button class="btn btn-primary">Add</button>
+    </div>
+    <p id="task-error" class="min-h-5 text-sm text-danger-600" :text="$error"></p>
+  </form>
+
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <c-search label="Search tasks" placeholder="Search tasks…" :value="$search"></c-search>
+    <c-filters label="Filter tasks">
+      <a href="?filter=all" :aria-current="$filter.all">All</a>
+      <a href="?filter=pending" :aria-current="$filter.pending">Pending</a>
+      <a href="?filter=completed" :aria-current="$filter.completed">Completed</a>
+    </c-filters>
+  </div>
+
+  <ul class="card divide-y divide-line p-0">
+    <for task in $visible key=task.id>
+      <li class="flex items-center gap-3 px-4 py-2">
+        <input type="checkbox" class="size-4" :checked="task.done" :aria-label="task.title" @change="toggle">
+        <if task.editing>
+          <input class="field flex-1" aria-label="Edit task" autofocus :model="$draft" @keydown="editKeydown" @focusout="saveEdit">
+        </if>
+        <else>
+          <span class="flex-1 py-2" title="Double-click to edit" .line-through="task.done" .text-muted="task.done" :text="task.title" @dblclick="edit"></span>
+        </else>
+        <button type="button" class="btn btn-icon" :aria-label="task.removeLabel" @click="remove">×</button>
+      </li>
+    </for>
+    <empty>
+      <li class="px-4 py-8 text-center text-muted">No tasks</li>
+    </empty>
+  </ul>
+</div>
+
+<c-alert id="clear-completed" title="Clear completed tasks?">
+  <p>Completed tasks will be removed.</p>
+  <button slot="actions" type="button" class="btn" @close value="cancel" autofocus>Cancel</button>
+  <button slot="actions" type="button" class="btn btn-danger" @close value="ok">Clear</button>
+</c-alert>

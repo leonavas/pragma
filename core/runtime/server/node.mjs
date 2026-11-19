@@ -90,7 +90,7 @@ export function createStatic(root) {
   return {
     async fetch(request) {
       if (request.method !== 'GET' && request.method !== 'HEAD') {
-        return new Response('Método não permitido', { status: 405, headers: { allow: 'GET, HEAD' } })
+        return new Response('Method not allowed', { status: 405, headers: { allow: 'GET, HEAD' } })
       }
       const { pathname } = new URL(request.url)
       const found = await find(pathname)
@@ -101,7 +101,7 @@ export function createStatic(root) {
         status = 404
         file = join(dir, '_404.html')
         rel = '/_404.html'
-        if (!(await isFile(file))) return new Response('Não encontrado', { status, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+        if (!(await isFile(file))) return new Response('Not found', { status, headers: { 'content-type': 'text/plain; charset=utf-8' } })
       }
       const info = await stat(file)
       const etag = `W/"${info.size.toString(16)}-${Math.floor(info.mtimeMs).toString(16)}"`
@@ -149,7 +149,7 @@ export function serve(handler, { root, port = 3000 } = {}) {
   const assets = createStatic(root)
   const env = { ...process.env, ASSETS: assets }
   const ctx = {
-    waitUntil: (p) => Promise.resolve(p).catch((err) => log.error('waitUntil falhou', err)),
+    waitUntil: (p) => Promise.resolve(p).catch((err) => log.error('waitUntil failed', err)),
     passThroughOnException() {},
   }
   const server = createServer(async (req, res) => {
@@ -158,11 +158,11 @@ export function serve(handler, { root, port = 3000 } = {}) {
     } catch (err) {
       log.error(err instanceof Error ? err.message : String(err), err)
       if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' })
-      res.end('Erro interno')
+      res.end('Internal error')
     }
   })
   server.listen(Number(port), () => {
-    log.info(`pragma servindo em http://localhost:${server.address().port}`, { 'server.port': server.address().port })
+    log.info(`pragma serving at http://localhost:${server.address().port}`, { 'server.port': server.address().port })
   })
   return server
 }

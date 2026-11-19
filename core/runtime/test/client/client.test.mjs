@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { start } from './server.mjs'
 
-const tools = process.env.PRAGMA_TOOLS ?? '/tmp/pragma-tools-runtime-cliente'
+const tools = process.env.PRAGMA_TOOLS ?? '/tmp/pragma-tools-runtime-client'
 const { chromium } = createRequire(tools + '/')('playwright')
 
 let server, browser
@@ -25,7 +25,7 @@ async function open(path) {
   page.on('pageerror', e => page.errors.push(e.message))
   page.on('request', r => page.requests.push(new URL(r.url()).pathname))
   await page.goto(server.url + path)
-  await page.waitForFunction(() => document.querySelector('#qtd')?.textContent !== '')
+  await page.waitForFunction(() => document.querySelector('#qty')?.textContent !== '')
   return page
 }
 
@@ -33,39 +33,39 @@ const text = (page, sel) => page.locator(sel).textContent()
 const tick = page => page.evaluate(() => new Promise(r => setTimeout(r)))
 
 test('data-text, data-attr, data-class, data-show', async () => {
-  const p = await open('/diretivas')
-  assert.equal(await text(p, '#nome'), 'Ana')
+  const p = await open('/directives')
+  assert.equal(await text(p, '#name'), 'Ana')
   const link = await p.evaluate(() => {
     const a = document.querySelector('#link')
     return [a.getAttribute('href'), a.getAttribute('aria-disabled'), a.hasAttribute('title'), a.getAttribute('data-x')]
   })
   assert.deepEqual(link, ['/x', null, false, ''])
-  assert.equal(await p.getAttribute('#cls', 'class'), 'base ativo')
+  assert.equal(await p.getAttribute('#cls', 'class'), 'base active')
   assert.equal(await p.isVisible('#show'), true)
   assert.equal(await p.isVisible('#hide'), false)
 
-  await p.evaluate(() => __ctx.update(s => { s.ativo = false; s.titulo = 'oi'; s.desabilitado = true; s.nome = '<b>x</b>' }))
-  assert.equal(await text(p, '#nome'), '<b>x</b>')
-  assert.equal(await p.locator('#nome b').count(), 0)
+  await p.evaluate(() => __ctx.update(s => { s.active = false; s.title = 'hi'; s.disabled = true; s.name = '<b>x</b>' }))
+  assert.equal(await text(p, '#name'), '<b>x</b>')
+  assert.equal(await p.locator('#name b').count(), 0)
   const link2 = await p.evaluate(() => {
     const a = document.querySelector('#link')
     return [a.getAttribute('aria-disabled'), a.getAttribute('title'), a.hasAttribute('data-x')]
   })
-  assert.deepEqual(link2, ['', 'oi', false])
-  assert.equal(await p.getAttribute('#cls', 'class'), 'base inativo')
+  assert.deepEqual(link2, ['', 'hi', false])
+  assert.equal(await p.getAttribute('#cls', 'class'), 'base inactive')
   assert.equal(await p.isVisible('#show'), false)
   assert.equal(await p.isVisible('#hide'), true)
   assert.deepEqual(p.errors, [])
 })
 
-test('data-if/data-else, data-with e escrita só quando muda', async () => {
-  const p = await open('/diretivas')
-  assert.equal(await p.locator('#sim').count(), 1)
-  assert.equal(await p.locator('#nao').count(), 0)
-  assert.equal(await p.getAttribute('#sim', 'data-of'), 't1')
-  await p.click('#alternar')
-  assert.equal(await p.locator('#sim').count(), 0)
-  assert.equal(await p.getAttribute('#nao', 'data-of'), 't1')
+test('data-if/data-else, data-with and writes only on change', async () => {
+  const p = await open('/directives')
+  assert.equal(await p.locator('#yes').count(), 1)
+  assert.equal(await p.locator('#no').count(), 0)
+  assert.equal(await p.getAttribute('#yes', 'data-of'), 't1')
+  await p.click('#toggle')
+  assert.equal(await p.locator('#yes').count(), 0)
+  assert.equal(await p.getAttribute('#no', 'data-of'), 't1')
   assert.equal(await text(p, '#w'), 'Bia')
   const writes = await p.evaluate(async () => {
     const seen = []
@@ -79,294 +79,294 @@ test('data-if/data-else, data-with e escrita só quando muda', async () => {
   assert.equal(writes, 0)
 })
 
-test('data-for/data-empty aninhados e diff por chave preservando nós', async () => {
-  const p = await open('/diretivas')
-  const items = () => p.$$eval('#lista > li[data-of="t2"][data-key]', ls => ls.map(l => [l.dataset.key, l.querySelector('.n').textContent, l.querySelectorAll('.ok').length, [...l.querySelectorAll('.tag')].map(t => t.textContent).join(), l.querySelectorAll('.sem').length]))
-  assert.deepEqual(await items(), [['1', 'um', 1, 'a,b', 0], ['2', 'dois', 0, '', 1]])
+test('nested data-for/data-empty and keyed diff preserving nodes', async () => {
+  const p = await open('/directives')
+  const items = () => p.$$eval('#list > li[data-of="t2"][data-key]', ls => ls.map(l => [l.dataset.key, l.querySelector('.n').textContent, l.querySelectorAll('.ok').length, [...l.querySelectorAll('.tag')].map(t => t.textContent).join(), l.querySelectorAll('.none').length]))
+  assert.deepEqual(await items(), [['1', 'one', 1, 'a,b', 0], ['2', 'two', 0, '', 1]])
 
   await p.evaluate(() => {
-    self.__li = [...document.querySelectorAll('#lista > li[data-of]')]
+    self.__li = [...document.querySelectorAll('#list > li[data-of]')]
     self.__tag = document.querySelector('.tag')
     __ctx.update(s => {
-      s.itens.unshift({ id: 3, nome: 'tres', ok: true, tags: [{ t: 'z' }] })
-      s.itens.reverse()
-      s.itens[1].tags.unshift({ t: 'c' })
-      s.itens[1].nome = 'UM'
+      s.items.unshift({ id: 3, name: 'three', ok: true, tags: [{ t: 'z' }] })
+      s.items.reverse()
+      s.items[1].tags.unshift({ t: 'c' })
+      s.items[1].name = 'ONE'
     })
   })
-  assert.deepEqual(await items(), [['2', 'dois', 0, '', 1], ['1', 'UM', 1, 'c,a,b', 0], ['3', 'tres', 1, 'z', 0]])
+  assert.deepEqual(await items(), [['2', 'two', 0, '', 1], ['1', 'ONE', 1, 'c,a,b', 0], ['3', 'three', 1, 'z', 0]])
   const same = await p.evaluate(() => {
-    const now = [...document.querySelectorAll('#lista > li[data-of]')]
+    const now = [...document.querySelectorAll('#list > li[data-of]')]
     return [now[0] === __li[1], now[1] === __li[0], document.querySelectorAll('.tag')[1] === __tag]
   })
   assert.deepEqual(same, [true, true, true])
 
-  await p.evaluate(() => __ctx.update(s => { s.itens = [] }))
+  await p.evaluate(() => __ctx.update(s => { s.items = [] }))
   assert.deepEqual(await items(), [])
-  assert.equal(await p.locator('#vazio').count(), 1)
-  await p.evaluate(() => __ctx.update(s => { s.itens = [{ id: 9, nome: 'nove', ok: false, tags: [] }] }))
-  assert.equal(await p.locator('#vazio').count(), 0)
+  assert.equal(await p.locator('#empty').count(), 1)
+  await p.evaluate(() => __ctx.update(s => { s.items = [{ id: 9, name: 'nine', ok: false, tags: [] }] }))
+  assert.equal(await p.locator('#empty').count(), 0)
   assert.deepEqual(p.errors, [])
 })
 
-test('componentes: estado por instância, ação do dono e cleanup ao remover', async () => {
-  const p = await open('/diretivas')
-  assert.equal(await p.evaluate(() => self.__montados), 2)
-  await p.locator('#lista li[data-key="1"] .mais').click()
-  await p.locator('#lista li[data-key="1"] .mais').click()
-  await p.locator('#lista li[data-key="2"] .mais').click()
-  assert.deepEqual(await p.$$eval('.cont', e => e.map(x => x.textContent)), ['2', '1'])
-  assert.deepEqual(await p.$$eval('.dono', e => e.map(x => x.textContent)), ['um', 'dois'])
-  await p.locator('#lista li[data-key="1"] .rm').click()
-  assert.deepEqual(await p.$$eval('.cont', e => e.map(x => x.textContent)), ['1'])
-  assert.equal(await p.evaluate(() => self.__desmontados), 1)
+test('components: per-instance state, owner action and cleanup on removal', async () => {
+  const p = await open('/directives')
+  assert.equal(await p.evaluate(() => self.__mounted), 2)
+  await p.locator('#list li[data-key="1"] .inc').click()
+  await p.locator('#list li[data-key="1"] .inc').click()
+  await p.locator('#list li[data-key="2"] .inc').click()
+  assert.deepEqual(await p.$$eval('.count', e => e.map(x => x.textContent)), ['2', '1'])
+  assert.deepEqual(await p.$$eval('.owner', e => e.map(x => x.textContent)), ['one', 'two'])
+  await p.locator('#list li[data-key="1"] .rm').click()
+  assert.deepEqual(await p.$$eval('.count', e => e.map(x => x.textContent)), ['1'])
+  assert.equal(await p.evaluate(() => self.__unmounted), 1)
 })
 
-test('data-model: texto, checkbox, número, select e radio', async () => {
-  const p = await open('/diretivas')
+test('data-model: text, checkbox, number, select and radio', async () => {
+  const p = await open('/directives')
   assert.equal(await p.inputValue('#m-text'), 'Ana')
-  assert.equal(await p.inputValue('#m-sel'), 'verde')
+  assert.equal(await p.inputValue('#m-sel'), 'green')
   assert.equal(await p.isChecked('#r-p'), true)
   await p.fill('#m-text', 'Carla')
-  assert.equal(await text(p, '#nome'), 'Carla')
+  assert.equal(await text(p, '#name'), 'Carla')
   await p.check('#m-check')
-  assert.equal(await text(p, '#eco-aceito'), 'true')
+  assert.equal(await text(p, '#echo-accepted'), 'true')
   await p.fill('#m-num', '7')
-  assert.equal(await text(p, '#eco-qtd'), '7')
-  assert.equal(await p.evaluate(() => typeof __ctx.state.qtd), 'number')
-  await p.selectOption('#m-sel', 'roxo')
-  assert.equal(await text(p, '#eco-cor'), 'roxo')
+  assert.equal(await text(p, '#echo-qty'), '7')
+  assert.equal(await p.evaluate(() => typeof __ctx.$.qty), 'number')
+  await p.selectOption('#m-sel', 'purple')
+  assert.equal(await text(p, '#echo-color'), 'purple')
   await p.check('#r-g')
-  assert.equal(await text(p, '#eco-tam'), 'g')
-  await p.evaluate(() => __ctx.update(s => { s.nome = 'Dani'; s.aceito = false; s.tamanho = 'p'; s.cor = 'azul' }))
+  assert.equal(await text(p, '#echo-size'), 'g')
+  await p.evaluate(() => __ctx.update(s => { s.name = 'Dani'; s.accepted = false; s.size = 'p'; s.color = 'blue' }))
   assert.equal(await p.inputValue('#m-text'), 'Dani')
   assert.equal(await p.isChecked('#m-check'), false)
   assert.equal(await p.isChecked('#r-p'), true)
-  assert.equal(await p.inputValue('#m-sel'), 'azul')
+  assert.equal(await p.inputValue('#m-sel'), 'blue')
   assert.deepEqual(p.errors, [])
 })
 
-test('actions sync e async, ctx.call, submit e ctx.update', async () => {
-  const p = await open('/diretivas')
+test('sync and async actions, ctx.call, submit and ctx.update', async () => {
+  const p = await open('/directives')
   const reqs = []
   p.on('request', r => r.method() === 'POST' && reqs.push([new URL(r.url()).pathname, r.postData(), r.headers().traceparent?.length]))
-  await p.click('#salvar')
-  await p.waitForSelector('#salvando', { state: 'visible' })
-  await p.waitForSelector('#resposta')
-  assert.equal(await text(p, '#resposta'), 'Ana')
-  assert.equal(await p.isVisible('#salvando'), false)
-  assert.deepEqual(reqs[0], ['/_action/diretivas/salvar', '{"nome":"Ana"}', 55])
-  await p.click('#falhar')
-  await p.waitForFunction(() => document.querySelector('#erro').textContent === 'Falhou')
-  await p.click('#enviar')
-  assert.equal(await text(p, '#enviado'), 'true')
-  assert.equal(new URL(p.url()).pathname, '/diretivas')
+  await p.click('#save')
+  await p.waitForSelector('#saving', { state: 'visible' })
+  await p.waitForSelector('#response')
+  assert.equal(await text(p, '#response'), 'Ana')
+  assert.equal(await p.isVisible('#saving'), false)
+  assert.deepEqual(reqs[0], ['/_action/directives/save', '{"name":"Ana"}', 55])
+  await p.click('#fail')
+  await p.waitForFunction(() => document.querySelector('#error').textContent === 'Failed')
+  await p.click('#submit')
+  assert.equal(await text(p, '#sent'), 'true')
+  assert.equal(new URL(p.url()).pathname, '/directives')
   await p.evaluate(() => setTimeout(() => __ctx.update(s => { s.tick = 42 }), 10))
   await p.waitForFunction(() => document.querySelector('#tick').textContent === '42')
 })
 
-test('store persistida reaplica layout e página e sobrevive ao reload', async () => {
-  const p = await open('/diretivas')
-  assert.equal(await text(p, '#qtd'), '0')
-  await p.click('#comprar')
-  await p.click('#comprar')
-  assert.equal(await text(p, '#qtd'), '2')
-  assert.equal(await p.evaluate(() => localStorage.getItem('pragma:carrinho')), '{"itens":[{"id":1},{"id":2}]}')
+test('persisted store updates layout and page and survives reload', async () => {
+  const p = await open('/directives')
+  assert.equal(await text(p, '#qty'), '0')
+  await p.click('#buy')
+  await p.click('#buy')
+  assert.equal(await text(p, '#qty'), '2')
+  assert.equal(await p.evaluate(() => localStorage.getItem('pragma:cart')), '{"items":[{"id":1},{"id":2}]}')
   await p.reload()
-  await p.waitForFunction(() => document.querySelector('#qtd').textContent === '2')
+  await p.waitForFunction(() => document.querySelector('#qty').textContent === '2')
 })
 
-test('conteúdo de slot pertence a quem o escreveu (dono léxico)', async () => {
+test('slot content belongs to whoever wrote it (lexical owner)', async () => {
   const p = await open('/slot')
-  assert.equal(await text(p, '#caixa-titulo'), 'da caixa')
-  assert.equal(await text(p, '#pagina-titulo'), 'da página')
-  assert.equal(await text(p, '#pagina-if'), 'da página')
-  await p.click('#pagina-btn')
-  await p.click('#fundo-btn')
-  assert.equal(await p.evaluate(() => __slot.state.cliques), 2)
-  assert.equal(await text(p, '#caixa-n'), '5')
-  await p.click('#meio-btn')
-  await p.click('#caixa-mais')
-  assert.equal(await text(p, '#caixa-n'), '7')
-  assert.equal(await text(p, '.cont'), '0')
-  await p.fill('#pagina-campo', 'oi')
-  assert.equal(await text(p, '#campo'), 'oi')
+  assert.equal(await text(p, '#box-title'), 'from box')
+  assert.equal(await text(p, '#page-title'), 'from page')
+  assert.equal(await text(p, '#page-if'), 'from page')
+  await p.click('#page-btn')
+  await p.click('#deep-btn')
+  assert.equal(await p.evaluate(() => __slot.$.clicks), 2)
+  assert.equal(await text(p, '#box-n'), '5')
+  await p.click('#middle-btn')
+  await p.click('#box-inc')
+  assert.equal(await text(p, '#box-n'), '7')
+  assert.equal(await text(p, '.count'), '0')
+  await p.fill('#page-field', 'hi')
+  assert.equal(await text(p, '#field'), 'hi')
   await p.locator('.item-btn').nth(1).click()
-  assert.equal(await text(p, '#escolhido'), 'dois')
+  assert.equal(await text(p, '#picked'), 'two')
   assert.deepEqual(p.errors, [])
 })
 
-test('state(ctx) recebe as props da raiz, inclusive data-attr-data-* de quem usa', async () => {
+test('state(ctx) gets the root props, including the caller data-attr-data-*', async () => {
   const p = await open('/slot')
   assert.deepEqual(await p.$$eval('li .n', e => e.map(x => x.textContent)), ['1', '1'])
   assert.deepEqual(await p.$$eval('li .max', e => e.map(x => x.textContent)), ['3', '7'])
-  assert.equal(await text(p, '#caixa-n'), '5')
+  assert.equal(await text(p, '#box-n'), '5')
 })
 
-test('getters do store são derivados: recalculam e não vão para o localStorage', async () => {
+test('store getters are derived: recomputed and kept out of localStorage', async () => {
   const p = await open('/slot')
-  assert.equal(await text(p, '#qtd'), '10')
-  assert.equal(await text(p, '#dobro'), '20')
-  await p.click('#pagina-btn')
-  assert.equal(await text(p, '#qtd'), '20')
-  assert.equal(await text(p, '#dobro'), '40')
-  assert.equal(await p.evaluate(() => localStorage.getItem('pragma:conta')), '{"n":2}')
+  assert.equal(await text(p, '#qty'), '10')
+  assert.equal(await text(p, '#double'), '20')
+  await p.click('#page-btn')
+  assert.equal(await text(p, '#qty'), '20')
+  assert.equal(await text(p, '#double'), '40')
+  assert.equal(await p.evaluate(() => localStorage.getItem('pragma:account')), '{"n":2}')
   await p.reload()
-  await p.waitForFunction(() => document.querySelector('#qtd').textContent === '20')
+  await p.waitForFunction(() => document.querySelector('#qty').textContent === '20')
   assert.deepEqual(p.errors, [])
 })
 
-test('router: aria-current="page" nos links da rota atual', async () => {
+test('router: aria-current="page" on links to the current route', async () => {
   const p = await open('/slot')
-  const atuais = () => p.$$eval('a[aria-current="page"]', e => e.map(x => x.id))
-  assert.deepEqual(await atuais(), ['nav-slot', 'link-slot'])
+  const current = () => p.$$eval('a[aria-current="page"]', e => e.map(x => x.id))
+  assert.deepEqual(await current(), ['nav-slot', 'link-slot'])
   await p.click('#nav-a')
-  await p.waitForFunction(() => document.title === 'Página A')
-  assert.deepEqual(await atuais(), ['nav-a'])
+  await p.waitForFunction(() => document.title === 'Page A')
+  assert.deepEqual(await current(), ['nav-a'])
 })
 
-test('overlay.js só é baixado em página com overlay', async () => {
-  const p = await open('/diretivas')
+test('overlay.js is only fetched on pages with overlays', async () => {
+  const p = await open('/directives')
   await tick(p)
   assert.equal(p.requests.some(r => r.endsWith('/overlay.js') && r.startsWith('/core/')), false)
   const o = await open('/overlay')
   await o.waitForFunction(() => performance.getEntriesByType('resource').some(e => e.name.endsWith('/core/overlay.js')))
 })
 
-test('data-attr-checked liga a propriedade e bloco novo com autofocus recebe foco', async () => {
+test('data-attr-checked sets the property and a new block with autofocus gets focus', async () => {
   const p = await open('/slot')
   await p.check('#chk')
-  await p.evaluate(() => __slot.update(s => { s.marcado = true }))
-  await p.evaluate(() => __slot.update(s => { s.marcado = false }))
+  await p.evaluate(() => __slot.update(s => { s.marked = true }))
+  await p.evaluate(() => __slot.update(s => { s.marked = false }))
   assert.equal(await p.isChecked('#chk'), false)
-  await p.evaluate(() => __slot.update(s => { s.editando = true }))
+  await p.evaluate(() => __slot.update(s => { s.editing = true }))
   assert.equal(await p.evaluate(() => document.activeElement.id), 'edit')
 })
 
-test('caminho inexistente lança erro em dev', async () => {
-  const p = await open('/diretivas')
-  await p.evaluate(() => __ctx.update(s => { delete s.nome }))
+test('unknown path throws in dev', async () => {
+  const p = await open('/directives')
+  await p.evaluate(() => __ctx.update(s => { delete s.name }))
   await tick(p)
-  assert.match(p.errors.join(), /caminho inexistente "state.nome"/)
+  assert.match(p.errors.join(), /unknown path "state.name"/)
 })
 
-test('loader: skeleton, dados, __pd reaproveitado e params', async () => {
-  const p = await open('/produto/7')
+test('loader: skeleton, data, reused __pd and params', async () => {
+  const p = await open('/product/7')
   assert.equal(await p.locator('#sk').count(), 1)
   assert.equal(await text(p, '#param'), '7')
-  await p.waitForSelector('#nome')
-  assert.equal(await text(p, '#nome'), 'Produto 7')
+  await p.waitForSelector('#name')
+  assert.equal(await text(p, '#name'), 'Product 7')
   assert.equal(await p.locator('#sk').count(), 0)
-  assert.equal(p.requests.filter(r => r === '/_data/produto/7').length, 1)
+  assert.equal(p.requests.filter(r => r === '/_data/product/7').length, 1)
 })
 
-test('loader: erro vira page.error', async () => {
-  const p = await open('/erro')
-  await p.waitForSelector('#erro')
-  assert.equal(await text(p, '#erro'), 'Deu ruim no load')
-  assert.equal(await p.locator('#nome').count(), 0)
+test('loader: error becomes page.error', async () => {
+  const p = await open('/error')
+  await p.waitForSelector('#error')
+  assert.equal(await text(p, '#error'), 'Load went wrong')
+  assert.equal(await p.locator('#name').count(), 0)
 })
 
-test('SSR: adota o DOM sem recriar nós e liga o estado', async () => {
+test('SSR: adopts the DOM without recreating nodes and binds state', async () => {
   const p = await open('/ssr')
   const r = await p.evaluate(() => ({
-    vivos: __antes.every(e => e.isConnected),
+    alive: __before.every(e => e.isConnected),
     mut: __mut,
     lis: [...document.querySelectorAll('#l li[data-of]')].map(l => l.textContent),
     d: document.querySelectorAll('#d').length,
     cd: document.querySelectorAll('#cd').length,
   }))
-  assert.equal(r.vivos, true)
+  assert.equal(r.alive, true)
   assert.deepEqual(r.mut, ['childList:c'])
-  assert.deepEqual(r.lis, ['um', 'dois'])
+  assert.deepEqual(r.lis, ['one', 'two'])
   assert.equal(r.d, 1)
   assert.equal(r.cd, 1)
-  await p.click('#mais')
+  await p.click('#inc')
   assert.equal(await text(p, '#c'), '1')
   assert.equal(p.requests.some(u => u.startsWith('/_data')), false)
   assert.deepEqual(p.errors, [])
 })
 
-test('router: link troca main e title, desmonta a página e não recarrega', async () => {
+test('router: link swaps main and title, unmounts the page and does not reload', async () => {
   const p = await open('/a')
   await p.waitForFunction(() => self.__ticks > 2)
-  await p.evaluate(() => { self.__marca = 1 })
-  await p.evaluate(() => document.querySelector('#ir-b').click())
-  await p.waitForFunction(() => document.title === 'Página B')
-  assert.equal(await text(p, '#titulo'), 'Página B')
+  await p.evaluate(() => { self.__mark = 1 })
+  await p.evaluate(() => document.querySelector('#go-b').click())
+  await p.waitForFunction(() => document.title === 'Page B')
+  assert.equal(await text(p, '#title'), 'Page B')
   assert.equal(new URL(p.url()).pathname, '/b')
-  assert.equal(await p.evaluate(() => self.__marca), 1)
-  assert.equal(await p.evaluate(() => self.__limpou), true)
+  assert.equal(await p.evaluate(() => self.__mark), 1)
+  assert.equal(await p.evaluate(() => self.__cleaned), true)
   const t = await p.evaluate(() => self.__ticks)
   await p.waitForTimeout(80)
   assert.equal(await p.evaluate(() => self.__ticks), t)
   assert.equal(await p.evaluate(() => document.activeElement.matches('main[data-page]')), true)
   await p.evaluate(() => document.querySelector('#d').click())
-  await p.waitForSelector('#lista li')
-  assert.equal(await text(p, '#nome'), 'Ana')
-  assert.equal(await p.evaluate(() => self.__marca), 1)
+  await p.waitForSelector('#list li')
+  assert.equal(await text(p, '#name'), 'Ana')
+  assert.equal(await p.evaluate(() => self.__mark), 1)
   assert.deepEqual(p.errors, [])
 })
 
-test('router: estático vence param e loader na navegação', async () => {
+test('router: static beats param and loader on navigation', async () => {
   const p = await open('/a')
-  await p.evaluate(() => document.querySelector('#novo').click())
-  await p.waitForFunction(() => document.title === 'Novo produto')
+  await p.evaluate(() => document.querySelector('#new').click())
+  await p.waitForFunction(() => document.title === 'New product')
   await p.goBack()
-  await p.waitForFunction(() => document.title === 'Página A')
+  await p.waitForFunction(() => document.title === 'Page A')
   await p.evaluate(() => document.querySelector('#p1').click())
   await p.waitForSelector('#sk')
-  await p.waitForSelector('#nome')
-  assert.equal(await text(p, '#nome'), 'Produto 1')
+  await p.waitForSelector('#name')
+  assert.equal(await text(p, '#name'), 'Product 1')
   assert.equal(await text(p, '#param'), '1')
 })
 
-test('router: prefetch no hover e por viewport', async () => {
+test('router: prefetch on hover and by viewport', async () => {
   const p = await open('/a')
   await p.evaluate(() => document.querySelector('#p1').dispatchEvent(new PointerEvent('pointerenter')))
-  await p.waitForFunction(() => performance.getEntriesByType('resource').some(e => e.name.includes('/produto/%5Bid%5D.html') || e.name.includes('/produto/[id].html')))
+  await p.waitForFunction(() => performance.getEntriesByType('resource').some(e => e.name.includes('/product/%5Bid%5D.html') || e.name.includes('/product/[id].html')))
   const b = await open('/b')
   await b.waitForFunction(() => performance.getEntriesByType('resource').some(e => e.name.endsWith('/assets/ssr.js')))
-  await b.waitForFunction(() => performance.getEntriesByType('resource').some(e => e.name.endsWith('/diretivas.html')))
+  await b.waitForFunction(() => performance.getEntriesByType('resource').some(e => e.name.endsWith('/directives.html')))
   assert.equal(b.requests.includes('/ssr'), false)
-  assert.equal(b.requests.includes('/volta'), false)
-  const before = b.requests.filter(r => r === '/diretivas.html').length
+  assert.equal(b.requests.includes('/back'), false)
+  const before = b.requests.filter(r => r === '/directives.html').length
   await b.evaluate(() => document.querySelector('#d').click())
-  await b.waitForSelector('#lista li')
-  assert.equal(b.requests.filter(r => r === '/diretivas.html').length, before)
+  await b.waitForSelector('#list li')
+  assert.equal(b.requests.filter(r => r === '/directives.html').length, before)
 })
 
-test('router: voltar e avançar restauram o scroll', async () => {
+test('router: back and forward restore scroll', async () => {
   const p = await open('/a')
   await p.evaluate(() => scrollTo(0, 1200))
-  await p.evaluate(() => document.querySelector('#ir-b').click())
-  await p.waitForFunction(() => document.title === 'Página B')
+  await p.evaluate(() => document.querySelector('#go-b').click())
+  await p.waitForFunction(() => document.title === 'Page B')
   assert.equal(await p.evaluate(() => scrollY), 0)
   await p.evaluate(() => scrollTo(0, 700))
   await p.goBack()
-  await p.waitForFunction(() => document.title === 'Página A')
+  await p.waitForFunction(() => document.title === 'Page A')
   await p.waitForFunction(() => scrollY === 1200)
   await p.goForward()
-  await p.waitForFunction(() => document.title === 'Página B')
+  await p.waitForFunction(() => document.title === 'Page B')
   await p.waitForFunction(() => scrollY === 700)
   assert.deepEqual(p.errors, [])
 })
 
-test('router: popstate com overlay aberto é consumido pelo overlay', async () => {
+test('router: popstate with an open overlay is consumed by the overlay', async () => {
   const p = await open('/overlay')
-  await p.evaluate(() => { self.__marca = 1 })
-  await p.click('#abrir')
+  await p.evaluate(() => { self.__mark = 1 })
+  await p.click('#open')
   assert.equal(await p.evaluate(() => document.querySelector('#m').open), true)
   await p.evaluate(() => history.back())
   await p.waitForFunction(() => !document.querySelector('#m').open)
   await p.waitForTimeout(50)
   assert.equal(new URL(p.url()).pathname, '/overlay')
-  assert.equal(await p.evaluate(() => self.__marca), 1)
-  assert.equal(await text(p, '#titulo'), 'Overlay')
+  assert.equal(await p.evaluate(() => self.__mark), 1)
+  assert.equal(await text(p, '#title'), 'Overlay')
 })
 
-test('desempenho: 1000 itens com diff por chave', async () => {
-  const p = await open('/lista')
+test('performance: 1000 items with keyed diff', async () => {
+  const p = await open('/list')
   const r = await p.evaluate(async () => {
     const flush = () => new Promise(r => queueMicrotask(r))
     const time = async fn => {
@@ -375,26 +375,26 @@ test('desempenho: 1000 itens com diff por chave', async () => {
       await flush()
       return performance.now() - t
     }
-    const antes = [...document.querySelectorAll('#l li')]
-    const itens = __ctx.state.itens
+    const before = [...document.querySelectorAll('#l li')]
+    const items = __ctx.$.items
     const out = {}
-    out.vazia = await time(s => { s.itens = [] })
-    out.criar1000 = await time(s => { s.itens = itens })
-    const criados = [...document.querySelectorAll('#l li')]
-    const um = []
-    for (let i = 0; i < 20; i++) um.push(await time(s => { s.itens[500].nome = 'mudou ' + i; s.itens[500].feito = i % 2 === 0 }))
-    out.mudar1 = um.sort((a, b) => a - b)[10]
-    out.trocar2 = await time(s => { const x = s.itens[1]; s.itens[1] = s.itens[998]; s.itens[998] = x })
-    out.remover1 = await time(s => { s.itens.splice(10, 1) })
-    const depois = [...document.querySelectorAll('#l li')]
-    out.preservou = depois.every(li => criados.includes(li))
-    out.n = depois.length
-    out.texto = document.querySelectorAll('#l li')[499].textContent
-    out.ssrAntes = antes.length
+    out.empty = await time(s => { s.items = [] })
+    out.create1000 = await time(s => { s.items = items })
+    const created = [...document.querySelectorAll('#l li')]
+    const one = []
+    for (let i = 0; i < 20; i++) one.push(await time(s => { s.items[500].name = 'changed ' + i; s.items[500].done = i % 2 === 0 }))
+    out.change1 = one.sort((a, b) => a - b)[10]
+    out.swap2 = await time(s => { const x = s.items[1]; s.items[1] = s.items[998]; s.items[998] = x })
+    out.remove1 = await time(s => { s.items.splice(10, 1) })
+    const after = [...document.querySelectorAll('#l li')]
+    out.preserved = after.every(li => created.includes(li))
+    out.n = after.length
+    out.text = document.querySelectorAll('#l li')[499].textContent
+    out.ssrBefore = before.length
     return out
   })
-  assert.equal(r.preservou, true)
+  assert.equal(r.preserved, true)
   assert.equal(r.n, 999)
-  assert.equal(r.texto, 'mudou 19')
-  console.log(`desempenho (ms): criar 1000 = ${r.criar1000.toFixed(2)}, mudar 1 de 1000 (mediana) = ${r.mudar1.toFixed(2)}, trocar 2 = ${r.trocar2.toFixed(2)}, remover 1 = ${r.remover1.toFixed(2)}, esvaziar = ${r.vazia.toFixed(2)}`)
+  assert.equal(r.text, 'changed 19')
+  console.log(`performance (ms): create 1000 = ${r.create1000.toFixed(2)}, change 1 of 1000 (median) = ${r.change1.toFixed(2)}, swap 2 = ${r.swap2.toFixed(2)}, remove 1 = ${r.remove1.toFixed(2)}, clear = ${r.empty.toFixed(2)}`)
 })

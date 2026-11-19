@@ -1,7 +1,7 @@
-export const state = () => ({ apagado: false })
+export const state = () => ({ deleted: false })
 
 export const actions = {
-  async apagar(ctx) {
-    if (await ctx.confirm('apagar') == 'ok') ctx.$.apagado = true
+  async deleteDraft(ctx) {
+    if (await ctx.confirm('delete-draft') === 'ok') ctx.$.deleted = true
   },
 }

@@ -1,5 +1,5 @@
 export const actions = {
-  comprar(ctx) {
-    ctx.shared.carrinho.total += 1
+  buy(ctx) {
+    ctx.shared.cart.total += 1
   },
 }

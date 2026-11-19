@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>List</title>
+  <style>#tall{height:3000px}</style>
+  <script>self.__pragmaDev=true</script>
+  <link rel="modulepreload" href="/assets/list.js">
+  <script type="application/json" id="pragma-route">{"pattern":"/list","page":"/assets/list.js","components":{},"stores":{"cart":"/assets/cart.js"},"loader":false,"ssr":false}</script>
+  <script type="module" src="/core/boot.js"></script>
+</head>
+<body>
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="shared.cart.items.length"></span></header>
+  <main data-page>
+    <ul id="l"><template data-for="item in state.items" data-key="item.id" data-tid="l1"><li data-class-done="item.done"><span data-text="item.name"></span></li></template></ul>
+  </main>
+</body>
+</html>

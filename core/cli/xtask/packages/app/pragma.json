@@ -1,0 +1,5 @@
+{
+  "name": "packages",
+  "lang": "en",
+  "budgets": { "initialJsKb": 120, "routeJsKb": 100, "cssKb": 15 }
+}

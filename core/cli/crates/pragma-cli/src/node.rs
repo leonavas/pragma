@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 
-/// Processo `node <entry>` numa porta interna, com o proxy do `Site` apontando para ele.
+/// `node <entry>` process on an internal port, with the `Site` proxy pointing at it.
 pub struct Node {
     entry: PathBuf,
     cwd: PathBuf,
@@ -22,7 +22,7 @@ impl Node {
         Node { entry, cwd, child: None, fingerprint: 0 }
     }
 
-    /// Sobe, reinicia (se o código do servidor mudou) ou derruba o node conforme o build atual.
+    /// Starts, restarts (if server code changed) or stops node according to the current build.
     pub async fn sync(&mut self, site: &Site) {
         if !self.entry.is_file() {
             self.stop().await;
@@ -38,7 +38,7 @@ impl Node {
         self.fingerprint = fingerprint;
         let port = match std::net::TcpListener::bind("127.0.0.1:0").and_then(|l| l.local_addr()) {
             Ok(addr) => addr.port(),
-            Err(e) => return eprintln!("{} sem porta livre para o node: {e}", red("erro")),
+            Err(e) => return eprintln!("{} no free port for node: {e}", red("error")),
         };
         let spawned = Command::new("node")
             .arg(&self.entry)
@@ -51,7 +51,7 @@ impl Node {
             .spawn();
         let mut child = match spawned {
             Ok(child) => child,
-            Err(e) => return eprintln!("{} não foi possível iniciar `node {}`: {e} (Node ≥ 22 instalado?)", red("erro"), self.entry.display()),
+            Err(e) => return eprintln!("{} cannot start `node {}`: {e} (is Node >= 22 installed?)", red("error"), self.entry.display()),
         };
         let pretty = std::io::stdout().is_terminal();
         if let Some(out) = child.stdout.take() {
@@ -81,9 +81,9 @@ impl Node {
             tokio::time::sleep(Duration::from_millis(25)).await;
         };
         if ready {
-            println!("{}", dim(&format!("node {} na porta {port}", if restarting { "reiniciado" } else { "rodando" })));
+            println!("{}", dim(&format!("node {} on port {port}", if restarting { "restarted" } else { "running" })));
         } else {
-            eprintln!("{} o servidor node não subiu; veja a saída acima", red("erro"));
+            eprintln!("{} node server did not start; see the output above", red("error"));
         }
         site.set_backend(Some(port));
         self.child = Some(child);
@@ -116,7 +116,7 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Registro OTel em JSON (um por linha, como o `core/server/log.js` imprime) → linha legível.
+/// OTel JSON record (one per line, as `core/server/log.js` prints) to a readable line.
 pub fn format_log(line: &str) -> String {
     let Ok(Value::Object(rec)) = serde_json::from_str::<Value>(line) else { return line.to_owned() };
     let Some(level) = rec.get("severityText").and_then(Value::as_str) else { return line.to_owned() };
@@ -150,7 +150,7 @@ pub fn format_log(line: &str) -> String {
     out
 }
 
-/// Lote do cliente (`{ resource, logs }`) quando o dev não tem servidor node para recebê-lo.
+/// Client batch (`{ resource, logs }`) when dev has no node server to receive it.
 pub fn print_client_logs(body: &[u8]) {
     let Ok(Value::Object(batch)) = serde_json::from_slice::<Value>(body) else { return };
     let resource = batch.get("resource").cloned().unwrap_or_else(|| serde_json::json!({ "service.name": "pragma-client" }));
@@ -191,11 +191,11 @@ mod tests {
 
     #[test]
     fn formats_otel_record() {
-        let line = r#"{"timeUnixNano":"1","severityNumber":9,"severityText":"INFO","body":"GET /loja","attributes":{"http.response.status_code":200},"resource":{"service.name":"app"}}"#;
+        let line = r#"{"timeUnixNano":"1","severityNumber":9,"severityText":"INFO","body":"GET /shop","attributes":{"http.response.status_code":200},"resource":{"service.name":"app"}}"#;
         let out = format_log(line);
-        assert!(out.contains("GET /loja"));
+        assert!(out.contains("GET /shop"));
         assert!(out.contains("http.response.status_code=200"));
         assert!(out.contains("(app)"));
-        assert_eq!(format_log("texto comum"), "texto comum");
+        assert_eq!(format_log("plain text"), "plain text");
     }
 }

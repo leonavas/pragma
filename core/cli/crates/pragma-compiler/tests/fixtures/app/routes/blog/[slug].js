@@ -1,1 +1,1 @@
-export const state = () => ({ lido: false })
+export const state = () => ({ read: false })

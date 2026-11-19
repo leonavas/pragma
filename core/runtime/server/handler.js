@@ -71,9 +71,9 @@ export function createHandler({ routes, service }) {
         kind = 'page'
       }
       const m = matchRoute(table, target)
-      // O router busca o HTML pré-gerado (/loja/index.html): isso é arquivo, não página SSR.
+      // The router fetches prebuilt HTML (/shop/index.html): that is a file, not an SSR page.
       if (kind === 'page' && (path.endsWith('.html') || !(m?.route.ssr && m.route.template && m.route.shell))) kind = null
-      if (!kind) return env.ASSETS ? env.ASSETS.fetch(request) : new Response('Não encontrado', { status: 404 })
+      if (!kind) return env.ASSETS ? env.ASSETS.fetch(request) : new Response('Not found', { status: 404 })
 
       const start = performance.now()
       const parent = parseTraceparent(request.headers.get('traceparent'))
@@ -113,23 +113,23 @@ export function createHandler({ routes, service }) {
 }
 
 async function data(m, { query, request, env, log }) {
-  if (request.method !== 'GET' && request.method !== 'HEAD') return fail('Método não permitido', 405)
+  if (request.method !== 'GET' && request.method !== 'HEAD') return fail('Method not allowed', 405)
   const load = m?.route.server?.load
-  if (!load) return fail('Rota sem dados', 404)
+  if (!load) return fail('Route has no data', 404)
   return json({ data: (await load({ params: m.params, query, request, env, log })) ?? null })
 }
 
 async function action(m, name, { query, request, env, log }) {
-  if (request.method !== 'POST') return fail('Método não permitido', 405)
+  if (request.method !== 'POST') return fail('Method not allowed', 405)
   let decoded
   try {
     decoded = decodeURIComponent(name)
   } catch {
-    return fail('Action inexistente', 404)
+    return fail('Unknown action', 404)
   }
   const actions = m?.route.server?.actions
   if (!actions || !Object.hasOwn(actions, decoded) || typeof actions[decoded] !== 'function') {
-    return fail(`Action inexistente: ${decoded}`, 404)
+    return fail(`Unknown action: ${decoded}`, 404)
   }
   let input = null
   const text = await request.text()
@@ -137,7 +137,7 @@ async function action(m, name, { query, request, env, log }) {
     try {
       input = JSON.parse(text)
     } catch {
-      return fail('Corpo da action não é JSON válido', 400)
+      return fail('Action body is not valid JSON', 400)
     }
   }
   const result = await actions[decoded]({ input, params: m.params, query, request, env, log })
@@ -171,7 +171,7 @@ export function shellWith(shell, body, payload) {
   if (body !== undefined) {
     const open = /<main\b[^>]*\bdata-page\b[^>]*>/.exec(html)
     const end = open ? html.indexOf('</main>', open.index) : -1
-    if (end < 0) throw new Error('shell sem <main data-page>…</main>')
+    if (end < 0) throw new Error('shell has no <main data-page>…</main>')
     html = html.slice(0, open.index + open[0].length) + body + html.slice(end)
   }
   const script = `<script type="application/json" id="pragma-data">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>`
@@ -180,15 +180,15 @@ export function shellWith(shell, body, payload) {
 }
 
 async function ingest(request, env, ctx) {
-  if (request.method !== 'POST') return fail('Método não permitido', 405)
-  if (Number(request.headers.get('content-length') ?? 0) > OTEL_MAX_BYTES) return fail('Lote grande demais', 413)
+  if (request.method !== 'POST') return fail('Method not allowed', 405)
+  if (Number(request.headers.get('content-length') ?? 0) > OTEL_MAX_BYTES) return fail('Batch too large', 413)
   const text = await request.text()
-  if (text.length > OTEL_MAX_BYTES) return fail('Lote grande demais', 413)
+  if (text.length > OTEL_MAX_BYTES) return fail('Batch too large', 413)
   let records
   try {
     records = fromClient(JSON.parse(text))
   } catch {
-    return fail('Lote de logs inválido', 400)
+    return fail('Invalid log batch', 400)
   }
   await later(flush(records, env), ctx)
   return new Response(null, { status: 204 })

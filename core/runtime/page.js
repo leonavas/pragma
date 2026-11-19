@@ -6,7 +6,7 @@ import { navigate } from './router.js'
 
 let ov
 export let overlay
-// overlay.js só baixa em página que tem overlay; o build faz o modulepreload nela.
+// overlay.js is only fetched on pages with overlays; the build modulepreloads it there.
 export const overlays = () => (ov ??= import('./overlay.js').then(m => (m.initOverlays({ log }), (overlay = m))))
 const open = (...a) => overlays().then(m => m.open(...a))
 const close = (...a) => overlays().then(m => m.close(...a))
@@ -76,7 +76,7 @@ function onEvent(e) {
   if (!el) return
   const o = scopeOf(el)?.[O] ?? cur.o, name = el.getAttribute('data-on-' + e.type), fn = o.mod.actions?.[name]
   if (!fn) {
-    if (self.__pragmaDev) throw new Error(`pragma: action inexistente "${name}"`)
+    if (self.__pragmaDev) throw new Error(`pragma: unknown action "${name}"`)
     return
   }
   if (e.type === 'submit') e.preventDefault()

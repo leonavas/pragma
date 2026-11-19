@@ -1,0 +1,43 @@
+<title>Shop · Minimart</title>
+
+<div class="grid items-start gap-8 lg:grid-cols-3">
+  <section class="flex flex-col gap-6 lg:col-span-2" aria-labelledby="shop-title">
+    <h1 id="shop-title" class="text-3xl font-semibold tracking-tight">Shop</h1>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <c-search label="Search products" placeholder="Search products…" :value="$search"></c-search>
+      <c-filters label="Categories">
+        <a href="?category=all" :aria-current="$category.all">All</a>
+        <a href="?category=pantry" :aria-current="$category.pantry">Pantry</a>
+        <a href="?category=cleaning" :aria-current="$category.cleaning">Cleaning</a>
+        <a href="?category=produce" :aria-current="$category.produce">Produce</a>
+      </c-filters>
+    </div>
+
+    <if page.loading>
+      <ul class="grid gap-4 sm:grid-cols-2" aria-busy="true" aria-label="Loading products">
+        <li class="skeleton h-48 rounded-2xl"></li>
+        <li class="skeleton h-48 rounded-2xl"></li>
+        <li class="skeleton h-48 rounded-2xl"></li>
+        <li class="skeleton h-48 rounded-2xl"></li>
+      </ul>
+    </if>
+    <else-if page.error>
+      <div class="card flex flex-col items-start gap-3" role="alert">
+        <p class="text-danger-600" :text="page.error.message"></p>
+        <a href="/shop" class="btn">Try again</a>
+      </div>
+    </else-if>
+    <else>
+      <ul class="grid gap-4 sm:grid-cols-2">
+        <for product in $products key=product.id>
+          <li><p-product-card :product="product"></p-product-card></li>
+        </for>
+        <empty>
+          <li class="card text-center text-muted sm:col-span-2">No products</li>
+        </empty>
+      </ul>
+    </else>
+  </section>
+
+  <p-cart-summary></p-cart-summary>
+</div>

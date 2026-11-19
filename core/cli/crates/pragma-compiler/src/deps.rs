@@ -25,22 +25,17 @@ const UI_LIBS: &[&str] = &[
 ];
 
 pub const RULE_IMPORT: &str = "js/import";
-pub const RULE_PACKAGE: &str = "app/pacote";
+pub const RULE_PACKAGE: &str = "app/package";
 
 pub struct Deps {
     root: PathBuf,
     listed: BTreeSet<String>,
     has_manifest: bool,
     resolver: Resolver,
-    env: &'static str,
-}
-
-pub fn is_package_file(path: &Path) -> bool {
-    path.starts_with("node_modules")
 }
 
 impl Deps {
-    pub fn new(root: &Path, prod: bool, diags: &mut Vec<Diagnostic>) -> Deps {
+    pub fn new(root: &Path, diags: &mut Vec<Diagnostic>) -> Deps {
         let mut listed = BTreeSet::new();
         let manifest = std::fs::read_to_string(root.join("package.json")).ok();
         if let Some(src) = &manifest {
@@ -50,65 +45,53 @@ impl Deps {
                         listed.extend(deps.keys().cloned());
                     }
                 }
-                Err(e) => diags.push(Diagnostic::error("package.json", e.line() as u32, e.column() as u32, "app/pacote", format!("package.json inválido: {e}"))),
+                Err(e) => diags.push(Diagnostic::error("package.json", e.line() as u32, e.column() as u32, "app/package", format!("invalid package.json: {e}"))),
             }
         }
         let resolver = Resolver::new(ResolveOptions {
             condition_names: ["browser", "import", "module", "default"].map(String::from).to_vec(),
             main_fields: ["module", "main"].map(String::from).to_vec(),
             alias_fields: vec![vec!["browser".into()]],
-            extensions: [".js", ".mjs"].map(String::from).to_vec(),
+            extensions: [".js", ".mjs", ".cjs"].map(String::from).to_vec(),
             symlinks: false,
             node_path: false,
             ..ResolveOptions::default()
         });
-        Deps { root: root.to_path_buf(), listed, has_manifest: manifest.is_some(), resolver, env: if prod { "production" } else { "development" } }
+        Deps { root: root.to_path_buf(), listed, has_manifest: manifest.is_some(), resolver }
     }
 
     pub fn check_listed(&self, spec: &str, client: bool) -> Result<(), String> {
         let name = pragma_jslint::package_name(spec);
         if client && UI_LIBS.contains(&name) {
-            return Err(format!("pacote \"{name}\" é framework de UI; no pragma a marcação vive no .html e o runtime cuida do DOM"));
+            return Err(format!("package \"{name}\" is a UI framework; in pragma markup lives in .html and the runtime owns the DOM"));
         }
         if self.listed.contains(name) {
             return Ok(());
         }
         if !self.has_manifest {
-            return Err(format!("pacote \"{name}\" sem package.json; crie com `npm init -y` e instale com `npm i {name}` ou `bun add {name}`"));
+            return Err(format!("package \"{name}\" needs a package.json; create one with `npm init -y` and install with `npm i {name}` or `bun add {name}`"));
         }
-        Err(format!("pacote \"{name}\" não está em dependencies do package.json; instale com `npm i {name}` ou `bun add {name}`"))
+        Err(format!("package \"{name}\" is not in package.json dependencies; install with `npm i {name}` or `bun add {name}`"))
     }
 
     pub fn resolve(&self, from: &Path, spec: &str) -> Result<PathBuf, (&'static str, String)> {
         let full = match self.resolver.resolve(self.root.join(from), spec) {
             Ok(r) => r.into_path_buf(),
             Err(ResolveError::NotFound(_)) => {
-                return Err((RULE_IMPORT, format!("\"{spec}\" não encontrado em node_modules; rode `npm install` ou `bun install`")));
+                return Err((RULE_IMPORT, format!("\"{spec}\" not found in node_modules; run `npm install` or `bun install`")));
             }
-            Err(ResolveError::Ignored(_)) => return Err((RULE_PACKAGE, format!("\"{spec}\" não existe no navegador (campo browser do pacote)"))),
-            Err(e) => return Err((RULE_PACKAGE, format!("não foi possível resolver \"{spec}\": {e}"))),
+            Err(ResolveError::Ignored(_)) => return Err((RULE_PACKAGE, format!("\"{spec}\" is not available in the browser (package browser field)"))),
+            Err(e) => return Err((RULE_PACKAGE, format!("cannot resolve \"{spec}\": {e}"))),
         };
         let Ok(rel) = full.strip_prefix(&self.root) else {
-            return Err((RULE_PACKAGE, format!("\"{spec}\" resolve para fora do projeto ({}); instale o pacote no node_modules do app", full.display())));
+            return Err((RULE_PACKAGE, format!("\"{spec}\" resolves outside the project ({}); install the package in the app node_modules", full.display())));
         };
         let rel_s = crate::project::rel_str(rel);
-        if !(rel_s.ends_with(".js") || rel_s.ends_with(".mjs")) {
-            return Err((RULE_PACKAGE, format!("\"{spec}\" resolve para {rel_s}, que não é JS puro; só pacotes ES module (.js, .mjs) funcionam no pragma")));
+        if ![".js", ".mjs", ".cjs"].iter().any(|e| rel_s.ends_with(e)) {
+            return Err((RULE_PACKAGE, format!("\"{spec}\" resolves to {rel_s}, which is not plain JS; only JavaScript packages (.js, .mjs, .cjs) work on the client")));
         }
-        Ok(rel.to_path_buf())
+        Ok(full)
     }
-
-    pub fn prepare(&self, src: String) -> String {
-        if src.contains("process.env.NODE_ENV") {
-            src.replace("process.env.NODE_ENV", &format!("\"{}\"", self.env))
-        } else {
-            src
-        }
-    }
-}
-
-pub fn looks_commonjs(src: &str) -> bool {
-    !crate::js::has_module_syntax(src) && (src.contains("module.exports") || src.contains("exports.") || src.contains("require("))
 }
 
 pub fn asset_path(rel: &str) -> String {

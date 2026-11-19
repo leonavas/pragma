@@ -4,7 +4,7 @@ let notify = () => {}
 
 export const onStoreChange = fn => { notify = fn }
 
-// Getters são valores derivados: não vão para o localStorage nem são sobrescritos por ele.
+// Getters are derived values: never written to or overwritten from localStorage.
 const plain = s => JSON.stringify(s, function (k, v) { return this === s && Object.getOwnPropertyDescriptor(s, k)?.get ? undefined : v })
 const restore = (s, v) => { for (const k in v) if (!Object.getOwnPropertyDescriptor(s, k)?.get) s[k] = v[k] }
 

@@ -1,7 +1,0 @@
-[
-  { "id": "cafe", "nome": "Café torrado", "categoria": "mercearia", "descricao": "Pacote de 500 g, torra média." },
-  { "id": "arroz", "nome": "Arroz integral", "categoria": "mercearia", "descricao": "Pacote de 1 kg." },
-  { "id": "detergente", "nome": "Detergente", "categoria": "limpeza", "descricao": "Frasco de 500 ml, neutro." },
-  { "id": "esponja", "nome": "Esponja", "categoria": "limpeza", "descricao": "Pacote com 3 unidades." },
-  { "id": "banana", "nome": "Banana prata", "categoria": "hortifruti", "descricao": "Dúzia." }
-]

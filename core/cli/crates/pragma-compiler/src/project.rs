@@ -1,4 +1,4 @@
-//! Descoberta do app (SPEC §2): rotas, layout, 404, componentes, módulos, stores e config.
+//! App discovery (SPEC §2): routes, layout, 404, components, modules, stores and config.
 use crate::html::{self, Node, Pos};
 use pragma_diag::Diagnostic;
 use std::collections::{BTreeMap, HashMap};
@@ -15,6 +15,7 @@ pub struct Budgets {
 #[derive(Debug, Default)]
 pub struct Config {
     pub name: String,
+    pub lang: String,
     pub budgets: Budgets,
     pub budget_lines: HashMap<&'static str, u32>,
 }
@@ -23,9 +24,9 @@ pub struct Config {
 pub struct Page {
     pub html: u32,
     pub pattern: String,
-    /// Nome do template SSR e do HTML de saída, sem extensão: `index`, `loja/[id]`.
+    /// SSR template and output HTML name, without extension: `index`, `shop/[id]`.
     pub out_name: String,
-    /// Pasta (relativa à raiz) onde a resolução de componentes começa.
+    /// Folder (relative to the root) where component resolution starts.
     pub dir: PathBuf,
     pub module: Option<PathBuf>,
     pub server: Option<PathBuf>,
@@ -38,13 +39,13 @@ pub struct Component {
     pub dir: PathBuf,
     pub module: Option<PathBuf>,
     pub css: Option<PathBuf>,
-    /// Pasta de onde partem as buscas dos componentes que este usa.
+    /// Folder where lookups for the components this one uses start.
     pub scope: PathBuf,
 }
 
 pub struct Project {
     pub root: PathBuf,
-    /// Arquivos com id (usado em `Pos.file`), relativos à raiz.
+    /// Files with an id (used in `Pos.file`), relative to the root.
     pub files: Vec<PathBuf>,
     pub sources: Vec<String>,
     pub trees: Vec<Vec<Node>>,
@@ -52,11 +53,11 @@ pub struct Project {
     pub layout: Option<u32>,
     pub not_found: Option<Page>,
     pub pages: Vec<Page>,
-    /// Pasta de componentes (`routes/x/_components` ou `lib/components`) → nome → componente.
+    /// Component folder (`routes/x/_components` or `lib/components`) -> name -> component.
     pub components: HashMap<PathBuf, BTreeMap<String, Component>>,
     pub stores: BTreeMap<String, PathBuf>,
     pub theme_css: Option<String>,
-    /// Todos os .js/.mjs do app (inclui core/), relativos.
+    /// All app .js/.mjs files (including core/), relative.
     pub js_files: Vec<PathBuf>,
     pub public_files: Vec<PathBuf>,
     pub diags: Vec<Diagnostic>,
@@ -132,13 +133,13 @@ impl Project {
         self.sources.push(src);
         self.trees.push(tree);
         for e in errors {
-            self.err_at(e.pos, "html/sintaxe", e.message);
+            self.err_at(e.pos, "html/syntax", e.message);
         }
-        for (pos, message) in sugar_errors {
-            self.err_at(pos, "html/sintaxe-antiga", message);
+        for (pos, rule, message) in sugar_errors {
+            self.err_at(pos, rule, message);
         }
         for (line, col) in comment_positions(&self.sources[id as usize], "<!--") {
-            self.err_at(Pos { file: id, line, col }, "html/comentario", "comentário é proibido; o código é a documentação");
+            self.err_at(Pos { file: id, line, col }, "html/comment", "comments are not allowed; the code is the documentation");
         }
         id
     }
@@ -167,7 +168,7 @@ impl Project {
         }
         walk(root, Path::new("public"), &mut p.public_files);
         if !root.join("routes").is_dir() {
-            p.err("routes", 1, 1, "app/estrutura", "pasta routes/ não encontrada");
+            p.err("routes", 1, 1, "app/structure", "routes/ folder not found");
         }
         for f in &all {
             let s = rel_str(f);
@@ -185,13 +186,13 @@ impl Project {
 
     fn load_config(&mut self) {
         let Some(src) = self.read(Path::new("pragma.json")) else {
-            self.err("pragma.json", 1, 1, "app/pragma-json", "pragma.json não encontrado");
+            self.err("pragma.json", 1, 1, "app/pragma-json", "pragma.json not found");
             return;
         };
         let v: serde_json::Value = match serde_json::from_str(&src) {
             Ok(v) => v,
             Err(e) => {
-                self.err("pragma.json", e.line() as u32, e.column() as u32, "app/pragma-json", format!("JSON inválido: {e}"));
+                self.err("pragma.json", e.line() as u32, e.column() as u32, "app/pragma-json", format!("invalid JSON: {e}"));
                 return;
             }
         };
@@ -200,18 +201,22 @@ impl Project {
             src.find(&pat).map_or(1, |i| src[..i].matches('\n').count() as u32 + 1)
         };
         let Some(obj) = v.as_object() else {
-            self.err("pragma.json", 1, 1, "app/pragma-json", "pragma.json deve ser um objeto");
+            self.err("pragma.json", 1, 1, "app/pragma-json", "pragma.json must be an object");
             return;
         };
         for (k, val) in obj {
             match k.as_str() {
                 "name" => match val.as_str() {
                     Some(s) => self.config.name = s.to_string(),
-                    None => self.err("pragma.json", line_of("name"), 1, "app/pragma-json", "\"name\" deve ser texto"),
+                    None => self.err("pragma.json", line_of("name"), 1, "app/pragma-json", "\"name\" must be a string"),
+                },
+                "lang" => match val.as_str() {
+                    Some(s) if !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') => self.config.lang = s.to_string(),
+                    _ => self.err("pragma.json", line_of("lang"), 1, "app/pragma-json", "\"lang\" must be a language tag such as \"en\" or \"pt-BR\""),
                 },
                 "budgets" => {
                     let Some(b) = val.as_object() else {
-                        self.err("pragma.json", line_of("budgets"), 1, "app/pragma-json", "\"budgets\" deve ser um objeto");
+                        self.err("pragma.json", line_of("budgets"), 1, "app/pragma-json", "\"budgets\" must be an object");
                         continue;
                     };
                     for (bk, bv) in b {
@@ -221,13 +226,13 @@ impl Project {
                             "cssKb" => "cssKb",
                             _ => {
                                 let l = line_of(bk);
-                                self.err("pragma.json", l, 1, "app/pragma-json", format!("orçamento desconhecido \"{bk}\" (use initialJsKb, routeJsKb, cssKb)"));
+                                self.err("pragma.json", l, 1, "app/pragma-json", format!("unknown budget \"{bk}\" (use initialJsKb, routeJsKb, cssKb)"));
                                 continue;
                             }
                         };
                         let l = line_of(key);
                         let Some(n) = bv.as_f64() else {
-                            self.err("pragma.json", l, 1, "app/pragma-json", format!("\"{key}\" deve ser número"));
+                            self.err("pragma.json", l, 1, "app/pragma-json", format!("\"{key}\" must be a number"));
                             continue;
                         };
                         self.config.budget_lines.insert(key, l);
@@ -240,17 +245,20 @@ impl Project {
                 }
                 _ => {
                     let l = line_of(k);
-                    self.err("pragma.json", l, 1, "app/pragma-json", format!("chave desconhecida \"{k}\" (use name, budgets)"));
+                    self.err("pragma.json", l, 1, "app/pragma-json", format!("unknown key \"{k}\" (use name, lang, budgets)"));
                 }
             }
         }
+        if self.config.lang.is_empty() {
+            self.config.lang = "en".into();
+        }
         if self.config.name.is_empty() {
-            self.err("pragma.json", 1, 1, "app/pragma-json", "pragma.json precisa de \"name\"");
+            self.err("pragma.json", 1, 1, "app/pragma-json", "pragma.json needs \"name\"");
         }
     }
 
     fn discover_components(&mut self, all: &[PathBuf]) {
-        // Pastas imediatamente dentro de um diretório de componentes.
+        // Folders directly inside a components directory.
         let mut dirs: BTreeMap<PathBuf, (PathBuf, String)> = BTreeMap::new();
         for f in all {
             let comps: Vec<_> = f.ancestors().filter(|a| a.file_name().is_some_and(|n| n == "_components") || *a == Path::new("lib/components")).collect();
@@ -259,26 +267,26 @@ impl Project {
             let Some(first) = rest.components().next() else { continue };
             let name = first.as_os_str().to_string_lossy().to_string();
             if rest.components().count() == 1 {
-                self.err(f, 1, 1, "app/estrutura", format!("arquivo solto em {}; use {}/<nome>/<nome>.html", rel_str(base), rel_str(base)));
+                self.err(f, 1, 1, "app/structure", format!("loose file in {}; use {}/<name>/<name>.html", rel_str(base), rel_str(base)));
                 continue;
             }
             dirs.entry(base.join(&name)).or_insert((base.to_path_buf(), name));
         }
         for (dir, (base, name)) in dirs {
             if !is_component_name(&name) {
-                self.err(&dir, 1, 1, "app/estrutura", format!("nome de componente inválido \"{name}\": use minúsculas, dígitos e hífen"));
+                self.err(&dir, 1, 1, "app/structure", format!("invalid component name \"{name}\": use lowercase letters, digits and hyphens"));
                 continue;
             }
             let html = dir.join(format!("{name}.html"));
             if !all.contains(&html) {
-                self.err(&dir, 1, 1, "app/estrutura", format!("componente sem {name}.html"));
+                self.err(&dir, 1, 1, "app/structure", format!("component has no {name}.html"));
                 continue;
             }
             let id = self.add_html(html);
             let module = Some(dir.join(format!("{name}.js"))).filter(|m| all.contains(m));
             let css = Some(dir.join(format!("{name}.css"))).filter(|m| all.contains(m));
             if all.contains(&dir.join(format!("{name}.server.js"))) {
-                self.err(dir.join(format!("{name}.server.js")), 1, 1, "app/estrutura", "componente não tem .server.js; dados ficam no .server.js da página");
+                self.err(dir.join(format!("{name}.server.js")), 1, 1, "app/structure", "components cannot have .server.js; data lives in the page .server.js");
             }
             let scope = if base == Path::new("lib/components") { base.clone() } else { base.parent().unwrap().to_path_buf() };
             let c = Component { name: name.clone(), html: id, dir: dir.clone(), module, css, scope };
@@ -303,7 +311,7 @@ impl Project {
                 let id = self.add_html(f.clone());
                 let module = Some(PathBuf::from("routes/_404.js")).filter(|m| all.contains(m));
                 if all.contains(&PathBuf::from("routes/_404.server.js")) {
-                    self.err("routes/_404.server.js", 1, 1, "app/estrutura", "_404 não tem loader na v0");
+                    self.err("routes/_404.server.js", 1, 1, "app/structure", "_404 cannot have a loader in v0");
                 }
                 self.not_found = Some(Page { html: id, pattern: "*".into(), out_name: "_404".into(), dir: "routes".into(), module, server: None });
                 continue;
@@ -316,20 +324,20 @@ impl Project {
                     continue;
                 }
                 if file_name == "_layout.js" || file_name == "_layout.server.js" {
-                    self.err(f, 1, 1, "app/estrutura", "o layout não tem módulo na v0");
+                    self.err(f, 1, 1, "app/structure", "the layout cannot have a module in v0");
                 } else if file_name.starts_with('_') && file_name.ends_with(".html") {
-                    self.err(f, 1, 1, "app/estrutura", "só routes/_layout.html e routes/_404.html são especiais; layouts aninhados estão fora da v0");
+                    self.err(f, 1, 1, "app/structure", "only routes/_layout.html and routes/_404.html are special; nested layouts are not in v0");
                 }
                 continue;
             }
             if let Some(stem) = file_name.strip_suffix(".server.js").or_else(|| file_name.strip_suffix(".js")) {
                 if !all.contains(&f.with_file_name(format!("{stem}.html"))) {
-                    self.err(f, 1, 1, "app/estrutura", format!("módulo sem página: falta {stem}.html"));
+                    self.err(f, 1, 1, "app/structure", format!("module without a page: missing {stem}.html"));
                 }
                 continue;
             }
             let Some(stem) = file_name.strip_suffix(".html") else {
-                self.err(f, 1, 1, "app/estrutura", "arquivo não suportado em routes/ (estáticos vão em public/, CSS em lib/theme.css ou no componente)");
+                self.err(f, 1, 1, "app/structure", "unsupported file in routes/ (static files go in public/, CSS in lib/theme.css or the component)");
                 continue;
             };
             let rel = f.strip_prefix("routes").unwrap();
@@ -355,7 +363,7 @@ impl Project {
                 }
             }
             if bad {
-                self.err(f, 1, 1, "app/estrutura", "parâmetro de rota inválido: use [nome] com letras, dígitos e _");
+                self.err(f, 1, 1, "app/structure", "invalid route param: use [name] with letters, digits and _");
                 continue;
             }
             if pattern.is_empty() {
@@ -363,13 +371,13 @@ impl Project {
             }
             if stem != "index" && all.contains(&f.with_extension("").join("index.html")) {
                 let other = rel_str(&f.with_extension("").join("index.html"));
-                self.err(f, 1, 1, "app/rota-conflito", format!("{s} e {other} respondem pela mesma rota"));
+                self.err(f, 1, 1, "app/route-conflict", format!("{s} and {other} serve the same route"));
                 continue;
             }
             let shape: String = pattern.split('/').map(|p| if p.starts_with(':') { ":" } else { p }).collect::<Vec<_>>().join("/");
             if let Some(prev) = seen.get(&shape) {
                 let prev = rel_str(prev);
-                self.err(f, 1, 1, "app/rota-conflito", format!("rota {pattern} conflita com {prev}"));
+                self.err(f, 1, 1, "app/route-conflict", format!("route {pattern} conflicts with {prev}"));
                 continue;
             }
             seen.insert(shape, f.clone());
@@ -380,7 +388,7 @@ impl Project {
             self.pages.push(Page { html: id, pattern, out_name, dir: f.parent().unwrap().to_path_buf(), module, server });
         }
         if self.layout.is_none() && self.root.join("routes").is_dir() {
-            self.err("routes/_layout.html", 1, 1, "app/estrutura", "falta routes/_layout.html com <main data-page><slot></slot></main>");
+            self.err("routes/_layout.html", 1, 1, "app/structure", "missing routes/_layout.html with <main data-page><slot></slot></main>");
         }
         self.pages.sort_by(|a, b| route_order(&a.pattern, &b.pattern));
     }
@@ -390,7 +398,7 @@ impl Project {
             let s = rel_str(f);
             if let Some(name) = s.strip_prefix("lib/state/").and_then(|n| n.strip_suffix(".js")) {
                 if name.contains('/') || !is_ident(name) {
-                    self.err(f, 1, 1, "app/estrutura", "store deve ser lib/state/<nome>.js com nome identificador");
+                    self.err(f, 1, 1, "app/structure", "a store must be lib/state/<name>.js with an identifier name");
                     continue;
                 }
                 self.stores.insert(name.to_string(), f.clone());
@@ -423,7 +431,7 @@ impl Project {
     }
 }
 
-/// Estático vence param, segmento a segmento.
+/// Static beats param, segment by segment.
 pub fn route_order(a: &str, b: &str) -> std::cmp::Ordering {
     let sa: Vec<&str> = a.split('/').collect();
     let sb: Vec<&str> = b.split('/').collect();

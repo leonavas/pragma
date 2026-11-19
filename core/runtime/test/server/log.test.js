@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createLogger, fromClient, newSpanId, newTraceId, parseTraceparent, resourceFrom, toOtlp } from '../../server/log.js'
 
-test('parseTraceparent aceita só traceparent W3C válido', () => {
+test('parseTraceparent only accepts a valid W3C traceparent', () => {
   const tp = '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'
   assert.deepEqual(parseTraceparent(tp), { traceId: '4bf92f3577b34da6a3ce929d0e0e4736', spanId: '00f067aa0ba902b7', flags: '01' })
   assert.ok(parseTraceparent('01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01-extra'))
@@ -18,19 +18,19 @@ test('parseTraceparent aceita só traceparent W3C válido', () => {
   ]) assert.equal(parseTraceparent(bad), null, String(bad))
 })
 
-test('ids novos têm o tamanho certo e não repetem', () => {
+test('new ids have the right length and do not repeat', () => {
   assert.match(newTraceId(), /^[0-9a-f]{32}$/)
   assert.match(newSpanId(), /^[0-9a-f]{16}$/)
   assert.notEqual(newTraceId(), newTraceId())
 })
 
-test('registro segue o OTel Logs Data Model', () => {
+test('record follows the OTel Logs Data Model', () => {
   const log = createLogger({ resource: { 'service.name': 's' }, traceId: 'a'.repeat(32), spanId: 'b'.repeat(16), min: 5 })
   log.debug('d')
   log.info('i', { 'http.request.method': 'GET' })
   log.warn('w')
-  log.error('e', new RangeError('fora'))
-  log.error('texto', 'não é objeto')
+  log.error('e', new RangeError('out of range'))
+  log.error('text', 'not an object')
   const [d, i, w, e, t] = log.records
   assert.deepEqual([d, i, w, e].map((r) => [r.severityNumber, r.severityText]), [[5, 'DEBUG'], [9, 'INFO'], [13, 'WARN'], [17, 'ERROR']])
   assert.match(i.timeUnixNano, /^\d{19}$/)
@@ -41,19 +41,19 @@ test('registro segue o OTel Logs Data Model', () => {
   assert.equal(i.spanId, 'b'.repeat(16))
   assert.deepEqual(i.resource, { 'service.name': 's' })
   assert.equal(e.attributes['exception.type'], 'RangeError')
-  assert.equal(e.attributes['exception.message'], 'fora')
+  assert.equal(e.attributes['exception.message'], 'out of range')
   assert.ok(e.attributes['exception.stacktrace'])
   assert.deepEqual(t.attributes, {})
 })
 
-test('nível mínimo padrão descarta DEBUG', () => {
+test('default minimum level drops DEBUG', () => {
   const log = createLogger({})
   log.debug('x')
   log.info('y')
   assert.equal(log.records.length, 1)
 })
 
-test('resourceFrom usa OTEL_SERVICE_NAME e OTEL_RESOURCE_ATTRIBUTES', () => {
+test('resourceFrom uses OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES', () => {
   assert.deepEqual(resourceFrom({}, 'app'), { 'service.name': 'app' })
   assert.deepEqual(resourceFrom({ OTEL_RESOURCE_ATTRIBUTES: 'service.version=1.2,deployment.environment=prod' }), {
     'service.version': '1.2',
@@ -63,7 +63,7 @@ test('resourceFrom usa OTEL_SERVICE_NAME e OTEL_RESOURCE_ATTRIBUTES', () => {
   assert.equal(resourceFrom({ OTEL_SERVICE_NAME: 'x' }, 'app')['service.name'], 'x')
 })
 
-test('toOtlp agrupa por resource e converte AnyValue', () => {
+test('toOtlp groups by resource and converts AnyValue', () => {
   const r = { 'service.name': 's' }
   const body = toOtlp([
     { timeUnixNano: '1', severityNumber: 9, severityText: 'INFO', body: 'a', attributes: { s: 'x', n: 2, f: 1.5, b: true, l: [1], o: { k: 'v' }, z: null }, resource: r },
@@ -85,7 +85,7 @@ test('toOtlp agrupa por resource e converte AnyValue', () => {
   assert.equal(b.observedTimeUnixNano, '2')
 })
 
-test('fromClient valida e limita o lote do cliente', () => {
+test('fromClient validates and limits the client batch', () => {
   const [r] = fromClient({
     resource: { 'service.name': 'web', n: 1 },
     logs: [{ timeUnixNano: 'abc', severityNumber: 99, body: 'x'.repeat(10000), attributes: { a: 'b', o: {}, n: NaN, ok: 3 }, traceId: 'XYZ', spanId: 'c'.repeat(16) }, null],

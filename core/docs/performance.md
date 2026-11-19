@@ -1,14 +1,14 @@
 # Performance
 
-Já é rápido por padrão: HTML pronto, fetch do `load` no `<head>`, JS só do que a página usa,
-prefetch de links, assets com hash, CSS só com as classes usadas, orçamentos no `check`.
+Fast by default: prebuilt HTML, `load` fetch starts in `<head>`, only the JS a page uses, link
+prefetch, hashed assets, CSS with only used classes, budgets enforced by `check`.
 
-- Navegue com `<a href>`.
-- Skeleton no formato do conteúdo final.
-- `<img>` com `width` e `height`; `loading="lazy"` abaixo da dobra; AVIF/WebP em `public/`.
-- `:for` com `:key` estável.
-- Página sem interação não tem `.js`.
-- Código pesado de uma página fica nela; se só roda após interação, `await import()` na action.
-- `load` devolve só o que a página mostra. Chamadas independentes: `Promise.all`.
-- Não aumente orçamento em `pragma.json`: reduza o código.
-- Não importe módulo grande em `lib/state/`, não busque dados no `mount`, não ligue `ssr` por padrão.
+- Navigate with `<a href>`.
+- Shape skeletons like the final content.
+- `<img>`: always `width` and `height`; `loading="lazy"` below the fold; AVIF/WebP in `public/`.
+- `<for>` with a stable `key`.
+- A page without interaction has no `.js`.
+- Heavy code used by one page stays in that page; if it runs only after an interaction, `await import()` it inside the action.
+- `load` returns only what the page shows. Run independent calls with `Promise.all`.
+- Never raise a budget in `pragma.json`: shrink the code.
+- Never import large modules in `lib/state/`, fetch data in `mount`, or enable `ssr` by default.

@@ -1,6 +1,6 @@
 [
   { "pattern": "/", "html": "/index.html", "modules": [], "loader": false, "ssr": false },
-  { "pattern": "/loja", "html": "/loja/index.html", "modules": [], "loader": false, "ssr": false },
-  { "pattern": "/loja/:id", "html": "/loja/[id].html", "modules": ["/assets/index-77aa01.js"], "loader": true, "ssr": false },
+  { "pattern": "/shop", "html": "/shop/index.html", "modules": [], "loader": false, "ssr": false },
+  { "pattern": "/shop/:id", "html": "/shop/[id].html", "modules": ["/assets/index-77aa01.js"], "loader": true, "ssr": false },
   { "pattern": "/blog/:slug", "html": "/blog/[slug].html", "modules": [], "loader": true, "ssr": true }
 ]

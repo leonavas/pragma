@@ -1,3 +1,3 @@
 [data-c="card"] .badge { color: var(--color-primary-600); }
-[data-c="card"].destaque { border-width: 2px; }
+[data-c="card"].featured { border-width: 2px; }
 [data-c="card"].card { border-radius: var(--radius-md); }

@@ -1,42 +1,42 @@
-<title>Início</title>
+<title>Home</title>
 
 <section class="flex flex-col items-start gap-6">
-  <span class="rounded-full border border-line px-3 py-1 text-xs font-medium text-muted">HTML, CSS e JS nativos</span>
-  <h1 class="max-w-2xl text-4xl font-semibold tracking-tight sm:text-5xl">Seu app começa aqui.</h1>
-  <p class="max-w-xl text-lg text-muted">Edite <code class="font-mono text-ink">routes/index.html</code>, salve e veja a página atualizar.</p>
+  <span class="rounded-full border border-line px-3 py-1 text-xs font-medium text-muted">Native HTML, CSS and JS</span>
+  <h1 class="max-w-2xl text-4xl font-semibold tracking-tight sm:text-5xl">Your app starts here.</h1>
+  <p class="max-w-xl text-lg text-muted">Edit <code class="font-mono text-ink">routes/index.html</code>, save and watch the page update.</p>
   <div class="flex flex-wrap items-center gap-3">
-    <button type="button" class="btn btn-primary" @open="como-funciona">Como funciona</button>
-    <c-dropdown id="mais-acoes" rotulo="Mais ações">
-      <a href="/nao-existe">Ver a página 404</a>
+    <button type="button" class="btn btn-primary" @open="how-it-works">How it works</button>
+    <c-dropdown id="more-actions" label="More actions">
+      <a href="/does-not-exist">See the 404 page</a>
       <hr>
-      <button type="button" class="text-danger-600" @click="apagar">Apagar rascunho…</button>
+      <button type="button" class="text-danger-600" @click="deleteDraft">Delete draft…</button>
     </c-dropdown>
   </div>
-  <p class="text-sm font-medium text-success-700" :show="$apagado" role="status">Rascunho apagado.</p>
+  <p class="text-sm font-medium text-success-700" :show="$deleted" role="status">Draft deleted.</p>
 </section>
 
 <section class="mt-16 grid gap-4 sm:grid-cols-3">
   <article class="card">
-    <h2 class="font-semibold">Páginas</h2>
-    <p class="mt-2 text-sm text-muted">Cada arquivo em routes/ vira uma rota. O comportamento fica no .js de mesmo nome.</p>
+    <h2 class="font-semibold">Pages</h2>
+    <p class="mt-2 text-sm text-muted">Each file in routes/ becomes a route. Behavior lives in the .js file with the same name.</p>
   </article>
   <article class="card">
-    <h2 class="font-semibold">Componentes</h2>
-    <p class="mt-2 text-sm text-muted">Modal, alert e dropdown já estão em lib/components/. Use com &lt;c-modal&gt;.</p>
+    <h2 class="font-semibold">Components</h2>
+    <p class="mt-2 text-sm text-muted">Modal, alert and dropdown are already in lib/components/. Use them as &lt;c-modal&gt;.</p>
   </article>
   <article class="card">
     <h2 class="font-semibold">Check</h2>
-    <p class="mt-2 text-sm text-muted">Rode pragma check antes de terminar. Zero erros.</p>
+    <p class="mt-2 text-sm text-muted">Run pragma check before you finish. Zero errors.</p>
   </article>
 </section>
 
-<c-modal id="como-funciona" titulo="Como funciona">
-  <p>O HTML de cada página sai pronto do build. O JS só cuida do comportamento, ligado por atributos data-*.</p>
-  <button slot="acoes" type="button" class="btn btn-primary" @close value="ok">Entendi</button>
+<c-modal id="how-it-works" title="How it works">
+  <p>Every page's HTML comes ready from the build. JS only handles behavior, wired up through data-* attributes.</p>
+  <button slot="actions" type="button" class="btn btn-primary" @close value="ok">Got it</button>
 </c-modal>
 
-<c-alert id="apagar" titulo="Apagar rascunho?">
-  <p>Essa ação não pode ser desfeita.</p>
-  <button slot="acoes" type="button" class="btn" @close value="cancel" autofocus>Cancelar</button>
-  <button slot="acoes" type="button" class="btn btn-danger" @close value="ok">Apagar</button>
+<c-alert id="delete-draft" title="Delete draft?">
+  <p>This cannot be undone.</p>
+  <button slot="actions" type="button" class="btn" @close value="cancel" autofocus>Cancel</button>
+  <button slot="actions" type="button" class="btn btn-danger" @close value="ok">Delete</button>
 </c-alert>

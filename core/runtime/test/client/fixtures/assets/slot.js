@@ -1,18 +1,18 @@
 export const state = ctx => ({
-  titulo: 'da página',
-  campo: '',
-  mostrar: true,
-  cliques: 0,
-  escolhido: '',
-  marcado: false,
-  editando: false,
-  itens: [{ id: 1, nome: 'um', max: 3 }, { id: 2, nome: 'dois', max: 7 }],
-  get dobro() { return ctx.shared.conta.total * 2 },
+  title: 'from page',
+  field: '',
+  visible: true,
+  clicks: 0,
+  picked: '',
+  marked: false,
+  editing: false,
+  items: [{ id: 1, name: 'one', max: 3 }, { id: 2, name: 'two', max: 7 }],
+  get double() { return ctx.shared.account.total * 2 },
 })
 
 export const actions = {
-  pagina(ctx) { ctx.state.cliques++; ctx.shared.conta.n++ },
-  escolher(ctx) { ctx.state.escolhido = ctx.scope.item.nome },
+  page(ctx) { ctx.$.clicks++; ctx.shared.account.n++ },
+  pick(ctx) { ctx.$.picked = ctx.scope.item.name },
 }
 
 export function mount(ctx) {
