@@ -85,6 +85,7 @@ Use `:--name="path"` when a value comes from state or data (position, width, col
 - Pass numbers without units (`42`) and add the unit in CSS (`* 1%`, `* 1px`). Compute the number in a script function (`const start = shift => (shift.from - dayStart) / dayLength * 100`).
 - `false`, `null`, `undefined`, and `""` remove the variable; use a fallback (`var(--tone, …)`).
 - On a component tag, `:--name` goes to the component root.
+- Values set every frame (scroll, drag, progress) update only their bindings, not the page (`state.md`, "Per-frame updates").
 - The server writes `style="--start:42"` in SSR pages. Do not write `style="..."` yourself (`html/style-inline`).
 
 ## Custom classes

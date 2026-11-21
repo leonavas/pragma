@@ -12,6 +12,8 @@
     dialog::backdrop { background: rgb(0 0 0 / 0.4); }
     .dialog { width: min(100% - 2rem, 28rem); margin: auto; padding: 1.5rem; }
     .tall { height: 3000px; }
+    @keyframes out { to { opacity: 0; } }
+    html.motion .dialog[data-leaving] { animation: out 0.3s forwards; }
   </style>
   <script type="module">
     import { initOverlays, open, close, confirm, closeAll, handlePopState } from '/core/overlay.js'
@@ -29,6 +31,7 @@
   <header>
     <button id="open-about" data-open="about">About</button>
     <button id="open-delete" data-open="delete">Delete</button>
+    <button id="outside">Outside</button>
     <div class="inline-flex" data-c="dropdown">
       <button type="button" class="btn" id="open-more" data-open="more" popovertarget="more">
         <span>More</span>
@@ -40,7 +43,6 @@
         <button id="item-js">Delete via confirm()…</button>
       </div>
     </div>
-    <button id="outside">Outside</button>
   </header>
   <main data-page class="tall">
     <dialog class="dialog" id="about" aria-label="About the app" data-c="modal">
@@ -59,6 +61,12 @@
       <header><h2>Details</h2></header>
       <div><p>Second level.</p></div>
       <footer><button id="ok-details" data-close value="ok">Close</button></footer>
+    </dialog>
+
+    <dialog class="dialog" id="terms" aria-label="Terms" data-c="modal" autofocus>
+      <header><h2>Terms</h2></header>
+      <div><p>Long text.</p></div>
+      <footer><button id="ok-terms" data-close value="ok">Close</button></footer>
     </dialog>
 
     <dialog class="dialog" role="alertdialog" id="delete" aria-label="Delete project?" data-c="alert">

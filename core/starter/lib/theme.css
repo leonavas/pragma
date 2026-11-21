@@ -54,13 +54,25 @@
     color: var(--color-ink);
     box-shadow: var(--shadow-xl);
   }
+  .dialog:focus { outline: none; }
   .dialog[open] { animation: dialog-in 0.18s ease-out; }
-  .dialog::backdrop { background: oklch(0.2 0 0 / 0.45); backdrop-filter: blur(2px); }
+  .dialog[data-leaving] { animation: dialog-out 0.12s ease-in forwards; }
+  .dialog::backdrop { background: oklch(0.2 0 0 / 0.45); backdrop-filter: blur(2px); animation: fade-in 0.18s ease-out; }
+  .dialog[data-leaving]::backdrop { animation: fade-out 0.12s ease-in forwards; }
 
   @keyframes dialog-in {
     from { opacity: 0; translate: 0 0.5rem; scale: 0.98; }
   }
+  @keyframes dialog-out {
+    to { opacity: 0; translate: 0 0.25rem; scale: 0.98; }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; }
+  }
+  @keyframes fade-out {
+    to { opacity: 0; }
+  }
   @media (prefers-reduced-motion: reduce) {
-    .dialog[open] { animation: none; }
+    .dialog[open], .dialog[data-leaving], .dialog::backdrop { animation: none; }
   }
 }

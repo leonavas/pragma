@@ -101,6 +101,12 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   `false`, other values stay strings.
 - **[firm]** Overlays (modal, alert, popup, dropdown) are always HTML + JS. Back (browser or
   Android) closes the overlay instead of leaving the page. Modal and alert lock scroll (SPEC §6).
+- **[firm]** (2026-11-21) `c-dropdown placement="bottom-start|bottom-end|top-start|top-end"`
+  (side, then shared edge; Floating UI names), with automatic flip to the other side or edge.
+  CSS anchor positioning (`position-area` + `position-try-fallbacks`, set inline by the runtime,
+  so it follows scroll and resize); the old measured placement stays as the fallback where
+  `position-try-fallbacks` is unsupported. *Why:* the source menus open upward and right-aligned
+  next to a send button; one closed prop beats free-form CSS per menu.
 - **[firm]** (2026-11-21) Styled select is `c-select` (starter): `c-dropdown` plus a hidden native
   `<select name>`, so `FormData` and WebMCP get the value. A component may pass a tool attribute on
   with `:toolparamdescription="$prop"`; the caller's fixed text is written at build time, a bound
@@ -205,6 +211,14 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   covers entry but nothing covers exit without keeping the node. Rejected: a `transition`
   directive (closed syntax, JS easing), `animationend`/`transitionend` listeners (miss
   descendants and transitions that never start).
+- **[firm]** (2026-11-21) `c-modal`/`c-alert` leave the same way: closing sets `data-leaving` +
+  `inert` on the `<dialog>`, waits for its CSS animations (same helper as blocks, `::backdrop`
+  included), then calls `close()`. Esc goes through `cancel` (prevented, then the same path). The
+  overlay leaves the stack when closing starts (history, scroll lock, `confirm()`), like Svelte's
+  `onoutrostart`; focus returns after `close()` (the opener is inert while the dialog is modal).
+  Opening again while leaving closes it at once and reopens. `autofocus` on the component focuses
+  the dialog itself (WAI-ARIA, text-first content); otherwise the first focusable element.
+  *Why:* the ported app's sheets and modals slide/fade out; a native `<dialog>` vanished at once.
 
 ## CSS
 
@@ -290,6 +304,16 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   uncached HTML.
 - **[superseded]** Budgets in `pragma.json` (`initialJsKb`, `routeJsKb`, `cssKb`, per-route
   `budgets.routes`), checked by build and check.
+- **[firm]** (2026-11-21) Binding-only updates: the full render records which bindings read each
+  reactive (object, key) (`state.js`); a change read only by `{}`, `:attr`, `:class`, `:show` or
+  `:--name` (also through derived functions) re-runs just those bindings in the next microtask.
+  A key read by `<if>`, `<for>`, `:model`, props or components, a key not read by the last render,
+  and any change without a key (events, loads, navigation) still render the page. Page `data` is
+  read through the reactive proxy so its reads are tracked too. Measured: 60 `:--x` frames on a
+  1000-row page, 49 ms → 3 ms (full render +15% for the bookkeeping). *Why:* per-frame animations
+  (hero scroll, timeline drag, 520 ms send) walked the whole page every frame. Trade-off (same as
+  Svelte): a derived function that reads non-state values (`Date.now()`) refreshes only on a full
+  render or when state it reads changes.
 - **[firm]** Budgets removed (2026-11-21): they broke builds on every runtime growth; size is
   reported, not enforced. `pragma build` prints the JS gzip size per page. A `budgets` key in an
   older `pragma.json` is accepted and ignored.

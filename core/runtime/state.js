@@ -1,7 +1,28 @@
-// Reactive values: a deep Proxy over plain objects and arrays. Every change calls `notify`, which
-// page.js turns into one render per microtask. Functions, DOM nodes and class instances are not wrapped.
+// Reactive values: a deep Proxy over plain objects and arrays. Every change calls `notify(target, key)`,
+// which page.js turns into one render per microtask. Functions, DOM nodes and class instances are not wrapped.
 const proxies = new WeakMap(), raws = new WeakMap(), persisted = []
 let notify = () => {}
+
+// What the last full render read: per (object, key), the bindings that read it, or ANY when a block,
+// a prop or a component read it (a change there can change the page's structure).
+const ANY = 0
+let reads = new WeakMap(), reader = null
+export const readBy = r => { reader = r }
+export const forgetReads = () => { reads = new WeakMap() }
+export function readers(target, key) {
+  const r = reads.get(target)?.get(key)
+  return r === ANY ? undefined : r
+}
+
+function read(target, key) {
+  let m = reads.get(target)
+  if (!m) reads.set(target, (m = new Map()))
+  const r = m.get(key)
+  if (r === ANY) return
+  if (reader === ANY) m.set(key, ANY)
+  else if (r) r.add(reader)
+  else m.set(key, new Set([reader]))
+}
 
 export const onChange = fn => { notify = fn }
 export const raw = v => raws.get(v) ?? v
@@ -15,14 +36,16 @@ function wrappable(v) {
 const handler = {
   get(target, key, receiver) {
     const v = Reflect.get(target, key, receiver)
-    return typeof key === 'symbol' ? v : reactive(v)
+    if (typeof key === 'symbol') return v
+    if (reader !== null) read(target, key)
+    return reactive(v)
   },
   set(target, key, v) {
     const value = raw(v), had = Object.hasOwn(target, key), old = target[key]
     const desc = Object.getOwnPropertyDescriptor(target, key)
     if (desc?.get && !desc.set) throw new TypeError(`pragma: "${String(key)}" is a prop and props are read-only`)
     target[key] = value
-    if (!had || old !== value || (Array.isArray(target) && key === 'length')) notify()
+    if (!had || old !== value || (Array.isArray(target) && key === 'length')) notify(target, key)
     return true
   },
   deleteProperty(target, key) {

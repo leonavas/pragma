@@ -1,4 +1,4 @@
-<dialog class="dialog" role="alertdialog" :id="$id" :aria-label="$title">
+<dialog class="dialog" role="alertdialog" :id="$id" :aria-label="$title" :autofocus="$autofocus">
   <h2 class="text-lg font-semibold">{$title}</h2>
   <div class="mt-2 text-sm text-muted"><slot></slot></div>
   <footer class="mt-6 flex justify-end gap-2"><slot name="actions"></slot></footer>

@@ -491,6 +491,64 @@ test('performance: 1000 items with keyed diff', async () => {
   console.log(`performance (ms): create 1000 = ${r.create1000.toFixed(2)}, change 1 of 1000 (median) = ${r.change1.toFixed(2)}, swap 2 = ${r.swap2.toFixed(2)}, remove 1 = ${r.remove1.toFixed(2)}, clear = ${r.empty.toFixed(2)}`)
 })
 
+test('performance: 60 frames of a :--x value on a 1000-item page patch only what reads x', async () => {
+  const p = await open('/fast')
+  const r = await p.evaluate(async () => {
+    const flush = () => new Promise(r => queueMicrotask(r))
+    const frame = () => new Promise(r => requestAnimationFrame(r))
+    const seen = []
+    const mo = new MutationObserver(rs => seen.push(...rs))
+    mo.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true })
+    const rows = self.__rows, times = []
+    for (let i = 1; i <= 60; i++) {
+      await frame()
+      const t = performance.now()
+      __ctx.$.x = i % 30
+      await flush()
+      times.push(performance.now() - t)
+    }
+    await flush()
+    mo.disconnect()
+    return { rows: self.__rows - rows, ops: seen.length, total: times.reduce((a, b) => a + b, 0), median: times.sort((a, b) => a - b)[30] }
+  })
+  console.log(`performance (ms): 60 :--x updates on 1000 items = ${r.total.toFixed(2)} total, ${r.median.toFixed(3)} median; DOM writes = ${r.ops}`)
+  assert.equal(r.rows, 0)
+  assert.equal(r.ops, 120)
+  assert.equal(await p.$eval('#dot', el => [el.style.getPropertyValue('--x'), el.getAttribute('aria-valuenow')].join()), '0,0')
+  assert.deepEqual(p.errors, [])
+})
+
+test('binding-only changes patch the same DOM a full render would', async () => {
+  const p = await open('/fast')
+  const view = () => p.evaluate(() => ({
+    dot: [document.querySelector('#dot').style.getPropertyValue('--x'), document.querySelector('#dot').className, document.querySelector('#dot').getAttribute('aria-valuenow')],
+    label: document.querySelector('#label').textContent,
+    open: document.querySelector('#open')?.textContent ?? null,
+    first: document.querySelector('#l li').className + ':' + document.querySelector('#l li').textContent,
+    n: document.querySelectorAll('#l li').length,
+    rows: self.__rows,
+  }))
+  const step = fn => p.evaluate(async fn => { new Function('s', fn)(__ctx.$); await new Promise(r => setTimeout(r)) }, fn)
+  const rows = (await view()).rows
+
+  await step('s.x = 40')
+  assert.deepEqual(await view(), { dot: ['40', 'far', '40'], label: 'far a', open: null, first: 'done:item 0', n: 1000, rows })
+  await step("s.y = 'b'")
+  assert.equal((await view()).label, 'far b')
+  await step("s.items[0].name = 'zero'; s.items[0].done = false")
+  assert.deepEqual(await view(), { dot: ['40', 'far', '40'], label: 'far b', open: null, first: ':zero', n: 1000, rows })
+
+  await step('s.open = true; s.x = 5')
+  assert.deepEqual(await view(), { dot: ['5', '', '5'], label: 'near', open: 'x = 5', first: ':zero', n: 1000, rows: rows + 1 })
+  await step('s.x = 6')
+  assert.equal((await view()).open, 'x = 6')
+  await step("s.items.push({ id: 1000, name: 'new', done: true })")
+  assert.deepEqual([(await view()).n, (await view()).rows], [1001, rows + 2])
+  await step('s.x = 7; s.open = false')
+  assert.deepEqual([(await view()).open, (await view()).dot[0], (await view()).rows], [null, '7', rows + 3])
+  assert.deepEqual(p.errors, [])
+})
+
 test('{} text: element templates, comment markers, attribute templates and derived functions', async () => {
   const p = await open('/template')
   assert.equal(await text(p, '#hello'), 'Hello Ana, you have 2 items {literal} & more')
