@@ -138,6 +138,9 @@ pragma check --strict
 - `.github/workflows/release.yml` builds the binaries for Linux, macOS and Windows and publishes them
   to GitHub Releases with `SHA256SUMS.txt`. It runs when you push a tag `vX.Y.Z`. You can also run it
   by hand with `release: true`: the tag is then `v<version>` from `core/cli/Cargo.toml`.
+- `.github/workflows/deploy-site.yml` runs when a push to `main` changes `site/`. It builds the CLI,
+  checks and builds the site, then deploys `site/dist` to Cloudflare Workers with `wrangler`. It needs
+  the repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
 - `install.sh` and `pragma self-update` download only from GitHub Releases.
 
 ## License
