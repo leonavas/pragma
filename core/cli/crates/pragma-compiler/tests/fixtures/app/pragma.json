@@ -1,4 +1,3 @@
 {
-  "name": "test-shop",
-  "budgets": { "initialJsKb": 50, "routeJsKb": 20, "cssKb": 40 }
+  "name": "test-shop"
 }

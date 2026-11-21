@@ -1063,24 +1063,12 @@ fn heavy_app() -> App {
 }
 
 #[test]
-fn npm_bytes_count_toward_budgets() {
+fn npm_bytes_count_toward_page_size() {
     let plain = App::new();
     let base = plain.try_build("dist", Mode::Prod).unwrap().pages.iter().find(|p| p.pattern == "/").unwrap().js_gzip_bytes;
-    let app = heavy_app();
-    app.write("pragma.json", "{\n  \"name\": \"test-shop\",\n  \"budgets\": { \"initialJsKb\": 500, \"routeJsKb\": 500, \"cssKb\": 40 }\n}\n");
-    let report = app.try_build("dist", Mode::Prod).unwrap();
+    let report = heavy_app().try_build("dist", Mode::Prod).unwrap();
     let with = report.pages.iter().find(|p| p.pattern == "/").unwrap().js_gzip_bytes;
     assert!(with > base + 25_000, "{base} -> {with}");
-    app.write("pragma.json", "{\n  \"name\": \"test-shop\",\n  \"budgets\": { \"initialJsKb\": 500, \"routeJsKb\": 20, \"cssKb\": 40 }\n}\n");
-    let d = app.try_build("dist", Mode::Prod).unwrap_err();
-    assert!(d.iter().any(|x| x.rule == "app/budget" && x.message.contains("routeJsKb") && x.message.contains("in /")), "{}", show(&d));
-    assert!(!d.iter().any(|x| x.message.contains("routeJsKb") && x.message.contains("/shop")), "{}", show(&d));
-    app.write("pragma.json", "{\n  \"name\": \"test-shop\",\n  \"budgets\": { \"initialJsKb\": 30, \"routeJsKb\": 500, \"cssKb\": 40 }\n}\n");
-    let d = app.try_build("dist", Mode::Prod).unwrap_err();
-    expect(&d, "app/budget", "pragma.json", 3);
-    assert!(d.iter().any(|x| x.message.contains("initialJsKb") && x.message.contains("in /")), "{}", show(&d));
-    let report = app.try_build("dev", Mode::Dev).unwrap();
-    assert!(report.warnings.iter().any(|x| x.rule == "app/budget"), "{:?}", report.warnings);
 }
 
 #[test]

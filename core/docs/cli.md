@@ -5,8 +5,8 @@
 | `pragma -V` | Prints the installed CLI version. |
 | `pragma new <dir>` | Creates an app with the fixed structure. Warns and keeps existing files if `<dir>` is not empty. |
 | `pragma dev [--port 5180] [--host 127.0.0.1] [--cf]` | Runs the dev server with WebSocket live reload. Shows an overlay on build errors while valid pages keep working. Starts Node >= 22 when `.server.js` exists. Prints `app/core-outdated` first if `.pragma/` is older than the CLI. `--cf`: Cloudflare bindings in dev (see below). |
-| `pragma check [--strict]` | Checks JS, HTML, CSS, budgets, accessibility, and WebMCP tools. `--strict` turns warnings into errors. |
-| `pragma build [--allow-outdated-core]` | Builds `dist/`. Stops with `app/core-outdated` if `.pragma/` is older than the CLI (`--allow-outdated-core` overrides this). |
+| `pragma check [--strict]` | Checks JS, HTML, CSS, accessibility, and WebMCP tools. `--strict` turns warnings into errors. |
+| `pragma build [--allow-outdated-core]` | Builds `dist/` and prints the JS gzip size of each page (information only, no limits). Stops with `app/core-outdated` if `.pragma/` is older than the CLI (`--allow-outdated-core` overrides this). |
 | `pragma serve [--port 3000] [--host 127.0.0.1]` | Serves `dist/` as in production. |
 | `pragma upgrade` | Syncs `.pragma/` (runtime, docs, `base.css`, `version`) with the installed CLI version. Prints updated, added, or removed files. Never edits files outside `.pragma/`. |
 | `pragma self-update [version]` | Downloads the latest or specified `pragma` binary from GitHub Releases, verifies `SHA256SUMS.txt`, and replaces the executable. |
@@ -63,7 +63,6 @@ Fix the root cause; do not work around a rule.
 | `app/endpoint-json` (warning) | An endpoint answers JSON. Use `load` and actions for page data (`data.md`). |
 | `app/package` | Follow package rules (`packages.md`). |
 | `app/pragma-json` | Fix `pragma.json` (`structure.md`). |
-| `app/budget` | Reduce bundle size (`performance.md`). |
 | `app/core-outdated` (warning; error in `pragma build`) | `.pragma/` differs from the CLI version. Run `pragma upgrade`. Do not edit `.pragma/` by hand. |
 
 ## Accessibility (`a11y/*`, warnings; errors with `--strict`)

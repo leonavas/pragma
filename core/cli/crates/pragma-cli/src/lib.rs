@@ -18,7 +18,7 @@ usage:
   pragma dev [--port 5180] [--host 127.0.0.1]   dev server with live reload
              [--cf]                             (--cf: .server.js gets the root wrangler.jsonc bindings)
   pragma build [--allow-outdated-core]          build dist/ for production (stops if .pragma/ is outdated)
-  pragma check [--strict]                       check HTML, CSS, JS and budgets (--strict: warnings become errors)
+  pragma check [--strict]                       check HTML, CSS and JS (--strict: warnings become errors)
   pragma serve [--port 3000] [--host 127.0.0.1] serve dist/ as in production
   pragma upgrade                                update .pragma/ (runtime, docs, base.css) to this version
   pragma self-update [version]                  update the pragma CLI binary from GitHub Releases
@@ -181,11 +181,9 @@ fn cmd_build(allow_outdated_core: bool) -> Result<i32, String> {
 fn cmd_check(strict: bool) -> Result<i32, String> {
     let root = app_root()?;
     let mut diagnostics: Vec<_> = upgrade::outdated(&root).into_iter().collect();
-    let (found, built) = pragma_compiler::check_report(&root);
-    diagnostics.extend(found);
+    diagnostics.extend(pragma_compiler::check(&root));
     let status = check_status(&mut diagnostics, strict);
     print_diagnostics(&root, &diagnostics);
-    report::print_route_budgets(&built);
     if diagnostics.is_empty() {
         println!("no problems found");
     }

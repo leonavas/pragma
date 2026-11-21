@@ -1,6 +1,6 @@
 # Performance
 
-Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<head>`, per-route CSS (inlined in production when <= 14 kB gzip), per-page JS, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets, unused CSS stripped, and `pragma check` budgets.
+Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<head>`, per-route CSS (inlined in production when <= 14 kB gzip), per-page JS, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets, and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
 
 ## Rules
 
@@ -12,5 +12,5 @@ Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<hea
 - Omit `.js` on pages without interaction.
 - Keep heavy single-page code on that page. Load interaction-only code with `await import()` inside the action.
 - Return only displayed fields from `load`. Run independent requests with `Promise.all`.
-- Do not raise budgets in `pragma.json`; reduce code size instead. When one page must exceed them (a large editor or chat), add an explicit exception for that route only in `budgets.routes` (`structure.md`); never raise the global budget. `pragma check` and `pragma build` name the budget that applied.
+- Keep page JS small. Read the size table of `pragma build` after you add a package or a large module.
 - Do not import large modules in `lib/state/`. Do not fetch data in `mount`. Do not enable `ssr` by default.

@@ -239,7 +239,7 @@ starts at the first interaction in the live result, so hydration is never counte
 
 The client import of highlight.js is now in one place: `seo/_components/http-response` loads
 `utils/highlight.js` with `import()` in `mount` for the head tags it fetches at request time. The
-chunk is outside that page's modulepreload list and its budget.
+chunk is outside that page's modulepreload list and its page size.
 
 Measured `dist/client/assets/npm/highlight.js-*.js` (rolldown via `pragma build`; raw and gzip in
 kB = 1000 bytes, gzip level 9):
@@ -266,7 +266,7 @@ What an example page costs now (`pragma build`, dev server for the HTML):
 
 Example pages need no highlighter chunk (14.8 kB gzip less than before) and measured CLS 0 at 390
 and 1440 px (it was up to 1.83 while the code arrived after boot). Route JS per page is in the
-`pragma build` table; budgets (`initialJsKb` 15, `routeJsKb` 10, `cssKb` 15) are unchanged.
+`pragma build` table.
 
 ## SEO and Open Graph
 

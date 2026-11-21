@@ -40,10 +40,10 @@ routes/  lib/components/<name>/  lib/state/<name>.js  lib/theme.css  utils/  pub
 
 ### 1.3 `pragma.json` [verified]
 ```json
-{ "name": "my-site", "lang": "en", "budgets": { "initialJsKb": 15, "routeJsKb": 10, "cssKb": 15 } }
+{ "name": "my-site", "lang": "en", "webmcp": true }
 ```
 - `name` required (used as fallback `<title>`, OTel service name, wrangler worker name). `lang` → `<html lang>`, default `"en"`, must match `[A-Za-z0-9-]+`.
-- Budgets are optional; each omitted key = not checked. Unknown keys → `app/pragma-json` error.
+- `webmcp` default `true`. `budgets` (removed) is accepted and ignored. Other unknown keys → `app/pragma-json` error.
 
 ### 1.4 Commands
 | Command | Notes |
@@ -638,7 +638,7 @@ import { format } from 'date-fns'
 
 export const state = () => ({ formattedDate: format(new Date(2024, 0, 15), 'yyyy-MM-dd') })
 ```
-- Client packages are prebundled with rolldown: one `/assets/npm/<pkg>-<hash>.js` per package (`@date-fns/tz` → `date-fns__tz`), shared chunks `/assets/npm/_*.js`, modulepreloaded, counted in budgets. Only imported names ship; subpaths share the package entry (`date-fns/format` + `date-fns/locale`).
+- Client packages are prebundled with rolldown: one `/assets/npm/<pkg>-<hash>.js` per package (`@date-fns/tz` → `date-fns__tz`), shared chunks `/assets/npm/_*.js`, modulepreloaded, counted in the page size. Only imported names ship; subpaths share the package entry (`date-fns/format` + `date-fns/locale`).
 - CommonJS works but ships whole (`lodash/groupBy`, `dayjs` + `dayjs/plugin/relativeTime`).
 - `import * as x` / `import('pkg')` ship the whole package. Template-literal specifier → `js/import`.
 - Errors: not in `dependencies` → `js/import`; UI frameworks (React, Vue, Svelte, Solid, lit, jQuery, Alpine…) → `js/import`; TS/JSX/.vue/CSS/assets or Node built-ins on the client → `app/package`; unknown export → `js/import`; remote `https://` imports → `js/import`.
@@ -680,7 +680,7 @@ ctx.log.info('order saved', { 'order.id': ctx.params.id })
 - Prebuilt HTML per route; `load` fetch starts in `<head>`; `modulepreload` for exactly the page's static import closure (+ `core/overlay.js` only with overlays); `import()` modules not preloaded.
 - Hashed, minified modules (oxc), no app bundler; per-component modules; CSS only used classes.
 - Link prefetch (hover/focus/viewport); view transitions; uncached HTML + immutable assets; brotli/gzip in `pragma serve`.
-- Budgets (gzip kB) enforced by `check`/`build` (`app/budget`, error in prod, warning in dev). Measured: a page with no JS of its own ≈ 7.2–7.5 kB gzip total (runtime).
+- No size limits: `build` prints JS gzip per page and CSS size, information only (budgets removed). Measured: a page with no JS of its own ≈ 7.2–7.5 kB gzip total (runtime).
 - Heavy code used after an interaction: `const { parse } = await import('./heavy.js')` inside the action.
 
 ---
@@ -688,7 +688,7 @@ ctx.log.info('order saved', { 'order.id': ctx.params.id })
 ## 15. Checks: lint, a11y, structure
 JS: `js/syntax js/html-in-js js/console js/jsdoc-types js/import js/comment js/vague-name js/ctx`.
 HTML: `html/syntax html/comment html/legacy-syntax html/unknown-directive html/invalid-path html/invalid-root html/block html/block-single-root html/for-without-key html/misplaced-else html/misplaced-empty html/outside-template html/unknown-action html/component html/unknown-component html/layout html/title html/script html/style-inline html/on-inline`.
-CSS: `css/syntax css/comment css/unknown-class css/arbitrary-value`. App: `app/structure app/route-conflict app/package app/pragma-json app/budget`.
+CSS: `css/syntax css/comment css/unknown-class css/arbitrary-value`. App: `app/structure app/route-conflict app/package app/pragma-json`.
 A11y warnings (errors with `--strict`), on the expanded page: `a11y/img-alt`, `a11y/accessible-name` (text, `:text`, `aria-label`, `aria-labelledby`, `title`, img alt, labelled svg), `a11y/label` (`<label for>`, wrapping `<label>`, `aria-label(ledby)`; `hidden submit reset button image` exempt), `a11y/dialog-name`, `a11y/click-non-interactive` (`@click` on non-interactive needs static `role` + `tabindex`), `a11y/heading`, `a11y/single-h1` (if/else branches separate), `a11y/tabindex` (>0), `a11y/duplicate-id`, `a11y/iframe-title`, `a11y/a-no-href`. `:<attr>` counts as the attribute.
 Example output [verified]:
 ```

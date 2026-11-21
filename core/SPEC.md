@@ -39,7 +39,7 @@ core/
 ```
 <app>/
   AGENTS.md            agent rules (CLAUDE.md points to it)
-  pragma.json          config: { "name", "lang", "webmcp", "budgets": { "initialJsKb", "routeJsKb", "cssKb" } }
+  pragma.json          config: { "name", "lang", "webmcp" } ("budgets" from older apps is ignored)
                        "webmcp": true (default when absent) | false (§3.1)
   routes/
     _layout.html       root layout; contains <main data-page><slot></slot></main>
@@ -478,9 +478,8 @@ dist/
   modulepreloaded like app modules (`docs/packages.md`).
 - Dev build adds `<script>self.__pragmaDev=true</script>` to `<head>` (path and action errors in dev).
 - `index.html` is not cached; hashed assets are `immutable`.
-- `pragma.json` budgets checked at the end of the build. `budgets.routes["/app/[id]"]` (same keys)
-  replaces the global limits it sets for that page only; a key that matches no page is
-  `app/pragma-json`; the `app/budget` message and the build/check summary name the budget used.
+- The build prints the JS gzip size of each page and the largest CSS size. Information only: no
+  size limits, no size errors or warnings.
 - Server WebAssembly: a `.wasm` imported by the server graph (project file, or a package export
   that resolves to `.wasm`, its specifier rewritten to the copy) is copied to `dist/server/`
   (`node_modules/x` → `npm/x`); `wrangler.jsonc` gets `rules: [{ type: "CompiledWasm", globs:
@@ -517,7 +516,6 @@ Errors with file:line:column, rule and message.
   wrongly bound head tags (`html/head`, §5.1); `<script>` with `src` or attributes, two
   `<script>`s, or one that is not at the top level of a page or component (`html/script`).
 - CSS: unknown class; arbitrary value.
-- Budgets (builds in a temp dir).
 - `core/` version: warning `app/core-outdated` when the app's `core/` is not byte-equal to the
   runtime, docs and `base.css` embedded in the binary (a file changed, missing or extra); fix
   with `pragma upgrade` (§11).

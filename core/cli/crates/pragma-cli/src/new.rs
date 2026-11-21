@@ -81,7 +81,7 @@ fn rename(json: &[u8], name: &str) -> Vec<u8> {
 mod tests {
     #[test]
     fn renames_only_name_value() {
-        let out = super::rename(b"{\n  \"name\": \"starter\",\n  \"budgets\": {}\n}", "my \"shop\"");
-        assert_eq!(String::from_utf8(out).unwrap(), "{\n  \"name\": \"my \\\"shop\\\"\",\n  \"budgets\": {}\n}");
+        let out = super::rename(b"{\n  \"name\": \"starter\",\n  \"lang\": \"en\"\n}", "my \"shop\"");
+        assert_eq!(String::from_utf8(out).unwrap(), "{\n  \"name\": \"my \\\"shop\\\"\",\n  \"lang\": \"en\"\n}");
     }
 }

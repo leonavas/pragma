@@ -21,8 +21,8 @@ and every form is a tool an agent can call.
 - **Native.** A page or a component is one `.html` file: markup, `<script>` and `<style>`. No JSX, no
   virtual DOM, no client framework.
 - **Closed.** One way to do each thing. Anything outside the syntax is a build error, not a convention.
-- **Small.** The starter page loads 10.0 kB of JavaScript (gzip), router and runtime included. Budgets
-  in `pragma.json` fail the build when a page grows.
+- **Small.** The starter page loads 10.0 kB of JavaScript (gzip), router and runtime included.
+  `pragma build` prints the JS size of each page.
 - **Agent-first.** Every app ships with `AGENTS.md` and its docs. `pragma check` answers with file,
   line, column, rule and fix. Every `<form>` is a WebMCP tool, and a page can answer in markdown.
 - **One binary.** The CLI compiles, checks, serves and bundles npm packages. No Vite, no esbuild, no
@@ -99,7 +99,7 @@ text.
 |---|---|
 | `pragma new <dir>` | Creates an app with the fixed structure. |
 | `pragma dev` | Runs the dev server with live reload (port 5180). |
-| `pragma check [--strict]` | Checks JS, HTML, CSS, budgets, accessibility and WebMCP tools. |
+| `pragma check [--strict]` | Checks JS, HTML, CSS, accessibility and WebMCP tools. |
 | `pragma build` | Builds `dist/`. |
 | `pragma serve` | Serves `dist/` as in production (port 3000). |
 | `pragma upgrade` | Syncs `.pragma/` in an app with the installed CLI version. |

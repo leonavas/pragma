@@ -68,7 +68,7 @@ A request for `/` or `/agents` with `Accept: text/markdown` gets the markdown fi
 - [Utility classes](https://pragma.leonavas.com/docs/classes.md): every utility class
 - [WebMCP: forms are agent tools](https://pragma.leonavas.com/docs/webmcp.md): forms as WebMCP tools, markdown for agents
 - [npm packages](https://pragma.leonavas.com/docs/packages.md): npm packages: when and which
-- [Performance](https://pragma.leonavas.com/docs/performance.md): performance defaults and budgets
+- [Performance](https://pragma.leonavas.com/docs/performance.md): performance defaults and the size report
 - [Logs](https://pragma.leonavas.com/docs/logs.md): OpenTelemetry logs
 - [pragma CLI](https://pragma.leonavas.com/docs/cli.md): commands, self-update, upgrade, check rules, deploy
 

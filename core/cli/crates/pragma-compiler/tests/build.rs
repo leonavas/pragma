@@ -717,9 +717,10 @@ fn arbitrary_value() {
 }
 
 #[test]
-fn budget_exceeded() {
-    let cfg = "{\n  \"name\": \"x\",\n  \"budgets\": {\n    \"initialJsKb\": 0.1\n  }\n}\n";
-    expect(&check_with(&[("pragma.json", Some(cfg))]), "app/budget", "pragma.json", 4);
+fn legacy_budgets_key_is_ignored() {
+    let cfg = "{\n  \"name\": \"x\",\n  \"budgets\": {\n    \"initialJsKb\": 0.1,\n    \"cssKb\": 0.1,\n    \"routes\": { \"/nope\": { \"jsKb\": 1 } }\n  }\n}\n";
+    let d = check_with(&[("pragma.json", Some(cfg))]);
+    assert!(d.is_empty(), "{d:#?}");
 }
 
 #[test]
@@ -1485,7 +1486,7 @@ fn webmcp_disabled_in_pragma_json() {
 }
 
 #[test]
-fn per_route_css_splitting_and_budget() {
+fn per_route_css_splitting() {
     let t = scratch(&[
         ("routes/_layout.html", "<header class=\"p-4\">Nav</header><main data-page><slot></slot></main>"),
         ("routes/index.html", "<title>Home</title><h1 class=\"text-2xl font-bold\">Home</h1>"),
@@ -1499,10 +1500,6 @@ fn per_route_css_splitting_and_budget() {
     assert!(index.contains("data-pragma-route-css>"), "route with page-only classes gets route CSS: {index}");
     assert!(!plain.contains("data-pragma-route-css"), "route with no extra CSS skips route CSS: {plain}");
     assert!(!out.join("client/assets/css/plain.css").exists());
-    // cssKb budget checks shared + route CSS per page
-    fs::write(app.join("pragma.json"), "{\n  \"name\": \"tpl\",\n  \"budgets\": { \"cssKb\": 0.1 }\n}\n").unwrap();
-    let d = check(&app);
-    assert!(d.iter().any(|x| x.rule == "app/budget" && x.message.contains("cssKb exceeded in /")), "{d:#?}");
 }
 
 #[test]
@@ -1829,28 +1826,4 @@ fn workers_modules_stay_external_in_server_code() {
     assert!(fs::read_to_string(out.join("server/routes/shop/[id].server.js")).unwrap().contains("from 'cloudflare:workers'"));
     let src = "import { env } from 'cloudflare:workers'\nlet open = false\nlet items = []\nfunction toggle() { return env }\n";
     expect(&check_with(&[("routes/index.js", Some(src))]), "app/package", "routes/index.js", 1);
-}
-
-#[test]
-fn route_budget_replaces_the_global_one_for_that_page() {
-    let cfg = "{\n  \"name\": \"x\",\n  \"budgets\": {\n    \"initialJsKb\": 0.1,\n    \"routes\": {\n      \"/shop/[id]\": { \"initialJsKb\": 500 },\n      \"/\": { \"initialJsKb\": 0.05 }\n    }\n  }\n}\n";
-    let t = app_with(&[("pragma.json", Some(cfg))]);
-    let (d, report) = pragma_compiler::check_report(&t.0.join("app"));
-    expect(&d, "app/budget", "pragma.json", 4);
-    expect(&d, "app/budget", "pragma.json", 7);
-    let budget: Vec<&str> = d.iter().filter(|x| x.rule == "app/budget").map(|x| x.message.as_str()).collect();
-    assert!(budget.iter().any(|m| m.contains("exceeded in /:") && m.ends_with("> 0.05 kB (budgets.routes \"/\")")), "{budget:?}");
-    assert!(!budget.iter().any(|m| m.contains("/shop/:id")), "{budget:?}");
-    let shop = report.pages.iter().find(|p| p.pattern == "/shop/:id").unwrap();
-    assert_eq!(shop.budget.as_deref(), Some("/shop/[id]"));
-    assert!(report.pages.iter().find(|p| p.pattern == "/blog/:slug").unwrap().budget.is_none());
-}
-
-#[test]
-fn route_budget_must_name_a_page_and_known_keys() {
-    let cfg = "{\n  \"name\": \"x\",\n  \"budgets\": {\n    \"routes\": {\n      \"/nope/[id]\": { \"initialJsKb\": 80 },\n      \"/shop/[id]\": { \"jsKb\": 80 },\n      \"shop\": { \"cssKb\": 1 }\n    }\n  }\n}\n";
-    let d = check_with(&[("pragma.json", Some(cfg))]);
-    expect(&d, "app/pragma-json", "pragma.json", 5);
-    expect(&d, "app/pragma-json", "pragma.json", 6);
-    expect(&d, "app/pragma-json", "pragma.json", 7);
 }

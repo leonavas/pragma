@@ -19,7 +19,7 @@ const topics = [
   { id: 'classes', summary: 'every utility class' },
   { id: 'webmcp', summary: 'forms as WebMCP tools, markdown for agents' },
   { id: 'packages', summary: 'npm packages: when and which' },
-  { id: 'performance', summary: 'performance defaults and budgets' },
+  { id: 'performance', summary: 'performance defaults and the size report' },
   { id: 'logs', summary: 'OpenTelemetry logs' },
   { id: 'cli', summary: 'commands, self-update, upgrade, check rules, deploy' },
 ]

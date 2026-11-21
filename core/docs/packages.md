@@ -22,7 +22,7 @@ let today = format(new Date(), 'PPP')
 
 - Use a quoted module specifier; do not use template literals.
 - Import named exports from the index or a subpath. The build tree-shakes each ES module package.
-- Each package outputs `/assets/npm/<package>-<hash>.js` (`@date-fns/tz` -> `date-fns__tz`) with `modulepreload`. Shared chunks go to `/assets/npm/_*.js`. Package size counts toward page budgets.
+- Each package outputs `/assets/npm/<package>-<hash>.js` (`@date-fns/tz` -> `date-fns__tz`) with `modulepreload`. Shared chunks go to `/assets/npm/_*.js`. Package size counts in the page JS size that `pragma build` prints.
 - Avoid `import * as x from 'pkg'` and `import('pkg')` when possible; they bundle the whole package.
 - `process.env.NODE_ENV` evaluates to `"production"` in build and `"development"` in dev.
 

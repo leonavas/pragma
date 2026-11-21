@@ -59,7 +59,7 @@ pragma upgrade
 - [Utility classes](https://pragma.leonavas.com/docs/classes.md): every utility class
 - [WebMCP: forms are agent tools](https://pragma.leonavas.com/docs/webmcp.md): forms as WebMCP tools, markdown for agents
 - [npm packages](https://pragma.leonavas.com/docs/packages.md): npm packages: when and which
-- [Performance](https://pragma.leonavas.com/docs/performance.md): performance defaults and budgets
+- [Performance](https://pragma.leonavas.com/docs/performance.md): performance defaults and the size report
 - [Logs](https://pragma.leonavas.com/docs/logs.md): OpenTelemetry logs
 - [pragma CLI](https://pragma.leonavas.com/docs/cli.md): commands, self-update, upgrade, check rules, deploy
 
@@ -159,7 +159,7 @@ The folder structure is fixed. Do not create other top-level folders. Do not edi
 ```
 <app>/
   AGENTS.md  CLAUDE.md
-  pragma.json              { "name": "app", "lang": "en", "webmcp": true, "budgets": { "initialJsKb": 15, "routeJsKb": 10, "cssKb": 15 } }
+  pragma.json              { "name": "app", "lang": "en", "webmcp": true }
   package.json             optional: npm packages in dependencies (packages.md)
   routes/
     _layout.html  _404.html
@@ -189,8 +189,6 @@ The folder structure is fixed. Do not create other top-level folders. Do not edi
 - `name` is required.
 - `lang` sets `<html lang>` (default `"en"`).
 - `webmcp` (default `true`) turns every `<form>` into an agent tool and enables `webmcp/*` rules (`webmcp.md`).
-- `budgets` sets gzip kB limits: `initialJsKb` (all JS loaded by a page), `routeJsKb` (page JS outside `.pragma/`), `cssKb` (global CSS).
-- `budgets.routes` sets limits for one page only; the keys it sets replace the global ones for that page: `"routes": { "/app/[id]": { "initialJsKb": 80, "cssKb": 30 } }`. The key is the route path (`[param]` as in the file name) and must match a page.
 
 ## `.pragma/` versioning
 
@@ -1504,7 +1502,7 @@ let today = format(new Date(), 'PPP')
 
 - Use a quoted module specifier; do not use template literals.
 - Import named exports from the index or a subpath. The build tree-shakes each ES module package.
-- Each package outputs `/assets/npm/<package>-<hash>.js` (`@date-fns/tz` -> `date-fns__tz`) with `modulepreload`. Shared chunks go to `/assets/npm/_*.js`. Package size counts toward page budgets.
+- Each package outputs `/assets/npm/<package>-<hash>.js` (`@date-fns/tz` -> `date-fns__tz`) with `modulepreload`. Shared chunks go to `/assets/npm/_*.js`. Package size counts in the page JS size that `pragma build` prints.
 - Avoid `import * as x from 'pkg'` and `import('pkg')` when possible; they bundle the whole package.
 - `process.env.NODE_ENV` evaluates to `"production"` in build and `"development"` in dev.
 
@@ -1578,7 +1576,7 @@ Source: https://pragma.leonavas.com/docs/performance.md
 
 # Performance
 
-Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<head>`, per-route CSS (inlined in production when <= 14 kB gzip), per-page JS, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets, unused CSS stripped, and `pragma check` budgets.
+Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<head>`, per-route CSS (inlined in production when <= 14 kB gzip), per-page JS, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets, and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
 
 ## Rules
 
@@ -1590,7 +1588,7 @@ Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<hea
 - Omit `.js` on pages without interaction.
 - Keep heavy single-page code on that page. Load interaction-only code with `await import()` inside the action.
 - Return only displayed fields from `load`. Run independent requests with `Promise.all`.
-- Do not raise budgets in `pragma.json`; reduce code size instead. When one page must exceed them (a large editor or chat), add an explicit exception for that route only in `budgets.routes` (`structure.md`); never raise the global budget. `pragma check` and `pragma build` name the budget that applied.
+- Keep page JS small. Read the size table of `pragma build` after you add a package or a large module.
 - Do not import large modules in `lib/state/`. Do not fetch data in `mount`. Do not enable `ssr` by default.
 
 ---
@@ -1648,8 +1646,8 @@ Source: https://pragma.leonavas.com/docs/cli.md
 | `pragma -V` | Prints the installed CLI version. |
 | `pragma new <dir>` | Creates an app with the fixed structure. Warns and keeps existing files if `<dir>` is not empty. |
 | `pragma dev [--port 5180] [--host 127.0.0.1] [--cf]` | Runs the dev server with WebSocket live reload. Shows an overlay on build errors while valid pages keep working. Starts Node >= 22 when `.server.js` exists. Prints `app/core-outdated` first if `.pragma/` is older than the CLI. `--cf`: Cloudflare bindings in dev (see below). |
-| `pragma check [--strict]` | Checks JS, HTML, CSS, budgets, accessibility, and WebMCP tools. `--strict` turns warnings into errors. |
-| `pragma build [--allow-outdated-core]` | Builds `dist/`. Stops with `app/core-outdated` if `.pragma/` is older than the CLI (`--allow-outdated-core` overrides this). |
+| `pragma check [--strict]` | Checks JS, HTML, CSS, accessibility, and WebMCP tools. `--strict` turns warnings into errors. |
+| `pragma build [--allow-outdated-core]` | Builds `dist/` and prints the JS gzip size of each page (information only, no limits). Stops with `app/core-outdated` if `.pragma/` is older than the CLI (`--allow-outdated-core` overrides this). |
 | `pragma serve [--port 3000] [--host 127.0.0.1]` | Serves `dist/` as in production. |
 | `pragma upgrade` | Syncs `.pragma/` (runtime, docs, `base.css`, `version`) with the installed CLI version. Prints updated, added, or removed files. Never edits files outside `.pragma/`. |
 | `pragma self-update [version]` | Downloads the latest or specified `pragma` binary from GitHub Releases, verifies `SHA256SUMS.txt`, and replaces the executable. |
@@ -1706,7 +1704,6 @@ Fix the root cause; do not work around a rule.
 | `app/endpoint-json` (warning) | An endpoint answers JSON. Use `load` and actions for page data (`data.md`). |
 | `app/package` | Follow package rules (`packages.md`). |
 | `app/pragma-json` | Fix `pragma.json` (`structure.md`). |
-| `app/budget` | Reduce bundle size (`performance.md`). |
 | `app/core-outdated` (warning; error in `pragma build`) | `.pragma/` differs from the CLI version. Run `pragma upgrade`. Do not edit `.pragma/` by hand. |
 
 ## Accessibility (`a11y/*`, warnings; errors with `--strict`)

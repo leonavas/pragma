@@ -39,8 +39,6 @@ pub struct BuildOptions {
 pub struct PageReport {
     pub pattern: String,
     pub js_gzip_bytes: u64,
-    /// `budgets.routes` key whose limits replace the global ones for this page.
-    pub budget: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -61,16 +59,11 @@ pub fn build(opts: &BuildOptions) -> Result<BuildReport, Vec<Diagnostic>> {
 }
 
 pub fn check(root: &Path) -> Vec<Diagnostic> {
-    check_report(root).0
-}
-
-/// `check` plus the build report (sizes and which budget each page used).
-pub fn check_report(root: &Path) -> (Vec<Diagnostic>, BuildReport) {
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
     let out_dir = std::env::temp_dir().join(format!("pragma-check-{}-{nanos}", std::process::id()));
-    let result = run(&BuildOptions { root: root.to_path_buf(), out_dir: out_dir.clone(), mode: Mode::Prod });
+    let (diags, _) = run(&BuildOptions { root: root.to_path_buf(), out_dir: out_dir.clone(), mode: Mode::Prod });
     let _ = fs::remove_dir_all(&out_dir);
-    result
+    diags
 }
 
 pub(crate) struct Fnv(u64);
@@ -471,9 +464,6 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let mut p = Project::load(&opts.root);
     let mut diags = std::mem::take(&mut p.diags);
     let mut report = BuildReport::default();
-    for r in p.config.route_budgets.iter().filter(|r| !p.pages.iter().any(|pg| pg.pattern == r.pattern)) {
-        diags.push(Diagnostic::error("pragma.json", r.line, 1, "app/pragma-json", format!("budgets.routes \"{}\" matches no page (use the route path, such as \"/app/[id]\")", r.key)));
-    }
 
     let mut sources: HashMap<PathBuf, String> = HashMap::new();
     for f in &p.js_files {
@@ -901,23 +891,11 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         w.write_client(&format!("client{html_url}"), doc.as_bytes(), prod);
 
         let initial: u64 = modules.iter().map(|m| gz.get(m).copied().unwrap_or(0)).sum();
-        let route_only: u64 = modules
-            .iter()
-            .filter(|m| {
-                let s = rel_str(m);
-                !s.starts_with(".pragma/") && !s.starts_with("core/")
-            })
-            .map(|m| gz.get(m).copied().unwrap_or(0))
-            .sum();
         let total_css_gz = shared_css_gz + route_css_gz;
         report.css_gzip_bytes = report.css_gzip_bytes.max(total_css_gz);
         if !o.is_404 {
             manifest.push(json!({ "pattern": o.page.pattern, "html": html_url, "modules": module_urls, "loader": o.loader, "ssr": o.ssr }));
-            let route_budget = p.config.route_budgets.iter().find(|r| r.pattern == o.page.pattern);
-            report.pages.push(PageReport { pattern: o.page.pattern.clone(), js_gzip_bytes: initial, budget: route_budget.map(|r| r.key.clone()) });
-            budget(&p, "initialJsKb", route_budget, initial, &o.page.pattern, &mut diags);
-            budget(&p, "routeJsKb", route_budget, route_only, &o.page.pattern, &mut diags);
-            budget(&p, "cssKb", route_budget, total_css_gz, &o.page.pattern, &mut diags);
+            report.pages.push(PageReport { pattern: o.page.pattern.clone(), js_gzip_bytes: initial });
         }
         if let Some(server) = &o.page.server {
             let mut ssr_scripts = SsrScripts::default();
@@ -938,9 +916,6 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             };
             server_routes.push((o.page.pattern.clone(), server.clone(), o.ssr, template, shell, ssr_scripts));
         }
-    }
-    if outs.iter().all(|o| o.is_404) {
-        budget(&p, "cssKb", None, shared_css_gz, "global CSS", &mut diags);
     }
     w.write_client("client/_pragma/manifest.json", serde_json::to_string_pretty(&Value::Array(manifest)).unwrap().as_bytes(), prod);
 
@@ -1080,11 +1055,6 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     for d in ["client", "server", "templates"] {
         w.prune(&opts.out_dir.join(d));
     }
-    if !prod {
-        for d in diags.iter_mut().filter(|d| d.rule == "app/budget") {
-            d.severity = Severity::Warning;
-        }
-    }
     for d in &mut diags {
         d.file = p.origin(&d.file).to_path_buf();
     }
@@ -1124,20 +1094,4 @@ fn base64(bytes: &[u8]) -> String {
         }
     }
     out
-}
-
-/// A page's limit comes from its `budgets.routes` entry when that entry sets the key, else from the
-/// global budget.
-fn budget(p: &Project, key: &'static str, route: Option<&project::RouteBudget>, bytes: u64, what: &str, diags: &mut Vec<Diagnostic>) {
-    let (limit, line, source) = match route.and_then(|r| r.budgets.get(key).map(|limit| (limit, r))) {
-        Some((limit, r)) => (limit, r.line, format!(" (budgets.routes \"{}\")", r.key)),
-        None => {
-            let Some(limit) = p.config.budgets.get(key) else { return };
-            (limit, p.config.budget_lines.get(key).copied().unwrap_or(1), String::new())
-        }
-    };
-    let kb = bytes as f64 / 1024.0;
-    if kb > limit {
-        diags.push(Diagnostic::error("pragma.json", line, 1, "app/budget", format!("{key} exceeded in {what}: {kb:.1} kB gzip > {limit} kB{source}")));
-    }
 }

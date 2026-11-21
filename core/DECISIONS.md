@@ -288,11 +288,11 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   per-component modules, all `modulepreload`ed (SPEC §9).
 - **[firm v0]** No bundler: each module minified (oxc) and hashed; `immutable` assets;
   uncached HTML.
-- **[firm v0]** Budgets in `pragma.json` (`initialJsKb`, `routeJsKb`, `cssKb`), checked by
-  build and check. Reference ceiling: 7.2 to 8.2 kB gzip total JS in the `tests_1` natives.
-- **[firm]** Budget exceptions are explicit per route: `budgets.routes["/app/[id]"]` overrides
-  only the keys it sets, only for that page, and the report names it. *Why:* a large page (chat,
-  schedule editor) must not raise the limit for every other page.
+- **[superseded]** Budgets in `pragma.json` (`initialJsKb`, `routeJsKb`, `cssKb`, per-route
+  `budgets.routes`), checked by build and check.
+- **[firm]** Budgets removed (2026-11-21): they broke builds on every runtime growth; size is
+  reported, not enforced. `pragma build` prints the JS gzip size per page. A `budgets` key in an
+  older `pragma.json` is accepted and ignored.
 - **[superseded]** Per-route chunks with a bundler and chunk manifest: v0 uses loose modules
   and the `/_pragma/manifest.json` manifest.
 
@@ -309,7 +309,7 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   minified in prod, `process.env.NODE_ENV` replaced, shared chunks). Output: one
   `/assets/npm/<package>-<hash>.js` per package (`@date-fns/tz` → `date-fns__tz`), chunks in
   `/assets/npm/_*`; the app import is rewritten to that URL and counts toward `modulepreload`
-  and budget. Subpaths of a package share its entry; a name repeated across subpaths (or
+  and page size. Subpaths of a package share its entry; a name repeated across subpaths (or
   `* as`/`import()` of a subpath) is re-exported as `$N$name` and the app import rewritten to
   `{ $N$name as name }`. CommonJS works (rolldown converts it). TS, JSX, `.vue`, imported
   CSS/assets and Node modules remain `app/package` errors; a name the package doesn't export
@@ -384,7 +384,7 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - **[firm]** Rust app to run locally, build and check: `pragma new`, `dev`, `build`, `check`,
   `serve`, `upgrade`, single binary. *Why:* best JS/CSS ecosystem (oxc, lightningcss), memory safety and
   single binary; Go and C++ discarded.
-- **[firm]** `pragma check` validates everything: JS, HTML, directives, CSS and budgets (SPEC
+- **[firm]** `pragma check` validates everything: JS, HTML, directives and CSS (SPEC
   §10). Confirmed by the author (2026-11-18).
 - **[firm]** `check` emits accessibility warnings (non-blocking; `--strict` makes them errors):
   img without alt, control without accessible name, input without label, dialog without name,
@@ -463,9 +463,8 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 
 - [ ] Better test app (replaces the removed `meu-app`): a todo app exercising every concept
       (routes and params, components and slots, state and stores, loader and SSR, server
-      actions, overlays, npm packages, a11y, budgets).
+      actions, overlays, npm packages, a11y).
 - [ ] `db`, `kv` and `files` interfaces over `env`.
-- [ ] Default budget values in `pragma.json`.
 - [ ] Publishing: release pipeline (cargo-dist), per-platform npm packages,
       provenance/attestations and signed checksums (see "Tool (Rust CLI)").
 - [ ] Bundler for app modules after v0 (`rolldown` already bundles npm packages), and whether

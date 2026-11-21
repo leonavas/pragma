@@ -1,15 +1,5 @@
 {
   "name": "pragma",
   "lang": "en",
-  "webmcp": true,
-  "budgets": {
-    "initialJsKb": 16,
-    "routeJsKb": 10,
-    "cssKb": 25,
-    "routes": {
-      "/examples/packages": {
-        "initialJsKb": 18
-      }
-    }
-  }
+  "webmcp": true
 }

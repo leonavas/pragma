@@ -94,7 +94,7 @@ Braces put a value in text, a colon binds an attribute, a dot a class, an at sig
 
 ### Small
 
-The starter page loads 10.0 kB of JavaScript, gzip, router and runtime included. Each page preloads only the modules it imports, and budgets in pragma.json fail the build when a page grows.
+The starter page loads 10.0 kB of JavaScript, gzip, router and runtime included. Each page preloads only the modules it imports, and pragma build prints the JS size of each page.
 
 ```
 page     JS gzip

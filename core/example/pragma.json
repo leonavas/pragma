@@ -1,6 +1,5 @@
 {
   "name": "minimart",
   "lang": "en",
-  "webmcp": true,
-  "budgets": { "initialJsKb": 15, "routeJsKb": 5, "cssKb": 10 }
+  "webmcp": true
 }

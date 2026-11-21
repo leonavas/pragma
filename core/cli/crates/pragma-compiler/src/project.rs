@@ -5,63 +5,11 @@ use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Default, Clone)]
-pub struct Budgets {
-    pub initial_js_kb: Option<f64>,
-    pub route_js_kb: Option<f64>,
-    pub css_kb: Option<f64>,
-}
-
-impl Budgets {
-    pub fn get(&self, key: &str) -> Option<f64> {
-        match key {
-            "initialJsKb" => self.initial_js_kb,
-            "routeJsKb" => self.route_js_kb,
-            "cssKb" => self.css_kb,
-            _ => None,
-        }
-    }
-
-    fn set(&mut self, key: &str, n: f64) {
-        match key {
-            "initialJsKb" => self.initial_js_kb = Some(n),
-            "routeJsKb" => self.route_js_kb = Some(n),
-            _ => self.css_kb = Some(n),
-        }
-    }
-}
-
-/// `budgets.routes["/app/[id]"]`: limits that replace the global ones for that page only.
-#[derive(Debug, Clone)]
-pub struct RouteBudget {
-    /// As written in pragma.json.
-    pub key: String,
-    /// Route pattern (`/app/:id`).
-    pub pattern: String,
-    pub budgets: Budgets,
-    pub line: u32,
-}
-
 #[derive(Debug, Default)]
 pub struct Config {
     pub name: String,
     pub lang: String,
     pub webmcp: bool,
-    pub budgets: Budgets,
-    pub budget_lines: HashMap<&'static str, u32>,
-    pub route_budgets: Vec<RouteBudget>,
-}
-
-const BUDGET_KEYS: [&str; 3] = ["initialJsKb", "routeJsKb", "cssKb"];
-
-/// `/app/[id]/` -> `/app/:id`.
-pub fn route_pattern(key: &str) -> String {
-    let segments: Vec<String> = key
-        .split('/')
-        .filter(|seg| !seg.is_empty())
-        .map(|seg| seg.strip_prefix('[').and_then(|x| x.strip_suffix(']')).map_or_else(|| seg.to_string(), |name| format!(":{name}")))
-        .collect();
-    format!("/{}", segments.join("/"))
 }
 
 #[derive(Debug, Clone)]
@@ -326,36 +274,6 @@ impl Project {
         p
     }
 
-    fn load_route_budgets(&mut self, routes: &serde_json::Value, line_of: &impl Fn(&str) -> u32) {
-        let Some(routes) = routes.as_object() else {
-            self.err("pragma.json", line_of("routes"), 1, "app/pragma-json", "\"budgets.routes\" must be an object: { \"/app/[id]\": { \"initialJsKb\": 80 } }");
-            return;
-        };
-        for (route, limits) in routes {
-            let line = line_of(route);
-            if !route.starts_with('/') {
-                self.err("pragma.json", line, 1, "app/pragma-json", format!("budget route \"{route}\" must start with / (\"/app/[id]\")"));
-                continue;
-            }
-            let Some(limits) = limits.as_object() else {
-                self.err("pragma.json", line, 1, "app/pragma-json", format!("budgets.routes \"{route}\" must be an object such as {{ \"initialJsKb\": 80 }}"));
-                continue;
-            };
-            let mut budgets = Budgets::default();
-            for (bk, bv) in limits {
-                let Some(key) = BUDGET_KEYS.into_iter().find(|k| k == bk) else {
-                    self.err("pragma.json", line, 1, "app/pragma-json", format!("unknown budget \"{bk}\" in budgets.routes \"{route}\" (use initialJsKb, routeJsKb, cssKb)"));
-                    continue;
-                };
-                match bv.as_f64() {
-                    Some(n) => budgets.set(key, n),
-                    None => self.err("pragma.json", line, 1, "app/pragma-json", format!("\"{key}\" in budgets.routes \"{route}\" must be a number")),
-                }
-            }
-            self.config.route_budgets.push(RouteBudget { key: route.clone(), pattern: route_pattern(route), budgets, line });
-        }
-    }
-
     fn load_config(&mut self) {
         let Some(src) = self.read(Path::new("pragma.json")) else {
             self.err("pragma.json", 1, 1, "app/pragma-json", "pragma.json not found");
@@ -390,33 +308,10 @@ impl Project {
                     Some(b) => self.config.webmcp = b,
                     None => self.err("pragma.json", line_of("webmcp"), 1, "app/pragma-json", "\"webmcp\" must be true or false"),
                 },
-                "budgets" => {
-                    let Some(b) = val.as_object() else {
-                        self.err("pragma.json", line_of("budgets"), 1, "app/pragma-json", "\"budgets\" must be an object");
-                        continue;
-                    };
-                    for (bk, bv) in b {
-                        if bk == "routes" {
-                            self.load_route_budgets(bv, &line_of);
-                            continue;
-                        }
-                        let Some(key) = BUDGET_KEYS.into_iter().find(|k| k == bk) else {
-                            let l = line_of(bk);
-                            self.err("pragma.json", l, 1, "app/pragma-json", format!("unknown budget \"{bk}\" (use initialJsKb, routeJsKb, cssKb, routes)"));
-                            continue;
-                        };
-                        let l = line_of(key);
-                        let Some(n) = bv.as_f64() else {
-                            self.err("pragma.json", l, 1, "app/pragma-json", format!("\"{key}\" must be a number"));
-                            continue;
-                        };
-                        self.config.budget_lines.insert(key, l);
-                        self.config.budgets.set(key, n);
-                    }
-                }
+                "budgets" => {}
                 _ => {
                     let l = line_of(k);
-                    self.err("pragma.json", l, 1, "app/pragma-json", format!("unknown key \"{k}\" (use name, lang, webmcp, budgets)"));
+                    self.err("pragma.json", l, 1, "app/pragma-json", format!("unknown key \"{k}\" (use name, lang, webmcp)"));
                 }
             }
         }

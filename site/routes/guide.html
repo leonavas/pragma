@@ -19,7 +19,7 @@
       <li><a href="#structure">Project structure</a></li>
       <li><a href="#develop">Develop</a></li>
       <li><a href="#check">Check</a></li>
-      <li><a href="#budgets">Performance budgets</a></li>
+      <li><a href="#performance">Performance</a></li>
       <li><a href="#build">Build</a></li>
       <li><a href="#deploy">Serve and deploy</a></li>
       <li><a href="#internals">Under the hood</a></li>
@@ -46,7 +46,7 @@ usage:
   pragma new &lt;dir&gt;                              create an app in &lt;dir&gt; (empty or missing)
   pragma dev [--port 5180] [--host 127.0.0.1]   dev server with live reload
   pragma build                                  build dist/ for production
-  pragma check [--strict]                       check HTML, CSS, JS and budgets (--strict: warnings become errors)
+  pragma check [--strict]                       check HTML, CSS and JS (--strict: warnings become errors)
   pragma serve [--port 3000] [--host 127.0.0.1] serve dist/ as in production
   pragma upgrade                                update .pragma/ (runtime, docs, base.css, version) to this version
   pragma self-update [version]                  update the pragma CLI binary from GitHub Releases
@@ -108,7 +108,7 @@ app created in my-app (41 files)
           <p>The layout is fixed, so there is nothing to configure and only one place for each thing. The files below are exactly what <code>pragma new</code> creates, minus <code>.pragma/</code>.</p>
         </div>
         <c-terminal title="my-app/">
-          <pre tabindex="0" aria-label="Files of a new app"><code><span class="term-ink">pragma.json</span>               name, lang and budgets
+          <pre tabindex="0" aria-label="Files of a new app"><code><span class="term-ink">pragma.json</span>               name, lang and webmcp
 <span class="term-ink">AGENTS.md</span>  CLAUDE.md      rules for coding agents
 <span class="term-ink">routes/</span>
   _layout.html            header, footer, site-wide &lt;head&gt;; &lt;slot&gt; is the page
@@ -127,7 +127,7 @@ app created in my-app (41 files)
             <li>Only <code>routes/</code>, <code>lib/</code>, <code>utils/</code>, <code>.pragma/</code> and <code>public/</code> are read. Other top-level files, like a README, are ignored.</li>
             <li>A page is <code>routes/x.html</code>, with an optional <code>&lt;script&gt;</code> and <code>&lt;style&gt;</code> at its top level and an optional <code>x.server.js</code> (<code>load</code>, server actions, <code>ssr</code>). A large script can live in <code>x.js</code> beside it instead, never both (<code>html/duplicate-module</code>).</li>
             <li>Anything else in <code>routes/</code> must be private, with a leading underscore: <code>_components/</code>, <code>_products.json</code>, <code>_catalog.server.js</code>.</li>
-            <li><code>pragma.json</code> takes exactly <code>name</code> (required: fallback title, log service name, Worker name), <code>lang</code> (default <code>en</code>) and <code>budgets</code>. Unknown keys are errors.</li>
+            <li><code>pragma.json</code> takes exactly <code>name</code> (required: fallback title, log service name, Worker name), <code>lang</code> (default <code>en</code>) and <code>webmcp</code> (default <code>true</code>). Unknown keys are errors.</li>
           </ul>
         </div>
         <c-terminal title="~/my-app">
@@ -135,8 +135,8 @@ app created in my-app (41 files)
 routes/notes.md:1:1 <span class="term-err">error</span> <span class="term-ink">[app/structure]</span> unsupported file in routes/ (static files go in public/, CSS in lib/theme.css or the component)
 <span class="term-err">1 error(s)</span>, 0 warning(s)
 <span class="term-cmd">pragma check</span>
-pragma.json:1:1 <span class="term-err">error</span> <span class="term-ink">[app/pragma-json]</span> unknown key "budget" (use name, lang, budgets)
- 1 | { "name": "guide-app", "budget": 3 }
+pragma.json:1:1 <span class="term-err">error</span> <span class="term-ink">[app/pragma-json]</span> unknown key "theme" (use name, lang, webmcp)
+ 1 | { "name": "guide-app", "theme": "dark" }
    | ^
 <span class="term-err">1 error(s)</span>, 0 warning(s)</code></pre>
         </c-terminal>
@@ -170,7 +170,7 @@ node restarted on port 43459
 {"severityText":"INFO","body":"GET /orders","attributes":{"http.request.method":"GET","url.path":"/_data/orders","http.response.status_code":200,"http.route":"/orders"}}</code></pre>
         </c-terminal>
         <div class="prose">
-          <p>Log lines are shortened here; the full records, with timestamps and span ids, are on the <a href="/examples/logs">logs page</a>. In dev, budgets only warn, and the browser throws on mistakes that production tolerates: an unknown action, a duplicate <code>&lt;for&gt;</code> key, a path that does not exist.</p>
+          <p>Log lines are shortened here; the full records, with timestamps and span ids, are on the <a href="/examples/logs">logs page</a>. In dev, the browser throws on mistakes that production tolerates: an unknown action, a duplicate <code>&lt;for&gt;</code> key, a path that does not exist.</p>
         </div>
       </section>
 
@@ -228,39 +228,33 @@ routes/broken.html:19:3 <span class="term-err">error</span> <span class="term-in
             <li><strong>JS</strong>: <code>js/syntax</code>, <code>js/comment</code>, <code>js/console</code>, <code>js/vague-name</code>, <code>js/html-in-js</code> (no <code>innerHTML</code> or <code>createElement</code>), <code>js/jsdoc-types</code>, <code>js/import</code>, and the script rules: <code>js/component-script</code> (no <code>var</code>, no top-level <code>await</code>, <code>export</code> only for props), <code>js/prop-write</code>, <code>js/const-state</code> (a mutated <code>const</code> the markup reads), <code>js/store-import</code> (stores only through <code>shared</code>) and <code>js/legacy-api</code> (the old <code>state(ctx)</code> API, with the migration).</li>
             <li><strong>HTML</strong>: <code>html/syntax</code> (close every non-void tag), <code>html/comment</code>, <code>html/script</code>, <code>html/duplicate-module</code> (a <code>&lt;script&gt;</code> and an <code>x.js</code> for the same file), <code>html/style-inline</code>, <code>html/on-inline</code>, <code>html/legacy-syntax</code>, <code>html/unknown-directive</code>, <code>html/invalid-path</code>, <code>html/invalid-root</code>, the block rules (<code>html/block</code>, <code>html/for-without-key</code>, <code>html/misplaced-else</code>…), <code>html/unknown-name</code>, <code>html/unknown-prop</code>, <code>html/component</code>, <code>html/unknown-component</code>, <code>html/layout</code>, <code>html/title</code>, <code>html/class</code> (no <code>:class</code>), <code>html/text-removed</code> (no <code>:text</code>), <code>html/interpolation</code> (no <code>{{ }}</code> or <code>${ }</code> outside <code>&lt;code&gt;</code>/<code>&lt;pre&gt;</code>), <code>html/data-attribute</code> (no hand-written <code>data-*</code>) and <code>html/head</code> (<code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> only at the top of a page or in the layout head). <code>html/unknown-directive</code> also names the pragma form for Vue, Alpine, Svelte, Angular and React attributes.</li>
             <li><strong>CSS</strong>: <code>css/syntax</code>, <code>css/comment</code>, <code>css/unknown-class</code> (only the utilities in <code>classes.md</code> and classes your CSS defines), <code>css/arbitrary-value</code>.</li>
-            <li><strong>App</strong>: <code>app/structure</code>, <code>app/route-conflict</code>, <code>app/package</code>, <code>app/pragma-json</code>, <code>app/budget</code>, and the warning <code>app/core-outdated</code> when <code>.pragma/</code> differs from the installed binary.</li>
+            <li><strong>App</strong>: <code>app/structure</code>, <code>app/route-conflict</code>, <code>app/package</code>, <code>app/pragma-json</code>, and the warning <code>app/core-outdated</code> when <code>.pragma/</code> differs from the installed binary.</li>
             <li><strong>Accessibility</strong>, checked on the expanded page with components inlined: <code>img-alt</code>, <code>accessible-name</code>, <code>label</code>, <code>dialog-name</code>, <code>click-non-interactive</code>, <code>heading</code>, <code>single-h1</code>, <code>tabindex</code>, <code>duplicate-id</code>, <code>iframe-title</code>, <code>a-no-href</code>. A bound attribute counts: <code>:aria-label</code> satisfies <code>aria-label</code>.</li>
           </ul>
         </div>
       </section>
 
-      <section class="doc-section" aria-labelledby="budgets">
-        <h2 id="budgets">Performance budgets</h2>
+      <section class="doc-section" aria-labelledby="performance">
+        <h2 id="performance">Performance</h2>
         <div class="prose">
-          <p>Budgets are gzip kilobytes in <code>pragma.json</code>, enforced by <code>check</code> and <code>build</code>: <code>initialJsKb</code> is all JS a page loads, runtime included; <code>routeJsKb</code> is the page's own JS outside <code>.pragma/</code>, npm packages included; <code>cssKb</code> is the global stylesheet. An omitted key is not checked. Exceeding one is an error in production builds and a warning in dev.</p>
+          <p><code>pragma build</code> prints the JS each page loads, gzip, runtime included, and the CSS size. The numbers are information only: no limit fails the build.</p>
         </div>
         <c-terminal title="~/my-app">
-          <pre tabindex="0" aria-label="A budget error"><code><span class="term-cmd">cat pragma.json</span>
-{
-  "name": "my-app",
-  "lang": "en",
-  "budgets": { "initialJsKb": 9, "routeJsKb": 10, "cssKb": 15 }
-}
-<span class="term-cmd">pragma check --strict</span>
-pragma.json:4:1 <span class="term-err">error</span> <span class="term-ink">[app/budget]</span> initialJsKb exceeded in /: 10.0 kB gzip &gt; 9 kB
- 4 |   "budgets": { "initialJsKb": 9, "routeJsKb": 10, "cssKb": 15 }
-   | ^
-<span class="term-err">1 error(s)</span>, 0 warning(s)</code></pre>
+          <pre tabindex="0" aria-label="The size report of a build"><code><span class="term-cmd">pragma build</span>
+page     JS gzip
+/        12.5 KB
+CSS       3.9 KB
+1 page(s)</code></pre>
         </c-terminal>
         <div class="prose">
-          <p>The starter budgets are 15, 10 and 15. A page with no script of its own costs 8.7 kB gzip, all of it runtime, so the budget is real room for your code. The fix for a budget error is smaller code, never a bigger number. What the build does so that you rarely hit one:</p>
+          <p>A page with no script of its own costs 8.7 kB gzip, all of it runtime. When a page grows, make the code smaller. What the build does to keep pages small:</p>
           <ul>
             <li>Every route is prebuilt HTML, and a page with a <code>load</code> starts its data fetch from an inline script in <code>&lt;head&gt;</code>, before any module runs.</li>
             <li>Exactly the modules a page imports get a <code>modulepreload</code>. Modules are minified and hashed one by one; there is no app bundle.</li>
             <li>The CSS contains only the classes the app uses.</li>
             <li>Links prefetch on hover, focus or when visible; navigations use view transitions.</li>
             <li>HTML is served <code>no-cache</code>, <code>/assets/</code> as <code>immutable</code>, both brotli or gzip compressed.</li>
-            <li>Code needed only after a click goes behind <code>await import()</code> in the action: not preloaded, not in the budget. See <a href="/examples/packages#lazy-import">lazy packages</a>.</li>
+            <li>Code needed only after a click goes behind <code>await import()</code> in the action: not preloaded, not in the page size. See <a href="/examples/packages#lazy-import">lazy packages</a>.</li>
           </ul>
         </div>
       </section>
