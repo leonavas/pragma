@@ -21,13 +21,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The binary embeds core/starter, core/runtime and core/docs (see build.rs),
+      # so the key covers them too. On a hit, Rust is not compiled at all.
+      - name: Restore cached pragma binary
+        id: bin-cache
+        uses: actions/cache@v4
+        with:
+          path: core/cli/target/release/pragma
+          key: pragma-bin-linux-x64-${{ hashFiles('core/cli/Cargo.lock', 'core/cli/**/Cargo.toml', 'core/cli/**/*.rs', 'core/cli/crates/*/assets/**', 'core/cli/crates/*/src/**', 'core/starter/**', 'core/runtime/**', 'core/docs/**') }}
+
       - uses: dtolnay/rust-toolchain@stable
+        if: steps.bin-cache.outputs.cache-hit != 'true'
 
       - uses: Swatinem/rust-cache@v2
+        if: steps.bin-cache.outputs.cache-hit != 'true'
         with:
+          shared-key: cli
           workspaces: core/cli -> target
 
       - name: Build pragma release binary
+        if: steps.bin-cache.outputs.cache-hit != 'true'
         run: cargo build --release --locked --manifest-path core/cli/Cargo.toml -p pragma-cli
 
       - name: Print version
@@ -42,9 +55,12 @@ jobs:
           retention-days: 14
 
   site:
-    name: Site (check and build)
+    name: Site (check, build, deploy)
     needs: cli
     runs-on: ubuntu-24.04
+    concurrency:
+      group: site-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - uses: actions/checkout@v4
 
@@ -84,3 +100,11 @@ jobs:
           path: site/dist
           if-no-files-found: error
           retention-days: 14
+
+      - name: Deploy to Cloudflare Workers
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: site
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4 deploy --config dist/server/wrangler.jsonc

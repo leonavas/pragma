@@ -120,6 +120,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - Use only features that work in the current versions of Chrome, Edge, Firefox, and Safari.
 - If a solution has a limit that the user will see (browser support, keyboard, data loss), tell the user before you write the code.
 - Run `pragma check --strict` before you finish. Fix all errors and warnings.
+- Deploy to Cloudflare Workers unless the user asks for another target. Follow `cli.md` (Deploy) step by step. Never deploy without a request from the user.
 
 ## To do X, read Y
 
@@ -139,7 +140,8 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 | Performance | `performance.md` |
 | Logs | `logs.md` |
 | npm packages (install, selection) | `packages.md` |
-| Commands, `check` rules, upgrade, self-update, deploy | `cli.md` |
+| Commands, `check` rules, upgrade, self-update | `cli.md` |
+| Deploy (Cloudflare Workers), secrets, bindings, domain, CI | `cli.md` (Deploy) |
 
 Copy the doc example when unsure. If no doc covers a case, tell the user. Then use the simplest code that gives the requested result in all target browsers. `pragma check` is the minimum, not the goal.
 
@@ -1449,8 +1451,106 @@ Every `<form>` is an agent tool (`webmcp.md`).
 
 | Path | Use |
 |---|---|
-| `client/` | HTML per route and assets. Deploy to static hosting when no `.server.js` exists. |
-| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest and serves `_404.html` with 404). |
-| `server/node.mjs` | Run `node dist/server/node.mjs` (reads `PORT`, default 3000). |
+| `client/` | HTML per route and assets. |
+| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest and serves `_404.html` with 404). Emitted when the app has a `*.server.js` or a `public/**/*.md`. |
+| `server/node.mjs` | Run `node dist/server/node.mjs` (reads `PORT`, default 3000). Emitted when the app has a `*.server.js`. |
 
 Every server (`dev`, `serve`, Workers, Node) returns the matching `.md` from `public/` when `Accept` prefers `text/markdown` (`webmcp.md`).
+
+## Deploy
+
+Cloudflare Workers is the default target. Deploy only when the user asks. Use another target (Node, static hosting) only when the user asks for it.
+
+### Before the first deploy
+
+1. Set `name` in `pragma.json` to a unique Worker name (lowercase letters, digits, hyphens). The name becomes the Worker name and the `<name>.<account>.workers.dev` URL. A deploy replaces any Worker with the same name in the account, so do not keep the starter name `app`. If the user gave no name, ask.
+2. Run `pragma check --strict`, then `pragma build`. Fix all errors.
+3. If `dist/server/wrangler.jsonc` does not exist (no `*.server.js` and no `public/**/*.md`), add `public/index.md` (`webmcp.md`) and build again. Without the worker, Workers cannot serve param pages (`[id].html`) or `_404.html`. Tell the user about the new file.
+4. Log in to Cloudflare. Local: `npx wrangler@4 login`. CI: set `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Do not write tokens into files.
+
+### Deploy
+
+```sh
+pragma build
+npx wrangler@4 deploy --config dist/server/wrangler.jsonc
+```
+
+Wrangler prints the URL. Then check:
+- `curl -I <url>` returns 200 and `curl -I <url>/missing-page` returns 404.
+- `curl -H 'Accept: text/markdown' <url>` returns markdown when `public/index.md` exists.
+- `npx wrangler@4 tail <name>` shows the live logs (`logs.md`).
+
+### Secrets, variables, bindings, domain
+
+`pragma build` rewrites `dist/`. Do not edit `dist/server/wrangler.jsonc`. For more configuration, create `wrangler.jsonc` in the app root. Use the same `name` as `pragma.json` and point to `dist/`. Keep only the keys the app uses:
+
+```jsonc
+{
+  "name": "my-app",
+  "main": "dist/server/worker.js",
+  "compatibility_date": "2025-11-01",
+  "assets": { "directory": "dist/client", "binding": "ASSETS", "run_worker_first": true },
+  "vars": { "PRAGMA_LOG_LEVEL": "info" },
+  "d1_databases": [{ "binding": "DB", "database_name": "my-app", "database_id": "<id>" }],
+  "kv_namespaces": [{ "binding": "KV", "id": "<id>" }],
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "my-app" }],
+  "routes": [{ "pattern": "app.example.com", "custom_domain": true }]
+}
+```
+
+Then deploy with `npx wrangler@4 deploy` (no `--config`).
+
+| Need | Do | Read in `.server.js` |
+|---|---|---|
+| Secret (API key, token) | `npx wrangler@4 secret put KEY_NAME --name <name>`. Never put a secret in `vars` or in a file. | `env.KEY_NAME` |
+| Plain variable | `vars` in the root `wrangler.jsonc`. | `env.NAME` |
+| SQL database (D1) | `npx wrangler@4 d1 create <db>`, then binding `DB`. | `db.get`, `db.all`, `db.run` |
+| Key-value store (KV) | `npx wrangler@4 kv namespace create <ns>`, then binding `KV`. | `kv.get`, `kv.put`, `kv.delete` |
+| File storage (R2) | `npx wrangler@4 r2 bucket create <bucket>`, then binding `FILES`. | `files.get`, `files.put`, `files.delete` |
+| Custom domain | `routes` with `custom_domain: true`. The zone must be in the same Cloudflare account. | |
+| Log export (OTLP) | `OTEL_*` in `vars`, headers with a token as a secret (`logs.md`). | |
+
+`load` and actions receive `env`, `db`, `kv`, and `files`. In `pragma dev` and `pragma serve`, `env` is the process environment (`KEY_NAME=value pragma dev`), and `db`, `kv`, and `files` are `undefined`. Check them before use.
+
+### Workers runtime limits
+
+- There is no filesystem. Do not use `node:fs`, `process.cwd()`, or paths on disk in `.server.js`. Import JSON with `import products from './_products.json' with { type: 'json' }`.
+- Read configuration from `env`, not `process.env`.
+- The generated config has no `nodejs_compat`. If a package needs `node:*` modules, add `"compatibility_flags": ["nodejs_compat"]` to the root `wrangler.jsonc` and tell the user.
+- If a feature cannot work on Workers, stop and tell the user before you change the target.
+
+### CI (GitHub Actions)
+
+Install the CLI version from `.pragma/version`, so `pragma build` does not stop with `app/core-outdated`:
+
+```yaml
+name: Deploy
+on:
+  push:
+    branches: [main]
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pragma
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/leonavas/pragma/main/install.sh | PRAGMA_VERSION="$(cat .pragma/version)" sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+      - run: npm ci --ignore-scripts
+        if: hashFiles('package-lock.json') != ''
+      - run: pragma check --strict
+      - run: pragma build
+      - run: npx --yes wrangler@4 deploy --config dist/server/wrangler.jsonc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+With a root `wrangler.jsonc`, remove `--config dist/server/wrangler.jsonc`. The API token needs the "Edit Cloudflare Workers" template permissions.

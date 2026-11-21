@@ -51,6 +51,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - Use only features that work in the current versions of Chrome, Edge, Firefox, and Safari.
 - If a solution has a limit that the user will see (browser support, keyboard, data loss), tell the user before you write the code.
 - Run `pragma check --strict` before you finish. Fix all errors and warnings.
+- Deploy to Cloudflare Workers unless the user asks for another target. Follow `cli.md` (Deploy) step by step. Never deploy without a request from the user.
 
 ## To do X, read Y
 
@@ -70,6 +71,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 | Performance | `performance.md` |
 | Logs | `logs.md` |
 | npm packages (install, selection) | `packages.md` |
-| Commands, `check` rules, upgrade, self-update, deploy | `cli.md` |
+| Commands, `check` rules, upgrade, self-update | `cli.md` |
+| Deploy (Cloudflare Workers), secrets, bindings, domain, CI | `cli.md` (Deploy) |
 
 Copy the doc example when unsure. If no doc covers a case, tell the user. Then use the simplest code that gives the requested result in all target browsers. `pragma check` is the minimum, not the goal.
