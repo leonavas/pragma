@@ -2,7 +2,7 @@ import articles from './_articles.json' with { type: 'json' }
 
 export const ssr = true
 
-const siteOrigin = 'https://pragma.dev'
+const siteOrigin = 'https://pragma.leonavas.com'
 
 function headFor(article) {
   if (!article) return { title: 'Note not found · pragma field notes', robots: 'noindex' }

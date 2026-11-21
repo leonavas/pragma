@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-ORIGIN="${PRAGMA_ORIGIN:-https://pragma.leonavas.workers.dev}"
+ORIGIN="${PRAGMA_ORIGIN:-https://pragma.leonavas.com}"
 INSTALL_DIR="${PRAGMA_INSTALL_DIR:-$HOME/.local/bin}"
 
 OS="$(uname -s)"

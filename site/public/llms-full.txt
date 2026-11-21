@@ -2,14 +2,14 @@
 
 > pragma is a web framework built for coding agents. An app is native HTML, CSS and plain JavaScript (never TypeScript) with a closed set of directives; a Rust CLI compiles, lints and validates it and answers every error with the file, the line, the rule and the fix. Pages ship prebuilt with only the JavaScript they use, and every form is a WebMCP tool by default.
 
-This file has everything needed to build a pragma app: install, the loop, the app rules (AGENTS.md) and every doc. Index: https://pragma.leonavas.workers.dev/llms.txt. Each part is also a separate file under https://pragma.leonavas.workers.dev/docs/.
+This file has everything needed to build a pragma app: install, the loop, the app rules (AGENTS.md) and every doc. Index: https://pragma.leonavas.com/llms.txt. Each part is also a separate file under https://pragma.leonavas.com/docs/.
 
 ## Install and create
 
-pragma is one Rust binary. Linux x64 binary: https://pragma.leonavas.workers.dev/downloads/pragma-linux-x64.tar.gz. Node 22 or newer only runs `.server.js` files.
+pragma is one Rust binary. Linux x64 binary: https://pragma.leonavas.com/downloads/pragma-linux-x64.tar.gz. Node 22 or newer only runs `.server.js` files.
 
 ```sh
-curl -fsSL https://pragma.leonavas.workers.dev/install.sh | sh
+curl -fsSL https://pragma.leonavas.com/install.sh | sh
 pragma new my-app
 cd my-app
 pragma dev
@@ -30,25 +30,25 @@ git clone https://github.com/leonavas/pragma && cd pragma && cargo install --pat
 
 ## Contents
 
-- [App rules (AGENTS.md)](https://pragma.leonavas.workers.dev/docs/rules.md): the rules every pragma app follows; read first
-- [App structure](https://pragma.leonavas.workers.dev/docs/structure.md): where each file goes, pragma.json
-- [HTML syntax](https://pragma.leonavas.workers.dev/docs/syntax.md): HTML directives ({path}, :, ., @, $) and blocks
-- [Components](https://pragma.leonavas.workers.dev/docs/components.md): components, props, slots
-- [State: script, actions, derived values, stores](https://pragma.leonavas.workers.dev/docs/state.md): script: state, actions, derived values, mount, stores
-- [Routes and router](https://pragma.leonavas.workers.dev/docs/routes.md): pages, links, params, query, layout, head tags
-- [Data: load, server actions, skeleton, SSR](https://pragma.leonavas.workers.dev/docs/data.md): load, server actions, skeleton, SSR
-- [Overlays: modal, alert, dropdown](https://pragma.leonavas.workers.dev/docs/overlays.md): modal, alert, dropdown
-- [CSS](https://pragma.leonavas.workers.dev/docs/css.md): styles and theme
-- [Utility classes](https://pragma.leonavas.workers.dev/docs/classes.md): every utility class
-- [WebMCP: forms are agent tools](https://pragma.leonavas.workers.dev/docs/webmcp.md): forms as WebMCP tools, markdown for agents
-- [npm packages](https://pragma.leonavas.workers.dev/docs/packages.md): npm packages: when and which
-- [Performance](https://pragma.leonavas.workers.dev/docs/performance.md): performance defaults and budgets
-- [Logs](https://pragma.leonavas.workers.dev/docs/logs.md): OpenTelemetry logs
-- [pragma CLI](https://pragma.leonavas.workers.dev/docs/cli.md): commands, check rules, deploy
+- [App rules (AGENTS.md)](https://pragma.leonavas.com/docs/rules.md): the rules every pragma app follows; read first
+- [App structure](https://pragma.leonavas.com/docs/structure.md): where each file goes, pragma.json
+- [HTML syntax](https://pragma.leonavas.com/docs/syntax.md): HTML directives ({path}, :, ., @, $) and blocks
+- [Components](https://pragma.leonavas.com/docs/components.md): components, props, slots
+- [State: script, actions, derived values, stores](https://pragma.leonavas.com/docs/state.md): script: state, actions, derived values, mount, stores
+- [Routes and router](https://pragma.leonavas.com/docs/routes.md): pages, links, params, query, layout, head tags
+- [Data: load, server actions, skeleton, SSR](https://pragma.leonavas.com/docs/data.md): load, server actions, skeleton, SSR
+- [Overlays: modal, alert, dropdown](https://pragma.leonavas.com/docs/overlays.md): modal, alert, dropdown
+- [CSS](https://pragma.leonavas.com/docs/css.md): styles and theme
+- [Utility classes](https://pragma.leonavas.com/docs/classes.md): every utility class
+- [WebMCP: forms are agent tools](https://pragma.leonavas.com/docs/webmcp.md): forms as WebMCP tools, markdown for agents
+- [npm packages](https://pragma.leonavas.com/docs/packages.md): npm packages: when and which
+- [Performance](https://pragma.leonavas.com/docs/performance.md): performance defaults and budgets
+- [Logs](https://pragma.leonavas.com/docs/logs.md): OpenTelemetry logs
+- [pragma CLI](https://pragma.leonavas.com/docs/cli.md): commands, check rules, deploy
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/rules.md
+Source: https://pragma.leonavas.com/docs/rules.md
 
 # AGENTS.md
 
@@ -115,7 +115,7 @@ If unsure, copy the doc's example. If no doc covers it, do the simplest thing th
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/structure.md
+Source: https://pragma.leonavas.com/docs/structure.md
 
 # App structure
 
@@ -167,7 +167,7 @@ Fixed. Create no other top-level folders. Never edit `core/`.
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/syntax.md
+Source: https://pragma.leonavas.com/docs/syntax.md
 
 # HTML syntax
 
@@ -292,7 +292,7 @@ Compute every derived value (total, label, filter, flag) in a function of the sc
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/components.md
+Source: https://pragma.leonavas.com/docs/components.md
 
 # Components
 
@@ -397,7 +397,7 @@ Usage:
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/state.md
+Source: https://pragma.leonavas.com/docs/state.md
 
 # State: script, actions, derived values, stores
 
@@ -576,7 +576,7 @@ function add(title) {
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/routes.md
+Source: https://pragma.leonavas.com/docs/routes.md
 
 # Routes and router
 
@@ -688,7 +688,7 @@ export async function load({ params, request }) {
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/data.md
+Source: https://pragma.leonavas.com/docs/data.md
 
 # Data: load, server actions, skeleton, SSR
 
@@ -791,7 +791,7 @@ Keep the title, back link and filters outside the loading chain. Shape the skele
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/overlays.md
+Source: https://pragma.leonavas.com/docs/overlays.md
 
 # Overlays: modal, alert, dropdown
 
@@ -849,7 +849,7 @@ async function remove() {
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/css.md
+Source: https://pragma.leonavas.com/docs/css.md
 
 # CSS
 
@@ -922,7 +922,7 @@ Never write `data-theme` or read `localStorage` for the theme: use `core/theme.j
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/classes.md
+Source: https://pragma.leonavas.com/docs/classes.md
 
 # Utility classes
 
@@ -1047,7 +1047,7 @@ tokens and dark mode: css.md.
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/webmcp.md
+Source: https://pragma.leonavas.com/docs/webmcp.md
 
 # WebMCP: forms are agent tools
 
@@ -1152,7 +1152,7 @@ No `.md` = HTML for everyone.
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/packages.md
+Source: https://pragma.leonavas.com/docs/packages.md
 
 # npm packages
 
@@ -1223,7 +1223,7 @@ The error points at the import in your file. In `.server.js`, any package from `
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/performance.md
+Source: https://pragma.leonavas.com/docs/performance.md
 
 # Performance
 
@@ -1242,7 +1242,7 @@ prefetch, hashed assets, CSS with only used classes, budgets enforced by `check`
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/logs.md
+Source: https://pragma.leonavas.com/docs/logs.md
 
 # Logs
 
@@ -1281,7 +1281,7 @@ async function save() {
 
 ---
 
-Source: https://pragma.leonavas.workers.dev/docs/cli.md
+Source: https://pragma.leonavas.com/docs/cli.md
 
 # `pragma` CLI
 

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://pragma.dev/sitemap.xml
+Sitemap: https://pragma.leonavas.com/sitemap.xml

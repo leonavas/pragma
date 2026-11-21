@@ -50,7 +50,7 @@ function cardOf(values) {
     host: pageUrl ? new URL(pageUrl).host : 'no og:url',
     title: values['twitter:title'] ?? values['og:title'] ?? values.title ?? '',
     description: values['twitter:description'] ?? values['og:description'] ?? values.description ?? '',
-    imagePath: image ? new URL(image, 'https://pragma.dev').pathname : '',
+    imagePath: image ? new URL(image, 'https://pragma.leonavas.com').pathname : '',
     imageAlt: values['og:image:alt'] ?? '',
   }
 }

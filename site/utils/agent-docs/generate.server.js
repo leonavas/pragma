@@ -1,6 +1,6 @@
 import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises'
 
-const siteOrigin = 'https://pragma.leonavas.workers.dev'
+const siteOrigin = 'https://pragma.leonavas.com'
 const siteRoot = new URL('../../', import.meta.url)
 const coreRoot = new URL('../../../core/', import.meta.url)
 const templates = new URL('./', import.meta.url)
