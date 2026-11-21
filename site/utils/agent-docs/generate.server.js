@@ -133,7 +133,7 @@ async function generateSources() {
   const out = {}
   await collectSources('routes', out)
   await collectSources('lib', out)
-  for (const path of ['pragma.json', 'package.json', 'public/robots.txt', 'public/sitemap.xml']) {
+  for (const path of ['pragma.json', 'package.json', 'public/robots.txt', 'public/sitemap.xml', 'utils/highlight.js', 'utils/code-lines.js']) {
     out[path] = await readText(new URL(path, siteRoot))
   }
   const code = JSON.stringify(out) + '\n'
