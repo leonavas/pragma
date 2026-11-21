@@ -53,7 +53,7 @@ pragma upgrade
 - [Components](https://pragma.leonavas.com/docs/components.md): components, props, slots
 - [State: script, actions, derived values, stores](https://pragma.leonavas.com/docs/state.md): script: state, actions, derived values, mount, stores
 - [Routes and router](https://pragma.leonavas.com/docs/routes.md): pages, links, params, query, layouts (including nested), head tags
-- [Data: load, server actions, skeleton, SSR](https://pragma.leonavas.com/docs/data.md): load, server actions, skeleton, SSR
+- [Data: load, server actions, skeleton, SSR, middleware, endpoints](https://pragma.leonavas.com/docs/data.md): load, server actions, skeleton, SSR
 - [Overlays: modal, alert, dropdown](https://pragma.leonavas.com/docs/overlays.md): modal, alert, dropdown
 - [CSS](https://pragma.leonavas.com/docs/css.md): styles and theme
 - [Utility classes](https://pragma.leonavas.com/docs/classes.md): every utility class
@@ -85,7 +85,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - A function defines an action (`@click="add"`) or a derived value (`{$total}` in HTML, `total()` in JS).
 - `export let step = 1` declares a prop.
 - `function mount(el) { …; return cleanup }` runs after mount.
-- Import services from `'pragma'`: `import { shared, data, params, query, page, call, navigate, open, close, confirm, log } from 'pragma'`.
+- Import services from `'pragma'`: `import { shared, data, params, query, page, call, stream, navigate, open, close, confirm, log } from 'pragma'`.
 - `<style>` scopes to its component or page (`:global(…)` opts out only its argument).
 - `{path}` inserts escaped text in text and attribute strings (`<p>Hi {$name}</p>`, `href="/shop/{p.id}"`).
 - `:` binds a value (`:href`, `:disabled`). `.` toggles a class. `@` binds an event.
@@ -93,6 +93,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - `@input="search"` passes `event`. `@change="toggle(task)"` passes only the listed arguments (paths, literals, `event`, `el`).
 - Call store functions directly: `@click="shared.cart.remove(item.id)"`.
 - Use tags for blocks: `<if v>`, `<else-if v>`, `<else>`, `<for x in v key=x.id>`, `<empty>`.
+- Animate block enter and leave in CSS with `[data-entering]` and `[data-leaving]` (`syntax.md`).
 - `<c-x>` maps to `lib/components/x/`. `<p-x>` maps to `_components/x/` in the page folder or an ancestor.
 - `routes/_layout.html` is the root layout (`<main data-page><slot></slot></main>`). Any subfolder can add `_layout.html` with `<slot></slot>` (no `<head>`, no `<script>`, no `.server.js`) to wrap routes in that folder and its subfolders.
 
@@ -113,6 +114,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - Build overlays only with `c-modal`, `c-alert`, and `c-dropdown`.
 - Use a native `<select>` by default. Use `c-select` for a styled list. Do not style `<select>` with `appearance` (`forms.md`).
 - Load data with `load` in `.server.js` and render a skeleton.
+- Put auth in `routes/_middleware.server.js`. Use `redirect` and `error` from `'pragma/server'`. Use endpoints (`.server.js` without `.html`) only for files, streams, webhooks, and WebSockets (`data.md`).
 - Use utilities from `classes.md`. Create a custom class only when a combination repeats 3+ times. Do not use inline `style`.
 - Follow accessibility rules: name every control, add `alt` and labels, use one `<h1>`.
 - Make every `<form>` a WebMCP tool: set `toolname` (`snake_case` verb_object), `tooldescription`, `name`, and `toolparamdescription` on each field. Add `notool` on login or password forms (`webmcp.md`).
@@ -126,13 +128,14 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 
 | Task | Read |
 |---|---|
-| HTML syntax (`{}`, `:`, `.`, `@`, `$`, blocks) | `syntax.md` |
+| HTML syntax (`{}`, `:`, `.`, `@`, `$`, blocks, enter and leave motion) | `syntax.md` |
 | File locations, `pragma.json`, `.pragma/version` | `structure.md` |
 | Pages, links, params, query, root and nested layouts | `routes.md` |
 | Page title, description, canonical, Open Graph, JSON-LD | `routes.md` (SEO) |
 | Components, props, slots | `components.md` |
 | `<script>`: state, actions, derived values, `mount`, stores | `state.md` |
-| `load`, server actions, skeleton, SSR | `data.md` |
+| `load`, server actions, skeleton, SSR, `call`/`stream` errors and redirects | `data.md` |
+| Cookies, redirects, errors, middleware (auth), endpoints, streaming | `data.md` |
 | Modal, alert, dropdown | `overlays.md` |
 | Select, styled select (`c-select`), form values | `forms.md` |
 | Styles, theme | `css.md`, `classes.md` |
@@ -163,6 +166,9 @@ The folder structure is fixed. Do not create other top-level folders. Do not edi
     index.html             page / (optional <script> and <style> at top)
     index.js               optional page script file instead of <script>
     index.server.js        optional server data and actions
+    _middleware.server.js  optional; runs before every request
+    files/
+      [name].server.js     endpoint /files/:name (no .html; returns a Response)
     shop/
       _layout.html         optional nested layout for /shop/*
       [id].html            /shop/:id
@@ -184,6 +190,7 @@ The folder structure is fixed. Do not create other top-level folders. Do not edi
 - `lang` sets `<html lang>` (default `"en"`).
 - `webmcp` (default `true`) turns every `<form>` into an agent tool and enables `webmcp/*` rules (`webmcp.md`).
 - `budgets` sets gzip kB limits: `initialJsKb` (all JS loaded by a page), `routeJsKb` (page JS outside `.pragma/`), `cssKb` (global CSS).
+- `budgets.routes` sets limits for one page only; the keys it sets replace the global ones for that page: `"routes": { "/app/[id]": { "initialJsKb": 80, "cssKb": 30 } }`. The key is the route path (`[param]` as in the file name) and must match a page.
 
 ## `.pragma/` versioning
 
@@ -200,6 +207,8 @@ The folder structure is fixed. Do not create other top-level folders. Do not edi
 | Root layout | `routes/_layout.html` |
 | Nested layout | `routes/<folder>/_layout.html` |
 | Server-only helper or JSON | `routes/<folder>/_name.server.js`, `_name.json` |
+| Middleware (auth, headers) | `routes/_middleware.server.js` |
+| Endpoint (file, stream, webhook, WebSocket) | `routes/<path>.server.js` without `.html` |
 | Route-local component | `routes/<folder>/_components/<name>/` |
 | Shared component | `lib/components/<name>/` |
 | Shared state store | `lib/state/<name>.js` |
@@ -209,7 +218,7 @@ The folder structure is fixed. Do not create other top-level folders. Do not edi
 
 ## Rules
 
-- A leading `_` makes a file or folder private (not a route). Only `_layout.html` and `_404.html` are special.
+- A leading `_` makes a file or folder private (not a route). Only `_layout.html`, `_404.html`, and `routes/_middleware.server.js` are special.
 - Put at most one `<script>` and one `<style>` at the top level of a page or component `.html` (never in layouts). Or use `.js`/`.css` with the same base name, not both.
 - Do not create `src/`, `pages/`, `styles/`, or `helpers/`.
 - Put CSS in a component or page `<style>`, a component `.css`, or `lib/theme.css`.
@@ -233,6 +242,7 @@ Pragma HTML uses a closed set of directives and block tags. Any other syntax is 
 |---|---|---|
 | `{path}` | Text, attribute string | Inserts escaped text (`<p>Hi {$name}</p>`, `alt="Photo of {p.name}"`, `href="/shop/{p.id}"`). |
 | `:<attr>="v"` | Element | Sets attribute (`:href`, `:disabled`, `:aria-current`). `false`/`null`/`undefined` removes it; `true` sets empty. `:checked` and `:selected` also set the DOM property. Never `:class`, `:style`, `:on*`. |
+| `:--<name>="v"` | Element, component tag | Sets the CSS variable `--name` (`:--left="bar.left"`). Numbers stay numbers; `false`/`null`/`undefined`/`""` removes it. Use it in CSS: `left: calc(var(--left) * 1%)` (`css.md`). |
 | `.<class>="[!]v"` | Element | Toggles the class. |
 | `:show="[!]v"` | Element | Sets `hidden` when falsy. |
 | `:model="$v"` | Input, select, textarea | Two-way binding (`$` or `shared` only). |
@@ -283,6 +293,29 @@ Write block paths without quotes: `<if page.loading>`, `<if !$open>`, `<for p in
   <h1>{data.product.name}</h1>
 </else>
 ```
+
+## Enter and leave motion
+
+Block roots animate with CSS only. The runtime sets two attributes on the root element of an `<if>`/`<else-if>`/`<else>`/`<for>`/`<empty>` instance:
+
+| Attribute | When |
+|---|---|
+| `data-entering` | Inserted after the block's first render; removed when its CSS animations end. |
+| `data-leaving` | Removed by the block; the element stays (inert) until its CSS animations end, then leaves the DOM. |
+
+```css
+@keyframes fade-in { from { opacity: 0; translate: 0 4px } }
+@keyframes fade-out { to { opacity: 0 } }
+.toast[data-entering] { animation: fade-in .2s ease-out }
+.toast[data-leaving] { animation: fade-out .15s ease-in }
+```
+
+- No CSS rule, no wait: without an animation or transition the element leaves at once.
+- Animations on descendants count (`.modal[data-leaving] .panel { animation: … }`). Infinite animations (spinners, `.skeleton`) are ignored.
+- The first render (page load, SSR, navigation, content of a newly inserted block) gets no `data-entering`.
+- If the value turns back on while the element is leaving, the same element returns (no new node).
+- Under `prefers-reduced-motion: reduce` nothing waits and `data-entering` is not set.
+- A leaving `<for>` item stays in place; the other items do not move. Use `position: absolute` in the leave rule if the gap must close at once.
 
 ## Values
 
@@ -337,10 +370,11 @@ Compute every derived value in a script or store function (`const total = () => 
 - Return `'true'` or `'false'` strings for `aria-*` states (`aria-pressed`, `aria-expanded`), because boolean `false` removes the attribute.
 - `:show` hides an element in the DOM; `<if>` adds or removes it. `autofocus` inside a newly inserted block receives focus.
 - In dev, missing paths throw (except under `query`).
-- Allowed markers: `data-page` (root layout `<main>`), `data-reload` (full-load `<a>`). Never write `data-c`, `data-tid`, `data-of`, `data-slot`, or `data-prop-*`.
+- Allowed markers: `data-page` (root layout `<main>`), `data-reload` (full-load `<a>`). Never write `data-c`, `data-tid`, `data-of`, `data-slot`, or `data-prop-*`. `data-entering` and `data-leaving` are set by the runtime: use them only in CSS selectors.
 - Do not write `data-*` attributes by hand (`html/data-attribute`). Bind `:data-x="path"` for multi-value style hooks (`[data-x=value]`), `.name="path"` for on/off states, and role/label/id for tests.
 - `:text` is removed (`html/text-removed`); use `{path}` inside the element.
-- Forbidden: inline `style` and `on*`, `:class`, `{{ }}`/`${ }` outside direct `<code>`/`<pre>` text (`html/interpolation`), legacy `state.`/`props.`, and foreign directives (`v-if`, `x-show`, `on:click`, `*ngIf`, `[disabled]`: `html/unknown-directive`).
+- Computed sizes, positions, colors, and counts go in CSS variables: `:--x="path"` on the element, `var(--x)` in CSS (`css.md`). Write the name in lowercase kebab-case (`:--bar-left`, `html/css-var`). A value with `;`, `{`, `}`, or `<` is refused.
+- Forbidden: inline `style` and `on*`, `:style`, `:class`, `{{ }}`/`${ }` outside direct `<code>`/`<pre>` text (`html/interpolation`), legacy `state.`/`props.`, and foreign directives (`v-if`, `x-show`, `on:click`, `*ngIf`, `[disabled]`: `html/unknown-directive`).
 
 ---
 
@@ -425,6 +459,36 @@ Usage:
   <p-product-card :product="p"></p-product-card>
 </for>
 ```
+
+## Recursive components (trees)
+
+A component can render itself to show a tree (markdown nodes, nested comments, folders). Put the self call inside `<if>` or `<for>`, so the recursion stops when the data ends.
+
+`lib/components/md-node/md-node.html`:
+```html
+<script>
+  export let node = null
+</script>
+
+<span>
+  <if $node.text>
+    <span>{$node.text}</span>
+  </if>
+  <else-if $node.strong>
+    <strong><for child in $node.children key=child.id><c-md-node :node="child"></c-md-node></for></strong>
+  </else-if>
+  <else>
+    <span><for child in $node.children key=child.id><c-md-node :node="child"></c-md-node></for></span>
+  </else>
+</span>
+```
+
+Usage: `<c-md-node :node="data.message.body"></c-md-node>`.
+
+- The component needs a `<script>` with `export let` props.
+- Call only itself (`<c-a>` inside `<c-a>`). A cycle through another component (`<c-a>` → `<c-b>` → `<c-a>`) is an error.
+- The self call cannot fill slots. Pass data with props.
+- The data must end: more than 64 levels throws an error. With `ssr`, the server renders the first 12 levels; the browser renders the rest.
 
 ## Slots
 
@@ -592,8 +656,9 @@ Keep the original `item` reference (`row.item`) when mutating it. Spreading `{ .
 | `shared` | Stores (`shared.tasks.items`, `shared.tasks.add(title)`). |
 | `data` | `load` result (`data.md`); undefined until `load` finishes. |
 | `params`, `query`, `page` | Route params, query strings, `page.loading`, `page.error`. |
-| `call(name, input)` | Calls a server action (`data.md`). |
-| `navigate(url)` | Navigates via the router. |
+| `call(name, input)` | Calls a server action; throws `ActionError` (`status`, `body`) on failure (`data.md`). |
+| `stream(name, input, { signal })` | Calls a server action that streams NDJSON; `for await` each line (`data.md`). |
+| `navigate(url, { replace })` | Navigates via the router; `replace: true` replaces the history entry. |
 | `open(id)`, `close(id)`, `confirm(id)` | Controls overlays (`overlays.md`). |
 | `log` | Emits logs (`logs.md`). |
 
@@ -642,6 +707,8 @@ Source: https://pragma.leonavas.com/docs/routes.md
 | `routes/shop/[id].html` | `/shop/:id` |
 
 - Every `.html` in `routes/` is a route, except names starting with `_`.
+- A `.server.js` without a sibling `.html` is an endpoint that returns a `Response` (`routes/files/[name].server.js` -> `/files/:name`; `data.md`, Endpoints). A page and an endpoint cannot serve the same path (`app/route-conflict`).
+- `routes/_middleware.server.js` runs before every request (`data.md`, Middleware).
 - Having both `x.html` and `x/index.html` is an error (`app/route-conflict`).
 - `[name]` (file or folder) defines a path param. Static segments take priority over params. `[...rest]` is not supported.
 - A page is an HTML fragment without `<html>`, `<head>`, or `<body>`. Top-level `<title>`, `<meta>`, and `<link>` move to `<head>` (see SEO).
@@ -763,7 +830,8 @@ export async function load({ params, request }) {
 
 - Use `<a href>`. The router swaps `<main data-page>`, prefetches links, and keeps the root layout.
 - Every navigation, including query-only changes, recreates page state.
-- Navigate from JS after an action with `navigate('/shop?filter=sale')` (`import { navigate } from 'pragma'`).
+- Navigate from JS after an action with `navigate('/shop?filter=sale')` (`import { navigate } from 'pragma'`). `navigate(url, { replace: true })` replaces the current history entry (wizard steps, fixing a URL).
+- A redirect from `load` replaces the history entry; a redirect from an action adds one (`data.md`). A URL on another origin is a full page load.
 - Force a full page load with `<a href="/logout" data-reload>`. Links with `target` or `download` also bypass the router.
 - Do not use `<button>` + `navigate` instead of `<a>`. Do not use `location.href`, `history.pushState`, or `location` to read params.
 
@@ -771,13 +839,15 @@ export async function load({ params, request }) {
 
 Source: https://pragma.leonavas.com/docs/data.md
 
-# Data: load, server actions, skeleton, SSR
+# Data: load, server actions, skeleton, SSR, middleware, endpoints
 
 | File | Export | Purpose |
 |---|---|---|
-| `x.server.js` | `load({ params, query, request, env, log })` | Return value becomes `data` in HTML and page `<script>`. |
-| `x.server.js` | `actions.name({ input, params, env, log })` | Invoked via `call('name', input)` from `'pragma'`. |
+| `x.server.js` | `load(context)` | Return value becomes `data` in HTML and page `<script>`. |
+| `x.server.js` | `actions.name({ input, ...context })` | Invoked via `call('name', input)` or `stream('name', input)` from `'pragma'`. |
 | `x.server.js` | `ssr = true` | Renders `data` into the first HTML (SEO, link previews, LCP). |
+| `x.server.js` without `x.html` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | Endpoint: returns a `Response` (files, streams, webhooks, WebSockets). |
+| `routes/_middleware.server.js` | `handle({ ...context, next })` | Runs before every request. |
 | `_name.server.js` | helpers | Private to the folder; imported only by `.server.js` files. |
 
 `routes/shop/[id].server.js`:
@@ -824,6 +894,163 @@ export const actions = {
 
 `data` is reactive: assigning `data.product.likes` updates the page.
 
+## Server context
+
+`load`, actions, endpoints, and middleware receive one context object:
+
+| Key | Value |
+|---|---|
+| `request` | The `Request`. |
+| `url` | Page URL as a `URL`. For `/_data` and `/_action` requests it is the page path, not the internal path. |
+| `params`, `query` | Route params and query, as strings. |
+| `env`, `db`, `kv`, `files` | Bindings and secrets (`cli.md`, Deploy). |
+| `log` | Server logger (`logs.md`). |
+| `cookies` | `get(name)`, `getAll()`, `set(name, value, options)`, `delete(name, options)`. |
+| `locals` | Object for the request. Middleware fills it (`locals.user`); `load` and actions read it. |
+| `setHeaders({ name: value })` | Adds headers to the response. Use `cookies.set` for cookies. |
+| `waitUntil(promise)` | Work after the response (email, audit). Workers: `ctx.waitUntil`. Node: runs in the background and logs a rejection. |
+
+`cookies.set` defaults: `path: '/'`, `httpOnly: true`, `sameSite: 'lax'`, `secure: true` (not on plain `http://localhost`). Options: `maxAge` (seconds), `expires`, `path`, `domain`, `httpOnly`, `secure`, `sameSite`, `partitioned`. `__Host-` names always get `Secure` and `Path=/` and reject `domain`. Cookies and headers apply to the response that goes out, also a `Response` you return.
+
+## Redirects and errors
+
+```js
+import { redirect, error } from 'pragma/server'
+
+export async function load({ locals, params }) {
+  if (!locals.user) redirect(303, '/login')
+  const order = await findOrder(params.id)
+  if (!order) error(404, 'Order not found')
+  return { order }
+}
+```
+
+- `redirect(status, location)`: status 301, 302, 303, 307, or 308. Use 303 after an action.
+- `error(status, body)`: status 400-599. `body` is a message string or an object with `message`.
+- Both throw. Use them in `load`, actions, endpoints, and middleware. `'pragma/server'` works only in `.server.js` files.
+
+| Request | `redirect` | `error` |
+|---|---|---|
+| Page load (`/_data`) or `call()` (`/_action`) | HTTP 200 `{"redirect":{"status":303,"location":"/x"}}`; the browser navigates. | Its status with `{"error": body}`; `page.error` or `call()` throws. |
+| Full page (SSR or prebuilt page behind middleware) | Real 30x with `Location`. | SSR page: its status with `page.error`. Otherwise 404 serves `_404.html`, other statuses a plain text response. |
+| Endpoint | Real 30x with `Location`. | Its status with `{"error": body}`. |
+
+## Middleware
+
+`routes/_middleware.server.js` (one per app) runs before every request: pages (also prebuilt ones), `/_data`, `/_action`, and endpoints. It does not run for `/assets/*`, `/_pragma/*`, and `/_otel`.
+
+```js
+import { redirect } from 'pragma/server'
+import { findSession } from './_session.server.js'
+
+export async function handle({ url, cookies, locals, env, next }) {
+  locals.user = await findSession(env, cookies.get('__Host-session'))
+  if (url.pathname.startsWith('/app') && !locals.user) redirect(303, '/login')
+  const response = await next()
+  response.headers.set('x-frame-options', 'DENY')
+  return response
+}
+```
+
+- `next()` returns the `Response`. Return it, change it, or return another `Response`.
+- Check `url.pathname` to choose the protected paths. `url` is the page path also for `/_data` and `/_action`.
+- A redirect also works for client navigation: the router goes to the final URL, so the address bar shows `/login`.
+
+## Endpoints
+
+A `.server.js` without a sibling `.html` is an endpoint. `routes/files/[name].server.js` serves `/files/:name` with the same param rules as pages.
+
+```js
+import { error } from 'pragma/server'
+
+export async function GET({ params, files, request }) {
+  const file = await files.get(params.name, { range: request.headers })
+  if (!file) error(404, 'File not found')
+  const headers = new Headers({ 'content-type': file.httpMetadata?.contentType ?? 'application/octet-stream' })
+  if (request.headers.has('range') && file.range) {
+    const end = file.range.offset + file.range.length - 1
+    headers.set('content-range', `bytes ${file.range.offset}-${end}/${file.size}`)
+    return new Response(file.body, { status: 206, headers })
+  }
+  return new Response(file.body, { headers })
+}
+```
+
+- Export only uppercase method handlers. `HEAD` uses `GET` without a body. Other methods get 405 with `Allow`.
+- Every handler returns a `Response`: binary bodies, `206` ranges, `ReadableStream` streams, redirects.
+- WebSocket: return `new Response(null, { status: 101, webSocket: client })` from `GET`. This works only on Workers (`wrangler dev`, deploy), not on Node (`pragma dev`, `pragma serve`).
+- Do not use endpoints for page data or writes from your pages. Use `load` and actions. `Response.json(...)` in an endpoint gives the warning `app/endpoint-json`.
+
+## Streaming from an action
+
+An action can return a `Response`. Its body and headers reach the client untouched, so a `ReadableStream` (for example NDJSON lines) streams chunk by chunk:
+
+```js
+export const actions = {
+  async ask({ input, env }) {
+    const lines = await startAnswer(env, input.question)
+    return new Response(lines, { headers: { 'content-type': 'application/x-ndjson' } })
+  },
+}
+```
+
+## Errors and redirects in the page
+
+| Server result | `call` | `stream` | `load` |
+|---|---|---|---|
+| Value | Resolves to it | Yields it once | `data` |
+| Error (4xx/5xx) | Throws `ActionError` | Throws `ActionError` | `page.error` (`status` + body fields) |
+| Redirect | Navigates (new history entry), resolves to `undefined` | Navigates, yields nothing | Navigates, replaces the history entry |
+
+`ActionError` is an `Error` with `status` (HTTP status) and `body` (the error body the server sent, or its text). `message` is `body.message` when present.
+
+```js
+async function book(day) {
+  try {
+    await call('book', { day })
+  } catch (failure) {
+    if (failure.status === 409) taken = failure.body.slots
+    else error = failure.message
+  }
+}
+```
+
+- A redirect navigates before `call` resolves: do not read the result after a redirecting action.
+- Show `page.error.message`; branch on `page.error.status` (`<if $notFound>` with `const notFound = () => page.error?.status === 404`).
+
+## Reading a stream (NDJSON)
+
+An action that returns a `Response` with `content-type: application/x-ndjson` streams one JSON value per line. Read it with `stream`:
+
+```js
+import { stream } from 'pragma'
+
+let messages = []
+let controller = null
+
+async function send(text) {
+  messages.push({ role: 'user', text }, { role: 'assistant', text: '' })
+  const reply = messages.at(-1)
+  controller = new AbortController()
+  try {
+    for await (const chunk of stream('chat', { text }, { signal: controller.signal })) {
+      if (chunk.type === 'delta') reply.text += chunk.text
+    }
+  } catch (failure) {
+    if (failure.name !== 'AbortError') reply.text = failure.message
+  } finally {
+    controller = null
+  }
+}
+
+const stop = () => controller?.abort()
+```
+
+- Each line arrives as soon as the server writes it; `stream` handles lines split across chunks.
+- Read the item back from state (`messages.at(-1)`) before writing to it: the object you pushed is not reactive.
+- `controller.abort()` stops the request and throws `AbortError` in the loop. `break` also stops it.
+- A JSON response (not NDJSON) yields its value once, or navigates if it is a redirect.
+
 ## Skeleton (page with `load`, without `ssr`)
 
 ```html
@@ -855,7 +1082,7 @@ With `ssr = true`, page and component scripts run once per request on the server
 |---|---|
 | Top-level `let`, props, derived functions, slot content | Rendered into the first HTML |
 | `data`, `params`, `query`, `page` | Read-only |
-| `shared`, `call`, `navigate`, `open`, `close`, `confirm` | Throws; script deferred to browser |
+| `shared`, `call`, `stream`, `navigate`, `open`, `close`, `confirm` | Throws; script deferred to browser |
 | Top-level `window`, `document`, `localStorage` | Throws; script deferred to browser |
 | Imports of npm packages or `.pragma/` | Skipped; script deferred to browser |
 | Prop passed from a store | Deferred to browser |
@@ -865,13 +1092,14 @@ When a script is deferred to the browser, its `$x` bindings fill at boot while t
 
 ## Rules
 
-- Throwing in `load` sets `page.error` and returns HTTP 500. Return `{ product: null }` for not-found states.
+- Throwing in `load` sets `page.error` and returns HTTP 500. Use `error(404, 'message')` for another status, or return `{ product: null }` for not-found states.
 - Put every write and every secret-using operation in a server action. Update `data` or a `let` after the call.
 - Read `data` inside functions only (`js/top-level-data`). Without `ssr`, `data` is undefined until `load` finishes.
 - Load data from `fetch` with secrets from `env`, a database via `env`, or `import products from './_products.json' with { type: 'json' }`.
 - Default mode is no SSR: prebuilt HTML holds static content outside `<if>`/`<for>`, and `.pragma/boot.js` renders the skeleton.
 - Enable `ssr = true` when crawlers, link previews, or data-bound `<head>`/JSON-LD tags need server data (`routes.md`).
-- Do not fetch data in `mount` or client actions. Do not create `/api/...` routes. Do not return secrets from `load`. `env` exists only on the server.
+- Do not fetch data in `mount` or client actions. Do not create `/api/...` routes or endpoints for page data. Do not return secrets from `load`. `env` exists only on the server.
+- Put auth checks in `routes/_middleware.server.js` and keep the user in `locals`. Store sessions in `__Host-` cookies.
 
 ---
 
@@ -999,10 +1227,36 @@ function toggle() {
 
 Do not write `data-theme` or read `localStorage` for theme state. Use `.pragma/theme.js`.
 
+## Values from state: CSS variables
+
+Use `:--name="path"` when a value comes from state or data (position, width, color, column count). Write the CSS once, with `var(--name)`:
+
+```html
+<div class="timeline">
+  <for shift in $shifts key=shift.id>
+    <div class="shift" :--start="shift.start" :--span="shift.span" :--tone="shift.color">{shift.label}</div>
+  </for>
+</div>
+<ul class="grid" :--cols="$columns">…</ul>
+<div class="pill" :--i="$selected" :--n="$options.length">…</div>
+```
+
+```css
+.timeline { position: relative; }
+.shift { position: absolute; left: calc(var(--start) * 1%); width: calc(var(--span) * 1%); background: var(--tone, var(--color-primary-600)); }
+.grid { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); }
+.pill::before { width: calc(100% / var(--n)); translate: calc(var(--i) * 100%) 0; }
+```
+
+- Pass numbers without units (`42`) and add the unit in CSS (`* 1%`, `* 1px`). Compute the number in a script function (`const start = shift => (shift.from - dayStart) / dayLength * 100`).
+- `false`, `null`, `undefined`, and `""` remove the variable; use a fallback (`var(--tone, …)`).
+- On a component tag, `:--name` goes to the component root.
+- The server writes `style="--start:42"` in SSR pages. Do not write `style="..."` yourself (`html/style-inline`).
+
 ## Custom classes
 
 - Create a custom class only when the same combination repeats in 3+ places, or when you need state selectors or animations.
-- Forbidden: inline `style="..."`, arbitrary values (`w-[37px]`), negative utilities (`-mt-2`), undefined classes, `!important`, ID selectors, external `@import`, and single-use custom classes.
+- Forbidden: inline `style="..."` and `:style` (use `:--name`), arbitrary values (`w-[37px]`), negative utilities (`-mt-2`), undefined classes, `!important`, ID selectors, external `@import`, and single-use custom classes.
 
 ---
 
@@ -1267,6 +1521,34 @@ Client code supports plain JS packages (`.js`, `.mjs`, `.cjs`, plus imported `.j
 
 In `.server.js`, all `package.json` dependencies and Node built-ins (`fs`, `node:*`) work without extra listing. A built-in name listed in `package.json` (such as `buffer`) bundles as a package.
 
+## WebAssembly (server only)
+
+Import a `.wasm` file, from the project (`./_solver.wasm`) or from a package export (`highs/runtime`), in server code. The import gives a compiled `WebAssembly.Module` on Workers and on Node (`pragma dev`, `pragma serve`, `node.mjs`). The build copies the file to `dist/server/` and adds a `CompiledWasm` rule to `dist/server/wrangler.jsonc`. A root `wrangler.jsonc` needs no rule (wrangler treats `*.wasm` the same way by default).
+
+```js
+import loadHighs from 'highs'
+import highsWasm from 'highs/runtime'
+
+let loading
+
+export function solver() {
+  loading ??= loadHighs({
+    instantiateWasm(imports, done) {
+      WebAssembly.instantiate(highsWasm, imports).then(done)
+      return {}
+    },
+  })
+  return loading
+}
+```
+
+- Workers cannot compile WebAssembly from bytes. Pass the imported module to the package (Emscripten packages: `instantiateWasm`).
+- Importing `.wasm` in client code is a `js/import` error.
+
+## Workers modules
+
+`cloudflare:workers`, `cloudflare:sockets` and other `cloudflare:*` modules work in `.server.js` on Workers only. They do not exist on Node (`pragma dev`, `pragma serve`, `node.mjs`). In client code they are an `app/package` error. Prefer the `env` that `load` and actions receive.
+
 ## Recommended
 
 | Need | Use |
@@ -1308,7 +1590,7 @@ Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<hea
 - Omit `.js` on pages without interaction.
 - Keep heavy single-page code on that page. Load interaction-only code with `await import()` inside the action.
 - Return only displayed fields from `load`. Run independent requests with `Promise.all`.
-- Do not raise budgets in `pragma.json`; reduce code size instead.
+- Do not raise budgets in `pragma.json`; reduce code size instead. When one page must exceed them (a large editor or chat), add an explicit exception for that route only in `budgets.routes` (`structure.md`); never raise the global budget. `pragma check` and `pragma build` name the budget that applied.
 - Do not import large modules in `lib/state/`. Do not fetch data in `mount`. Do not enable `ssr` by default.
 
 ---
@@ -1365,7 +1647,7 @@ Source: https://pragma.leonavas.com/docs/cli.md
 |---|---|
 | `pragma -V` | Prints the installed CLI version. |
 | `pragma new <dir>` | Creates an app with the fixed structure. Warns and keeps existing files if `<dir>` is not empty. |
-| `pragma dev [--port 5180] [--host 127.0.0.1]` | Runs the dev server with WebSocket live reload. Shows an overlay on build errors while valid pages keep working. Starts Node >= 22 when `.server.js` exists. Prints `app/core-outdated` first if `.pragma/` is older than the CLI. |
+| `pragma dev [--port 5180] [--host 127.0.0.1] [--cf]` | Runs the dev server with WebSocket live reload. Shows an overlay on build errors while valid pages keep working. Starts Node >= 22 when `.server.js` exists. Prints `app/core-outdated` first if `.pragma/` is older than the CLI. `--cf`: Cloudflare bindings in dev (see below). |
 | `pragma check [--strict]` | Checks JS, HTML, CSS, budgets, accessibility, and WebMCP tools. `--strict` turns warnings into errors. |
 | `pragma build [--allow-outdated-core]` | Builds `dist/`. Stops with `app/core-outdated` if `.pragma/` is older than the CLI (`--allow-outdated-core` overrides this). |
 | `pragma serve [--port 3000] [--host 127.0.0.1]` | Serves `dist/` as in production. |
@@ -1393,7 +1675,7 @@ Fix the root cause; do not work around a rule.
 | `js/jsdoc-types` | Remove TypeScript and JSDoc types. |
 | `js/import` | Import only project files, `.pragma/`, and `package.json` dependencies (`packages.md`). Pass a quoted specifier to `import()` (`import('./chart.js')`), never a variable or `${}`. |
 | `js/comment`, `html/comment`, `css/comment` | Delete the comment. Use clear names. |
-| `js/vague-name` | Use descriptive names. Avoid generic words (`tmp`, `data`, `info`, `handler`, `util`), names ending in a digit, and names under 3 chars except `$ i j k id ok el ctx url log` and parameters of expression-body arrows. |
+| `js/vague-name` | Use descriptive names. Avoid generic words (`tmp`, `data`, `info`, `handler`, `util`), names ending in a single digit (`item2`; multi-digit numbers and pairs like `12x36` are fine), and names under 3 chars except `$ i j k id ok el ctx url log db kv` (server context keys) and parameters of expression-body arrows. |
 | `js/legacy-api` | Replace old API (`export const state`/`actions`, `export function mount`, `ctx.$`, `ctx.update`, `store()`). Use top-level `let`, functions, `function mount(el)`, and `export let` (`components.md`, `state.md`). |
 | `js/prop-write` | Do not mutate props (including via `:model`). Copy into a `let` (`let current = start`). |
 | `js/const-state` | Declare mutated state with `let`, not `const`. |
@@ -1413,12 +1695,15 @@ Fix the root cause; do not work around a rule.
 | `html/duplicate-module` | Use inline `<script>`/`<style>` or external `x.js`/`x.css`, not both. |
 | `html/component`, `html/unknown-component` | Follow component rules (`components.md`). |
 | `html/layout`, `html/title`, `html/head` | Follow layout and SEO rules (`routes.md`). |
+| `html/css-var` | Write `:--name` in lowercase kebab-case. A static value cannot contain `;`, `{`, `}`, or `<` (`css.md`). |
 | `html/class` | Toggle classes with `.name="path"`. Do not use `:class` or `{}` in `class` (`syntax.md`). |
 | `html/interpolation` | Replace `{{ }}` and `${ }` with `{path}` (`syntax.md`). |
-| `html/script`, `html/style-inline`, `html/on-inline` | Put at most one `<script>` (optional `type="module"`) and one `<style>` at the top level of a page or component `.html`. Put JSON-LD `<script type="application/ld+json">` only at the top level of a page (`routes.md`). |
+| `html/script`, `html/style-inline`, `html/on-inline` | Put at most one `<script>` (optional `type="module"`) and one `<style>` at the top level of a page or component `.html`. Replace `style="..."` with classes, or with `:--name="path"` and `var(--name)` in CSS (`css.md`). Put JSON-LD `<script type="application/ld+json">` only at the top level of a page (`routes.md`). |
 | `html/json-ld` | Fix invalid JSON or unclosed `{` in JSON-LD strings. Use `{` for a literal brace. |
 | `css/unknown-class`, `css/arbitrary-value` | Use classes from `classes.md` or custom classes per `css.md`. |
 | `app/structure`, `app/route-conflict` | Follow structure and route rules (`structure.md`, `routes.md`). |
+| `app/endpoint`, `app/middleware` | An endpoint exports only `GET`/`POST`/`PUT`/`PATCH`/`DELETE`; the middleware exports `handle` (`data.md`). |
+| `app/endpoint-json` (warning) | An endpoint answers JSON. Use `load` and actions for page data (`data.md`). |
 | `app/package` | Follow package rules (`packages.md`). |
 | `app/pragma-json` | Fix `pragma.json` (`structure.md`). |
 | `app/budget` | Reduce bundle size (`performance.md`). |
@@ -1453,7 +1738,7 @@ Every `<form>` is an agent tool (`webmcp.md`).
 | Path | Use |
 |---|---|
 | `client/` | HTML per route and assets. |
-| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest and serves `_404.html` with 404). Emitted when the app has a `*.server.js` or a `public/**/*.md`. |
+| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest and serves `_404.html` with 404). Emitted when the app has a `*.server.js` or a `public/**/*.md`. `run_worker_first` sends every request, also prebuilt pages, through the worker, so middleware runs for them. |
 | `server/node.mjs` | Run `node dist/server/node.mjs` (reads `PORT`, default 3000). Emitted when the app has a `*.server.js`. |
 
 Every server (`dev`, `serve`, Workers, Node) returns the matching `.md` from `public/` when `Accept` prefers `text/markdown` (`webmcp.md`).
@@ -1513,12 +1798,23 @@ Then deploy with `npx wrangler@4 deploy` (no `--config`).
 
 `load` and actions receive `env`, `db`, `kv`, and `files`. In `pragma dev` and `pragma serve`, `env` is the process environment (`KEY_NAME=value pragma dev`), and `db`, `kv`, and `files` are `undefined`. Check them before use.
 
+### Bindings in dev (`pragma dev --cf`)
+
+`pragma dev --cf` gives `.server.js` the bindings of the root `wrangler.jsonc` through wrangler `getPlatformProxy`: `vars`, secrets from `.dev.vars`, D1, KV, R2, `send_email`, rate limits, `ctx.waitUntil` and `caches`. Bindings with `"remote": true` use the real Cloudflare resource (log in first: `npx wrangler@4 login`); the others run locally with state in `.wrangler/` (exclude it from git).
+
+1. Install wrangler in the app: `npm i -D wrangler@4`.
+2. Create the root `wrangler.jsonc` (above).
+3. Run `pragma dev --cf`.
+
+Without `--cf`, `pragma dev` is unchanged. A change to `wrangler.jsonc` or `.dev.vars` restarts the node server. `cloudflare:workers` imports still do not work on Node (`packages.md`).
+
 ### Workers runtime limits
 
 - There is no filesystem. Do not use `node:fs`, `process.cwd()`, or paths on disk in `.server.js`. Import JSON with `import products from './_products.json' with { type: 'json' }`.
 - Read configuration from `env`, not `process.env`.
 - The generated config has no `nodejs_compat`. If a package needs `node:*` modules, add `"compatibility_flags": ["nodejs_compat"]` to the root `wrangler.jsonc` and tell the user.
 - If a feature cannot work on Workers, stop and tell the user before you change the target.
+- WebSocket endpoints (`status: 101`) work only on Workers. `pragma dev` and `pragma serve` run Node and cannot upgrade; test them with `npx wrangler@4 dev --config dist/server/wrangler.jsonc`.
 
 ### CI (GitHub Actions)
 

@@ -16,7 +16,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - A function defines an action (`@click="add"`) or a derived value (`{$total}` in HTML, `total()` in JS).
 - `export let step = 1` declares a prop.
 - `function mount(el) { …; return cleanup }` runs after mount.
-- Import services from `'pragma'`: `import { shared, data, params, query, page, call, navigate, open, close, confirm, log } from 'pragma'`.
+- Import services from `'pragma'`: `import { shared, data, params, query, page, call, stream, navigate, open, close, confirm, log } from 'pragma'`.
 - `<style>` scopes to its component or page (`:global(…)` opts out only its argument).
 - `{path}` inserts escaped text in text and attribute strings (`<p>Hi {$name}</p>`, `href="/shop/{p.id}"`).
 - `:` binds a value (`:href`, `:disabled`). `.` toggles a class. `@` binds an event.
@@ -24,6 +24,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - `@input="search"` passes `event`. `@change="toggle(task)"` passes only the listed arguments (paths, literals, `event`, `el`).
 - Call store functions directly: `@click="shared.cart.remove(item.id)"`.
 - Use tags for blocks: `<if v>`, `<else-if v>`, `<else>`, `<for x in v key=x.id>`, `<empty>`.
+- Animate block enter and leave in CSS with `[data-entering]` and `[data-leaving]` (`syntax.md`).
 - `<c-x>` maps to `lib/components/x/`. `<p-x>` maps to `_components/x/` in the page folder or an ancestor.
 - `routes/_layout.html` is the root layout (`<main data-page><slot></slot></main>`). Any subfolder can add `_layout.html` with `<slot></slot>` (no `<head>`, no `<script>`, no `.server.js`) to wrap routes in that folder and its subfolders.
 
@@ -44,6 +45,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - Build overlays only with `c-modal`, `c-alert`, and `c-dropdown`.
 - Use a native `<select>` by default. Use `c-select` for a styled list. Do not style `<select>` with `appearance` (`forms.md`).
 - Load data with `load` in `.server.js` and render a skeleton.
+- Put auth in `routes/_middleware.server.js`. Use `redirect` and `error` from `'pragma/server'`. Use endpoints (`.server.js` without `.html`) only for files, streams, webhooks, and WebSockets (`data.md`).
 - Use utilities from `classes.md`. Create a custom class only when a combination repeats 3+ times. Do not use inline `style`.
 - Follow accessibility rules: name every control, add `alt` and labels, use one `<h1>`.
 - Make every `<form>` a WebMCP tool: set `toolname` (`snake_case` verb_object), `tooldescription`, `name`, and `toolparamdescription` on each field. Add `notool` on login or password forms (`webmcp.md`).
@@ -57,13 +59,14 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 
 | Task | Read |
 |---|---|
-| HTML syntax (`{}`, `:`, `.`, `@`, `$`, blocks) | `syntax.md` |
+| HTML syntax (`{}`, `:`, `.`, `@`, `$`, blocks, enter and leave motion) | `syntax.md` |
 | File locations, `pragma.json`, `.pragma/version` | `structure.md` |
 | Pages, links, params, query, root and nested layouts | `routes.md` |
 | Page title, description, canonical, Open Graph, JSON-LD | `routes.md` (SEO) |
 | Components, props, slots | `components.md` |
 | `<script>`: state, actions, derived values, `mount`, stores | `state.md` |
-| `load`, server actions, skeleton, SSR | `data.md` |
+| `load`, server actions, skeleton, SSR, `call`/`stream` errors and redirects | `data.md` |
+| Cookies, redirects, errors, middleware (auth), endpoints, streaming | `data.md` |
 | Modal, alert, dropdown | `overlays.md` |
 | Select, styled select (`c-select`), form values | `forms.md` |
 | Styles, theme | `css.md`, `classes.md` |

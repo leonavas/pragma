@@ -2,8 +2,8 @@ import { render, hooks, scopeOf, input, eventCall } from './directives.js'
 import { log } from './log.js'
 import { reactive, onChange, persist, persistStores } from './state.js'
 import { coerce } from './props.js'
-import { load, call } from './loader.js'
-import { navigate } from './router.js'
+import { load, call, stream } from './loader.js'
+import { navigate, redirect } from './router.js'
 
 let ov
 export let overlay
@@ -73,6 +73,7 @@ const services = {
   get query() { return cur?.query },
   get page() { return cur?.page },
   call: (name, data) => call(cur.url, name, data),
+  stream: (name, data, options) => stream(cur.url, name, data, options),
 }
 
 // A page or component instance: `scope` is what its HTML reads as `$x` (state, props, functions).
@@ -156,7 +157,7 @@ export function enter(route, mods, url, params, doc, pending) {
   if (document.querySelector('dialog,[popover]')) overlays()
   const p = (cur = { route, url, params, query: Object.fromEntries(url.searchParams), page: { loading: false, error: null } })
   // with ssr the loader sets `data` synchronously, so the page script sees it as the server did
-  const done = load(p, doc, pending).then(() => cur === p && schedule())
+  const done = load(p, doc, pending).then(to => cur === p && (to ? redirect(to, true) : schedule()))
   p.o = instance(document.querySelector('main[data-page]'), mods.page ?? {}, null)
   flush()
   return done

@@ -50,6 +50,22 @@ function fill(scope, value, literal = (text) => text) {
 
 const quoted = (text) => text.replace(/"/g, '&quot;')
 
+const CSS_VAR_END = /(?:^|;)--[a-z0-9-]+:$/
+const cssValue = (v) => (v == null || v === false || v === '' || /[;{}<]/.test(String(v)) ? null : String(v))
+
+function style(scope, value) {
+  const parts = template(value)
+  let out = parts[0]
+  for (let i = 1; i < parts.length; i += 2) {
+    const v = resolve(scope, parts[i])
+    if (!CSS_VAR_END.test(out)) out += v == null ? '' : escape(v)
+    else if (cssValue(v) == null) out = out.replace(CSS_VAR_END, '')
+    else out += escape(cssValue(v))
+    out += parts[i + 1]
+  }
+  return quoted(out.replace(/^;/, ''))
+}
+
 const PATH_AT = { text: 1, attr: 2, show: 1, if: 2, elif: 2, for: 3 }
 const CLIENT_ROOTS = new Set(['state', 'shared'])
 
@@ -84,6 +100,11 @@ function run(ops, scope, ctx, chain) {
         out += fill(scope, op[1])
         break
       case 'attr': {
+        if (op[1] === 'style' && isTemplate(op[2])) {
+          const css = style(scope, op[2])
+          if (css) out += ` style="${css}"`
+          break
+        }
         if (isTemplate(op[2])) {
           out += ` ${op[1]}="${fill(scope, op[2], quoted)}"`
           break
@@ -195,7 +216,7 @@ export function serverServices({ data, params, query, page }, log) {
   return {
     data: readonly(data), params: readonly(params), query: readonly(query), page: readonly(page), log,
     shared: new Proxy({}, { get: browserOnly('shared') }),
-    call: browserOnly('call'), navigate: browserOnly('navigate'), open: browserOnly('open'), close: browserOnly('close'), confirm: browserOnly('confirm'),
+    call: browserOnly('call'), stream: browserOnly('stream'), navigate: browserOnly('navigate'), open: browserOnly('open'), close: browserOnly('close'), confirm: browserOnly('confirm'),
   }
 }
 

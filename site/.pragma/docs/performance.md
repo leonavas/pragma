@@ -12,5 +12,5 @@ Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<hea
 - Omit `.js` on pages without interaction.
 - Keep heavy single-page code on that page. Load interaction-only code with `await import()` inside the action.
 - Return only displayed fields from `load`. Run independent requests with `Promise.all`.
-- Do not raise budgets in `pragma.json`; reduce code size instead.
+- Do not raise budgets in `pragma.json`; reduce code size instead. When one page must exceed them (a large editor or chat), add an explicit exception for that route only in `budgets.routes` (`structure.md`); never raise the global budget. `pragma check` and `pragma build` name the budget that applied.
 - Do not import large modules in `lib/state/`. Do not fetch data in `mount`. Do not enable `ssr` by default.

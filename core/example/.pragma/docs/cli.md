@@ -4,7 +4,7 @@
 |---|---|
 | `pragma -V` | Prints the installed CLI version. |
 | `pragma new <dir>` | Creates an app with the fixed structure. Warns and keeps existing files if `<dir>` is not empty. |
-| `pragma dev [--port 5180] [--host 127.0.0.1]` | Runs the dev server with WebSocket live reload. Shows an overlay on build errors while valid pages keep working. Starts Node >= 22 when `.server.js` exists. Prints `app/core-outdated` first if `.pragma/` is older than the CLI. |
+| `pragma dev [--port 5180] [--host 127.0.0.1] [--cf]` | Runs the dev server with WebSocket live reload. Shows an overlay on build errors while valid pages keep working. Starts Node >= 22 when `.server.js` exists. Prints `app/core-outdated` first if `.pragma/` is older than the CLI. `--cf`: Cloudflare bindings in dev (see below). |
 | `pragma check [--strict]` | Checks JS, HTML, CSS, budgets, accessibility, and WebMCP tools. `--strict` turns warnings into errors. |
 | `pragma build [--allow-outdated-core]` | Builds `dist/`. Stops with `app/core-outdated` if `.pragma/` is older than the CLI (`--allow-outdated-core` overrides this). |
 | `pragma serve [--port 3000] [--host 127.0.0.1]` | Serves `dist/` as in production. |
@@ -32,7 +32,7 @@ Fix the root cause; do not work around a rule.
 | `js/jsdoc-types` | Remove TypeScript and JSDoc types. |
 | `js/import` | Import only project files, `.pragma/`, and `package.json` dependencies (`packages.md`). Pass a quoted specifier to `import()` (`import('./chart.js')`), never a variable or `${}`. |
 | `js/comment`, `html/comment`, `css/comment` | Delete the comment. Use clear names. |
-| `js/vague-name` | Use descriptive names. Avoid generic words (`tmp`, `data`, `info`, `handler`, `util`), names ending in a digit, and names under 3 chars except `$ i j k id ok el ctx url log` and parameters of expression-body arrows. |
+| `js/vague-name` | Use descriptive names. Avoid generic words (`tmp`, `data`, `info`, `handler`, `util`), names ending in a single digit (`item2`; multi-digit numbers and pairs like `12x36` are fine), and names under 3 chars except `$ i j k id ok el ctx url log db kv` (server context keys) and parameters of expression-body arrows. |
 | `js/legacy-api` | Replace old API (`export const state`/`actions`, `export function mount`, `ctx.$`, `ctx.update`, `store()`). Use top-level `let`, functions, `function mount(el)`, and `export let` (`components.md`, `state.md`). |
 | `js/prop-write` | Do not mutate props (including via `:model`). Copy into a `let` (`let current = start`). |
 | `js/const-state` | Declare mutated state with `let`, not `const`. |
@@ -52,12 +52,15 @@ Fix the root cause; do not work around a rule.
 | `html/duplicate-module` | Use inline `<script>`/`<style>` or external `x.js`/`x.css`, not both. |
 | `html/component`, `html/unknown-component` | Follow component rules (`components.md`). |
 | `html/layout`, `html/title`, `html/head` | Follow layout and SEO rules (`routes.md`). |
+| `html/css-var` | Write `:--name` in lowercase kebab-case. A static value cannot contain `;`, `{`, `}`, or `<` (`css.md`). |
 | `html/class` | Toggle classes with `.name="path"`. Do not use `:class` or `{}` in `class` (`syntax.md`). |
 | `html/interpolation` | Replace `{{ }}` and `${ }` with `{path}` (`syntax.md`). |
-| `html/script`, `html/style-inline`, `html/on-inline` | Put at most one `<script>` (optional `type="module"`) and one `<style>` at the top level of a page or component `.html`. Put JSON-LD `<script type="application/ld+json">` only at the top level of a page (`routes.md`). |
+| `html/script`, `html/style-inline`, `html/on-inline` | Put at most one `<script>` (optional `type="module"`) and one `<style>` at the top level of a page or component `.html`. Replace `style="..."` with classes, or with `:--name="path"` and `var(--name)` in CSS (`css.md`). Put JSON-LD `<script type="application/ld+json">` only at the top level of a page (`routes.md`). |
 | `html/json-ld` | Fix invalid JSON or unclosed `{` in JSON-LD strings. Use `{` for a literal brace. |
 | `css/unknown-class`, `css/arbitrary-value` | Use classes from `classes.md` or custom classes per `css.md`. |
 | `app/structure`, `app/route-conflict` | Follow structure and route rules (`structure.md`, `routes.md`). |
+| `app/endpoint`, `app/middleware` | An endpoint exports only `GET`/`POST`/`PUT`/`PATCH`/`DELETE`; the middleware exports `handle` (`data.md`). |
+| `app/endpoint-json` (warning) | An endpoint answers JSON. Use `load` and actions for page data (`data.md`). |
 | `app/package` | Follow package rules (`packages.md`). |
 | `app/pragma-json` | Fix `pragma.json` (`structure.md`). |
 | `app/budget` | Reduce bundle size (`performance.md`). |
@@ -92,7 +95,7 @@ Every `<form>` is an agent tool (`webmcp.md`).
 | Path | Use |
 |---|---|
 | `client/` | HTML per route and assets. |
-| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest and serves `_404.html` with 404). Emitted when the app has a `*.server.js` or a `public/**/*.md`. |
+| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest and serves `_404.html` with 404). Emitted when the app has a `*.server.js` or a `public/**/*.md`. `run_worker_first` sends every request, also prebuilt pages, through the worker, so middleware runs for them. |
 | `server/node.mjs` | Run `node dist/server/node.mjs` (reads `PORT`, default 3000). Emitted when the app has a `*.server.js`. |
 
 Every server (`dev`, `serve`, Workers, Node) returns the matching `.md` from `public/` when `Accept` prefers `text/markdown` (`webmcp.md`).
@@ -152,12 +155,23 @@ Then deploy with `npx wrangler@4 deploy` (no `--config`).
 
 `load` and actions receive `env`, `db`, `kv`, and `files`. In `pragma dev` and `pragma serve`, `env` is the process environment (`KEY_NAME=value pragma dev`), and `db`, `kv`, and `files` are `undefined`. Check them before use.
 
+### Bindings in dev (`pragma dev --cf`)
+
+`pragma dev --cf` gives `.server.js` the bindings of the root `wrangler.jsonc` through wrangler `getPlatformProxy`: `vars`, secrets from `.dev.vars`, D1, KV, R2, `send_email`, rate limits, `ctx.waitUntil` and `caches`. Bindings with `"remote": true` use the real Cloudflare resource (log in first: `npx wrangler@4 login`); the others run locally with state in `.wrangler/` (exclude it from git).
+
+1. Install wrangler in the app: `npm i -D wrangler@4`.
+2. Create the root `wrangler.jsonc` (above).
+3. Run `pragma dev --cf`.
+
+Without `--cf`, `pragma dev` is unchanged. A change to `wrangler.jsonc` or `.dev.vars` restarts the node server. `cloudflare:workers` imports still do not work on Node (`packages.md`).
+
 ### Workers runtime limits
 
 - There is no filesystem. Do not use `node:fs`, `process.cwd()`, or paths on disk in `.server.js`. Import JSON with `import products from './_products.json' with { type: 'json' }`.
 - Read configuration from `env`, not `process.env`.
 - The generated config has no `nodejs_compat`. If a package needs `node:*` modules, add `"compatibility_flags": ["nodejs_compat"]` to the root `wrangler.jsonc` and tell the user.
 - If a feature cannot work on Workers, stop and tell the user before you change the target.
+- WebSocket endpoints (`status: 101`) work only on Workers. `pragma dev` and `pragma serve` run Node and cannot upgrade; test them with `npx wrangler@4 dev --config dist/server/wrangler.jsonc`.
 
 ### CI (GitHub Actions)
 

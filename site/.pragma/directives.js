@@ -1,7 +1,11 @@
-const D = Symbol(), S = Symbol(), NONE = { b: [] }
+const D = Symbol(), S = Symbol(), L = Symbol(), NONE = { b: [] }
 // Outer scope of each open component; slot content (data-slot="n") uses the one n levels up.
 const outer = []
 let auto = 0
+// Open `data-self` roots (a component inside itself); more than SELF_DEPTH means the data never ends.
+export const SELF_DEPTH = 64
+let deep = 0
+const defs = new Map()
 
 export const hooks = { on() {}, enter: (el, s) => s, remove() {} }
 export const scopeOf = el => el[S]
@@ -41,6 +45,22 @@ export function template(v) {
 }
 
 const str = v => (v == null ? '' : String(v))
+
+// `:--name`: false, null, undefined and '' remove the property; a value that could add declarations is refused.
+function cssValue(v, name) {
+  if (v == null || v === false || v === '') return null
+  v = String(v)
+  if (!/[;{}<]/.test(v)) return v
+  if (self.__pragmaDev) fail(`:--${name} got "${v}": a CSS value cannot contain ; { } or <`)
+  return null
+}
+
+// A component inside itself: its root arrives empty and gets the body from the page's <template data-def>.
+function fillSelf(el, id) {
+  let t = defs.get(id)
+  if (!t?.isConnected) defs.set(id, (t = document.querySelector(`template[data-def="${CSS.escape(id)}"]`) ?? fail(`<${el.getAttribute('data-self')}> renders itself but the page has no <template data-def="${id}">`)))
+  el.append(...t.content.firstElementChild.cloneNode(true).childNodes)
+}
 
 function fill(s, t) {
   let o = t[0]
@@ -96,6 +116,7 @@ function parse(el) {
       case 'text': d.b.push([0, template(value)]); break
       case 'show': d.b.push([1, ...cond(value)]); break
       case 'attr-': d.b.push(value.includes('{') ? [4, template(value), 0, a] : [2, path(value), 0, a]); break
+      case 'var-': d.b.push([6, path(value), 0, a]); break
       case 'class-': d.b.push([3, ...cond(value), a]); break
       case 'with-': (d.w ??= []).push([a, path(value)]); break
       case 'on-': hooks.on(a); d.e = 1; break
@@ -104,10 +125,12 @@ function parse(el) {
         if (self.__pragmaDev && d.m[0] !== 'state' && d.m[0] !== 'shared') fail(`data-model only accepts state or shared: "${value}"`)
         hooks.on('input'); d.e = 1; break
       case 'c': d.x = 1; break
+      case 'self': d.r = 1; break
       case 'page': d.x = 2; break
       case 'slot': d.u = +value
     }
   }
+  if (d.r && !el.firstChild) fillSelf(el, el.getAttribute('data-c'))
   // `{path}` beside child elements: <!--{path}-->text<!--}-->; the text node between them is bound.
   // <!--n{path}--> is slot content: it belongs to the owner n components up.
   for (let n = el.firstChild, m; n; n = n.nextSibling) {
@@ -116,7 +139,7 @@ function parse(el) {
     if (t?.nodeType !== 3) n.after((t = document.createTextNode('')))
     d.b.push([5, path(m[2]), t, +m[1]])
   }
-  return (el[D] = d.b.length || d.w || d.e || d.x || d.u ? d : NONE)
+  return (el[D] = d.b.length || d.w || d.e || d.x || d.u || d.r ? d : NONE)
 }
 
 function bind(el, [t, p, n, a], s) {
@@ -127,6 +150,9 @@ function bind(el, [t, p, n, a], s) {
     if (el.getAttribute(a) !== (v = fill(s, p))) el.setAttribute(a, v)
   } else if (t === 5) {
     if (n.data !== (v = str(get(s, p)))) n.data = v
+  } else if (t === 6) {
+    v = cssValue(get(s, p), a)
+    if (el.style.getPropertyValue('--' + a) !== (v ?? '')) v == null ? el.style.removeProperty('--' + a) : el.style.setProperty('--' + a, v)
   } else if (t === 2) {
     v = get(s, p)
     v = v === false || v == null ? null : v === true ? '' : String(v)
@@ -171,6 +197,7 @@ function visit(el, s, d = el[D] ?? parse(el)) {
     for (const [a, p] of d.w) w[a] = get(s, p)
     s = Object.assign({ __proto__: s }, w)
   }
+  if (d.r && ++deep > SELF_DEPTH) fail(`<${el.getAttribute('data-self')}> is nested more than ${SELF_DEPTH} levels inside itself: stop the recursion on data (a tree without cycles, <if>/<for> around the self call)`)
   if (d.x === 1) outer.push(s)
   if (d.x) s = hooks.enter(el, s, d.x, w)
   for (const b of d.b) bind(el, b, b[0] === 5 && b[3] ? (outer.at(-b[3]) ?? s) : s)
@@ -178,32 +205,90 @@ function visit(el, s, d = el[D] ?? parse(el)) {
   if (el.firstElementChild) walk(el, s)
   if (d.m) model(el, s, d.m)
   if (d.x === 1) outer.pop()
+  if (d.r) deep--
 }
 
 function walk(parent, s) {
   let last, id
   for (let n = parent.firstElementChild; n; n = n.nextElementSibling) {
+    if (n[L]) continue
     const d = n[D] ?? parse(n)
     if (d.t) [n, last, id] = block(n, d, lexical(s, d), last, d.id ?? id)
     else visit(n, s, d)
   }
 }
 
-function clone(t, id) {
+// Motion is CSS only: a block root inserted after the block's first render gets `data-entering`
+// until its animations end; a removed one gets `data-leaving` + inert and stays until they end.
+let leaving = [], entering = []
+const reduced = matchMedia('(prefers-reduced-motion: reduce)')
+
+function clone(t, d, id) {
   const n = t.content.firstElementChild.cloneNode(true)
   n.setAttribute('data-of', id)
+  if (d.r && !reduced.matches) {
+    n.setAttribute('data-entering', '')
+    entering.push(n)
+  }
   return n
 }
 
 function drop(n) {
+  if (n[L]) return
+  n[L] = {}
+  leaving.push(n)
+}
+
+function stay(n) {
+  n[L] = null
+  n.removeAttribute('data-leaving')
+  n.inert = false
+}
+
+function gone(n, token) {
+  if (n[L] !== token) return
+  n[L] = null
   hooks.remove(n)
   n.remove()
+}
+
+const running = n => n.getAnimations({ subtree: true }).filter(a => a.effect?.getComputedTiming().endTime < Infinity)
+
+function after(animations, done) {
+  if (!animations.length) return done()
+  const ms = Math.max(...animations.map(a => a.effect.getComputedTiming().endTime - (a.currentTime ?? 0)))
+  Promise.race([Promise.allSettled(animations.map(a => a.finished)), new Promise(r => setTimeout(r, ms + 50))]).then(done)
+}
+
+function settle() {
+  if (!leaving.length && !entering.length) return
+  const out = leaving.filter(n => n[L]), into = entering, motion = !reduced.matches
+  leaving = []
+  entering = []
+  if (motion) for (const n of out) {
+    n.removeAttribute('data-entering')
+    n.setAttribute('data-leaving', '')
+    n.inert = true
+  }
+  const waits = [...out.map(n => [motion ? running(n) : [], gone.bind(null, n, n[L])]), ...into.map(n => [running(n), () => n.removeAttribute('data-entering')])]
+  for (const [animations, done] of waits) after(animations, done)
+}
+
+const next = n => {
+  do n = n.nextElementSibling
+  while (n?.[L])
+  return n
 }
 
 // else-if/else/empty have no tid of their own: instances use the tid of the if/for opening the chain (same as SSR).
 // `last`: an earlier branch of the chain is already on.
 function block(t, d, s, last, id) {
-  if (d.t === 2) return list(t, d, s)
+  const r = d.t === 2 ? list(t, d, s) : branch(t, d, s, last, id)
+  d.r = 1
+  return r
+}
+
+function branch(t, d, s, last, id) {
   const chained = d.t > 2 && last
   const on = !chained && (d.t === 3 || !get(s, d.p) === d.n)
   let n = t.nextElementSibling
@@ -212,9 +297,11 @@ function block(t, d, s, last, id) {
     if (n) drop(n)
     return [t, chained, id]
   }
-  if (n) visit(n, s)
-  else {
-    t.after((n = clone(t, id)))
+  if (n) {
+    if (n[L]) stay(n)
+    visit(n, s)
+  } else {
+    t.after((n = clone(t, d, id)))
     visit(n, s)
     ;(n.matches('[autofocus]') ? n : n.querySelector('[autofocus]'))?.focus()
   }
@@ -236,10 +323,13 @@ function list(t, d, s) {
   for (let i = 0; i < keys.length; i++) {
     let n = old.get(keys[i])
     if (!n) {
-      n = clone(t, id)
+      n = clone(t, d, id)
       n.setAttribute('data-key', keys[i])
       ref.after(n)
-    } else if (ref.nextElementSibling !== n) ref.after(n)
+    } else {
+      if (n[L]) stay(n)
+      if (next(ref) !== n) ref.after(n)
+    }
     visit(n, scopes[i])
     ref = n
   }
@@ -248,5 +338,7 @@ function list(t, d, s) {
 
 export function render(el, s) {
   outer.length = 0
+  deep = 0
   visit(el, s)
+  settle()
 }

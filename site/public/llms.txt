@@ -27,7 +27,7 @@ Validate the pragma version before you change code:
 - [Components](https://pragma.leonavas.com/docs/components.md): components, props, slots
 - [State: script, actions, derived values, stores](https://pragma.leonavas.com/docs/state.md): script: state, actions, derived values, mount, stores
 - [Routes and router](https://pragma.leonavas.com/docs/routes.md): pages, links, params, query, layouts (including nested), head tags
-- [Data: load, server actions, skeleton, SSR](https://pragma.leonavas.com/docs/data.md): load, server actions, skeleton, SSR
+- [Data: load, server actions, skeleton, SSR, middleware, endpoints](https://pragma.leonavas.com/docs/data.md): load, server actions, skeleton, SSR
 - [Overlays: modal, alert, dropdown](https://pragma.leonavas.com/docs/overlays.md): modal, alert, dropdown
 - [CSS](https://pragma.leonavas.com/docs/css.md): styles and theme
 - [Utility classes](https://pragma.leonavas.com/docs/classes.md): every utility class
