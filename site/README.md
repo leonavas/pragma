@@ -94,8 +94,8 @@ Fonts: `--font-display` = Pragma Reto (every `h1`, and `.section-title` on the l
 Martian Mono (other headings and UI, `font-stretch` 75-112%), `font-sans` = Hanken Grotesk (prose).
 Pragma Reto is the brand font: one weight, no curves, 91 glyphs (letters, digits, basic punctuation).
 A missing glyph falls back to Martian Mono. The source is `design/font/build_reto.py` (see
-`design/README.md`). The header logo is the word "pragma" in the same shapes, as inline SVG in
-`routes/_layout.html`; the favicon is the letter p. Global classes: `.wrap`, `.btn` (`.btn-primary`, `.btn-small`), `.nav-link`,
+`design/README.md`). The header logo is the Pipe mark (a bar and a chevron) and the word "pragma" in
+the same shapes, as inline SVG in `routes/_layout.html`; the favicon is the mark. Global classes: `.wrap`, `.btn` (`.btn-primary`, `.btn-small`), `.nav-link`,
 `.prose`, `.doc-section`, `.todo`, `.label`. Code colors: `--code-*` tokens, used by
 `::highlight(code-*)` in the showcase and by `[data-hl]` in the SEO response view.
 
