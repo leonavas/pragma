@@ -51,8 +51,8 @@ utils/
   highlight.js                 highlight.js wrapper: markLines() on the server, highlightLines() for token spans
   code-lines.js                codeKinds (shared with the client) and plainLines()
 public/
-  fonts/                       Martian Mono + Hanken Grotesk (woff2, OFL)
-  og.png                       1200x630 Open Graph image
+  fonts/                       Pragma Reto (ours, MIT) + Martian Mono + Hanken Grotesk (woff2, OFL)
+  og.png                       1200x630 Open Graph image (source: design/og/og.html)
   robots.txt, sitemap.xml      sitemap lists every indexable page; update it when you add one
   index.md, agents.md          the landing and /agents in markdown (generated)
   llms.txt, llms-full.txt      llmstxt.org index and every doc in one file (generated)
@@ -90,8 +90,12 @@ has `notool`.
 Dark only. `lib/theme.css` defines `ground`, `sunken`, `surface`, `raised`, `line`, `line-strong`,
 `ink`, `muted`, `faint`, `accent` (phosphor green) and `accent-ink`; each becomes a utility
 (`bg-ground`, `text-muted`, `border-line`, `text-accent`...). `primary-*` is remapped to the accent.
-Fonts: `font-mono` = Martian Mono (headings and UI, `font-stretch` 75-112%), `font-sans` = Hanken
-Grotesk (prose). Global classes: `.wrap`, `.btn` (`.btn-primary`, `.btn-small`), `.nav-link`,
+Fonts: `--font-display` = Pragma Reto (every `h1`, and `.section-title` on the landing), `font-mono` =
+Martian Mono (other headings and UI, `font-stretch` 75-112%), `font-sans` = Hanken Grotesk (prose).
+Pragma Reto is the brand font: one weight, no curves, 91 glyphs (letters, digits, basic punctuation).
+A missing glyph falls back to Martian Mono. The source is `design/font/build_reto.py` (see
+`design/README.md`). The header logo is the word "pragma" in the same shapes, as inline SVG in
+`routes/_layout.html`; the favicon is the letter p. Global classes: `.wrap`, `.btn` (`.btn-primary`, `.btn-small`), `.nav-link`,
 `.prose`, `.doc-section`, `.todo`, `.label`. Code colors: `--code-*` tokens, used by
 `::highlight(code-*)` in the showcase and by `[data-hl]` in the SEO response view.
 

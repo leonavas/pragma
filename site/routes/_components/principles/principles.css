@@ -1,10 +1,11 @@
 [data-c="principles"] { padding-block: 5rem; }
 .principles-title {
-  max-width: 22ch;
-  font-size: clamp(1.75rem, 3.6vw, 2.5rem);
-  font-weight: 500;
-  line-height: 1.08;
-  letter-spacing: -0.03em;
+  max-width: 30ch;
+  font-family: var(--font-display);
+  font-stretch: 100%;
+  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-weight: 400;
+  line-height: 1.2;
 }
 .principle {
   display: grid;
