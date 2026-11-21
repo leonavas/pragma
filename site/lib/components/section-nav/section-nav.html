@@ -18,10 +18,10 @@
   [data-c="section-nav"] .section-nav-list { display: grid; counter-reset: section; border-top: 1px solid var(--color-line); }
   [data-c="section-nav"] .section-nav-link { display: grid; grid-template-columns: 2.25rem 1fr; align-items: baseline; gap: 0.25rem 0; padding: 0.875rem 0; border-bottom: 1px solid var(--color-line); color: var(--color-ink); text-decoration: none; counter-increment: section; }
   [data-c="section-nav"] .section-nav-link::before { content: counter(section, decimal-leading-zero); grid-row: span 2; color: var(--color-faint); font: 0.6875rem var(--font-mono); }
-  [data-c="section-nav"] .section-nav-name { font: 500 0.875rem var(--font-mono); }
+  [data-c="section-nav"] .section-nav-name { font-size: 0.9375rem; font-weight: 550; }
   [data-c="section-nav"] .section-nav-hint { color: var(--color-muted); font-size: 0.875rem; }
   [data-c="section-nav"] .section-nav-link:is(:hover, [aria-current="page"]) .section-nav-name,
-  [data-c="section-nav"] [aria-current="page"]::before { color: var(--color-accent); }
+  [data-c="section-nav"] [aria-current="page"]::before { color: var(--color-accent-text); }
   [data-c="section-nav"]:is(.compact, .pager) .section-nav-list { border-top: 0; }
   [data-c="section-nav"].compact .section-nav-link { grid-template-columns: 1.75rem 1fr; padding: 0.4rem 0; border: 0; }
   [data-c="section-nav"]:is(.compact, .pager) .section-nav-link::before { grid-row: auto; }

@@ -16,7 +16,7 @@
 <div :data-status="$status">
   <p class="status-line">
     <span class="status-dot" aria-hidden="true"></span>
-    <span class="font-mono text-sm text-muted" .text-accent="$passed" .text-danger-300="$failed">{$status}</span>
+    <span class="font-mono text-sm text-muted" .text-accent-text="$passed" .text-error="$failed">{$status}</span>
   </p>
   <div class="flex flex-wrap gap-2">
     <button type="button" class="btn btn-small" @click="build('passed')" :disabled="$running">Run build</button>

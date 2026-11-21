@@ -67,7 +67,7 @@
     </div>
   </if>
   <else-if page.error>
-    <p class="font-mono text-xs text-danger-300" role="alert">{page.error.message}</p>
+    <p class="font-mono text-xs text-error" role="alert">{page.error.message}</p>
   </else-if>
   <else>
     <div class="grid min-w-0 gap-4">
@@ -99,9 +99,9 @@
   .response-tab { border-color: var(--color-line); color: var(--color-faint); }
   .response-tab:hover { color: var(--color-ink); }
   .response-tab[aria-pressed="true"] { border-color: var(--color-accent); color: var(--color-ink); }
-  [data-tone="ok"] { color: var(--color-accent); }
-  [data-tone="warn"] { color: var(--color-warning-300); }
-  [data-tone="error"] { color: var(--color-danger-300); }
+  [data-tone="ok"] { color: var(--color-accent-text); }
+  [data-tone="warn"] { color: var(--color-warning); }
+  [data-tone="error"] { color: var(--color-error); }
   .response-code {
     max-height: 22rem;
     padding: 0.625rem 0;
@@ -114,7 +114,7 @@
   .response-line { display: flex; padding-inline: 0.75rem; }
   .response-origin { flex: none; width: 3.75rem; color: var(--color-faint); user-select: none; }
   .response-origin:empty, .response-note:empty { display: none; }
-  .response-origin[data-origin="page"] { color: var(--color-accent); }
+  .response-origin[data-origin="page"] { color: var(--color-accent-text); }
   [data-origin="layout"] .response-text { opacity: 0.62; }
   .response-text { min-width: 0; padding-left: 1.25em; text-indent: -1.25em; white-space: pre-wrap; overflow-wrap: anywhere; }
 </style>

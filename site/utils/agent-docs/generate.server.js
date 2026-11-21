@@ -151,7 +151,7 @@ async function generate() {
   await writePublic('index.md', landing)
   const agents = await fill(await readText(new URL('agents.md', templates)), loaded)
   await writePublic('agents.md', agents)
-  await checkHeadings(landing, ['routes/index.html', 'routes/_components/hero/hero.html', 'routes/_components/setup-tool/setup-tool.html', 'routes/_components/docs-tool/docs-tool.html'])
+  await checkHeadings(landing, ['routes/index.html', 'routes/_components/hero/hero.html'])
   await checkHeadings(agents, ['routes/agents.html', 'routes/_components/setup-tool/setup-tool.html', 'routes/_components/docs-tool/docs-tool.html'])
   await checkTopicLists(loaded)
   for (const problem of drift) process.stderr.write('drift: ' + problem + '\n')

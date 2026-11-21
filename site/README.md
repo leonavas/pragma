@@ -18,9 +18,9 @@ pragma build && pragma serve  # production build; run from this folder (see "Sou
 ```
 routes/
   _layout.html                 header, footer and the site-wide <head> defaults (SEO/OGP)
-  index.html                   landing: <p-audience>, <p-hero>, why, showcase, <p-principles>, tools, install, sections
+  index.html                   landing: <p-audience>, <p-hero>, why, showcase, <p-principles>, install, sections
   agents.html                  /agents: the prompt, install, files for agents, the WebMCP tools
-  _components/hero|principles|cli-session/   landing-only pieces (<p-...>); cli-session is the animated hero terminal
+  _components/hero|principles|prompt/   landing-only pieces (<p-...>); prompt is the hero box with the agent prompt and its Copy button (same text as /agents)
   _components/audience/        Human / Agent switch (real links) + the "agents: read /llms-full.txt" note
   _components/docs-tool/       WebMCP tool get_pragma_docs (fetches public/docs/<topic>.md)
   _components/setup-tool/      WebMCP tool get_setup_instructions (commands + prompt for an app description)
@@ -51,7 +51,7 @@ utils/
   highlight.js                 highlight.js wrapper: markLines() on the server, highlightLines() for token spans
   code-lines.js                codeKinds (shared with the client) and plainLines()
 public/
-  fonts/                       Pragma Reto (ours, MIT) + Martian Mono + Hanken Grotesk (woff2, OFL)
+  fonts/                       Inter + JetBrains Mono (variable woff2, latin subset from Fontsource, OFL)
   og.png                       1200x630 Open Graph image (source: design/og/og.html)
   robots.txt, sitemap.xml      sitemap lists every indexable page; update it when you add one
   index.md, agents.md          the landing and /agents in markdown (generated)
@@ -87,13 +87,16 @@ has `notool`.
 
 ## Design tokens
 
-Dark only. `lib/theme.css` defines `ground`, `sunken`, `surface`, `raised`, `line`, `line-strong`,
-`ink`, `muted`, `faint`, `accent` (phosphor green) and `accent-ink`; each becomes a utility
-(`bg-ground`, `text-muted`, `border-line`, `text-accent`...). `primary-*` is remapped to the accent.
-Fonts: `--font-display` = Pragma Reto (every `h1`, and `.section-title` on the landing), `font-mono` =
-Martian Mono (other headings and UI, `font-stretch` 75-112%), `font-sans` = Hanken Grotesk (prose).
-Pragma Reto is the brand font: one weight, no curves, 91 glyphs (letters, digits, basic punctuation).
-A missing glyph falls back to Martian Mono. The source is `design/font/build_reto.py` (see
+Light and dark. `lib/theme.css` defines the light values in `:root` and the dark ones in
+`@media (prefers-color-scheme: dark)`, so the site follows the device with no script (the site does
+not import `.pragma/theme.js`, so the compiler injects no `data-theme` boot script and `dark:`
+utilities stay off). Tokens: `ground`, `sunken`, `surface`, `raised`,
+`line`, `line-strong`, `ink`, `muted`, `faint`, `accent` (phosphor lime fill in both modes), `accent-text` (green text: deep in light so it reads on white, lime in dark),
+`accent-ink`, `error` and `warning`; each becomes a utility (`bg-ground`, `text-muted`, `text-error`...).
+Use `error`/`warning` for status text, never a palette shade (`danger-300` is unreadable on light).
+`primary-*` is remapped to the accent. Fonts: `font-sans` = Inter (headings, UI, prose), `font-mono` =
+JetBrains Mono (code, CLI output and data only). The Pragma Reto brand font now lives only in the logo
+SVG (source: `design/font/build_reto.py`, see
 `design/README.md`). The header logo is the Pipe mark (a bar and a chevron) and the word "pragma" in
 the same shapes, as inline SVG in `routes/_layout.html`; the favicon is the mark. Global classes: `.wrap`, `.btn` (`.btn-primary`, `.btn-small`), `.nav-link`,
 `.prose`, `.doc-section`, `.todo`, `.label`. Code colors: `--code-*` tokens, used by
@@ -134,7 +137,7 @@ One folder per section under `routes/examples/<section>/`, rendered at `/example
 - Static CLI output (commands, `pragma check` errors, logs) goes in `<c-terminal title="~/my-app">`
   with a `<pre tabindex="0" aria-label="..."><code>` inside. Classes for the spans: `term-cmd`
   (a command; the `$ ` is added by CSS), `term-ok`, `term-err`, `term-warn`, `term-dim`, `term-ink`,
-  `term-link`. The landing's animated terminal is a different component, `<p-cli-session>`.
+  `term-link`.
 
 ## How to add an example
 

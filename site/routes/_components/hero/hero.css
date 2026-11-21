@@ -1,15 +1,47 @@
 [data-c="hero"] {
-  padding-block: 3rem 4.5rem;
-  border-bottom: 1px solid var(--color-line);
+  padding-block: 3.5rem 4.5rem;
 }
-.hero-title { font-size: clamp(2rem, 5.4vw, 4.1rem); }
-.hero-grid { display: grid; gap: 3rem; margin-top: 2.25rem; }
+.hero-stack {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+.hero-title {
+  max-width: 17ch;
+  font-size: clamp(2.375rem, 6vw, 4.75rem);
+  line-height: 1.04;
+}
+.hero-lede {
+  max-width: 34rem;
+  margin-top: 1.5rem;
+  color: var(--color-muted);
+  font-size: clamp(1.0625rem, 1.6vw, 1.25rem);
+  line-height: 1.6;
+}
+.hero-prompt {
+  width: 100%;
+  max-width: 46rem;
+  margin-top: 2.5rem;
+}
+.hero-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 2rem;
+  margin-top: 1.5rem;
+  font-size: 0.9375rem;
+}
+.hero-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  color: var(--color-muted);
+  text-decoration: underline;
+  text-decoration-color: var(--color-line-strong);
+}
+.hero-links a:hover { color: var(--color-ink); text-decoration-color: var(--color-accent-text); }
 @media (min-width: 64rem) {
-  [data-c="hero"] { padding-block: 4.5rem 6rem; }
-  .hero-grid {
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-    gap: 4.5rem;
-    align-items: start;
-    margin-top: 3.5rem;
-  }
+  [data-c="hero"] { padding-block: 6rem 7rem; }
+  .hero-lede { margin-top: 1.75rem; }
+  .hero-prompt { margin-top: 3rem; }
 }

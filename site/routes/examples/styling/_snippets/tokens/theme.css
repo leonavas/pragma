@@ -16,5 +16,5 @@
 }
 
 @layer components {
-  .nav-link[aria-current="page"] { color: var(--color-accent); }
+  .nav-link[aria-current="page"] { color: var(--color-accent-text); }
 }

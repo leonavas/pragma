@@ -1,0 +1,96 @@
+<script>
+  import { log } from 'pragma'
+
+  const promptText = 'Read https://pragma.leonavas.com/llms-full.txt and create a pragma app that [describe your app]. Install pragma if missing, or validate the version with pragma -V and .pragma/version and run pragma self-update and pragma upgrade if outdated. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.'
+  const resetDelayMs = 1800
+  const buttonLabels = { idle: 'Copy the prompt', copied: 'Copied', failed: 'Copy failed' }
+  const announcements = { idle: '', copied: 'Prompt copied to the clipboard.', failed: 'Copy failed. Select the prompt and copy it by hand.' }
+
+  let copyStatus = 'idle'
+  let resetTimer = 0
+
+  const copied = () => copyStatus === 'copied'
+  const buttonLabel = () => buttonLabels[copyStatus]
+  const announcement = () => announcements[copyStatus]
+
+  async function copyPrompt() {
+    clearTimeout(resetTimer)
+    try {
+      await navigator.clipboard.writeText(promptText)
+      copyStatus = 'copied'
+    } catch (failure) {
+      log.warn('prompt copy failed', { 'exception.message': failure.message })
+      copyStatus = 'failed'
+    }
+    resetTimer = setTimeout(() => { copyStatus = 'idle' }, resetDelayMs)
+  }
+
+  function mount() {
+    return () => clearTimeout(resetTimer)
+  }
+</script>
+
+<div class="prompt">
+  <p class="prompt-text" tabindex="0" aria-label="Prompt for a coding agent">Read https://pragma.leonavas.com/llms-full.txt and create a pragma app that <mark class="prompt-slot">[describe your app]</mark>. Install pragma if missing, or validate the version with <code>pragma -V</code> and <code>.pragma/version</code> and run <code>pragma self-update</code> and <code>pragma upgrade</code> if outdated. Follow the <code>AGENTS.md</code> that <code>pragma new</code> writes into the app, and finish with <code>pragma check --strict</code> at zero errors and zero warnings.</p>
+  <div class="prompt-actions">
+    <p class="prompt-hint">Replace the brackets with what you want to build.</p>
+    <button type="button" class="btn btn-primary prompt-copy" @click="copyPrompt">
+      <if $copied>
+        <svg class="prompt-check size-4" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      </if>
+      <else>
+        <svg class="size-4" viewBox="0 0 16 16" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"></rect><path d="M10.5 3.5v-.5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h.5" fill="none" stroke="currentColor" stroke-width="1.5"></path></svg>
+      </else>
+      <span>{$buttonLabel}</span>
+    </button>
+  </div>
+  <p class="sr-only" role="status">{$announcement}</p>
+</div>
+
+<style>
+  .prompt {
+    display: grid;
+    overflow: hidden;
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-2xl);
+    background: var(--color-surface);
+    box-shadow: var(--shadow-lg);
+    text-align: left;
+  }
+  .prompt-text {
+    padding: 1.5rem 1.5rem 1.25rem;
+    color: var(--color-ink);
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+  }
+  .prompt-text:focus-visible { outline-offset: -2px; border-radius: var(--radius-2xl) var(--radius-2xl) 0 0; }
+  .prompt-text code { color: var(--color-ink); font-size: 0.875em; white-space: nowrap; }
+  .prompt-slot {
+    padding: 0.05em 0.3em;
+    border-radius: var(--radius-sm);
+    background: color-mix(in oklch, var(--color-accent) 45%, transparent);
+    color: var(--color-ink);
+  }
+  .prompt-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1.5rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--color-line);
+    background: var(--color-sunken);
+  }
+  .prompt-hint { color: var(--color-muted); font-size: 0.875rem; }
+  .prompt-copy { min-width: 11rem; }
+  @media (max-width: 39.99rem) {
+    .prompt-text { padding: 1.25rem 1.25rem 1rem; font-size: 1rem; }
+    .prompt-actions { padding: 1rem 1.25rem; }
+    .prompt-copy { width: 100%; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .prompt-check { stroke-dasharray: 16; animation: prompt-check 0.32s var(--ease-out) both; }
+  }
+  @keyframes prompt-check { from { stroke-dashoffset: 16; } }
+</style>

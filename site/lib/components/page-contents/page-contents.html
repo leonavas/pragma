@@ -1,4 +1,4 @@
-<nav aria-label="On this page" class="sticky top-14 z-30 flex h-12 items-center gap-1 border-b border-line bg-ground font-mono text-xs lg:top-24 lg:block lg:h-auto lg:self-start lg:border-b-0 lg:bg-transparent lg:pt-14">
+<nav aria-label="On this page" class="sticky top-14 z-30 flex h-12 items-center gap-1 border-b border-line bg-ground text-sm lg:top-24 lg:block lg:h-auto lg:self-start lg:border-b-0 lg:bg-transparent lg:pt-14">
   <p class="hidden text-faint lg:mb-4 lg:block lg:uppercase lg:tracking-wider" aria-hidden="true">On this page</p>
   <ul class="contents-list flex h-full min-w-0 gap-5 overflow-x-auto pr-10 lg:grid lg:h-auto lg:gap-3 lg:overflow-visible lg:pr-0"><slot></slot></ul>
 </nav>
@@ -8,7 +8,7 @@
   [data-c="page-contents"] .contents-list { padding-left: var(--gutter); scrollbar-width: none; mask-image: linear-gradient(to right, transparent, #000 var(--gutter), #000 calc(100% - 2.5rem), transparent); }
   [data-c="page-contents"] li { display: flex; flex: none; }
   [data-c="page-contents"] a { display: inline-flex; align-items: center; color: var(--color-muted); text-decoration: none; white-space: nowrap; }
-  [data-c="page-contents"] a:hover { color: var(--color-accent); }
+  [data-c="page-contents"] a:hover { color: var(--color-accent-text); }
   [data-c="page-contents"] a:focus-visible { outline-offset: -2px; }
   @media (min-width: 64rem) {
     [data-c="page-contents"] { margin-inline: 0; }

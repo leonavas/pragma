@@ -1,10 +1,10 @@
 <head>
   <meta name="description" content="pragma is a web framework built for coding agents: native HTML, CSS and JavaScript, prebuilt pages, WebMCP tools and a Rust CLI that checks everything an agent writes.">
-  <meta name="theme-color" content="#0e1014">
-  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#fafbfc" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e1014" media="(prefers-color-scheme: dark)">
+  <meta name="color-scheme" content="light dark">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="preload" as="font" type="font/woff2" href="/fonts/martian-mono.woff2" crossorigin>
-  <link rel="preload" as="font" type="font/woff2" href="/fonts/pragma-reto.woff2" crossorigin>
+  <link rel="preload" as="font" type="font/woff2" href="/fonts/inter.woff2" crossorigin>
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="pragma">
   <meta property="og:locale" content="en_US">
@@ -16,11 +16,11 @@
   <meta property="og:image:alt" content="pragma: native HTML, CSS and JS with a Rust CLI">
   <meta name="twitter:card" content="summary_large_image">
 </head>
-<a href="#main" class="skip-link bg-accent px-3 py-2 font-mono text-xs text-accent-ink no-underline">Skip to content</a>
+<a href="#main" class="skip-link bg-accent px-3 py-2 text-sm font-medium text-accent-ink no-underline">Skip to content</a>
 <header class="sticky top-0 z-40 border-b border-line bg-ground">
-  <nav class="wrap flex h-14 items-center justify-between gap-3 font-mono text-xs" aria-label="Main">
+  <nav class="wrap flex h-14 items-center justify-between gap-3 text-sm" aria-label="Main">
     <a href="/" class="flex shrink-0 items-center gap-1.5 text-ink no-underline" aria-label="pragma home">
-      <svg class="size-7 text-accent" viewBox="0 0 32 32" aria-hidden="true"><path d="M8 4H12V28H8Z" fill="currentColor"></path><path d="M16 8L21 13L16 18" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="square"></path></svg>
+      <svg class="size-7 text-accent-text" viewBox="0 0 32 32" aria-hidden="true"><path d="M8 4H12V28H8Z" fill="currentColor"></path><path d="M16 8L21 13L16 18" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="square"></path></svg>
       <svg width="72" height="19" viewBox="0 -7 124.5 33" fill="currentColor" fill-rule="evenodd" aria-hidden="true"><path d="M0 1H16V17H3V25H0ZM3 4V14H13V4Z"></path><path d="M22 1H33V4H25V17H22Z"></path><path d="M36.5 1H52.5V17H36.5V7.5H49.5V4H36.5ZM39.5 10.5V14H49.5V10.5Z"></path><path d="M58.5 1H74.5V25H58.5V22H71.5V17H58.5ZM61.5 4V14H71.5V4Z"></path><path d="M80.5 1H102.5V17H99.5V4H93V17H90V4H83.5V17H80.5Z"></path><path d="M108.5 1H124.5V17H108.5V7.5H121.5V4H108.5ZM111.5 10.5V14H121.5V10.5Z"></path></svg>
     </a>
     <ul class="flex items-center gap-3 sm:gap-6">
@@ -38,7 +38,7 @@
 </header>
 <main data-page id="main" tabindex="-1" class="flex-1 outline-none"><slot></slot></main>
 <footer class="mt-24 border-t border-line">
-  <div class="wrap flex flex-col gap-4 py-8 font-mono text-xs text-faint md:flex-row md:items-center md:justify-between">
+  <div class="wrap flex flex-col gap-4 py-8 text-sm text-faint md:flex-row md:items-center md:justify-between">
     <p class="max-w-md">Built with pragma: prebuilt HTML, no client framework, zero warnings from <span class="whitespace-nowrap text-muted">pragma check --strict</span>.</p>
     <ul class="flex flex-wrap gap-x-5 md:shrink-0">
       <li><a href="/guide" class="nav-link inline-flex min-h-11 items-center">Guide</a></li>

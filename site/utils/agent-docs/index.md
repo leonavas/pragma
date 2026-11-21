@@ -2,11 +2,14 @@
 
 Agents: the full docs are one file at {{origin}}/llms-full.txt (index: {{origin}}/llms.txt). This page in HTML: {{origin}}/. For agents: {{origin}}/agents.md.
 
-Send your agent this page. It reads the docs and writes native HTML, CSS and JavaScript. A Rust CLI rejects anything off-spec with the file, the line and the fix. Pages ship prebuilt, with only the JavaScript they use, and every form is a tool an agent can call.
+Paste this into your coding agent. It reads the docs, builds the app and checks every line.
 
-- [Hand it to your agent]({{origin}}/agents.md)
-- [Install](#install)
-- [Read the examples]({{origin}}/examples)
+```
+Read {{origin}}/llms-full.txt and create a pragma app that [describe your app]. Install pragma if missing, or validate the version with pragma -V and .pragma/version and run pragma self-update and pragma upgrade if outdated. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.
+```
+
+- [Install the CLI yourself](#install)
+- [Read the guide]({{origin}}/guide)
 
 ## Install
 
@@ -64,6 +67,8 @@ This is the whole component, read from disk when the page renders: the source yo
 
 {{source routes/_components/task-list/task-list.html}}
 
+{{tools routes/_components/task-list/task-list.html}}
+
 ## Four constraints, enforced by the compiler
 
 ### Native
@@ -97,11 +102,12 @@ Braces put a value in text, a colon binds an attribute, a dot a class, an at sig
 The starter page loads 12.5 kB of JavaScript, gzip, router and runtime included. Each page preloads only the modules it imports, and pragma build prints the JS size of each page.
 
 ```
+$ pragma build
 page     JS gzip
-/        10.0 KB
-CSS       4.1 KB
+/        12.5 KB
+CSS       3.9 KB
 1 page(s)
-dist/ built in 6 ms
+dist/ built in 14 ms
 ```
 
 ### Agent-first
@@ -113,15 +119,9 @@ routes/index.html:8:4 error [html/unknown-name]
   $count is not declared in the script of routes/index.html:
   add `let count = …` (state), `export let count = …` (prop)
   or `function count() { … }`
++ let count = 0
+no problems found
 ```
-
-## Tools for agents on this page
-
-An agent in the browser sees these forms as WebMCP tools and calls them. You can use the same forms. Agents without a browser read the same docs at {{origin}}/llms-full.txt.
-
-{{tools routes/_components/setup-tool/setup-tool.html routes/_components/docs-tool/docs-tool.html routes/_components/task-list/task-list.html}}
-
-[Everything for agents]({{origin}}/agents.md)
 
 ## Every feature, running on this page's runtime
 

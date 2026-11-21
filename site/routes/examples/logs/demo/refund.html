@@ -27,7 +27,7 @@
     <div class="skeleton h-28" aria-busy="true" aria-label="Loading refund"></div>
   </if>
   <else-if page.error>
-    <p class="font-mono text-sm text-danger-300" role="alert">{page.error.message}</p>
+    <p class="font-mono text-sm text-error" role="alert">{page.error.message}</p>
   </else-if>
   <else>
     <article class="grid gap-4 border border-line bg-surface p-5" aria-labelledby="refund-title">
@@ -42,7 +42,7 @@
         <button type="button" class="btn btn-small" @click="send('reopen')" :disabled="$sending">Reopen</button>
       </div>
       <if $error>
-        <p class="font-mono text-xs text-danger-300" role="alert">{$error}</p>
+        <p class="font-mono text-xs text-error" role="alert">{$error}</p>
       </if>
     </article>
   </else>

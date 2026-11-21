@@ -1,61 +1,53 @@
 @font-face {
-  font-family: "Martian Mono";
-  src: url("/fonts/martian-mono.woff2") format("woff2-variations");
+  font-family: "Inter";
+  src: url("/fonts/inter.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono.woff2") format("woff2-variations");
   font-weight: 100 800;
-  font-stretch: 75% 112.5%;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Hanken Grotesk";
-  src: url("/fonts/hanken-grotesk.woff2") format("woff2-variations");
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Pragma Reto";
-  src: url("/fonts/pragma-reto.woff2") format("woff2");
-  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 
 @layer tokens {
   :root {
-    color-scheme: dark;
+    --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
-    --font-mono: "Martian Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-    --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
-    --font-display: "Pragma Reto", "Martian Mono", ui-monospace, monospace;
-
-    --color-ground: oklch(0.158 0.006 255);
-    --color-sunken: oklch(0.132 0.006 255);
-    --color-surface: oklch(0.192 0.007 255);
-    --color-raised: oklch(0.225 0.008 255);
-    --color-line: oklch(0.285 0.008 255);
-    --color-line-strong: oklch(0.38 0.01 255);
-    --color-ink: oklch(0.945 0.004 255);
-    --color-muted: oklch(0.74 0.008 255);
-    --color-faint: oklch(0.6 0.008 255);
+    --color-ground: oklch(0.985 0.002 255);
+    --color-sunken: oklch(0.962 0.003 255);
+    --color-surface: oklch(1 0 0);
+    --color-raised: oklch(0.94 0.004 255);
+    --color-line: oklch(0.9 0.005 255);
+    --color-line-strong: oklch(0.8 0.008 255);
+    --color-ink: oklch(0.21 0.01 255);
+    --color-muted: oklch(0.45 0.01 255);
+    --color-faint: oklch(0.54 0.01 255);
     --color-accent: oklch(0.9 0.185 127);
     --color-accent-ink: oklch(0.2 0.04 127);
+    --color-accent-text: oklch(0.52 0.15 128);
+    --color-error: oklch(0.52 0.19 27);
+    --color-warning: oklch(0.53 0.12 70);
 
     --color-primary-300: oklch(0.92 0.17 127);
     --color-primary-500: oklch(0.84 0.18 127);
     --color-primary-600: oklch(0.74 0.16 127);
     --color-primary-800: oklch(0.45 0.1 127);
 
-    --code-keyword: oklch(0.8 0.1 295);
-    --code-string: oklch(0.84 0.085 78);
-    --code-number: oklch(0.8 0.11 45);
-    --code-tag: oklch(0.8 0.075 230);
-    --code-attribute: oklch(0.8 0.06 185);
-    --code-property: oklch(0.86 0.03 255);
-    --code-comment: oklch(0.58 0.01 255);
-    --code-punctuation: oklch(0.64 0.012 255);
+    --code-keyword: oklch(0.5 0.17 295);
+    --code-string: oklch(0.5 0.12 70);
+    --code-number: oklch(0.53 0.15 45);
+    --code-tag: oklch(0.48 0.12 240);
+    --code-attribute: oklch(0.47 0.09 185);
+    --code-property: oklch(0.38 0.03 255);
+    --code-comment: oklch(0.56 0.01 255);
+    --code-punctuation: oklch(0.5 0.012 255);
+    --code-gutter: oklch(0.7 0.008 255);
     --skeleton-bg: var(--color-raised);
 
     --measure: 68ch;
@@ -63,6 +55,33 @@
     --header-height: 3.5rem;
     --switcher-height: 3rem;
     --gutter: 1.25rem;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --color-ground: oklch(0.158 0.006 255);
+      --color-sunken: oklch(0.132 0.006 255);
+      --color-surface: oklch(0.192 0.007 255);
+      --color-raised: oklch(0.225 0.008 255);
+      --color-line: oklch(0.285 0.008 255);
+      --color-line-strong: oklch(0.38 0.01 255);
+      --color-ink: oklch(0.945 0.004 255);
+      --color-muted: oklch(0.74 0.008 255);
+      --color-faint: oklch(0.6 0.008 255);
+      --color-accent-text: oklch(0.9 0.185 127);
+      --color-error: oklch(0.808 0.114 19.571);
+      --color-warning: oklch(0.85 0.12 85);
+
+      --code-keyword: oklch(0.8 0.1 295);
+      --code-string: oklch(0.84 0.085 78);
+      --code-number: oklch(0.8 0.11 45);
+      --code-tag: oklch(0.8 0.075 230);
+      --code-attribute: oklch(0.8 0.06 185);
+      --code-property: oklch(0.86 0.03 255);
+      --code-comment: oklch(0.58 0.01 255);
+      --code-punctuation: oklch(0.64 0.012 255);
+      --code-gutter: oklch(0.45 0.008 255);
+    }
   }
   @media (max-width: 19.99rem) {
     :root { --gutter: 0.75rem; }
@@ -77,7 +96,7 @@
     background: var(--color-ground);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    font-feature-settings: "ss01", "cv11";
+    font-feature-settings: "cv11";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
     scrollbar-color: var(--color-line-strong) var(--color-ground);
@@ -93,11 +112,11 @@
     flex-direction: column;
   }
   ::selection {
-    background: oklch(0.9 0.185 127 / 0.28);
+    background: color-mix(in oklch, var(--color-accent) 28%, transparent);
     color: var(--color-ink);
   }
   :focus-visible {
-    outline: 2px solid var(--color-accent);
+    outline: 2px solid var(--color-accent-text);
     outline-offset: 2px;
   }
   a {
@@ -113,15 +132,14 @@
     font-size: inherit;
   }
   h1, h2, h3 {
-    font-family: var(--font-mono);
-    font-stretch: 80%;
+    font-weight: 600;
+    letter-spacing: -0.015em;
     text-wrap: balance;
   }
   h1 {
-    font-family: var(--font-display);
-    font-stretch: 100%;
-    font-weight: 400;
-    line-height: 1.14;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.08;
   }
   p {
     text-wrap: pretty;
@@ -151,20 +169,16 @@
   .site-link:hover { color: var(--color-ink); }
   .site-link:focus-visible { outline-offset: -2px; }
   .site-link[aria-current="page"],
-  body:has([data-c="doc"]) .site-link[href="/examples"] { border-color: var(--color-accent); color: var(--color-accent); }
+  body:has([data-c="doc"]) .site-link[href="/examples"] { border-color: var(--color-accent); color: var(--color-accent-text); }
   .section-title {
-    font-family: var(--font-display);
-    font-stretch: 100%;
-    font-size: clamp(1.3125rem, 2.1vw, 1.625rem);
-    font-weight: 400;
-    line-height: 1.32;
+    font-size: clamp(1.5rem, 2.6vw, 2rem);
+    font-weight: 650;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
   }
   .label {
-    font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: 0.8125rem;
     font-weight: 500;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
     color: var(--color-faint);
   }
 
@@ -176,12 +190,11 @@
     height: 2.75rem;
     padding: 0 1.125rem;
     border: 1px solid var(--color-line-strong);
-    border-radius: 2px;
+    border-radius: var(--radius-lg);
     background: transparent;
     color: var(--color-ink);
-    font-family: var(--font-mono);
-    font-size: 0.8125rem;
-    font-weight: 500;
+    font-size: 0.9375rem;
+    font-weight: 550;
     text-decoration: none;
     cursor: pointer;
     transition: background-color 0.18s var(--ease-out), border-color 0.18s var(--ease-out), color 0.18s var(--ease-out);
@@ -193,7 +206,7 @@
   .btn-primary:focus-visible { outline-color: var(--color-ink); }
   .btn-danger { border-color: transparent; background: var(--color-danger-500); color: var(--color-white); }
   .btn-danger:hover { background: var(--color-danger-600); }
-  .btn-small { height: 2rem; padding: 0 0.75rem; font-size: 0.75rem; }
+  .btn-small { height: 2rem; padding: 0 0.75rem; border-radius: var(--radius-md); font-size: 0.8125rem; }
 
   .dialog {
     width: min(100% - 2rem, 30rem);
@@ -202,7 +215,8 @@
     border: 1px solid var(--color-line-strong);
     background: var(--color-surface);
     color: var(--color-ink);
-    box-shadow: 0 24px 48px -12px oklch(0 0 0 / 0.6);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-2xl);
   }
   .dialog[open] { animation: dialog-in 0.22s var(--ease-out); }
   .dialog::backdrop { background: oklch(0.1 0.006 255 / 0.7); }
@@ -216,7 +230,7 @@
     transition: color 0.15s var(--ease-out);
   }
   .nav-link:hover { color: var(--color-ink); }
-  .nav-link[aria-current="page"] { color: var(--color-accent); }
+  .nav-link[aria-current="page"] { color: var(--color-accent-text); }
 
   .prose {
     max-width: var(--measure);
@@ -230,6 +244,7 @@
   .prose a:hover { text-decoration-color: var(--color-accent); }
   .prose code {
     padding: 0.15em 0.4em;
+    border-radius: var(--radius-sm);
     background: var(--color-raised);
     color: var(--color-ink);
     font-size: 0.78em;
@@ -255,7 +270,7 @@
   [data-hl="hl-attr"] { color: var(--code-attribute); }
   [data-hl="hl-comment"], [data-hl="hl-meta"] { color: var(--code-comment); }
   [data-hl="hl-tag"] { color: var(--code-punctuation); }
-  [data-hl="hl-directive"], [data-hl="hl-block"] { color: var(--color-accent); }
+  [data-hl="hl-directive"], [data-hl="hl-block"] { color: var(--color-accent-text); }
   [data-hl="hl-component"] { color: var(--code-number); }
 
   @media (prefers-reduced-motion: reduce) {
@@ -280,7 +295,7 @@
   }
   .doc-section > h2 code {
     font-size: 0.85em;
-    color: var(--color-accent);
+    color: var(--color-accent-text);
   }
   .doc-section code { overflow-wrap: anywhere; }
 }
@@ -293,6 +308,7 @@
     min-width: 0;
     padding: 1.25rem;
     border: 1px solid var(--color-line);
+    border-radius: var(--radius-xl);
     background: var(--color-surface);
   }
   .tool-field {
@@ -300,10 +316,10 @@
     min-height: 2.5rem;
     padding: 0.5rem 0.75rem;
     border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-lg);
     background: var(--color-sunken);
     color: var(--color-ink);
-    font-family: var(--font-mono);
-    font-size: 0.8125rem;
+    font-size: 0.9375rem;
     caret-color: var(--color-accent);
   }
   .tool-field:focus-visible { outline-offset: 0; border-color: var(--color-accent); }
@@ -313,6 +329,7 @@
     padding: 1rem;
     overflow: auto;
     border: 1px solid var(--color-line);
+    border-radius: var(--radius-lg);
     background: var(--color-sunken);
     color: var(--color-muted);
     font-size: 0.75rem;

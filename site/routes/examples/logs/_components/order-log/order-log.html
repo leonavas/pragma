@@ -58,7 +58,7 @@
   <ol class="flex min-h-48 flex-col border-t border-line font-mono text-xs" aria-label="Last records passed to log">
     <for record in $recordRows key=record.id>
       <li class="record grid gap-x-3 gap-y-1 border-b border-line py-2.5">
-        <span class="tabular-nums" .text-accent="record.isInfo" .text-warning-300="record.isWarn" .text-danger-300="record.isError">{record.levelText}</span>
+        <span class="tabular-nums" .text-accent-text="record.isInfo" .text-warning="record.isWarn" .text-error="record.isError">{record.levelText}</span>
         <span class="text-ink">{record.body}</span>
         <span class="record-attributes break-all text-faint">{record.attributesText}</span>
       </li>

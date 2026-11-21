@@ -141,9 +141,9 @@
   }
 </script>
 
-<figure class="border border-line bg-sunken" .is-expanded="$expanded">
+<figure class="overflow-hidden rounded-xl border border-line bg-sunken" .is-expanded="$expanded">
   <if page.error>
-    <p class="px-4 py-5 font-mono text-xs text-danger-300" role="alert">{page.error.message}</p>
+    <p class="px-4 py-5 font-mono text-xs text-error" role="alert">{page.error.message}</p>
   </if>
   <else>
     <div class="flex min-w-0 flex-col">
@@ -174,7 +174,7 @@
     </div>
   </else>
   <div class="showcase-live flex min-w-0 flex-col">
-    <p class="flex min-h-11 items-center gap-2 whitespace-nowrap border-b border-line bg-ground px-4 font-mono text-xs uppercase tracking-wider text-faint"><span class="showcase-dot size-1.5 flex-none bg-accent" aria-hidden="true" :data-beat="$beat"></span>Live result<span class="ml-auto min-w-0 truncate normal-case tracking-normal tabular-nums text-muted" aria-hidden="true">{$patches}</span></p>
+    <p class="flex min-h-11 items-center gap-2 whitespace-nowrap border-b border-line bg-ground px-4 text-sm text-faint"><span class="showcase-dot size-1.5 flex-none bg-accent" aria-hidden="true" :data-beat="$beat"></span>Live result<span class="ml-auto min-w-0 truncate font-mono text-xs tabular-nums text-muted" aria-hidden="true">{$patches}</span></p>
     <div class="showcase-stage"><slot></slot></div>
   </div>
   <figcaption class="col-span-full border-t border-line px-4 py-3 text-sm text-muted">{$caption}</figcaption>
@@ -210,7 +210,7 @@
   [data-c="showcase"] .showcase-copy { color: var(--color-muted); }
   [data-c="showcase"] .showcase-copy:hover { color: var(--color-ink); }
   [data-c="showcase"] :is(.showcase-file, .showcase-check-icon, .showcase-copy-done, .showcase-copy-blocked, .showcase-expand, .showcase-expand-less) { display: none; }
-  [data-c="showcase"] .showcase-copy.is-done { color: var(--color-accent); }
+  [data-c="showcase"] .showcase-copy.is-done { color: var(--color-accent-text); }
   [data-c="showcase"] .is-done :is(.showcase-copy-idle, .showcase-copy-icon) { display: none; }
   [data-c="showcase"] .is-done .showcase-copy-done { display: inline; }
   [data-c="showcase"] .is-done .showcase-check-icon {
@@ -218,7 +218,7 @@
     stroke-dasharray: 16;
     animation: showcase-check 0.32s var(--ease-out) both;
   }
-  [data-c="showcase"] .showcase-copy.is-blocked { color: var(--color-warning-300); }
+  [data-c="showcase"] .showcase-copy.is-blocked { color: var(--color-warning); }
   [data-c="showcase"] .is-blocked .showcase-copy-idle { display: none; }
   [data-c="showcase"] .is-blocked .showcase-copy-blocked { display: inline; }
   [data-c="showcase"] .showcase-code {
@@ -231,7 +231,6 @@
     overflow: auto;
     color: var(--color-ink);
     font-size: 0.8125rem;
-    font-stretch: 87.5%;
     line-height: 1.7;
     tab-size: 2;
     counter-reset: line;
@@ -252,7 +251,7 @@
     position: absolute;
     left: 0;
     width: calc(var(--line-gutter) - 1rem);
-    color: oklch(0.45 0.008 255);
+    color: var(--code-gutter);
     text-align: right;
     text-indent: 0;
   }
@@ -272,13 +271,13 @@
   [data-c="showcase"] .code-line::highlight(code-title) { color: var(--code-property); }
   [data-c="showcase"] .code-line::highlight(code-comment) { color: var(--code-comment); }
   [data-c="showcase"] .code-line::highlight(code-punctuation) { color: var(--code-punctuation); }
-  [data-c="showcase"] .code-line::highlight(code-directive) { color: var(--color-accent); }
+  [data-c="showcase"] .code-line::highlight(code-directive) { color: var(--color-accent-text); }
   [data-c="showcase"] .code-line::highlight(code-component) { color: var(--code-number); }
   [data-c="showcase"] .is-expanded .showcase-expand-more { display: none; }
   [data-c="showcase"] .is-expanded .showcase-expand-less { display: inline; }
   [data-c="showcase"] .showcase-live {
     border-top: 1px solid var(--color-line);
-    background: var(--color-ground) radial-gradient(oklch(0.27 0.008 255) 1px, transparent 1px) -10px -10px / 20px 20px;
+    background: var(--color-ground) radial-gradient(var(--color-line) 1px, transparent 1px) -10px -10px / 20px 20px;
   }
   [data-c="showcase"] .showcase-dot[data-beat="a"] { animation: showcase-beat-a 0.7s var(--ease-out); }
   [data-c="showcase"] .showcase-dot[data-beat="b"] { animation: showcase-beat-b 0.7s var(--ease-out); }

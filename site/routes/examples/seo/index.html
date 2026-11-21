@@ -85,7 +85,7 @@
   &lt;meta name="description" content="..."&gt;
 &lt;/section&gt;</code></pre>
         </div>
-        <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/head] &lt;meta&gt; belongs in &lt;head&gt;: write it at the top level of the page fragment (or in the layout &lt;head&gt;)</p>
+        <p class="font-mono text-xs leading-relaxed text-error">error [html/head] &lt;meta&gt; belongs in &lt;head&gt;: write it at the top level of the page fragment (or in the layout &lt;head&gt;)</p>
       </li>
       <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
         <div class="flex min-w-0 flex-col gap-2">
@@ -94,7 +94,7 @@
   &lt;meta property="og:title" content="..."&gt;
 &lt;/div&gt;</code></pre>
         </div>
-        <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/head] &lt;meta&gt; belongs in &lt;head&gt;: write it at the top level of the page fragment (or in the layout &lt;head&gt;)</p>
+        <p class="font-mono text-xs leading-relaxed text-error">error [html/head] &lt;meta&gt; belongs in &lt;head&gt;: write it at the top level of the page fragment (or in the layout &lt;head&gt;)</p>
       </li>
       <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
         <div class="flex min-w-0 flex-col gap-2">
@@ -103,35 +103,35 @@
   &lt;meta property="og:url" :content="params.slug"&gt;
 &lt;/head&gt;</code></pre>
         </div>
-        <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/head] the layout &lt;head&gt; is static (the same on every page); put bound tags at the top of the page fragment</p>
+        <p class="font-mono text-xs leading-relaxed text-error">error [html/head] the layout &lt;head&gt; is static (the same on every page); put bound tags at the top of the page fragment</p>
       </li>
       <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
         <div class="flex min-w-0 flex-col gap-2">
           <p class="font-mono text-xs text-faint">routes/post.html, with no ssr in post.server.js</p>
           <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;title&gt;{data.title}&lt;/title&gt;</code></pre>
         </div>
-        <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/head] bound head tags are rendered by the server so crawlers see them: add export const ssr = true to routes/post.server.js</p>
+        <p class="font-mono text-xs leading-relaxed text-error">error [html/head] bound head tags are rendered by the server so crawlers see them: add export const ssr = true to routes/post.server.js</p>
       </li>
       <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
         <div class="flex min-w-0 flex-col gap-2">
           <p class="font-mono text-xs text-faint">routes/post.html</p>
           <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;meta name="description" :content="$summary"&gt;</code></pre>
         </div>
-        <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/head] head tags are rendered by the server and read only data, params or query; "$summary"</p>
+        <p class="font-mono text-xs leading-relaxed text-error">error [html/head] head tags are rendered by the server and read only data, params or query; "$summary"</p>
       </li>
       <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
         <div class="flex min-w-0 flex-col gap-2">
           <p class="font-mono text-xs text-faint">routes/notes.html</p>
           <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;script type="application/ld+json"&gt;{ "@type": "Article", "headline": "Notes", }&lt;/script&gt;</code></pre>
         </div>
-        <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/json-ld] invalid JSON-LD: trailing comma</p>
+        <p class="font-mono text-xs leading-relaxed text-error">error [html/json-ld] invalid JSON-LD: trailing comma</p>
       </li>
       <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
         <div class="flex min-w-0 flex-col gap-2">
           <p class="font-mono text-xs text-faint">routes/post.html, with no ssr in post.server.js</p>
           <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;script type="application/ld+json"&gt;{ "@type": "Article", "headline": "{data.title}" }&lt;/script&gt;</code></pre>
         </div>
-        <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/head] JSON-LD with &#123;path&#125; is rendered by the server so crawlers see it: add export const ssr = true to routes/post.server.js</p>
+        <p class="font-mono text-xs leading-relaxed text-error">error [html/head] JSON-LD with &#123;path&#125; is rendered by the server so crawlers see it: add export const ssr = true to routes/post.server.js</p>
       </li>
       <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
         <div class="flex min-w-0 flex-col gap-2">
@@ -140,7 +140,7 @@
   &lt;script type="application/ld+json"&gt;{ "@type": "Organization", "name": "Shop" }&lt;/script&gt;
 &lt;/div&gt;</code></pre>
         </div>
-        <p class="font-mono text-xs leading-relaxed text-danger-300">error [html/script] JSON-LD &lt;script type="application/ld+json"&gt; goes at the top level of a page</p>
+        <p class="font-mono text-xs leading-relaxed text-error">error [html/script] JSON-LD &lt;script type="application/ld+json"&gt; goes at the top level of a page</p>
       </li>
     </ul>
   </section>

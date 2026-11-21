@@ -48,7 +48,7 @@
   <section class="doc-section" aria-labelledby="dynamic">
     <h2 id="dynamic">Dynamic styles: <code>.name</code> toggles and <code>data-*</code></h2>
     <div class="prose">
-      <p>There is no <code>:class</code> and no <code>style</code>: every class name is written out in the source, so check can validate it and the build can generate it. Toggle a class on a condition with <code>.text-accent="$passed"</code>. When the value itself varies, bind a <code>data-*</code> attribute (<code>:data-status="$status"</code>) and style each value with an attribute selector in the component's <code>&lt;style&gt;</code>. Only the bound form is allowed: a hand-written <code>data-status="ok"</code> fails check with <code>html/data-attribute</code>.</p>
+      <p>There is no <code>:class</code> and no <code>style</code>: every class name is written out in the source, so check can validate it and the build can generate it. Toggle a class on a condition with <code>.text-accent-text="$passed"</code>. When the value itself varies, bind a <code>data-*</code> attribute (<code>:data-status="$status"</code>) and style each value with an attribute selector in the component's <code>&lt;style&gt;</code>. Only the bound form is allowed: a hand-written <code>data-status="ok"</code> fails check with <code>html/data-attribute</code>.</p>
     </div>
     <c-showcase :source="data.examples.dynamic" caption="The text color is two utility toggles; the dot reads data-status from the root.">
       <p-build-status></p-build-status>

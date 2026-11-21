@@ -33,7 +33,7 @@
     </div>
     <div class="grid gap-1 bg-ground p-3">
       <dt class="text-faint">client bound at</dt>
-      <dd class="tabular-nums text-accent">{$hydratedAt}</dd>
+      <dd class="tabular-nums text-accent-text">{$hydratedAt}</dd>
     </div>
   </dl>
   <ul class="grid gap-2" aria-label="Rendering strategies">
@@ -44,6 +44,6 @@
       </li>
     </for>
   </ul>
-  <p class="font-mono text-xs text-danger-300" role="status">{$error}</p>
+  <p class="font-mono text-xs text-error" role="status">{$error}</p>
   <p class="font-mono text-xs text-faint">first request by {data.agent}</p>
 </c-demo-page>

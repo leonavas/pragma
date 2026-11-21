@@ -31,7 +31,7 @@
     <input id="signup-email" type="email" class="h-8 min-w-0 flex-1 border bg-surface px-3 text-sm text-ink" autocomplete="off" spellcheck="false" :model="$address" :aria-invalid="$ariaInvalid" aria-describedby="signup-email-status">
     <button type="submit" class="btn btn-small" :disabled="$invalid">Join</button>
   </div>
-  <p id="signup-email-status" class="min-h-5" role="status" .text-accent="$valid" .text-warning-300="$invalid">{$status}</p>
+  <p id="signup-email-status" class="min-h-5" role="status" .text-accent-text="$valid" .text-warning="$invalid">{$status}</p>
 </form>
 
 <style>

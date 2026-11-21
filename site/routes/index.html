@@ -51,7 +51,7 @@ pragma 0.1.0</code></pre>
         </c-terminal>
       </li>
     </ol>
-    <div class="flex flex-wrap gap-3">
+    <div class="grid gap-3 sm:flex sm:flex-wrap">
       <a href="https://github.com/leonavas/pragma/releases/latest" class="btn btn-primary">Download from GitHub</a>
       <a href="/guide" class="btn">Start with the guide</a>
     </div>
@@ -59,8 +59,8 @@ pragma 0.1.0</code></pre>
 </section>
 
 <section class="wrap" aria-labelledby="callout-title">
-  <div class="grid gap-8 border border-line bg-sunken p-8 lg:grid-cols-3 lg:items-center lg:gap-16 lg:p-12">
-    <h2 id="callout-title" class="section-title lg:col-span-2">This framework is for agents. If you're still reading this instead of asking your agent to try it, it's not for you yet. <span class="text-accent">Come back in 6 months.</span></h2>
+  <div class="grid gap-8 rounded-2xl border border-line bg-sunken p-8 lg:grid-cols-3 lg:items-center lg:gap-16 lg:p-12">
+    <h2 id="callout-title" class="section-title lg:col-span-2">This framework is for agents. If you're still reading this instead of asking your agent to try it, it's not for you yet. <span class="text-accent-text">Come back in 6 months.</span></h2>
     <a href="/agents" class="btn btn-primary w-fit">Hand it to your agent</a>
   </div>
 </section>
@@ -118,43 +118,34 @@ pragma 0.1.0</code></pre>
       <article class="rule">
         <h3 class="rule-name">Closed</h3>
         <p class="rule-text">Braces put a value in text, a colon binds an attribute, a dot a class, an at sign an event, a dollar sign names the script's state. Conditions and loops are tags. Anything outside that list is a build error, not a convention.</p>
-        <pre class="rule-code"><code><span class="text-accent">&lt;for</span> task in $visible
-  key=task.id<span class="text-accent">&gt;</span>
-  &lt;li <span class="text-accent">.done</span>="task.done"&gt;
-    <span class="text-accent">&#123;task.title&#125;</span>
+        <pre class="rule-code"><code><span class="text-accent-text">&lt;for</span> task in $visible
+  key=task.id<span class="text-accent-text">&gt;</span>
+  &lt;li <span class="text-accent-text">.done</span>="task.done"&gt;
+    <span class="text-accent-text">&#123;task.title&#125;</span>
   &lt;/li&gt;
-<span class="text-accent">&lt;/for&gt;</span></code></pre>
+<span class="text-accent-text">&lt;/for&gt;</span></code></pre>
       </article>
       <article class="rule">
         <h3 class="rule-name">Small</h3>
         <p class="rule-text">The starter page loads 12.5 kB of JavaScript, gzip, router and runtime included. Each page preloads only the modules it imports, and pragma build prints the JS size of each page.</p>
-        <pre class="rule-code"><code>page     JS gzip
-/        <span class="text-ink">10.0 KB</span>
-CSS       <span class="text-ink">4.1 KB</span>
+        <pre class="rule-code"><code><span class="text-accent-text">$</span> pragma build
+page     JS gzip
+/        <span class="text-ink">12.5 KB</span>
+CSS       <span class="text-ink">3.9 KB</span>
 1 page(s)
-dist/ built in 6 ms</code></pre>
+dist/ built in 14 ms</code></pre>
       </article>
       <article class="rule">
         <h3 class="rule-name">Agent-first</h3>
         <p class="rule-text">Every app ships with AGENTS.md and its docs. pragma check answers with file, line, column, rule and fix, so an agent corrects itself in one pass instead of guessing. Every form is a WebMCP tool, and a page can answer in markdown.</p>
-        <pre class="rule-code"><code>routes/index.html:8:4
-error [html/unknown-name]
+        <pre class="rule-code" aria-label="pragma check names the fix, the agent applies it, the check passes"><code>routes/index.html:8:4
+<span class="text-error">error</span> [html/unknown-name]
   $count is not declared
-  add `let count = …`</code></pre>
+  add `let count = …`
+<span class="fix-step text-accent-text">+ let count = 0</span>
+<span class="fix-step fix-step-late text-accent-text">no problems found</span></code></pre>
       </article>
     </div>
-  </div>
-</section>
-
-<section id="tools" class="wrap" aria-labelledby="tools-title">
-  <div class="block bordered tools">
-    <div class="tools-intro">
-      <h2 id="tools-title" class="section-title">Tools for agents on this page</h2>
-      <p class="head-note">An agent in the browser sees these forms as WebMCP tools and calls them. You can use the same forms. Agents without a browser read the same docs at <a href="/llms-full.txt" class="text-ink">/llms-full.txt</a>.</p>
-      <a href="/agents" class="btn w-fit">Everything for agents</a>
-    </div>
-    <p-setup-tool></p-setup-tool>
-    <p-docs-tool></p-docs-tool>
   </div>
 </section>
 
@@ -174,7 +165,7 @@ error [html/unknown-name]
 <style>
   .head-row { display: grid; gap: 1rem; }
   .head-note { max-width: 60ch; color: var(--color-muted); line-height: 1.65; }
-  .head-note code, .step-copy code, .answer-list code { padding: 0.1em 0.35em; background: var(--color-raised); color: var(--color-ink); font-size: 0.8em; }
+  .head-note code, .step-copy code, .answer-list code { padding: 0.1em 0.35em; border-radius: var(--radius-sm); background: var(--color-raised); color: var(--color-ink); font-size: 0.8em; }
 
   .install { display: grid; gap: 2.5rem; padding-block: 3.5rem; border-top: 1px solid var(--color-line); }
   .steps { display: grid; border-top: 1px solid var(--color-line); }
@@ -183,41 +174,52 @@ error [html/unknown-name]
   .step-copy a { color: var(--color-ink); text-decoration-color: var(--color-line-strong); }
   .step-copy a:hover { text-decoration-color: var(--color-accent); }
   .step-name { display: flex; align-items: baseline; gap: 0.75rem; color: var(--color-ink); font-size: 0.9375rem; font-weight: 500; }
-  .step-number { color: var(--color-accent); font-family: var(--font-display); font-size: 1.375rem; line-height: 1; }
+  .step-number { color: var(--color-accent-text); font-size: 1.375rem; font-weight: 650; line-height: 1; }
 
   .block { display: grid; gap: 2.5rem; padding-block: 4rem; }
   .bordered { border-top: 1px solid var(--color-line); }
   .why-title { max-width: 30ch; }
   .why { display: grid; gap: 2.5rem; }
-  .answer { display: grid; gap: 1rem; align-content: start; padding: 1.5rem; border: 1px solid var(--color-line); background: var(--color-sunken); }
+  .answer { display: grid; gap: 1rem; align-content: start; padding: 1.5rem; border: 1px solid var(--color-line); border-radius: var(--radius-xl); background: var(--color-sunken); }
   .answer-lead { color: var(--color-ink); font-weight: 600; }
   .answer-list { display: grid; gap: 0.875rem; padding-left: 1.1em; color: var(--color-muted); font-size: 0.9375rem; line-height: 1.6; list-style: square; }
-  .answer-list li::marker { color: var(--color-accent); }
+  .answer-list li::marker { color: var(--color-accent-text); }
 
   .rules { display: grid; gap: 2.5rem 2rem; }
   .rule { display: grid; grid-template-rows: subgrid; grid-row: span 3; gap: 0.875rem; min-width: 0; padding-top: 1.25rem; border-top: 1px solid var(--color-accent); }
-  .rule-name { color: var(--color-accent); font-size: 0.875rem; font-weight: 500; }
+  .rule-name { color: var(--color-accent-text); font-size: 0.875rem; font-weight: 500; }
   .rule-text { color: var(--color-muted); font-size: 0.9375rem; line-height: 1.65; }
   .rule-code {
     margin: 0;
     padding: 1rem;
     overflow-x: auto;
     border: 1px solid var(--color-line);
+    border-radius: var(--radius-lg);
     background: var(--color-sunken);
     color: var(--color-muted);
     font-size: 0.75rem;
     line-height: 1.75;
   }
+  .fix-step { display: inline-block; }
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .fix-step {
+        animation: fix-in linear both;
+        animation-timeline: view();
+        animation-range: entry 40% entry 100%;
+      }
+      .fix-step-late { animation-range: entry 100% cover 25%; }
+    }
+  }
+  @keyframes fix-in {
+    from { opacity: 0; translate: -0.5ch 0; }
+  }
 
-  .tools { gap: 1.5rem; }
-  .tools-intro { display: grid; gap: 1.25rem; align-content: start; margin-bottom: 1rem; }
   .examples-block { padding-bottom: 0; }
 
   @media (min-width: 48rem) {
     .step { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 2.5rem; align-items: start; }
     .rules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .tools-intro { grid-column: 1 / -1; }
     .examples :global(.section-nav-list) { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 2rem; }
   }
 
@@ -231,7 +233,5 @@ error [html/unknown-name]
 
   @media (min-width: 80rem) {
     .rules { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: auto auto 1fr; }
-    .tools { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 2rem; }
-    .tools-intro { grid-column: auto; margin-bottom: 0; }
   }
 </style>

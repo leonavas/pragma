@@ -1,7 +1,7 @@
 <section aria-label="Scratchpad on this page">
   <header class="store-panel-head">
     <span class="label">this page</span>
-    <span class="font-mono text-xs text-accent" :show="shared.scratchpad.pinned">pinned</span>
+    <span class="font-mono text-xs text-accent-text" :show="shared.scratchpad.pinned">pinned</span>
   </header>
   <div class="grid gap-3 p-3">
     <textarea class="store-textarea" rows="4" maxlength="280" aria-label="Draft" placeholder="Type here, then reload the page" :model="shared.scratchpad.draft"></textarea>

@@ -2,11 +2,14 @@
 
 Agents: the full docs are one file at https://pragma.leonavas.com/llms-full.txt (index: https://pragma.leonavas.com/llms.txt). This page in HTML: https://pragma.leonavas.com/. For agents: https://pragma.leonavas.com/agents.md.
 
-Send your agent this page. It reads the docs and writes native HTML, CSS and JavaScript. A Rust CLI rejects anything off-spec with the file, the line and the fix. Pages ship prebuilt, with only the JavaScript they use, and every form is a tool an agent can call.
+Paste this into your coding agent. It reads the docs, builds the app and checks every line.
 
-- [Hand it to your agent](https://pragma.leonavas.com/agents.md)
-- [Install](#install)
-- [Read the examples](https://pragma.leonavas.com/examples)
+```
+Read https://pragma.leonavas.com/llms-full.txt and create a pragma app that [describe your app]. Install pragma if missing, or validate the version with pragma -V and .pragma/version and run pragma self-update and pragma upgrade if outdated. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.
+```
+
+- [Install the CLI yourself](#install)
+- [Read the guide](https://pragma.leonavas.com/guide)
 
 ## Install
 
@@ -121,7 +124,7 @@ This is the whole component, read from disk when the page renders: the source yo
 
 <style>
   .tasks-filter { color: var(--color-muted); text-decoration-color: var(--color-line-strong); text-underline-offset: 0.3em; }
-  .tasks-filter[aria-pressed="true"] { color: var(--color-accent); text-decoration-color: currentColor; }
+  .tasks-filter[aria-pressed="true"] { color: var(--color-accent-text); text-decoration-color: currentColor; }
   .tasks-check { accent-color: var(--color-accent); }
   .tasks-title {
     overflow-wrap: anywhere;
@@ -134,6 +137,9 @@ This is the whole component, read from disk when the page renders: the source yo
   }
 </style>
 ```
+
+- `add_task`: Add a task to the demo to-do list on the pragma landing page
+  - `title`: Title of the task, up to 48 characters
 
 ## Four constraints, enforced by the compiler
 
@@ -168,11 +174,12 @@ Braces put a value in text, a colon binds an attribute, a dot a class, an at sig
 The starter page loads 12.5 kB of JavaScript, gzip, router and runtime included. Each page preloads only the modules it imports, and pragma build prints the JS size of each page.
 
 ```
+$ pragma build
 page     JS gzip
-/        10.0 KB
-CSS       4.1 KB
+/        12.5 KB
+CSS       3.9 KB
 1 page(s)
-dist/ built in 6 ms
+dist/ built in 14 ms
 ```
 
 ### Agent-first
@@ -184,20 +191,9 @@ routes/index.html:8:4 error [html/unknown-name]
   $count is not declared in the script of routes/index.html:
   add `let count = …` (state), `export let count = …` (prop)
   or `function count() { … }`
++ let count = 0
+no problems found
 ```
-
-## Tools for agents on this page
-
-An agent in the browser sees these forms as WebMCP tools and calls them. You can use the same forms. Agents without a browser read the same docs at https://pragma.leonavas.com/llms-full.txt.
-
-- `get_setup_instructions`: Get the commands to install pragma and create an app, plus a prompt for a coding agent, for a short app description
-  - `app`: What the app does, in one sentence, written to follow 'create a pragma app that'
-- `get_pragma_docs`: Get one pragma framework doc as markdown, by topic; read rules first, then the topic you need
-  - `topic`: Doc to read: rules is AGENTS.md, the others are the files in .pragma/docs
-- `add_task`: Add a task to the demo to-do list on the pragma landing page
-  - `title`: Title of the task, up to 48 characters
-
-[Everything for agents](https://pragma.leonavas.com/agents.md)
 
 ## Every feature, running on this page's runtime
 
