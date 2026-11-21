@@ -38,6 +38,8 @@ async function remove() {
 | `c-alert` | `id`, `title` | default, `actions` | Esc, `@close`, Back |
 | `c-dropdown` | `id`, `label` | default (`<a>`, `<button>`, `<hr>`) | outside click, Esc, `@close`, Back |
 
+`c-dropdown` is a menu of links and actions. It sends no value to a form. To pick a form value from a styled list, use `c-select` (`forms.md`).
+
 | JS (`import { open, close, confirm } from 'pragma'`) | Effect |
 |---|---|
 | `open(id)` / `close(id)` | Opens or closes the overlay. |

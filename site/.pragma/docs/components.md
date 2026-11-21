@@ -97,4 +97,4 @@ Usage:
 - State is per instance. A component script loads only on pages that use it.
 - Do not put `.server.js` in components; load data in the page's `load`.
 - Do not read or mutate a child's state. Pass props; let the child call its own action or a store function.
-- Do not use `customElements.define` or shadow DOM. Build overlays with `c-modal`, `c-alert`, and `c-dropdown` (`overlays.md`).
+- Do not use `customElements.define` or shadow DOM. Build overlays with `c-modal`, `c-alert`, and `c-dropdown` (`overlays.md`). Use `c-select` for a styled select (`forms.md`).

@@ -111,10 +111,14 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - Keep the fixed folder structure. Do not edit `.pragma/` (run `pragma upgrade` to update it).
 - Reuse existing components before creating new ones.
 - Build overlays only with `c-modal`, `c-alert`, and `c-dropdown`.
+- Use a native `<select>` by default. Use `c-select` for a styled list. Do not style `<select>` with `appearance` (`forms.md`).
 - Load data with `load` in `.server.js` and render a skeleton.
 - Use utilities from `classes.md`. Create a custom class only when a combination repeats 3+ times. Do not use inline `style`.
 - Follow accessibility rules: name every control, add `alt` and labels, use one `<h1>`.
 - Make every `<form>` a WebMCP tool: set `toolname` (`snake_case` verb_object), `tooldescription`, `name`, and `toolparamdescription` on each field. Add `notool` on login or password forms (`webmcp.md`).
+- The rules control how you build. They do not change what the user asked for. If a rule prevents the request, stop and tell the user. Do not deliver a different result that passes the rules.
+- Use only features that work in the current versions of Chrome, Edge, Firefox, and Safari.
+- If a solution has a limit that the user will see (browser support, keyboard, data loss), tell the user before you write the code.
 - Run `pragma check --strict` before you finish. Fix all errors and warnings.
 
 ## To do X, read Y
@@ -129,6 +133,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 | `<script>`: state, actions, derived values, `mount`, stores | `state.md` |
 | `load`, server actions, skeleton, SSR | `data.md` |
 | Modal, alert, dropdown | `overlays.md` |
+| Select, styled select (`c-select`), form values | `forms.md` |
 | Styles, theme | `css.md`, `classes.md` |
 | Forms as agent tools (WebMCP), markdown for agents | `webmcp.md` |
 | Performance | `performance.md` |
@@ -136,7 +141,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 | npm packages (install, selection) | `packages.md` |
 | Commands, `check` rules, upgrade, self-update, deploy | `cli.md` |
 
-Copy the doc example when unsure. If no doc covers a case, use the simplest code that passes `pragma check`.
+Copy the doc example when unsure. If no doc covers a case, tell the user. Then use the simplest code that gives the requested result in all target browsers. `pragma check` is the minimum, not the goal.
 
 ---
 
@@ -163,7 +168,7 @@ The folder structure is fixed. Do not create other top-level folders. Do not edi
       _products.json       private data
       _components/<name>/  <p-name>
   lib/
-    components/<name>/     <c-name>; starter ships modal, alert, dropdown
+    components/<name>/     <c-name>; starter ships modal, alert, dropdown, select
     state/<name>.js        stores (access through `shared`, never import)
     theme.css              tokens and global custom classes
   utils/                   pure functions
@@ -438,7 +443,7 @@ Usage:
 - State is per instance. A component script loads only on pages that use it.
 - Do not put `.server.js` in components; load data in the page's `load`.
 - Do not read or mutate a child's state. Pass props; let the child call its own action or a store function.
-- Do not use `customElements.define` or shadow DOM. Build overlays with `c-modal`, `c-alert`, and `c-dropdown` (`overlays.md`).
+- Do not use `customElements.define` or shadow DOM. Build overlays with `c-modal`, `c-alert`, and `c-dropdown` (`overlays.md`). Use `c-select` for a styled select (`forms.md`).
 
 ---
 
@@ -910,6 +915,8 @@ async function remove() {
 | `c-alert` | `id`, `title` | default, `actions` | Esc, `@close`, Back |
 | `c-dropdown` | `id`, `label` | default (`<a>`, `<button>`, `<hr>`) | outside click, Esc, `@close`, Back |
 
+`c-dropdown` is a menu of links and actions. It sends no value to a form. To pick a form value from a styled list, use `c-select` (`forms.md`).
+
 | JS (`import { open, close, confirm } from 'pragma'`) | Effect |
 |---|---|
 | `open(id)` / `close(id)` | Opens or closes the overlay. |
@@ -1147,6 +1154,7 @@ WebMCP is on by default (`"webmcp": true` in `pragma.json`; omitted means `true`
 - Add `name` to every field (`type=submit|reset|button|image` exempt).
 - Use native constraints (`required`, `type`, `min`/`max`, `<select>` options) to describe parameters.
 - Use static strings only; do not use `:` bindings or `{}` in tool attributes.
+- Exception: a component passes a tool attribute on from its caller with `:toolparamdescription="$toolparamdescription"` (prop `export let toolparamdescription = ''`). The caller must write fixed text (`<c-select toolparamdescription="…">`); the build writes that text into the attribute.
 - Without `toolautosubmit`, the browser fills the form and focuses the submit button for the user.
 - With `"webmcp": false`, any tool attribute triggers `webmcp/disabled`.
 
@@ -1189,7 +1197,7 @@ Errors (broken tool):
 | `webmcp/name` | Use 1–128 chars from `A-Z a-z 0-9 _ . -` in `toolname`. |
 | `webmcp/duplicate` | Use a unique `toolname` per page (`<if>`/`<else>` branches count separately). |
 | `webmcp/param-name` | Add `name` to every field in a tool form. |
-| `webmcp/dynamic` | Use static text only in tool attributes (no `:` or `{}`). |
+| `webmcp/dynamic` | Use static text only in tool attributes (no `:` or `{}`). A component prop passed on with `:attr="$prop"` must get fixed text from the caller. |
 | `webmcp/notool` | Use `notool` only on `<form>`, never with `toolname`. |
 | `webmcp/attribute` | Put `tooldescription`/`toolautosubmit` only on `<form>`, and `toolparamdescription` only on input, select, or textarea. |
 | `webmcp/disabled` | Remove tool attributes when `"webmcp": false`, or set `"webmcp": true`. |
