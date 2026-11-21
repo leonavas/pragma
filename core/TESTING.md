@@ -19,7 +19,7 @@ Run from `core/cli/` with `cargo xtask test [target]`:
 - Implemented in `core/cli/xtask/` (standard `cargo xtask`; alias in `core/cli/.cargo/config.toml`).
 - First browser test run installs Playwright in `~/.cache/pragma-tools` (outside the repo) and
   browsers in `~/.cache/ms-playwright`. `PRAGMA_TOOLS_DIR` overrides the folder.
-- `e2e` and `packages` build `pragma` to `core/cli/target/release/pragma` and use that binary.
+- `e2e` and `packages` build `pragma` to `<target dir>/release/pragma` (`/work/cargo-target/pragma` locally, see `core/cli/.cargo/config.toml`) and use that binary.
 - `packages` lives in `core/cli/xtask/packages/`: fixture app (`app/`, versions pinned in
   `package-lock.json`) and `packages.test.mjs`. `node_modules` is fetched with `npm ci` the first
   time into `~/.cache/pragma-tools/packages/<lockfile hash>/`, with a private npm cache (`npm-cache/`)

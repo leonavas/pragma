@@ -24,6 +24,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # core/cli/.cargo/config.toml points target-dir at the dev machine's /work.
+  CARGO_TARGET_DIR: ${{ github.workspace }}/core/cli/target
+
 jobs:
   build:
     name: Build (${{ matrix.target }})

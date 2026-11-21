@@ -1,2 +1,6 @@
 [alias]
 xtask = "run --quiet --package xtask --"
+
+[build]
+# Shared target dir on /work, also used by the pragma-wt-* worktrees. CI sets CARGO_TARGET_DIR.
+target-dir = "/work/cargo-target/pragma"

@@ -94,7 +94,7 @@ fn release(ctx: &Ctx, args: &[String]) -> ExitCode {
     println!("› updated core/cli/Cargo.toml to {ver}");
 
     let repo = ctx.core.parent().unwrap();
-    let bin = ctx.cli.join("target/release/pragma");
+    let bin = ctx.target.join("release/pragma");
     let ok = run(
         "updating Cargo.lock and building release binary",
         Command::new("cargo").args(["build", "--release", "--quiet", "-p", "pragma-cli"]).current_dir(&ctx.cli),
@@ -138,6 +138,7 @@ fn release(ctx: &Ctx, args: &[String]) -> ExitCode {
 struct Ctx {
     core: PathBuf,
     cli: PathBuf,
+    target: PathBuf,
     tools: PathBuf,
 }
 
@@ -145,10 +146,14 @@ impl Ctx {
     fn new() -> Self {
         let cli = PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf();
         let core = cli.parent().unwrap().to_path_buf();
+        // xtask runs from <target dir>/<profile>/xtask, wherever .cargo/config.toml or
+        // CARGO_TARGET_DIR puts the target dir.
+        let exe = env::current_exe().expect("cannot locate the xtask binary");
+        let target = exe.parent().and_then(|p| p.parent()).expect("xtask is not in a target dir").to_path_buf();
         let tools = env::var_os("PRAGMA_TOOLS_DIR").map(PathBuf::from).unwrap_or_else(|| {
             PathBuf::from(env::var_os("HOME").expect("HOME not set")).join(".cache/pragma-tools")
         });
-        Self { core, cli, tools }
+        Self { core, cli, target, tools }
     }
 
     fn playwright(&self) -> PathBuf {
@@ -223,7 +228,7 @@ fn pragma_release(ctx: &Ctx) -> bool {
 }
 
 fn e2e(ctx: &Ctx) -> bool {
-    let bin = ctx.cli.join("target/release/pragma");
+    let bin = ctx.target.join("release/pragma");
     tools(ctx)
         && pragma_release(ctx)
         && run(
@@ -237,7 +242,7 @@ fn e2e(ctx: &Ctx) -> bool {
 }
 
 fn packages(ctx: &Ctx) -> bool {
-    let bin = ctx.cli.join("target/release/pragma");
+    let bin = ctx.target.join("release/pragma");
     tools(ctx)
         && pragma_release(ctx)
         && run(
