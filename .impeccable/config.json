@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          "site/routes/examples/syntax/_snippets/rejected/wrong.html"
+        ],
+        "createdAt": "2026-11-19T03:00:28.427Z",
+        "reason": "agent decision: wrong.html is a fixture of code pragma check rejects, displayed as source text, never rendered"
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "design/logo/index.html"
+        ],
+        "createdAt": "2026-11-21T15:58:53.038Z",
+        "reason": "agent triage: false positives, static scan does not resolve clamp() padding, padding on the child .wrap, or the 1px-gap hairline grid; rendered spacing checked in screenshots"
+      }
+    ]
+  }
+}

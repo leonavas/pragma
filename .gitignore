@@ -12,3 +12,5 @@ build/
 .env.*
 
 site/public/downloads/
+
+.impeccable/hook.cache.json
