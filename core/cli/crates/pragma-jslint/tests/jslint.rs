@@ -357,3 +357,13 @@ fn minify_rewrites_imports() {
         assert!(out.contains(spec), "missing {spec}: {out}");
     }
 }
+
+#[test]
+fn digit_suffix_flags_copies_not_domain_numbers() {
+    assert_eq!(rules("const item2 = 1"), vec!["js/vague-name"]);
+    assert_eq!(rules("const valor1 = 1"), vec!["js/vague-name"]);
+    assert_eq!(rules("const pode42 = 1"), Vec::<&str>::new());
+    assert_eq!(rules("const INICIO_EC141 = 1"), Vec::<&str>::new());
+    assert_eq!(rules("const escala12x36 = 1"), Vec::<&str>::new());
+    assert_eq!(rules("const carga5x2 = 1"), Vec::<&str>::new());
+}

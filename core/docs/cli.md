@@ -32,7 +32,7 @@ Fix the root cause; do not work around a rule.
 | `js/jsdoc-types` | Remove TypeScript and JSDoc types. |
 | `js/import` | Import only project files, `.pragma/`, and `package.json` dependencies (`packages.md`). Pass a quoted specifier to `import()` (`import('./chart.js')`), never a variable or `${}`. |
 | `js/comment`, `html/comment`, `css/comment` | Delete the comment. Use clear names. |
-| `js/vague-name` | Use descriptive names. Avoid generic words (`tmp`, `data`, `info`, `handler`, `util`), names ending in a digit, and names under 3 chars except `$ i j k id ok el ctx url log` and parameters of expression-body arrows. |
+| `js/vague-name` | Use descriptive names. Avoid generic words (`tmp`, `data`, `info`, `handler`, `util`), names ending in a single digit (`item2`; multi-digit numbers and pairs like `12x36` are fine), and names under 3 chars except `$ i j k id ok el ctx url log` and parameters of expression-body arrows. |
 | `js/legacy-api` | Replace old API (`export const state`/`actions`, `export function mount`, `ctx.$`, `ctx.update`, `store()`). Use top-level `let`, functions, `function mount(el)`, and `export let` (`components.md`, `state.md`). |
 | `js/prop-write` | Do not mutate props (including via `:model`). Copy into a `let` (`let current = start`). |
 | `js/const-state` | Declare mutated state with `let`, not `const`. |

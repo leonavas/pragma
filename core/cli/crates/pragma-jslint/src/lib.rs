@@ -38,10 +38,24 @@ const VAGUE: &[&str] = &[
 ];
 const DIGIT_OK: &[&str] = &["base64", "sha1", "sha256", "md5", "utf8", "i18n"];
 
+// A single trailing digit marks a numbered copy (`item2`, `x1`). Longer numbers
+// (`pode42`, `ec141`) and dimension pairs (`12x36`, `5x2`) are domain terms.
+fn copy_suffix(lower: &str) -> bool {
+    let bytes = lower.as_bytes();
+    let n = bytes.len();
+    if n == 0 || !bytes[n - 1].is_ascii_digit() {
+        return false;
+    }
+    if n >= 2 && bytes[n - 2].is_ascii_digit() {
+        return false;
+    }
+    !(n >= 3 && bytes[n - 2] == b'x' && bytes[n - 3].is_ascii_digit())
+}
+
 fn vague_name(name: &str, short_ok: bool) -> bool {
     let lower = name.to_ascii_lowercase();
     VAGUE.contains(&lower.as_str())
-        || (lower.ends_with(|c: char| c.is_ascii_digit()) && !DIGIT_OK.contains(&lower.as_str()))
+        || (copy_suffix(&lower) && !DIGIT_OK.contains(&lower.as_str()))
         || (!short_ok && name.chars().count() < 3 && !SHORT_OK.contains(&name))
 }
 
