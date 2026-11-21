@@ -39,6 +39,8 @@ pub struct BuildOptions {
 pub struct PageReport {
     pub pattern: String,
     pub js_gzip_bytes: u64,
+    /// `budgets.routes` key whose limits replace the global ones for this page.
+    pub budget: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -59,11 +61,16 @@ pub fn build(opts: &BuildOptions) -> Result<BuildReport, Vec<Diagnostic>> {
 }
 
 pub fn check(root: &Path) -> Vec<Diagnostic> {
+    check_report(root).0
+}
+
+/// `check` plus the build report (sizes and which budget each page used).
+pub fn check_report(root: &Path) -> (Vec<Diagnostic>, BuildReport) {
     let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
     let out_dir = std::env::temp_dir().join(format!("pragma-check-{}-{nanos}", std::process::id()));
-    let (diags, _) = run(&BuildOptions { root: root.to_path_buf(), out_dir: out_dir.clone(), mode: Mode::Prod });
+    let result = run(&BuildOptions { root: root.to_path_buf(), out_dir: out_dir.clone(), mode: Mode::Prod });
     let _ = fs::remove_dir_all(&out_dir);
-    diags
+    result
 }
 
 pub(crate) struct Fnv(u64);
@@ -299,6 +306,12 @@ fn module_graph(
                         diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/store-import", format!("stores are reached through `shared`: `import {{ shared }} from 'pragma'`, then `shared.{name}`")));
                     } else if client && rel_str(&t).ends_with(".server.js") {
                         diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", format!("client module cannot import {} (server code)", imp.spec)));
+                    } else if is_wasm(&t) {
+                        if client {
+                            diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", format!("{} is WebAssembly; import .wasm only in server code (.server.js)", imp.spec)));
+                        } else {
+                            ok = Some(t);
+                        }
                     } else {
                         queue.push_back(t.clone());
                         ok = Some(t);
@@ -347,6 +360,16 @@ fn check_endpoints(p: &Project, sources: &HashMap<PathBuf, String>) -> Vec<Diagn
         out.push(Diagnostic::error(m, 1, 1, "app/middleware", "export async function handle({ request, url, cookies, locals, next }) that returns next() or a Response"));
     }
     out
+}
+
+fn is_wasm(path: &Path) -> bool {
+    path.extension().is_some_and(|e| e == "wasm")
+}
+
+/// Import specifier from the module at `from` to the file at `to` (both relative to the same folder).
+fn relative_spec(from: &str, to: &str) -> String {
+    let depth = from.matches('/').count();
+    if depth == 0 { format!("./{to}") } else { format!("{}{to}", "../".repeat(depth)) }
 }
 
 fn npm_path(file: &str) -> PathBuf {
@@ -448,6 +471,9 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let mut p = Project::load(&opts.root);
     let mut diags = std::mem::take(&mut p.diags);
     let mut report = BuildReport::default();
+    for r in p.config.route_budgets.iter().filter(|r| !p.pages.iter().any(|pg| pg.pattern == r.pattern)) {
+        diags.push(Diagnostic::error("pragma.json", r.line, 1, "app/pragma-json", format!("budgets.routes \"{}\" matches no page (use the route path, such as \"/app/[id]\")", r.key)));
+    }
 
     let mut sources: HashMap<PathBuf, String> = HashMap::new();
     for f in &p.js_files {
@@ -887,10 +913,11 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         report.css_gzip_bytes = report.css_gzip_bytes.max(total_css_gz);
         if !o.is_404 {
             manifest.push(json!({ "pattern": o.page.pattern, "html": html_url, "modules": module_urls, "loader": o.loader, "ssr": o.ssr }));
-            report.pages.push(PageReport { pattern: o.page.pattern.clone(), js_gzip_bytes: initial });
-            budget(&p, "initialJsKb", p.config.budgets.initial_js_kb, initial, &o.page.pattern, &mut diags);
-            budget(&p, "routeJsKb", p.config.budgets.route_js_kb, route_only, &o.page.pattern, &mut diags);
-            budget(&p, "cssKb", p.config.budgets.css_kb, total_css_gz, &o.page.pattern, &mut diags);
+            let route_budget = p.config.route_budgets.iter().find(|r| r.pattern == o.page.pattern);
+            report.pages.push(PageReport { pattern: o.page.pattern.clone(), js_gzip_bytes: initial, budget: route_budget.map(|r| r.key.clone()) });
+            budget(&p, "initialJsKb", route_budget, initial, &o.page.pattern, &mut diags);
+            budget(&p, "routeJsKb", route_budget, route_only, &o.page.pattern, &mut diags);
+            budget(&p, "cssKb", route_budget, total_css_gz, &o.page.pattern, &mut diags);
         }
         if let Some(server) = &o.page.server {
             let mut ssr_scripts = SsrScripts::default();
@@ -913,7 +940,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         }
     }
     if outs.iter().all(|o| o.is_404) {
-        budget(&p, "cssKb", p.config.budgets.css_kb, shared_css_gz, "global CSS", &mut diags);
+        budget(&p, "cssKb", None, shared_css_gz, "global CSS", &mut diags);
     }
     w.write_client("client/_pragma/manifest.json", serde_json::to_string_pretty(&Value::Array(manifest)).unwrap().as_bytes(), prod);
 
@@ -955,19 +982,35 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         entries.extend(script_ids.keys().cloned());
         entries.retain(|e| opts.root.join(e).is_file() || sources.contains_key(e));
         let smods = module_graph(&opts.root, &entries, false, &sources, &deps, &mut BTreeMap::new(), &mut diags);
-        let server_out = |path: &Path| {
-            let rel = rel_str(path);
-            rel.strip_prefix(".pragma/").map_or_else(|| rel.clone(), |rest| format!("core/{rest}"))
-        };
+        let mut wasm: BTreeMap<String, PathBuf> = BTreeMap::new();
         for (path, m) in &smods {
-            let out_rel = server_out(path);
-            let up = "../".repeat(out_rel.matches('/').count());
-            let to_runtime = |i: &js::Import| {
-                let target = m.imports.iter().find(|(imp, _)| imp.spec == i.spec && i.spec == "pragma/server")?.1.as_ref()?;
-                Some(format!("{}{}", if up.is_empty() { "./" } else { &up }, server_out(target)))
-            };
-            let code = js::rewrite(&m.src, &m.imports.iter().map(|(i, _)| i.clone()).collect::<Vec<_>>(), to_runtime);
-            w.write(&format!("server/{out_rel}"), code.as_bytes());
+            let out_rel = deps::asset_path(&rel_str(path));
+            let dir = path.parent().unwrap_or(Path::new(""));
+            let mut moved: HashMap<&str, String> = HashMap::new();
+            for (imp, t) in &m.imports {
+                if let Some(t) = t.as_ref().filter(|t| is_wasm(t)) {
+                    wasm.insert(deps::asset_path(&rel_str(t)), t.clone());
+                } else if t.is_none() && pragma_jslint::is_package(&imp.spec) && let Some(file) = deps.resolve_server_wasm(dir, &imp.spec) {
+                    let out = deps::asset_path(&rel_str(&file));
+                    moved.insert(&imp.spec, relative_spec(&out_rel, &out));
+                    wasm.insert(out, file);
+                } else if imp.spec == "pragma/server" && let Some(t) = t {
+                    moved.insert(&imp.spec, relative_spec(&out_rel, &deps::asset_path(&rel_str(t))));
+                }
+            }
+            if moved.is_empty() {
+                w.write(&format!("server/{out_rel}"), m.src.as_bytes());
+            } else {
+                let specs: Vec<js::Import> = m.imports.iter().map(|(imp, _)| imp.clone()).collect();
+                let src = js::rewrite(&m.src, &specs, |imp| moved.get(imp.spec.as_str()).cloned());
+                w.write(&format!("server/{out_rel}"), src.as_bytes());
+            }
+        }
+        for (out, file) in &wasm {
+            match fs::read(opts.root.join(file)) {
+                Ok(bytes) => w.write(&format!("server/{out}"), &bytes),
+                Err(e) => diags.push(Diagnostic::error(file, 1, 1, "app/package", format!("cannot read {}: {e}", rel_str(file)))),
+            }
         }
         let mut worker = String::from("import { createHandler } from './core/server/handler.js'\n");
         for (i, r) in server_routes.iter().enumerate() {
@@ -1010,18 +1053,25 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         }
         w.write("server/package.json", b"{ \"type\": \"module\" }\n");
         if report.has_server {
-            let node = format!(
-                "import h from './worker.js'\nimport {{ serve }} from './core/server/node.mjs'\n\nserve(h, {{ root: new URL('../client/', import.meta.url), port: process.env.PORT ?? 3000, service: {} }})\n",
-                json!(p.config.name)
-            );
+            let options = format!("{{ root: new URL('../client/', import.meta.url), port: process.env.PORT ?? 3000, service: {} }}", json!(p.config.name));
+            // a static import graph is loaded before any code runs: the .wasm loader must be
+            // registered before worker.js is imported
+            let node = if wasm.is_empty() {
+                format!("import h from './worker.js'\nimport {{ serve }} from './core/server/node.mjs'\n\nserve(h, {options})\n")
+            } else {
+                format!("import {{ serve, registerWasm }} from './core/server/node.mjs'\n\nregisterWasm()\nconst {{ default: h }} = await import('./worker.js')\nserve(h, {options})\n")
+            };
             w.write("server/node.mjs", node.as_bytes());
         }
-        let wrangler = json!({
+        let mut wrangler = json!({
             "name": p.config.name,
             "main": "worker.js",
             "compatibility_date": "2025-11-01",
             "assets": { "directory": "../client", "binding": "ASSETS", "run_worker_first": true },
         });
+        if !wasm.is_empty() {
+            wrangler["rules"] = json!([{ "type": "CompiledWasm", "globs": ["**/*.wasm"], "fallthrough": true }]);
+        }
         w.write("server/wrangler.jsonc", serde_json::to_string_pretty(&wrangler).unwrap().as_bytes());
     } else if report.has_server {
         diags.push(Diagnostic::error(".pragma/server/handler.js", 1, 1, "app/structure", ".pragma/server/handler.js not found; required by *.server.js"));
@@ -1076,11 +1126,18 @@ fn base64(bytes: &[u8]) -> String {
     out
 }
 
-fn budget(p: &Project, key: &'static str, limit: Option<f64>, bytes: u64, what: &str, diags: &mut Vec<Diagnostic>) {
-    let Some(limit) = limit else { return };
+/// A page's limit comes from its `budgets.routes` entry when that entry sets the key, else from the
+/// global budget.
+fn budget(p: &Project, key: &'static str, route: Option<&project::RouteBudget>, bytes: u64, what: &str, diags: &mut Vec<Diagnostic>) {
+    let (limit, line, source) = match route.and_then(|r| r.budgets.get(key).map(|limit| (limit, r))) {
+        Some((limit, r)) => (limit, r.line, format!(" (budgets.routes \"{}\")", r.key)),
+        None => {
+            let Some(limit) = p.config.budgets.get(key) else { return };
+            (limit, p.config.budget_lines.get(key).copied().unwrap_or(1), String::new())
+        }
+    };
     let kb = bytes as f64 / 1024.0;
     if kb > limit {
-        let line = p.config.budget_lines.get(key).copied().unwrap_or(1);
-        diags.push(Diagnostic::error("pragma.json", line, 1, "app/budget", format!("{key} exceeded in {what}: {kb:.1} kB gzip > {limit} kB")));
+        diags.push(Diagnostic::error("pragma.json", line, 1, "app/budget", format!("{key} exceeded in {what}: {kb:.1} kB gzip > {limit} kB{source}")));
     }
 }

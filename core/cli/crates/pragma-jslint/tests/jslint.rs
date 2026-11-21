@@ -239,6 +239,15 @@ fn node_only_on_server() {
 }
 
 #[test]
+fn workers_modules_only_on_server() {
+    let src = "import { env } from 'cloudflare:workers'";
+    assert_eq!(diags("routes/app/[id].server.js", src, &APP), vec![]);
+    assert_eq!(diags("routes/app/[id].server.js", "import { connect } from 'cloudflare:sockets'", &APP), vec![]);
+    assert_eq!(diags("routes/app/[id].js", src, &APP), vec![(1, 21, "app/package")]);
+    assert!(pragma_jslint::workers_module_message("cloudflare:workers").contains("Cloudflare Workers module"));
+}
+
+#[test]
 fn column_counts_chars_not_bytes() {
     assert_eq!(
         app("const résumé = 'café'; el.innerHTML = résumé"),

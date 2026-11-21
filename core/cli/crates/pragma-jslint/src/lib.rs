@@ -183,6 +183,11 @@ impl Linter<'_> {
                 self.report(span, RULE_PACKAGE, node_builtin_message(specifier));
             }
             return;
+        } else if is_workers_module(specifier) {
+            if !self.server {
+                self.report(span, RULE_PACKAGE, workers_module_message(specifier));
+            }
+            return;
         } else if specifier.starts_with("http:")
             || specifier.starts_with("https:")
             || specifier.starts_with("//")
@@ -208,6 +213,14 @@ pub fn is_node_builtin(specifier: &str) -> bool {
 
 pub fn node_builtin_message(specifier: &str) -> String {
     format!("`{specifier}` is a Node module and doesn't run in the browser; use it in a .server.js")
+}
+
+pub fn is_workers_module(specifier: &str) -> bool {
+    specifier.starts_with("cloudflare:")
+}
+
+pub fn workers_module_message(specifier: &str) -> String {
+    format!("`{specifier}` is a Cloudflare Workers module and doesn't run in the browser; use it in a .server.js")
 }
 
 pub fn is_package(specifier: &str) -> bool {

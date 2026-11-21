@@ -16,12 +16,19 @@ pub struct Node {
     child: Option<Child>,
     fingerprint: u64,
     dev: bool,
+    cf_config: Option<PathBuf>,
 }
 
 impl Node {
     /// `dev`: shows `log.debug` (PRAGMA_LOG_LEVEL=debug) unless the environment sets a level.
     pub fn new(entry: PathBuf, cwd: PathBuf, dev: bool) -> Node {
-        Node { entry, cwd, child: None, fingerprint: 0, dev }
+        Node { entry, cwd, child: None, fingerprint: 0, dev, cf_config: None }
+    }
+
+    /// `pragma dev --cf`: `env`, `ctx` and `caches` come from wrangler `getPlatformProxy` over `config`.
+    pub fn with_cloudflare(mut self, config: PathBuf) -> Node {
+        self.cf_config = Some(config);
+        self
     }
 
     /// Starts, restarts (if server code changed) or stops node according to the current build.
@@ -31,7 +38,10 @@ impl Node {
             site.set_backend(None);
             return;
         }
-        let fingerprint = fingerprint(self.entry.parent().unwrap());
+        let mut fingerprint = fingerprint(self.entry.parent().unwrap());
+        if let Some(config) = &self.cf_config {
+            fingerprint ^= cloudflare_fingerprint(config);
+        }
         if self.child.is_some() && fingerprint == self.fingerprint {
             return;
         }
@@ -45,6 +55,9 @@ impl Node {
         let mut cmd = Command::new("node");
         if self.dev && std::env::var_os("PRAGMA_LOG_LEVEL").is_none() {
             cmd.env("PRAGMA_LOG_LEVEL", "debug");
+        }
+        if let Some(config) = &self.cf_config {
+            cmd.env("PRAGMA_CF_CONFIG", config);
         }
         let spawned = cmd
             .arg(&self.entry)
@@ -77,11 +90,13 @@ impl Node {
             });
         }
         let started = Instant::now();
+        // remote bindings open a session with Cloudflare first
+        let limit = Duration::from_secs(if self.cf_config.is_some() { 90 } else { 10 });
         let ready = loop {
             if tokio::net::TcpStream::connect(("127.0.0.1", port)).await.is_ok() {
                 break true;
             }
-            if matches!(child.try_wait(), Ok(Some(_))) || started.elapsed() > Duration::from_secs(10) {
+            if matches!(child.try_wait(), Ok(Some(_))) || started.elapsed() > limit {
                 break false;
             }
             tokio::time::sleep(Duration::from_millis(25)).await;
@@ -96,10 +111,37 @@ impl Node {
     }
 
     pub async fn stop(&mut self) {
-        if let Some(mut child) = self.child.take() {
-            let _ = child.kill().await;
+        let Some(mut child) = self.child.take() else { return };
+        // getPlatformProxy runs workerd: SIGTERM lets node dispose it before exiting
+        if self.cf_config.is_some()
+            && let Some(pid) = child.id()
+            && Command::new("kill").arg("-TERM").arg(pid.to_string()).status().await.is_ok_and(|s| s.success())
+            && tokio::time::timeout(Duration::from_secs(5), child.wait()).await.is_ok()
+        {
+            return;
         }
+        let _ = child.kill().await;
     }
+}
+
+fn cloudflare_fingerprint(config: &Path) -> u64 {
+    let mut hasher = std::hash::DefaultHasher::new();
+    std::fs::read(config).unwrap_or_default().hash(&mut hasher);
+    std::fs::read(config.with_file_name(".dev.vars")).unwrap_or_default().hash(&mut hasher);
+    hasher.finish()
+}
+
+/// Root wrangler config `pragma dev --cf` reads bindings from.
+pub fn cloudflare_config(root: &Path) -> Result<PathBuf, String> {
+    let config = ["wrangler.jsonc", "wrangler.json", "wrangler.toml"]
+        .iter()
+        .map(|name| root.join(name))
+        .find(|path| path.is_file())
+        .ok_or("pragma dev --cf reads bindings from wrangler.jsonc in the app root; create it (cli.md, \"Secrets, variables, bindings\")")?;
+    if !root.ancestors().any(|dir| dir.join("node_modules/wrangler/package.json").is_file()) {
+        return Err("pragma dev --cf needs wrangler in the app: run `npm i -D wrangler@4`".into());
+    }
+    Ok(config)
 }
 
 fn fingerprint(dir: &Path) -> u64 {
@@ -194,6 +236,18 @@ fn text(value: &Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cloudflare_needs_a_root_config_and_wrangler() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        assert!(cloudflare_config(root).unwrap_err().contains("wrangler.jsonc"));
+        std::fs::write(root.join("wrangler.jsonc"), "{}").unwrap();
+        assert!(cloudflare_config(root).unwrap_err().contains("npm i -D wrangler@4"));
+        std::fs::create_dir_all(root.join("node_modules/wrangler")).unwrap();
+        std::fs::write(root.join("node_modules/wrangler/package.json"), "{}").unwrap();
+        assert_eq!(cloudflare_config(root).unwrap(), root.join("wrangler.jsonc"));
+    }
 
     #[test]
     fn formats_otel_record() {

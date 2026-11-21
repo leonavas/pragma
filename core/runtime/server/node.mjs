@@ -1,9 +1,10 @@
 import { createServer } from 'node:http'
+import nodeModule from 'node:module'
 import { readFile, stat } from 'node:fs/promises'
 import { extname, join, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { compileRoutes, matchRoute } from './handler.js'
 import { createLogger, minSeverity, resourceFrom, writeLine } from './log.js'
 
@@ -188,14 +189,47 @@ async function send(res, response, method) {
   await pipeline(Readable.fromWeb(response.body), res)
 }
 
+const wasmSource = (url) => `import { readFileSync } from 'node:fs'\nexport default new WebAssembly.Module(readFileSync(new URL(${JSON.stringify(url)})))`
+
+function loadWasm(url, context, nextLoad) {
+  if (!url.startsWith('file:') || !url.endsWith('.wasm')) return nextLoad(url, context)
+  return { format: 'module', source: wasmSource(url), shortCircuit: true }
+}
+
+export function registerWasm() {
+  if (nodeModule.registerHooks) return nodeModule.registerHooks({ load: loadWasm })
+  nodeModule.register('data:text/javascript,' + encodeURIComponent(`const wasmSource = ${wasmSource}\nexport const load = ${loadWasm}`))
+}
+
+async function cloudflarePlatform(configPath) {
+  let wrangler
+  try {
+    const require = nodeModule.createRequire(join(process.cwd(), 'package.json'))
+    wrangler = await import(pathToFileURL(require.resolve('wrangler')).href)
+  } catch {
+    throw new Error('pragma dev --cf needs wrangler in the app: run `npm i -D wrangler@4`')
+  }
+  const getPlatformProxy = wrangler.getPlatformProxy ?? wrangler.default?.getPlatformProxy
+  return getPlatformProxy({ configPath, remoteBindings: true })
+}
+
 export function serve(handler, { root, port = 3000, service } = {}) {
   const log = createLogger({ resource: resourceFrom(process.env, service), min: minSeverity(process.env), sink: writeLine })
   const assets = createStatic(root)
   const env = { ...process.env, ASSETS: assets }
-  const ctx = {
+  let ctx = {
     waitUntil: (p) => Promise.resolve(p).catch((err) => log.error('waitUntil failed', err)),
     passThroughOnException() {},
   }
+  const cfConfig = process.env.PRAGMA_CF_CONFIG
+  const ready = cfConfig
+    ? cloudflarePlatform(cfConfig).then((proxy) => {
+        Object.assign(env, proxy.env, { ASSETS: assets })
+        ctx = proxy.ctx
+        Object.defineProperty(globalThis, 'caches', { value: proxy.caches, writable: true, enumerable: true, configurable: true })
+        process.once('SIGTERM', () => proxy.dispose().finally(() => process.exit(0)))
+      })
+    : Promise.resolve()
   const server = createServer(async (req, res) => {
     try {
       await send(res, await handler.fetch(toRequest(req), env, ctx), req.method)
@@ -205,8 +239,15 @@ export function serve(handler, { root, port = 3000, service } = {}) {
       res.end('Internal error')
     }
   })
-  server.listen(Number(port), () => {
-    log.info(`pragma serving at http://localhost:${server.address().port}`, { 'server.port': server.address().port })
-  })
+  ready.then(
+    () =>
+      server.listen(Number(port), () => {
+        log.info(`pragma serving at http://localhost:${server.address().port}`, { 'server.port': server.address().port })
+      }),
+    (err) => {
+      log.error(err instanceof Error ? err.message : String(err), err)
+      process.exitCode = 1
+    },
+  )
   return server
 }

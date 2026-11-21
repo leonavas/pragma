@@ -36,6 +36,7 @@ The folder structure is fixed. Do not create other top-level folders. Do not edi
 - `lang` sets `<html lang>` (default `"en"`).
 - `webmcp` (default `true`) turns every `<form>` into an agent tool and enables `webmcp/*` rules (`webmcp.md`).
 - `budgets` sets gzip kB limits: `initialJsKb` (all JS loaded by a page), `routeJsKb` (page JS outside `.pragma/`), `cssKb` (global CSS).
+- `budgets.routes` sets limits for one page only; the keys it sets replace the global ones for that page: `"routes": { "/app/[id]": { "initialJsKb": 80, "cssKb": 30 } }`. The key is the route path (`[param]` as in the file name) and must match a page.
 
 ## `.pragma/` versioning
 
