@@ -1,3 +1,5 @@
+import { readBy, forgetReads } from './state.js'
+
 const D = Symbol(), S = Symbol(), L = Symbol(), NONE = { b: [] }
 // Outer scope of each open component; slot content (data-slot="n") uses the one n levels up.
 const outer = []
@@ -200,7 +202,12 @@ function visit(el, s, d = el[D] ?? parse(el)) {
   if (d.r && ++deep > SELF_DEPTH) fail(`<${el.getAttribute('data-self')}> is nested more than ${SELF_DEPTH} levels inside itself: stop the recursion on data (a tree without cycles, <if>/<for> around the self call)`)
   if (d.x === 1) outer.push(s)
   if (d.x) s = hooks.enter(el, s, d.x, w)
-  for (const b of d.b) bind(el, b, b[0] === 5 && b[3] ? (outer.at(-b[3]) ?? s) : s)
+  for (const b of d.b) {
+    const r = [el, b, b[0] === 5 && b[3] ? (outer.at(-b[3]) ?? s) : s]
+    readBy(r)
+    bind(...r)
+  }
+  readBy(0)
   if (d.e) el[S] = s
   if (el.firstElementChild) walk(el, s)
   if (d.m) model(el, s, d.m)
@@ -253,6 +260,8 @@ function gone(n, token) {
 }
 
 const running = n => n.getAnimations({ subtree: true }).filter(a => a.effect?.getComputedTiming().endTime < Infinity)
+
+export const afterMotion = (n, done) => after(reduced.matches ? [] : running(n), done)
 
 function after(animations, done) {
   if (!animations.length) return done()
@@ -339,6 +348,18 @@ function list(t, d, s) {
 export function render(el, s) {
   outer.length = 0
   deep = 0
-  visit(el, s)
+  forgetReads()
+  readBy(0)
+  try { visit(el, s) } finally { readBy(null) }
   settle()
+}
+
+// After a change read only by bindings (state.js `readers`): runs just those, nothing else is walked.
+export function patch(groups) {
+  try {
+    for (const g of groups) for (const r of g) {
+      readBy(r)
+      bind(...r)
+    }
+  } finally { readBy(null) }
 }

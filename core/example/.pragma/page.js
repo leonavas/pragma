@@ -1,6 +1,6 @@
-import { render, hooks, scopeOf, input, eventCall } from './directives.js'
+import { render, patch, hooks, scopeOf, input, eventCall } from './directives.js'
 import { log } from './log.js'
-import { reactive, onChange, persist, persistStores } from './state.js'
+import { reactive, readers, onChange, persist, persistStores } from './state.js'
 import { coerce } from './props.js'
 import { load, call, stream } from './loader.js'
 import { navigate, redirect } from './router.js'
@@ -15,9 +15,17 @@ const confirm = (...a) => overlays().then(m => m.confirm(...a))
 
 const C = Symbol(), O = Symbol(), mounted = new Set(), comps = {}, types = new Set()
 export const shared = {}
-let cur, queued, mounts = []
+let cur, queued, whole, mounts = []
+const dirty = new Set()
 
-export function schedule() {
+// A state change read only by bindings (`:--x`, `{x}`, `:attr`, `:class`, `:show`) patches those
+// bindings; anything else (no key, a key read by a block, prop or component, a key never read) renders the page.
+export function schedule(target, key) {
+  if (!whole) {
+    const r = target && readers(target, key)
+    if (r) dirty.add(r)
+    else whole = true
+  }
   if (queued) return
   queued = true
   queueMicrotask(flush)
@@ -26,6 +34,13 @@ export function schedule() {
 function flush() {
   queued = false
   if (!cur) return
+  const groups = [...dirty]
+  dirty.clear()
+  if (!whole) {
+    patch(groups)
+    return persistStores()
+  }
+  whole = false
   render(document.body, { __proto__: null, shared, params: cur.params, query: cur.query, page: cur.page })
   persistStores()
   // `function mount(el)`: el is the component root, or the page's `<main data-page>`
@@ -115,7 +130,7 @@ function unmount(o) {
 hooks.on = t => types.has(t) || (types.add(t), document.addEventListener(t, onEvent, true))
 hooks.remove = n => { for (const o of mounted) if (n.contains(o.el)) unmount(o) }
 hooks.enter = (el, s, x, w = null) => {
-  if (x === 2) return { __proto__: s, data: cur.data, state: cur.o.scope, [O]: cur.o }
+  if (x === 2) return { __proto__: s, data: reactive(cur.data), state: cur.o.scope, [O]: cur.o }
   const mod = comps[el.dataset.c]
   if (!mod) return s
   const o = el[C] ?? instance(el, mod, w)
@@ -159,6 +174,7 @@ export function enter(route, mods, url, params, doc, pending) {
   // with ssr the loader sets `data` synchronously, so the page script sees it as the server did
   const done = load(p, doc, pending).then(to => cur === p && (to ? redirect(to, true) : schedule()))
   p.o = instance(document.querySelector('main[data-page]'), mods.page ?? {}, null)
+  whole = true
   flush()
   return done
 }

@@ -34,9 +34,9 @@ async function remove() {
 
 | Component | Props | Slots | Closes on |
 |---|---|---|---|
-| `c-modal` | `id`, `title` | default, `actions` | Esc, backdrop, ×, `@close`, Back |
-| `c-alert` | `id`, `title` | default, `actions` | Esc, `@close`, Back |
-| `c-dropdown` | `id`, `label` | default (`<a>`, `<button>`, `<hr>`) | outside click, Esc, `@close`, Back |
+| `c-modal` | `id`, `title`, `autofocus` | default, `actions` | Esc, backdrop, ×, `@close`, Back |
+| `c-alert` | `id`, `title`, `autofocus` | default, `actions` | Esc, `@close`, Back |
+| `c-dropdown` | `id`, `label`, `placement` | default (`<a>`, `<button>`, `<hr>`) | outside click, Esc, `@close`, Back |
 
 `c-dropdown` is a menu of links and actions. It sends no value to a form. To pick a form value from a styled list, use `c-select` (`forms.md`).
 
@@ -44,6 +44,33 @@ async function remove() {
 |---|---|
 | `open(id)` / `close(id)` | Opens or closes the overlay. |
 | `await confirm(id)` | Opens the overlay and resolves to the clicked `@close` button's `value`, or `'cancel'`. |
+
+## Placement
+
+`placement` on `c-dropdown`: `bottom-start` (default), `bottom-end`, `top-start`, `top-end`. The side of the trigger, then the shared edge (`end`: right edges line up in LTR). With no room, the menu flips to the other side or edge.
+
+```html
+<c-dropdown id="send-as" label="Agent" placement="top-end">…</c-dropdown>
+```
+
+## Focus
+
+On open, focus goes to the element with `autofocus` inside the overlay, else to the first focusable element. For long or text-first content, put `autofocus` on the component (`<c-modal id="terms" title="Terms" autofocus>`): the dialog itself gets focus and the reader starts at the top. On close, focus returns to the opener.
+
+## Motion
+
+Opening animates with `.dialog[open]` (or `@starting-style`). Closing is CSS too: the runtime sets `data-leaving` on the `<dialog>` and makes it inert, waits for its CSS animations (also `::backdrop`) to end, then closes it. No animation rule or `prefers-reduced-motion` → it closes at once. History, scroll lock and `confirm()` resolve when closing starts; focus returns after the dialog is closed. The starter `.dialog` fades out. A side sheet is a `c-modal` with a class (`<c-modal id="person" title="Ana" class="sheet">`) that slides out:
+
+```css
+.sheet { margin: 0 0 0 auto; height: 100dvh; max-height: none; }
+.sheet[open] { animation: sheet-in 0.22s ease-out; }
+.sheet[data-leaving] { animation: sheet-out 0.14s ease-in forwards; }
+@keyframes sheet-in { from { translate: 100% 0; } }
+@keyframes sheet-out { to { translate: 100% 0; } }
+@media (prefers-reduced-motion: reduce) { .sheet[open], .sheet[data-leaving] { animation: none; } }
+```
+
+Use `forwards` on exit animations, so the dialog does not flash back before it closes.
 
 ## Rules
 

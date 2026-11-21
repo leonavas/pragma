@@ -132,6 +132,30 @@ const rows = () => items.map(item => ({ item, label: formatPrice(item.price) }))
 
 Keep the original `item` reference (`row.item`) when mutating it. Spreading `{ ...item, label }` creates a copy that does not update the source.
 
+## Per-frame updates
+
+Assign state from `requestAnimationFrame` (scroll, drag, a progress animation) and bind it with `:--name`, `{}`, `:attr`, `:class`, or `:show`. When a change is read only by such bindings (directly or through derived functions), the runtime updates only those bindings, not the page. A value read by `<if>`, `<for>`, `:model`, or a component prop renders the whole page.
+
+```js
+let progress = 0
+
+function mount() {
+  const start = performance.now()
+  let frame = 0
+  const step = now => {
+    progress = Math.min(1, (now - start) / 520)
+    if (progress < 1) frame = requestAnimationFrame(step)
+  }
+  frame = requestAnimationFrame(step)
+  return () => cancelAnimationFrame(frame)
+}
+```
+```html
+<div class="send" :--progress="$progress"></div>
+```
+
+Derived functions recompute only when state they read changes. Keep values from outside state (`Date.now()`, module variables) in a `let` you assign (`now = Date.now()`).
+
 ## Services (`import { … } from 'pragma'`)
 
 | Name | Use |
