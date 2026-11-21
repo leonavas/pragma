@@ -560,3 +560,124 @@ test('a const holding a function made by a call is a handler; a non-function thr
   await p.click('#not-a-function')
   assert.match(p.errors.join(), /@click="name" needs a function, but "name" holds string/)
 })
+
+test('loader: a redirect replaces the history entry and an error keeps its status and body', async () => {
+  const p = await open('/gone')
+  await p.waitForSelector('#title')
+  assert.equal(new URL(p.url()).pathname, '/b')
+  assert.equal(await p.evaluate(() => history.length), 2)
+  await p.goBack()
+  assert.equal(new URL(p.url()).href, 'about:blank')
+  assert.equal(await p.locator('#gone').count(), 0)
+
+  const m = await open('/missing')
+  await m.waitForSelector('#error')
+  assert.deepEqual([await text(m, '#status'), await text(m, '#code'), await text(m, '#message')], ['404', 'missing', 'No product'])
+  assert.deepEqual(p.errors, [])
+})
+
+test('call: errors carry status and body; a redirect navigates and resolves to undefined', async () => {
+  const p = await open('/net')
+  const failures = await p.evaluate(async () => {
+    const out = []
+    for (const name of ['conflict', 'plain']) {
+      try { await __net.call(name, { day: 1 }) } catch (e) { out.push([e instanceof Error, e.name, e.status, e.body, e.message]) }
+    }
+    return out
+  })
+  assert.deepEqual(failures, [
+    [true, 'ActionError', 409, { message: 'Slot taken', field: 'day' }, 'Slot taken'],
+    [true, 'ActionError', 400, 'bad input', 'bad input'],
+  ])
+  const after = await p.evaluate(async () => {
+    const before = history.length, r = await __net.call('go')
+    return [r, location.pathname, document.querySelector('#title').textContent, history.length - before]
+  })
+  assert.deepEqual(after, [undefined, '/b', 'Page B', 1])
+  assert.deepEqual(p.errors, [])
+})
+
+test('navigate with replace uses replaceState', async () => {
+  const p = await open('/net')
+  const r = await p.evaluate(async () => {
+    const before = history.length
+    await __net.navigate('/b', { replace: true })
+    return [location.pathname, history.length - before]
+  })
+  assert.deepEqual(r, ['/b', 0])
+})
+
+test('stream: yields NDJSON lines as they arrive, aborts, throws ActionError and follows a JSON redirect', async () => {
+  const p = await open('/net')
+  const chat = await p.evaluate(async () => {
+    const t0 = performance.now(), out = []
+    for await (const line of __net.stream('chat', { q: 1 })) out.push([line, performance.now() - t0])
+    return out
+  })
+  assert.deepEqual(chat.map(c => c[0]), [{ accept: 'application/x-ndjson, application/json' }, { n: 1 }, { n: 2, s: 'ã' }, { n: 3 }])
+  assert.ok(chat[3][1] - chat[0][1] > 200, 'lines arrive while the response streams')
+
+  const aborted = await p.evaluate(async () => {
+    const c = new AbortController(), out = []
+    try {
+      for await (const line of __net.stream('slow', null, { signal: c.signal })) {
+        out.push(line.n)
+        if (out.length === 2) c.abort()
+      }
+    } catch (e) { return [out, e.name] }
+    return [out, 'no error']
+  })
+  assert.deepEqual(aborted, [[0, 1], 'AbortError'])
+
+  const failed = await p.evaluate(async () => {
+    try { for await (const _ of __net.stream('conflict')) {} } catch (e) { return [e.name, e.status, e.body.field] }
+  })
+  assert.deepEqual(failed, ['ActionError', 409, 'day'])
+
+  const redirected = await p.evaluate(async () => {
+    const out = []
+    for await (const line of __net.stream('go')) out.push(line)
+    return [out, location.pathname]
+  })
+  assert.deepEqual(redirected, [[], '/b'])
+  assert.deepEqual(p.errors, [])
+})
+
+const motion = p => p.evaluate(() => [...document.querySelectorAll('main p, #l li')].map(n => n.textContent + (n.hasAttribute('data-leaving') ? ':leaving' : '') + (n.hasAttribute('data-entering') ? ':entering' : '') + (n.inert ? ':inert' : '')))
+
+test('motion: data-leaving keeps the node until its CSS animation ends; data-entering only after the first render', async () => {
+  const p = await open('/motion')
+  assert.deepEqual(await motion(p), ['on', 'a', 'b', 'c', 'plain'])
+
+  await p.evaluate(() => {
+    self.__on = document.querySelector('#on')
+    self.__li = [...document.querySelectorAll('#l li')]
+    __ctx.update(s => {
+      s.on = false
+      s.items = ['a', 'c', 'd']
+      s.plain = false
+    })
+  })
+  await tick(p)
+  assert.deepEqual(await motion(p), ['on:leaving:inert', 'off:entering', 'a', 'b:leaving:inert', 'c', 'd:entering'])
+  assert.deepEqual(await p.evaluate(() => { const l = [...document.querySelectorAll('#l li')]; return [l[0] === __li[0], l[2] === __li[2]] }), [true, true])
+
+  await p.evaluate(() => __ctx.update(s => { s.on = true }))
+  await tick(p)
+  assert.deepEqual(await motion(p), ['on', 'off:leaving:inert', 'a', 'b:leaving:inert', 'c', 'd:entering'])
+  assert.equal(await p.evaluate(() => document.querySelector('#on') === __on), true)
+
+  await p.waitForFunction(() => !document.querySelector('[data-leaving], [data-entering]'))
+  assert.deepEqual(await motion(p), ['on', 'a', 'c', 'd'])
+  assert.deepEqual(p.errors, [])
+})
+
+test('motion: removal is immediate under prefers-reduced-motion', async () => {
+  const ctx = await browser.newContext({ reducedMotion: 'reduce' })
+  const p = await ctx.newPage()
+  await p.goto(server.url + '/motion')
+  await p.waitForFunction(() => self.__ctx)
+  await p.evaluate(() => __ctx.update(s => { s.on = false; s.items = ['a', 'x'] }))
+  await tick(p)
+  assert.deepEqual(await motion(p), ['off', 'a', 'x', 'plain'])
+})

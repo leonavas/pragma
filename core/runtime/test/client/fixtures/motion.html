@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Motion</title>
+  <script>self.__pragmaDev=true</script>
+  <style>
+    @keyframes out { to { opacity: 0 } }
+    @keyframes in { from { opacity: 0 } }
+    .spin { animation: in 1s infinite }
+    #on[data-leaving], #off[data-leaving], li[data-leaving] { animation: out .3s }
+    #on[data-entering], #off[data-entering], li[data-entering] { animation: in .3s }
+  </style>
+  <script type="application/json" id="pragma-route">{"pattern":"/motion","page":"/assets/motion.js","components":{},"stores":{"cart":"/assets/cart.js"},"loader":false,"ssr":false}</script>
+  <script type="module" src="/core/boot.js"></script>
+</head>
+<body>
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
+  <main data-page>
+    <template data-if="state.on" data-tid="m1"><p id="on">on</p></template>
+    <template data-else><p id="off">off</p></template>
+    <ul id="l"><template data-for="i in state.items" data-key="i" data-tid="m2"><li data-text="{i}"></li></template></ul>
+    <template data-if="state.plain" data-tid="m3"><p id="plain" class="spin">plain</p></template>
+  </main>
+</body>
+</html>

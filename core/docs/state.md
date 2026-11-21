@@ -139,8 +139,9 @@ Keep the original `item` reference (`row.item`) when mutating it. Spreading `{ .
 | `shared` | Stores (`shared.tasks.items`, `shared.tasks.add(title)`). |
 | `data` | `load` result (`data.md`); undefined until `load` finishes. |
 | `params`, `query`, `page` | Route params, query strings, `page.loading`, `page.error`. |
-| `call(name, input)` | Calls a server action (`data.md`). |
-| `navigate(url)` | Navigates via the router. |
+| `call(name, input)` | Calls a server action; throws `ActionError` (`status`, `body`) on failure (`data.md`). |
+| `stream(name, input, { signal })` | Calls a server action that streams NDJSON; `for await` each line (`data.md`). |
+| `navigate(url, { replace })` | Navigates via the router; `replace: true` replaces the history entry. |
 | `open(id)`, `close(id)`, `confirm(id)` | Controls overlays (`overlays.md`). |
 | `log` | Emits logs (`logs.md`). |
 

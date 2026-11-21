@@ -156,6 +156,13 @@ the template of the branch that produced it, with `data-of="<tid>"` (the `data-t
 `if`/`for` opening the chain) and, in `for`, `data-key="<value>"`. Updates diff by key; existing
 nodes are not recreated.
 
+Motion (client only, CSS-driven): an instance inserted after its block's first render gets
+`data-entering` until its finite animations end (`getAnimations({ subtree: true })`). A removed
+instance gets `data-leaving` + `inert`, is skipped by later renders, and leaves the DOM when its
+finite animations end (timeout fallback: computed end time + 50 ms); with no animation, or under
+`prefers-reduced-motion: reduce`, it leaves at the end of the same render. If its block wants it
+back before then, the same node returns. Component cleanups run when the node leaves the DOM.
+
 ### Compiled format (for SSR)
 
 The build emits `templates/<route>.json`: a list of ops.
@@ -273,7 +280,7 @@ The top-level script is the component (no `export default`, `this` or `ctx`):
 - Imports are hoisted out of the per-instance factory. No top-level `await` (do it in `mount()` or
   an action), no `var`, no destructuring `let`, no other `export` (`js/component-script`); `$` and
   `$pragma` are reserved names.
-- Services: `import { shared, data, params, query, page, log, call, navigate, open, close, confirm } from 'pragma'`.
+- Services: `import { shared, data, params, query, page, log, call, stream, navigate, open, close, confirm } from 'pragma'`.
   They are live: `data` is undefined until the loader is done (read it in functions, or rely on
   `ssr`: then it is already set when the script runs). Only page, component and store scripts
   import `pragma` (`js/import` elsewhere).
@@ -309,13 +316,22 @@ export const ssr = false
   the fetch before modules: `self.__pd = fetch('/_data' + location.pathname + location.search)`.
   The runtime uses `self.__pd` if present.
 - `call('name', input)` (from `pragma`) → `POST /_action/<path>/<name>` with JSON → action result.
+  `stream('name', input, { signal })` → same request (`accept: application/x-ndjson, application/json`),
+  async iterator over the NDJSON lines of a streamed `Response`.
+- Wire contract for `/_data` and `/_action`: success → 200 with the JSON (`{ "data" }` for
+  `/_data`, the action value for `/_action`, or a raw `Response` such as NDJSON); a redirect →
+  200 `{ "redirect": { "status": 303, "location": "/x" } }` (the only key); an error → the real
+  4xx/5xx with `{ "error": <body> }`. Client: `call`/`stream` throw `ActionError` (`status`,
+  `body`, `message` = `body.message`); a redirect navigates (action: push; `load`: replace; other
+  origin or 20+ hops in a chain: full load) and `call` resolves to `undefined`;
+  `page.error` = `{ ...body, status }`.
 - `ssr = true`: the server runs `load`, renders the compiled template and embeds data in
   `<script type="application/json" id="pragma-data">`. The client binds directives without
   rebuilding the DOM.
 - With `ssr`, the server also runs the page script and the script of each component on the page
   (once per request, no `mount`, no events), so `$x` bindings (initial `let`s, props, derived
   functions) and slot content are in the first HTML. In those scripts `data`, `params`, `query`
-  and `page` are read-only, `shared`, `call`, `navigate`, `open`, `close` and `confirm` throw.
+  and `page` are read-only, `shared`, `call`, `stream`, `navigate`, `open`, `close` and `confirm` throw.
   A script is left to the browser (its `$x` bindings filled at boot, as without `ssr`) when it
   imports anything other than app code (`routes/`, `lib/`, `utils/`: no npm package, no
   `core/` module), when it throws while running on the server (reading `window`, `document`,
@@ -401,6 +417,7 @@ Usage:
   The layout is not recreated; its directives are reapplied.
 - `popstate`: the overlay manager intercepts first.
 - Scroll: top on new navigation; restored on back/forward. Focus moves to `<main>`.
+- `navigate(url, { replace: true })` uses `history.replaceState`.
 - Links `href="/path"` (no query or hash) to the current route get `aria-current="page"`:
   the build marks prebuilt HTML and the router keeps it on each navigation.
 - `document.startViewTransition` when available, except under `prefers-reduced-motion: reduce`

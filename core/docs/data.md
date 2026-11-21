@@ -3,7 +3,7 @@
 | File | Export | Purpose |
 |---|---|---|
 | `x.server.js` | `load(context)` | Return value becomes `data` in HTML and page `<script>`. |
-| `x.server.js` | `actions.name({ input, ...context })` | Invoked via `call('name', input)` from `'pragma'`. |
+| `x.server.js` | `actions.name({ input, ...context })` | Invoked via `call('name', input)` or `stream('name', input)` from `'pragma'`. |
 | `x.server.js` | `ssr = true` | Renders `data` into the first HTML (SEO, link previews, LCP). |
 | `x.server.js` without `x.html` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | Endpoint: returns a `Response` (files, streams, webhooks, WebSockets). |
 | `routes/_middleware.server.js` | `handle({ ...context, next })` | Runs before every request. |
@@ -152,6 +152,63 @@ export const actions = {
 }
 ```
 
+## Errors and redirects in the page
+
+| Server result | `call` | `stream` | `load` |
+|---|---|---|---|
+| Value | Resolves to it | Yields it once | `data` |
+| Error (4xx/5xx) | Throws `ActionError` | Throws `ActionError` | `page.error` (`status` + body fields) |
+| Redirect | Navigates (new history entry), resolves to `undefined` | Navigates, yields nothing | Navigates, replaces the history entry |
+
+`ActionError` is an `Error` with `status` (HTTP status) and `body` (the error body the server sent, or its text). `message` is `body.message` when present.
+
+```js
+async function book(day) {
+  try {
+    await call('book', { day })
+  } catch (failure) {
+    if (failure.status === 409) taken = failure.body.slots
+    else error = failure.message
+  }
+}
+```
+
+- A redirect navigates before `call` resolves: do not read the result after a redirecting action.
+- Show `page.error.message`; branch on `page.error.status` (`<if $notFound>` with `const notFound = () => page.error?.status === 404`).
+
+## Reading a stream (NDJSON)
+
+An action that returns a `Response` with `content-type: application/x-ndjson` streams one JSON value per line. Read it with `stream`:
+
+```js
+import { stream } from 'pragma'
+
+let messages = []
+let controller = null
+
+async function send(text) {
+  messages.push({ role: 'user', text }, { role: 'assistant', text: '' })
+  const reply = messages.at(-1)
+  controller = new AbortController()
+  try {
+    for await (const chunk of stream('chat', { text }, { signal: controller.signal })) {
+      if (chunk.type === 'delta') reply.text += chunk.text
+    }
+  } catch (failure) {
+    if (failure.name !== 'AbortError') reply.text = failure.message
+  } finally {
+    controller = null
+  }
+}
+
+const stop = () => controller?.abort()
+```
+
+- Each line arrives as soon as the server writes it; `stream` handles lines split across chunks.
+- Read the item back from state (`messages.at(-1)`) before writing to it: the object you pushed is not reactive.
+- `controller.abort()` stops the request and throws `AbortError` in the loop. `break` also stops it.
+- A JSON response (not NDJSON) yields its value once, or navigates if it is a redirect.
+
 ## Skeleton (page with `load`, without `ssr`)
 
 ```html
@@ -183,7 +240,7 @@ With `ssr = true`, page and component scripts run once per request on the server
 |---|---|
 | Top-level `let`, props, derived functions, slot content | Rendered into the first HTML |
 | `data`, `params`, `query`, `page` | Read-only |
-| `shared`, `call`, `navigate`, `open`, `close`, `confirm` | Throws; script deferred to browser |
+| `shared`, `call`, `stream`, `navigate`, `open`, `close`, `confirm` | Throws; script deferred to browser |
 | Top-level `window`, `document`, `localStorage` | Throws; script deferred to browser |
 | Imports of npm packages or `.pragma/` | Skipped; script deferred to browser |
 | Prop passed from a store | Deferred to browser |
