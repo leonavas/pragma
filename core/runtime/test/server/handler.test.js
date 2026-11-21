@@ -328,7 +328,7 @@ test('handler serves markdown for Accept: text/markdown with Vary: Accept', asyn
   assert.equal(plain.headers.get('vary'), null)
 })
 
-test('SSR 200 emits Link preload/modulepreload headers for Early Hints without duplicates', async (t) => {
+test('SSR 200 emits Link preload headers for stylesheets without duplicates or modulepreload', async (t) => {
   capture(t)
   const shell = `<!doctype html>
 <html>
@@ -363,7 +363,7 @@ test('SSR 200 emits Link preload/modulepreload headers for Early Hints without d
   assert.equal(ok.status, 200)
   assert.equal(
     ok.headers.get('link'),
-    '</assets/app.css>; rel=preload; as=style, </assets/theme.css>; rel=preload; as=style, </assets/app.js>; rel=modulepreload',
+    '</assets/app.css>; rel=preload; as=style, </assets/theme.css>; rel=preload; as=style',
   )
 
   const head = await h.fetch(new Request('http://x/post/1', { method: 'HEAD' }), {})
@@ -378,7 +378,7 @@ test('SSR 200 emits Link preload/modulepreload headers for Early Hints without d
   assert.equal(noLinks.status, 200)
   assert.equal(noLinks.headers.get('link'), null)
 
-  assert.equal(earlyHints('<link rel="stylesheet" href="/a.css"><link rel="modulepreload" href="/b.js">'), '</a.css>; rel=preload; as=style, </b.js>; rel=modulepreload')
+  assert.equal(earlyHints('<link rel="stylesheet" href="/a.css"><link rel="modulepreload" href="/b.js">'), '</a.css>; rel=preload; as=style')
 })
 
 test('platform helpers db, kv, files are passed to load and actions and undefined when absent', async (t) => {

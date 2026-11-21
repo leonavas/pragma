@@ -232,10 +232,8 @@ export function earlyHints(html) {
     const relVal = (rel?.[1] ?? rel?.[2] ?? rel?.[3] ?? '').trim().toLowerCase()
     const hrefVal = (href?.[1] ?? href?.[2] ?? href?.[3] ?? '').trim()
     if (!hrefVal || /[>\r\n]/.test(hrefVal)) continue
-    let hint
-    if (relVal === 'stylesheet') hint = `<${hrefVal}>; rel=preload; as=style`
-    else if (relVal === 'modulepreload') hint = `<${hrefVal}>; rel=modulepreload`
-    else continue
+    if (relVal !== 'stylesheet') continue
+    const hint = `<${hrefVal}>; rel=preload; as=style`
     if (seen.has(hint)) continue
     seen.add(hint)
     hints.push(hint)

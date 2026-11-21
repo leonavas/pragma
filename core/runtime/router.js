@@ -41,41 +41,35 @@ const own = el => (el.localName === 'meta' && el.name !== 'viewport' && !el.hasA
 
 function syncHead(doc) {
   document.title = doc.title
-  const old = [...document.head.children].filter(own), next = [...doc.head.children].filter(own)
+  const h = document.head
+  const old = [...h.children].filter(own), next = [...doc.head.children].filter(own)
   if (old.length === next.length && old.every((el, i) => el.isEqualNode(next[i]))) return
-  const at = document.head.querySelector('link[rel=stylesheet], style[data-pragma-shared-css], style[data-pragma-route-css]')
+  const at = h.querySelector('link[rel=stylesheet], [data-pragma-shared-css], [data-pragma-route-css]')
   for (const el of old) el.remove()
-  for (const el of next) document.head.insertBefore(document.importNode(el, true), at)
+  for (const el of next) h.insertBefore(document.importNode(el, true), at)
 }
 
 function loadRouteCss(href) {
-  const target = new URL(href, location.href).href
-  const existing = [...document.head.querySelectorAll('link[rel=stylesheet][data-pragma-route-css]')].find(el => el.href === target)
+  const h = document.head, target = new URL(href, location.href).href
+  const existing = [...h.querySelectorAll('link[data-pragma-route-css]')].find(el => el.href === target)
   if (existing) return { el: existing, created: false, ready: Promise.resolve() }
   const el = document.createElement('link')
   el.rel = 'stylesheet'
   el.href = href
   el.setAttribute('data-pragma-route-css', '')
-  const ready = new Promise(resolve => {
-    el.onload = resolve
-    el.onerror = resolve
-  })
-  const sheets = document.head.querySelectorAll('link[rel=stylesheet]')
-  const last = sheets[sheets.length - 1]
-  if (last) last.after(el)
-  else document.head.append(el)
+  const ready = new Promise(resolve => { el.onload = el.onerror = resolve })
+  const sheets = h.querySelectorAll('link[rel=stylesheet]')
+  sheets.length ? sheets[sheets.length - 1].after(el) : h.append(el)
   return { el, created: true, ready }
 }
 
 function syncRouteCss(keep, nextStyle) {
-  for (const el of document.head.querySelectorAll('link[rel=stylesheet][data-pragma-route-css], style[data-pragma-route-css]')) {
-    if (el !== keep) el.remove()
-  }
+  const h = document.head
+  for (const el of h.querySelectorAll('[data-pragma-route-css]')) if (el !== keep) el.remove()
   if (nextStyle) {
     const style = document.importNode(nextStyle, true)
-    const anchor = document.head.querySelector('style[data-pragma-shared-css], link[rel=stylesheet]')
-    if (anchor) anchor.after(style)
-    else document.head.append(style)
+    const anchor = h.querySelector('[data-pragma-shared-css], link[rel=stylesheet]')
+    anchor ? anchor.after(style) : h.append(style)
   }
 }
 
@@ -204,5 +198,5 @@ export function startRouter() {
   }
   document.addEventListener('pointerenter', hover, true)
   document.addEventListener('focusin', hover)
-  observe()
+  document.readyState === 'complete' ? observe() : addEventListener('load', observe, { once: true })
 }
