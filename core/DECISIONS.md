@@ -238,6 +238,9 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   uncached HTML.
 - **[firm v0]** Budgets in `pragma.json` (`initialJsKb`, `routeJsKb`, `cssKb`), checked by
   build and check. Reference ceiling: 7.2 to 8.2 kB gzip total JS in the `tests_1` natives.
+- **[firm]** Budget exceptions are explicit per route: `budgets.routes["/app/[id]"]` overrides
+  only the keys it sets, only for that page, and the report names it. *Why:* a large page (chat,
+  schedule editor) must not raise the limit for every other page.
 - **[superseded]** Per-route chunks with a bundler and chunk manifest: v0 uses loose modules
   and the `/_pragma/manifest.json` manifest.
 
@@ -269,6 +272,10 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - **[firm]** Server: `package.json` packages imported normally (CJS included), not resolved at
   build; Node finds `node_modules` walking up from `dist/server`; the build writes
   `server/package.json` with `"type": "module"`. Workers: `wrangler` bundles.
+- **[firm]** Server WebAssembly as a compiled module, like adapter-cloudflare + wrangler: the
+  `.wasm` is copied next to the server code with a `CompiledWasm` rule; Node gets the same
+  `WebAssembly.Module` through a load hook. *Why:* Workers cannot compile wasm from bytes (e.g.
+  `highs`), and one import must work on Workers and in `pragma dev`.
 - **[superseded]** No bundler for packages (each `node_modules` module as an asset, CJS
   forbidden): `rolldown` now prebundles. Import maps remain discarded (the import URL is
   rewritten).
@@ -309,6 +316,10 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   `serve` answers 204 and static hosts get the 404 that stops the client.
 - **[likely]** No host lock-in: small interfaces (`db`, `kv`, `files`) over `env`. v0 exposes
   `env` directly to `load`.
+- **[likely]** `pragma dev --cf` uses wrangler `getPlatformProxy` in the node child (as
+  adapter-cloudflare's dev), opt-in, wrangler from the app's `node_modules`. *Why:* real D1/R2/
+  `send_email`/rate-limit bindings (including `remote: true`) in dev without workerd as the dev
+  server; plain `pragma dev` stays dependency-free. `cloudflare:workers` imports stay Workers-only.
 - **[superseded]** `/api/*` prefix and `pragma serve` forwarding to Node/Deno/Bun: now
   `/_data`, `/_action`, `/_otel`, and `serve` is the dev server without watch.
 

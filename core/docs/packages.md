@@ -39,6 +39,34 @@ Client code supports plain JS packages (`.js`, `.mjs`, `.cjs`, plus imported `.j
 
 In `.server.js`, all `package.json` dependencies and Node built-ins (`fs`, `node:*`) work without extra listing. A built-in name listed in `package.json` (such as `buffer`) bundles as a package.
 
+## WebAssembly (server only)
+
+Import a `.wasm` file, from the project (`./_solver.wasm`) or from a package export (`highs/runtime`), in server code. The import gives a compiled `WebAssembly.Module` on Workers and on Node (`pragma dev`, `pragma serve`, `node.mjs`). The build copies the file to `dist/server/` and adds a `CompiledWasm` rule to `dist/server/wrangler.jsonc`. A root `wrangler.jsonc` needs no rule (wrangler treats `*.wasm` the same way by default).
+
+```js
+import loadHighs from 'highs'
+import highsWasm from 'highs/runtime'
+
+let loading
+
+export function solver() {
+  loading ??= loadHighs({
+    instantiateWasm(imports, done) {
+      WebAssembly.instantiate(highsWasm, imports).then(done)
+      return {}
+    },
+  })
+  return loading
+}
+```
+
+- Workers cannot compile WebAssembly from bytes. Pass the imported module to the package (Emscripten packages: `instantiateWasm`).
+- Importing `.wasm` in client code is a `js/import` error.
+
+## Workers modules
+
+`cloudflare:workers`, `cloudflare:sockets` and other `cloudflare:*` modules work in `.server.js` on Workers only. They do not exist on Node (`pragma dev`, `pragma serve`, `node.mjs`). In client code they are an `app/package` error. Prefer the `env` that `load` and actions receive.
+
 ## Recommended
 
 | Need | Use |

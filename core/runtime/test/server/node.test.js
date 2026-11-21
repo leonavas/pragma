@@ -7,7 +7,7 @@ import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { createHandler } from '../../server/handler.js'
-import { serve } from '../../server/node.mjs'
+import { registerWasm, serve } from '../../server/node.mjs'
 
 const root = new URL('./fixtures/client/', import.meta.url)
 
@@ -220,6 +220,20 @@ test('serves precompressed .br and .gz sidecars with matching headers and preser
     assert.match(vary, /\baccept\b(?!-)/)
   } finally {
     preServer.close()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('registerWasm makes a .wasm import a WebAssembly.Module, as on Workers', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pragma-wasm-'))
+  const addWasm = [0, 97, 115, 109, 1, 0, 0, 0, 1, 7, 1, 96, 2, 127, 127, 1, 127, 3, 2, 1, 0, 7, 7, 1, 3, 97, 100, 100, 0, 0, 10, 9, 1, 7, 0, 32, 0, 32, 1, 106, 11]
+  writeFileSync(join(dir, 'add.wasm'), Uint8Array.from(addWasm))
+  try {
+    registerWasm()
+    const { default: compiled } = await import(new URL(`file://${join(dir, 'add.wasm')}`).href)
+    assert.ok(compiled instanceof WebAssembly.Module)
+    assert.equal(new WebAssembly.Instance(compiled).exports.add(2, 3), 5)
+  } finally {
     rmSync(dir, { recursive: true, force: true })
   }
 })

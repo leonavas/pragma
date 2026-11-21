@@ -32,6 +32,7 @@ pub struct Deps {
     listed: BTreeSet<String>,
     has_manifest: bool,
     resolver: Resolver,
+    server_resolver: Resolver,
 }
 
 impl Deps {
@@ -57,10 +58,20 @@ impl Deps {
             node_path: false,
             ..ResolveOptions::default()
         });
-        Deps { root: root.to_path_buf(), listed, has_manifest: manifest.is_some(), resolver }
+        let server_resolver = Resolver::new(ResolveOptions {
+            condition_names: ["workerd", "worker", "import", "module", "default"].map(String::from).to_vec(),
+            main_fields: ["module", "main"].map(String::from).to_vec(),
+            extensions: [".js", ".mjs", ".cjs", ".wasm"].map(String::from).to_vec(),
+            node_path: false,
+            ..ResolveOptions::default()
+        });
+        Deps { root: root.to_path_buf(), listed, has_manifest: manifest.is_some(), resolver, server_resolver }
     }
 
     pub fn check_listed(&self, spec: &str, client: bool) -> Result<(), (&'static str, String)> {
+        if pragma_jslint::is_workers_module(spec) {
+            return if client { Err((RULE_PACKAGE, pragma_jslint::workers_module_message(spec))) } else { Ok(()) };
+        }
         let name = pragma_jslint::package_name(spec);
         if client && UI_LIBS.contains(&name) {
             return Err((RULE_IMPORT, format!("package \"{name}\" is a UI framework; in pragma markup lives in .html and the runtime owns the DOM")));
@@ -100,6 +111,15 @@ impl Deps {
             return Err((RULE_PACKAGE, format!("\"{spec}\" resolves to {rel_s}, which is not plain JS; only JavaScript packages (.js, .mjs, .cjs) work on the client")));
         }
         Ok(full)
+    }
+}
+
+impl Deps {
+    /// A server import of a package file that is WebAssembly (`highs/runtime` -> `highs.wasm`).
+    pub fn resolve_server_wasm(&self, from: &Path, spec: &str) -> Option<PathBuf> {
+        let full = self.server_resolver.resolve(self.root.join(from), spec).ok()?.into_path_buf();
+        let rel = full.strip_prefix(&self.root).ok()?;
+        rel.extension().is_some_and(|e| e == "wasm").then(|| rel.to_path_buf())
     }
 }
 

@@ -16,6 +16,7 @@ const HELP: &str = "pragma — HTML, CSS and JS without a framework
 usage:
   pragma new <dir>                              create an app in <dir> (warns and keeps existing files if not empty)
   pragma dev [--port 5180] [--host 127.0.0.1]   dev server with live reload
+             [--cf]                             (--cf: .server.js gets the root wrangler.jsonc bindings)
   pragma build [--allow-outdated-core]          build dist/ for production (stops if .pragma/ is outdated)
   pragma check [--strict]                       check HTML, CSS, JS and budgets (--strict: warnings become errors)
   pragma serve [--port 3000] [--host 127.0.0.1] serve dist/ as in production
@@ -45,7 +46,11 @@ pub fn run(args: Vec<String>) -> i32 {
             Ok(0)
         }
         "new" => cmd_new(rest),
-        "dev" => cmd_dev(rest),
+        "dev" => {
+            let cf = rest.iter().any(|a| a == "--cf");
+            let rest: Vec<String> = rest.iter().filter(|a| *a != "--cf").cloned().collect();
+            cmd_dev(&rest, cf)
+        }
         "build" => {
             let allow = rest.iter().any(|a| a == "--allow-outdated-core");
             let rest: Vec<String> = rest.iter().filter(|a| *a != "--allow-outdated-core").cloned().collect();
@@ -135,7 +140,7 @@ fn cmd_new(args: &[String]) -> Result<i32, String> {
     Ok(0)
 }
 
-fn cmd_dev(args: &[String]) -> Result<i32, String> {
+fn cmd_dev(args: &[String], cf: bool) -> Result<i32, String> {
     let args = parse(args, &["port", "host"])?;
     no_positional(&args)?;
     let port = args.port(5180)?;
@@ -144,7 +149,8 @@ fn cmd_dev(args: &[String]) -> Result<i32, String> {
         print_diagnostics(&root, &[warning]);
         eprintln!("{} pages may fail to render with an old .pragma/ (e.g. SSR \"unknown op\"); run `pragma upgrade`\n", report::paint("33", "warning:"));
     }
-    Ok(runtime()?.block_on(dev::run(root, &args.host(), port)))
+    let cf_config = if cf { Some(node::cloudflare_config(&root)?) } else { None };
+    Ok(runtime()?.block_on(dev::run_with(root, &args.host(), port, cf_config)))
 }
 
 fn cmd_build(allow_outdated_core: bool) -> Result<i32, String> {
@@ -175,9 +181,11 @@ fn cmd_build(allow_outdated_core: bool) -> Result<i32, String> {
 fn cmd_check(strict: bool) -> Result<i32, String> {
     let root = app_root()?;
     let mut diagnostics: Vec<_> = upgrade::outdated(&root).into_iter().collect();
-    diagnostics.extend(pragma_compiler::check(&root));
+    let (found, built) = pragma_compiler::check_report(&root);
+    diagnostics.extend(found);
     let status = check_status(&mut diagnostics, strict);
     print_diagnostics(&root, &diagnostics);
+    report::print_route_budgets(&built);
     if diagnostics.is_empty() {
         println!("no problems found");
     }

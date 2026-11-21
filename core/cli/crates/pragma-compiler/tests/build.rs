@@ -1630,3 +1630,78 @@ fn webmcp_component_passes_caller_text_to_tool_attribute() {
     let d = check(&app);
     assert!(!d.iter().any(|x| x.rule == "webmcp/disabled"), "{d:#?}");
 }
+
+const WASM: &str = "\0asm\u{1}\0\0\0";
+
+#[test]
+fn server_wasm_is_copied_with_a_compiled_wasm_rule() {
+    let server = "import loadSolver from 'solver'\nimport solverWasm from 'solver/runtime'\nimport addWasm from './_add.wasm'\nimport { find } from '../../utils/db.js'\n\nexport async function load({ params }) {\n  return { product: await find(params.id), kinds: [typeof loadSolver, typeof solverWasm, typeof addWasm] }\n}\n";
+    let t = app_with(&[
+        ("package.json", Some("{ \"dependencies\": { \"solver\": \"1.0.0\" } }")),
+        ("node_modules/solver/package.json", Some("{ \"name\": \"solver\", \"exports\": { \".\": \"./build/solver.mjs\", \"./runtime\": \"./build/solver.wasm\" } }")),
+        ("node_modules/solver/build/solver.mjs", Some("export default function loadSolver() {}\n")),
+        ("node_modules/solver/build/solver.wasm", Some(WASM)),
+        ("routes/shop/_add.wasm", Some(WASM)),
+        ("routes/shop/[id].server.js", Some(server)),
+    ]);
+    let root = t.0.join("app");
+    let d = check(&root);
+    assert!(d.is_empty(), "{d:?}");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root, out_dir: out.clone(), mode: Mode::Prod }).unwrap();
+    let code = fs::read_to_string(out.join("server/routes/shop/[id].server.js")).unwrap();
+    assert!(code.contains("from 'solver'\n"), "{code}");
+    assert!(code.contains("from '../../npm/solver/build/solver.wasm'"), "{code}");
+    assert!(code.contains("from './_add.wasm'"), "{code}");
+    assert_eq!(fs::read(out.join("server/npm/solver/build/solver.wasm")).unwrap(), WASM.as_bytes());
+    assert_eq!(fs::read(out.join("server/routes/shop/_add.wasm")).unwrap(), WASM.as_bytes());
+    let wrangler: serde_json::Value = serde_json::from_str(&fs::read_to_string(out.join("server/wrangler.jsonc")).unwrap()).unwrap();
+    assert_eq!(wrangler["rules"][0]["type"], "CompiledWasm");
+    assert_eq!(wrangler["rules"][0]["globs"][0], "**/*.wasm");
+    let node = fs::read_to_string(out.join("server/node.mjs")).unwrap();
+    assert!(node.contains("registerWasm()\nconst { default: h } = await import('./worker.js')"), "{node}");
+}
+
+#[test]
+fn wasm_import_in_client_code_is_an_error() {
+    let src = "import addWasm from './_add.wasm'\nlet open = false\nlet items = []\nfunction toggle() { return addWasm }\n";
+    expect(&check_with(&[("routes/_add.wasm", Some(WASM)), ("routes/index.js", Some(src))]), "js/import", "routes/index.js", 1);
+}
+
+#[test]
+fn workers_modules_stay_external_in_server_code() {
+    let server = "import { env } from 'cloudflare:workers'\nimport { find } from '../../utils/db.js'\n\nexport async function load({ params }) {\n  return { product: await find(params.id), name: env.APP_NAME }\n}\n";
+    let t = app_with(&[("routes/shop/[id].server.js", Some(server))]);
+    let root = t.0.join("app");
+    let d = check(&root);
+    assert!(d.is_empty(), "{d:?}");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root, out_dir: out.clone(), mode: Mode::Prod }).unwrap();
+    assert!(fs::read_to_string(out.join("server/routes/shop/[id].server.js")).unwrap().contains("from 'cloudflare:workers'"));
+    let src = "import { env } from 'cloudflare:workers'\nlet open = false\nlet items = []\nfunction toggle() { return env }\n";
+    expect(&check_with(&[("routes/index.js", Some(src))]), "app/package", "routes/index.js", 1);
+}
+
+#[test]
+fn route_budget_replaces_the_global_one_for_that_page() {
+    let cfg = "{\n  \"name\": \"x\",\n  \"budgets\": {\n    \"initialJsKb\": 0.1,\n    \"routes\": {\n      \"/shop/[id]\": { \"initialJsKb\": 500 },\n      \"/\": { \"initialJsKb\": 0.05 }\n    }\n  }\n}\n";
+    let t = app_with(&[("pragma.json", Some(cfg))]);
+    let (d, report) = pragma_compiler::check_report(&t.0.join("app"));
+    expect(&d, "app/budget", "pragma.json", 4);
+    expect(&d, "app/budget", "pragma.json", 7);
+    let budget: Vec<&str> = d.iter().filter(|x| x.rule == "app/budget").map(|x| x.message.as_str()).collect();
+    assert!(budget.iter().any(|m| m.contains("exceeded in /:") && m.ends_with("> 0.05 kB (budgets.routes \"/\")")), "{budget:?}");
+    assert!(!budget.iter().any(|m| m.contains("/shop/:id")), "{budget:?}");
+    let shop = report.pages.iter().find(|p| p.pattern == "/shop/:id").unwrap();
+    assert_eq!(shop.budget.as_deref(), Some("/shop/[id]"));
+    assert!(report.pages.iter().find(|p| p.pattern == "/blog/:slug").unwrap().budget.is_none());
+}
+
+#[test]
+fn route_budget_must_name_a_page_and_known_keys() {
+    let cfg = "{\n  \"name\": \"x\",\n  \"budgets\": {\n    \"routes\": {\n      \"/nope/[id]\": { \"initialJsKb\": 80 },\n      \"/shop/[id]\": { \"jsKb\": 80 },\n      \"shop\": { \"cssKb\": 1 }\n    }\n  }\n}\n";
+    let d = check_with(&[("pragma.json", Some(cfg))]);
+    expect(&d, "app/pragma-json", "pragma.json", 5);
+    expect(&d, "app/pragma-json", "pragma.json", 6);
+    expect(&d, "app/pragma-json", "pragma.json", 7);
+}

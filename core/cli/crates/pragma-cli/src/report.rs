@@ -66,11 +66,19 @@ pub fn kb(bytes: u64) -> String {
     format!("{:.1} KB", bytes as f64 / 1024.0)
 }
 
+/// Pages whose `budgets.routes` entry replaced the global budget.
+pub fn print_route_budgets(report: &BuildReport) {
+    for page in report.pages.iter().filter(|p| p.budget.is_some()) {
+        println!("{}", dim(&format!("budget {}: budgets.routes \"{}\" (global budget for the other keys)", page.pattern, page.budget.as_deref().unwrap_or_default())));
+    }
+}
+
 pub fn print_summary(report: &BuildReport) {
     let width = report.pages.iter().map(|p| p.pattern.chars().count()).max().unwrap_or(0).max(6);
     println!("{:width$}  {:>8}", "page", "JS gzip");
     for page in &report.pages {
-        println!("{:width$}  {:>8}", page.pattern, kb(page.js_gzip_bytes));
+        let budget = page.budget.as_ref().map(|key| dim(&format!("  budgets.routes \"{key}\""))).unwrap_or_default();
+        println!("{:width$}  {:>8}{budget}", page.pattern, kb(page.js_gzip_bytes));
     }
     println!("{:width$}  {:>8}", "CSS", kb(report.css_gzip_bytes));
     let server = if report.has_server { ", with server" } else { "" };

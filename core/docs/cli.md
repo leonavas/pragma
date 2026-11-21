@@ -4,7 +4,7 @@
 |---|---|
 | `pragma -V` | Prints the installed CLI version. |
 | `pragma new <dir>` | Creates an app with the fixed structure. Warns and keeps existing files if `<dir>` is not empty. |
-| `pragma dev [--port 5180] [--host 127.0.0.1]` | Runs the dev server with WebSocket live reload. Shows an overlay on build errors while valid pages keep working. Starts Node >= 22 when `.server.js` exists. Prints `app/core-outdated` first if `.pragma/` is older than the CLI. |
+| `pragma dev [--port 5180] [--host 127.0.0.1] [--cf]` | Runs the dev server with WebSocket live reload. Shows an overlay on build errors while valid pages keep working. Starts Node >= 22 when `.server.js` exists. Prints `app/core-outdated` first if `.pragma/` is older than the CLI. `--cf`: Cloudflare bindings in dev (see below). |
 | `pragma check [--strict]` | Checks JS, HTML, CSS, budgets, accessibility, and WebMCP tools. `--strict` turns warnings into errors. |
 | `pragma build [--allow-outdated-core]` | Builds `dist/`. Stops with `app/core-outdated` if `.pragma/` is older than the CLI (`--allow-outdated-core` overrides this). |
 | `pragma serve [--port 3000] [--host 127.0.0.1]` | Serves `dist/` as in production. |
@@ -151,6 +151,16 @@ Then deploy with `npx wrangler@4 deploy` (no `--config`).
 | Log export (OTLP) | `OTEL_*` in `vars`, headers with a token as a secret (`logs.md`). | |
 
 `load` and actions receive `env`, `db`, `kv`, and `files`. In `pragma dev` and `pragma serve`, `env` is the process environment (`KEY_NAME=value pragma dev`), and `db`, `kv`, and `files` are `undefined`. Check them before use.
+
+### Bindings in dev (`pragma dev --cf`)
+
+`pragma dev --cf` gives `.server.js` the bindings of the root `wrangler.jsonc` through wrangler `getPlatformProxy`: `vars`, secrets from `.dev.vars`, D1, KV, R2, `send_email`, rate limits, `ctx.waitUntil` and `caches`. Bindings with `"remote": true` use the real Cloudflare resource (log in first: `npx wrangler@4 login`); the others run locally with state in `.wrangler/` (exclude it from git).
+
+1. Install wrangler in the app: `npm i -D wrangler@4`.
+2. Create the root `wrangler.jsonc` (above).
+3. Run `pragma dev --cf`.
+
+Without `--cf`, `pragma dev` is unchanged. A change to `wrangler.jsonc` or `.dev.vars` restarts the node server. `cloudflare:workers` imports still do not work on Node (`packages.md`).
 
 ### Workers runtime limits
 

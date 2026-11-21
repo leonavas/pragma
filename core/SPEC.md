@@ -434,7 +434,16 @@ dist/
   modulepreloaded like app modules (`docs/packages.md`).
 - Dev build adds `<script>self.__pragmaDev=true</script>` to `<head>` (path and action errors in dev).
 - `index.html` is not cached; hashed assets are `immutable`.
-- `pragma.json` budgets checked at the end of the build.
+- `pragma.json` budgets checked at the end of the build. `budgets.routes["/app/[id]"]` (same keys)
+  replaces the global limits it sets for that page only; a key that matches no page is
+  `app/pragma-json`; the `app/budget` message and the build/check summary name the budget used.
+- Server WebAssembly: a `.wasm` imported by the server graph (project file, or a package export
+  that resolves to `.wasm`, its specifier rewritten to the copy) is copied to `dist/server/`
+  (`node_modules/x` → `npm/x`); `wrangler.jsonc` gets `rules: [{ type: "CompiledWasm", globs:
+  ["**/*.wasm"] }]` and `node.mjs` calls `registerWasm()` (Node load hook: default export =
+  `WebAssembly.Module`) before a dynamic `import('./worker.js')`. `.wasm` in client code is
+  `js/import`. `cloudflare:*` imports stay external in server code (Workers only; not on Node)
+  and are `app/package` in client code.
 
 ## 10. Check (`pragma check`)
 
@@ -501,6 +510,12 @@ Errors with file:line:column, rule and message.
   `/_action`, `/_otel` and ssr pages. A build with errors still writes its outputs (pages without
   errors keep working, with the error overlay): node is restarted for it too, so it always serves
   the same build as the client files.
+- `pragma dev --cf`: same, but node gets `PRAGMA_CF_CONFIG=<root wrangler config>` and `serve`
+  merges wrangler `getPlatformProxy({ configPath, remoteBindings: true })` `env` (bindings win;
+  `ASSETS` stays the static server), uses its `ctx` and sets `globalThis.caches`. Wrangler is
+  resolved from the app (`npm i -D wrangler@4`); missing config or wrangler stops with the fix.
+  Node is stopped with SIGTERM (disposes workerd) and restarted when the config or `.dev.vars`
+  changes; `.wrangler/` is not watched.
 - `pragma serve`: same server without watch, over `dist/`. Ctrl+C or SIGTERM also stop the
   child node.
 - Markdown for agents: a request without a file extension whose `Accept` lists
