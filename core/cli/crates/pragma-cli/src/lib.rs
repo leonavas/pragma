@@ -23,8 +23,8 @@ usage:
   pragma self-update [version]                  update the pragma CLI binary from GitHub Releases
 
 options:
-  -h, --help      show this help
-  -V, --version   show the version";
+  -h, --help          show this help
+  -v, -V, --version   show the version";
 
 pub fn run(args: Vec<String>) -> i32 {
     let Some((command, rest)) = args.split_first() else {
@@ -40,7 +40,7 @@ pub fn run(args: Vec<String>) -> i32 {
             println!("{HELP}");
             Ok(0)
         }
-        "-V" | "--version" => {
+        "-v" | "-V" | "--version" => {
             println!("pragma {}", env!("CARGO_PKG_VERSION"));
             Ok(0)
         }
