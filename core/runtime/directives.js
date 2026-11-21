@@ -13,6 +13,8 @@ export const hooks = { on() {}, enter: (el, s) => s, remove() {} }
 export const scopeOf = el => el[S]
 
 const fail = msg => { throw new Error('pragma: ' + msg) }
+// Inside <svg> a <template> is a plain SVG element without .content: its body is its own children.
+const body = t => t.content ?? t
 const path = v => v.split('.')
 const cond = v => (v[0] === '!' ? [path(v.slice(1)), true] : [path(v), false])
 
@@ -61,7 +63,7 @@ function cssValue(v, name) {
 function fillSelf(el, id) {
   let t = defs.get(id)
   if (!t?.isConnected) defs.set(id, (t = document.querySelector(`template[data-def="${CSS.escape(id)}"]`) ?? fail(`<${el.getAttribute('data-self')}> renders itself but the page has no <template data-def="${id}">`)))
-  el.append(...t.content.firstElementChild.cloneNode(true).childNodes)
+  el.append(...body(t).firstElementChild.cloneNode(true).childNodes)
 }
 
 function fill(s, t) {
@@ -231,7 +233,7 @@ let leaving = [], entering = []
 const reduced = matchMedia('(prefers-reduced-motion: reduce)')
 
 function clone(t, d, id) {
-  const n = t.content.firstElementChild.cloneNode(true)
+  const n = body(t).firstElementChild.cloneNode(true)
   n.setAttribute('data-of', id)
   if (d.r && !reduced.matches) {
     n.setAttribute('data-entering', '')
