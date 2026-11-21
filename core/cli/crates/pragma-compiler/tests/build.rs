@@ -1630,3 +1630,56 @@ fn webmcp_component_passes_caller_text_to_tool_attribute() {
     let d = check(&app);
     assert!(!d.iter().any(|x| x.rule == "webmcp/disabled"), "{d:#?}");
 }
+
+const ENDPOINT: &str = "import { error } from 'pragma/server'\n\nexport async function GET({ params, env }) {\n  const file = await env.FILES.get(params.name)\n  if (!file) error(404, 'No file')\n  return new Response(file.body)\n}\n";
+const MIDDLEWARE: &str = "import { redirect } from 'pragma/server'\n\nexport async function handle({ url, cookies, next }) {\n  if (url.pathname.startsWith('/files') && !cookies.get('sid')) redirect(303, '/')\n  return next()\n}\n";
+
+#[test]
+fn endpoints_and_middleware_reach_the_worker() {
+    let t = app_with(&[("routes/files/[name].server.js", Some(ENDPOINT)), ("routes/_middleware.server.js", Some(MIDDLEWARE))]);
+    let out = t.0.join("dev");
+    let r = build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    assert!(r.has_server);
+    let worker = fs::read_to_string(out.join("server/worker.js")).unwrap();
+    assert!(worker.contains("import * as e0 from \"./routes/files/[name].server.js\""), "{worker}");
+    assert!(worker.contains("import { handle as middleware } from \"./routes/_middleware.server.js\""), "{worker}");
+    assert!(worker.contains("  middleware,\n"), "{worker}");
+    assert!(worker.contains("{ pattern: \"/files/:name\", endpoint: e0, file: \"routes/files/[name].server.js\" }"), "{worker}");
+    let routing: serde_json::Value = serde_json::from_str(&fs::read_to_string(out.join("server/routes.json")).unwrap()).unwrap();
+    assert_eq!(routing, serde_json::json!({ "middleware": true, "endpoints": ["/files/:name"] }));
+    let endpoint = fs::read_to_string(out.join("server/routes/files/[name].server.js")).unwrap();
+    assert!(endpoint.starts_with("import { error } from '../../core/server/http.js'"), "{endpoint}");
+    let middleware = fs::read_to_string(out.join("server/routes/_middleware.server.js")).unwrap();
+    assert!(middleware.starts_with("import { redirect } from '../core/server/http.js'"), "{middleware}");
+    assert!(out.join("server/core/server/http.js").is_file());
+    let manifest = fs::read_to_string(out.join("client/_pragma/manifest.json")).unwrap();
+    assert!(!manifest.contains("/files"), "endpoints stay out of the client manifest");
+}
+
+#[test]
+fn endpoint_rules() {
+    let d = check_with(&[("routes/files/[name].server.js", Some(ENDPOINT))]);
+    assert!(d.is_empty(), "{d:#?}");
+    let d = check_with(&[("routes/feed.server.js", Some("export function load() {\n  return {}\n}\n"))]);
+    expect(&d, "app/endpoint", "routes/feed.server.js", 1);
+    assert!(message(&d, "app/endpoint").contains("add feed.html"));
+    let d = check_with(&[("routes/feed.server.js", Some("export const limit = 3\n\nexport function GET() {\n  return new Response('x')\n}\n"))]);
+    assert!(message(&d, "app/endpoint").contains("move `limit` to a private helper such as _feed.server.js"));
+    let d = check_with(&[("routes/products.server.js", Some("export function GET() {\n  return Response.json({ products: [] })\n}\n"))]);
+    expect(&d, "app/endpoint-json", "routes/products.server.js", 2);
+    let d = check_with(&[("routes/shop.server.js", Some("export function GET() {\n  return new Response('x')\n}\n"))]);
+    expect(&d, "app/route-conflict", "routes/shop.server.js", 1);
+}
+
+#[test]
+fn middleware_rules() {
+    expect(&check_with(&[("routes/_middleware.server.js", Some("export const x = 1\n"))]), "app/middleware", "routes/_middleware.server.js", 1);
+    expect(&check_with(&[("routes/shop/_middleware.server.js", Some(MIDDLEWARE))]), "app/middleware", "routes/shop/_middleware.server.js", 1);
+    assert!(check_with(&[("routes/_middleware.server.js", Some(MIDDLEWARE))]).is_empty());
+}
+
+#[test]
+fn pragma_server_is_server_only() {
+    let d = check_with(&[("routes/index.js", Some("import { redirect } from 'pragma/server'\n\nexport const go = () => redirect(303, '/')\n"))]);
+    assert!(message(&d, "js/import").contains("only for .server.js files"));
+}

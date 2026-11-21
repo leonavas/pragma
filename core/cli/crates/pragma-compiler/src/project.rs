@@ -36,6 +36,13 @@ pub struct Page {
     pub server: Option<PathBuf>,
 }
 
+/// A `.server.js` without a sibling `.html`: uppercase method handlers that return a `Response`.
+#[derive(Debug, Clone)]
+pub struct Endpoint {
+    pub pattern: String,
+    pub file: PathBuf,
+}
+
 #[derive(Debug, Clone)]
 pub struct Component {
     pub name: String,
@@ -61,6 +68,9 @@ pub struct Project {
     pub nested_layouts: HashMap<PathBuf, u32>,
     pub not_found: Option<Page>,
     pub pages: Vec<Page>,
+    pub endpoints: Vec<Endpoint>,
+    /// `routes/_middleware.server.js`: `handle` runs before every request.
+    pub middleware: Option<PathBuf>,
     /// Component folder (`routes/x/_components` or `lib/components`) -> name -> component.
     pub components: HashMap<PathBuf, BTreeMap<String, Component>>,
     pub stores: BTreeMap<String, PathBuf>,
@@ -235,6 +245,8 @@ impl Project {
             nested_layouts: HashMap::new(),
             not_found: None,
             pages: Vec::new(),
+            endpoints: Vec::new(),
+            middleware: None,
             components: HashMap::new(),
             stores: BTreeMap::new(),
             theme_css: None,
@@ -425,10 +437,24 @@ impl Project {
                 if file_name == "_layout.html" && !parent_private {
                     let id = self.add_html(f.clone());
                     self.nested_layouts.insert(f.parent().unwrap().to_path_buf(), id);
+                } else if file_name == "_middleware.server.js" {
+                    if s == "routes/_middleware.server.js" {
+                        self.middleware = Some(f.clone());
+                    } else {
+                        self.err(f, 1, 1, "app/middleware", "middleware lives only in routes/_middleware.server.js; it runs for every request, so check url.pathname there");
+                    }
                 } else if file_name == "_layout.js" || file_name == "_layout.server.js" {
                     self.err(f, 1, 1, "app/structure", "the layout cannot have a module or .server.js");
                 } else if file_name.starts_with('_') && file_name.ends_with(".html") {
                     self.err(f, 1, 1, "app/structure", "only _layout.html and routes/_404.html are special in routes/");
+                }
+                continue;
+            }
+            if let Some(stem) = file_name.strip_suffix(".server.js")
+                && !all.contains(&f.with_file_name(format!("{stem}.html")))
+            {
+                if let Some(pattern) = self.claim_route(f, stem, &mut seen) {
+                    self.endpoints.push(Endpoint { pattern, file: f.clone() });
                 }
                 continue;
             }
@@ -443,46 +469,12 @@ impl Project {
                 continue;
             };
             let rel = f.strip_prefix("routes").unwrap();
-            let mut segs: Vec<String> = rel.parent().into_iter().flat_map(|p| p.components()).map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
-            if stem != "index" {
-                segs.push(stem.to_string());
-            }
-            let mut pattern = String::new();
-            let mut bad = false;
-            for seg in &segs {
-                pattern.push('/');
-                if let Some(inner) = seg.strip_prefix('[').and_then(|x| x.strip_suffix(']')) {
-                    if !is_ident(inner) {
-                        bad = true;
-                    }
-                    pattern.push(':');
-                    pattern.push_str(inner);
-                } else {
-                    if seg.contains('[') || seg.contains(']') {
-                        bad = true;
-                    }
-                    pattern.push_str(seg);
-                }
-            }
-            if bad {
-                self.err(f, 1, 1, "app/structure", "invalid route param: use [name] with letters, digits and _");
-                continue;
-            }
-            if pattern.is_empty() {
-                pattern.push('/');
-            }
             if stem != "index" && all.contains(&f.with_extension("").join("index.html")) {
                 let other = rel_str(&f.with_extension("").join("index.html"));
                 self.err(f, 1, 1, "app/route-conflict", format!("{s} and {other} serve the same route"));
                 continue;
             }
-            let shape: String = pattern.split('/').map(|p| if p.starts_with(':') { ":" } else { p }).collect::<Vec<_>>().join("/");
-            if let Some(prev) = seen.get(&shape) {
-                let prev = rel_str(prev);
-                self.err(f, 1, 1, "app/route-conflict", format!("route {pattern} conflicts with {prev}"));
-                continue;
-            }
-            seen.insert(shape, f.clone());
+            let Some(pattern) = self.claim_route(f, stem, &mut seen) else { continue };
             let id = self.add_html(f.clone());
             let (module, css) = self.extract(id, f.with_file_name(format!("{stem}.js")), f.with_file_name(format!("{stem}.css")), all);
             let server = Some(f.with_file_name(format!("{stem}.server.js"))).filter(|m| all.contains(m));
@@ -493,6 +485,49 @@ impl Project {
             self.err("routes/_layout.html", 1, 1, "app/structure", "missing routes/_layout.html with <main data-page><slot></slot></main>");
         }
         self.pages.sort_by(|a, b| route_order(&a.pattern, &b.pattern));
+        self.endpoints.sort_by(|a, b| route_order(&a.pattern, &b.pattern));
+    }
+
+    /// URL pattern of a page or endpoint file (`routes/shop/[id].html` -> `/shop/:id`), or `None`
+    /// after reporting a bad param or a route another file already serves.
+    fn claim_route(&mut self, f: &Path, stem: &str, seen: &mut BTreeMap<String, PathBuf>) -> Option<String> {
+        let rel = f.strip_prefix("routes").unwrap();
+        let mut segs: Vec<String> = rel.parent().into_iter().flat_map(|p| p.components()).map(|c| c.as_os_str().to_string_lossy().to_string()).collect();
+        if stem != "index" {
+            segs.push(stem.to_string());
+        }
+        let mut pattern = String::new();
+        let mut bad = false;
+        for seg in &segs {
+            pattern.push('/');
+            if let Some(inner) = seg.strip_prefix('[').and_then(|x| x.strip_suffix(']')) {
+                if !is_ident(inner) {
+                    bad = true;
+                }
+                pattern.push(':');
+                pattern.push_str(inner);
+            } else {
+                if seg.contains('[') || seg.contains(']') {
+                    bad = true;
+                }
+                pattern.push_str(seg);
+            }
+        }
+        if bad {
+            self.err(f, 1, 1, "app/structure", "invalid route param: use [name] with letters, digits and _");
+            return None;
+        }
+        if pattern.is_empty() {
+            pattern.push('/');
+        }
+        let shape: String = pattern.split('/').map(|p| if p.starts_with(':') { ":" } else { p }).collect::<Vec<_>>().join("/");
+        if let Some(prev) = seen.get(&shape) {
+            let prev = rel_str(prev);
+            self.err(f, 1, 1, "app/route-conflict", format!("route {pattern} conflicts with {prev}"));
+            return None;
+        }
+        seen.insert(shape, f.to_path_buf());
+        Some(pattern)
     }
 
     fn discover_stores(&mut self, all: &[PathBuf]) {

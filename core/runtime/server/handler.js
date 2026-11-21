@@ -1,6 +1,8 @@
 import { renderPage, renderHead } from './render.js'
 import { createLogger, flush, fromClient, minSeverity, newSpanId, newTraceId, parseTraceparent, resourceFrom } from './log.js'
 import { createPlatform } from './platform.js'
+import { createCookies } from './cookies.js'
+import { HttpError, Redirect } from './http.js'
 
 const OTEL_MAX_BYTES = 256 * 1024
 
@@ -81,7 +83,7 @@ function later(promise, ctx) {
   else return promise
 }
 
-export function createHandler({ routes, service }) {
+export function createHandler({ routes, middleware, service }) {
   const table = compileRoutes(routes)
   const markdownFiles = new Map()
   let pages
@@ -97,7 +99,13 @@ export function createHandler({ routes, service }) {
     return found
   }
 
-  // Static files first; then a prebuilt param page from the manifest; then _404.html with status 404.
+  async function notFoundPage(request, env) {
+    if (!env.ASSETS) return null
+    const missing = await env.ASSETS.fetch(new Request(new URL('/_404', request.url), { headers: request.headers }))
+    if (!missing.ok) return null
+    return new Response(request.method === 'HEAD' ? null : missing.body, { status: 404, headers: missing.headers })
+  }
+
   async function asset(request, env) {
     const res = await env.ASSETS.fetch(request)
     if (res.status !== 404 || (request.method !== 'GET' && request.method !== 'HEAD')) return res
@@ -111,9 +119,7 @@ export function createHandler({ routes, service }) {
       const page = await env.ASSETS.fetch(new Request(at(m.route.html), request))
       if (page.ok) return page
     }
-    const missing = await env.ASSETS.fetch(new Request(at('/_404.html'), request))
-    if (!missing.ok) return res
-    return new Response(request.method === 'HEAD' ? null : missing.body, { status: 404, headers: missing.headers })
+    return (await notFoundPage(request, env)) ?? res
   }
 
   return {
@@ -134,23 +140,17 @@ export function createHandler({ routes, service }) {
         const i = rest.lastIndexOf('/')
         target = rest.slice(0, i) || '/'
         actionName = rest.slice(i + 1)
-      } else if (request.method === 'GET' || request.method === 'HEAD') {
-        kind = 'page'
       }
       const m = matchRoute(table, target)
+      if (!kind && m?.route.endpoint) kind = 'endpoint'
+      else if (!kind && (request.method === 'GET' || request.method === 'HEAD')) kind = 'page'
       const md = kind === 'page' && env.ASSETS && !/\.[^/]*$/.test(path) ? await markdownFor(path, request, env) : null
-      if (md && prefersMarkdown(request.headers.get('accept'))) {
-        return withVary(asMarkdown(await env.ASSETS.fetch(new Request(new URL(md, request.url), request))))
-      }
       // The router fetches prebuilt HTML (/shop/index.html): that is a file, not an SSR page.
       if (kind === 'page' && (path.endsWith('.html') || !(m?.route.ssr && m.route.template && m.route.shell))) kind = null
-      if (!kind) {
-        if (!env.ASSETS) return new Response('Not found', { status: 404 })
-        const res = await asset(request, env)
-        if (path.endsWith('.md')) return asMarkdown(res)
-        return md ? withVary(res) : res
-      }
+      const guarded = Boolean(middleware) && !path.startsWith('/assets/') && !path.startsWith('/_pragma/')
+      if (!kind && !guarded) return dispatch()
 
+      const api = kind === 'data' || kind === 'action'
       const start = performance.now()
       const parent = parseTraceparent(request.headers.get('traceparent'))
       const log = createLogger({
@@ -159,44 +159,140 @@ export function createHandler({ routes, service }) {
         spanId: newSpanId(),
         min: minSeverity(env),
       })
-      const query = Object.fromEntries(url.searchParams)
-      const { db, kv, files } = createPlatform(env)
+      const pageUrl = new URL(url.origin + target + url.search)
+      const { cookies, setCookieLines } = createCookies(request, pageUrl)
+      const headers = new Map()
+      const event = {
+        request,
+        url: pageUrl,
+        params: m?.params ?? {},
+        query: Object.fromEntries(url.searchParams),
+        env,
+        log,
+        cookies,
+        locals: {},
+        ...createPlatform(env),
+        setHeaders(values) {
+          for (const [key, value] of Object.entries(values ?? {})) {
+            const name = key.toLowerCase()
+            if (name === 'set-cookie') throw new Error('setHeaders cannot set set-cookie; use cookies.set(name, value, options)')
+            headers.set(name, String(value))
+          }
+        },
+        waitUntil(promise) {
+          const tracked = Promise.resolve(promise).catch((err) => {
+            log.error('waitUntil failed', err)
+            return flush(log.records.splice(0), env)
+          })
+          if (ctx?.waitUntil) ctx.waitUntil(tracked)
+        },
+      }
 
-      let res
-      try {
-        if (kind === 'data') res = await data(m, { query, request, env, db, kv, files, log })
-        else if (kind === 'action') res = await action(m, actionName, { query, request, env, db, kv, files, log })
-        else res = await page(m, { query, request, env, db, kv, files, log })
-      } catch (err) {
+      async function serveFile() {
+        if (!env.ASSETS) return new Response('Not found', { status: 404 })
+        const res = await asset(request, env)
+        if (path.endsWith('.md')) return asMarkdown(res)
+        return md ? withVary(res) : res
+      }
+
+      async function dispatch() {
+        if (md && prefersMarkdown(request.headers.get('accept'))) {
+          return withVary(asMarkdown(await env.ASSETS.fetch(new Request(new URL(md, request.url), request))))
+        }
+        if (kind === 'data') return data(m, event)
+        if (kind === 'action') return action(m, actionName, event)
+        if (kind === 'endpoint') return endpoint(m, event)
+        if (kind === 'page') {
+          const res = await page(m, event)
+          return md ? withVary(res) : res
+        }
+        return serveFile()
+      }
+
+      async function failure(err) {
+        if (err instanceof Redirect) {
+          if (api) return json({ redirect: { status: err.status, location: err.location } })
+          return new Response(null, { status: err.status, headers: { location: err.location } })
+        }
+        if (err instanceof HttpError) {
+          if (api || kind === 'endpoint') return json({ error: err.body }, err.status)
+          if (err.status === 404) {
+            const missing = await notFoundPage(request, env)
+            if (missing) return missing
+          }
+          return new Response(request.method === 'HEAD' ? null : err.body.message, { status: err.status, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+        }
         const message = err instanceof Error ? err.message : String(err)
         log.error(message, err)
-        res = fail(message, 500)
+        if (api || kind === 'endpoint') return fail(message, 500)
+        return new Response('Internal error', { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } })
       }
 
-      const status = res.status
-      const attrs = {
-        'http.request.method': request.method,
-        'url.path': path,
-        'http.response.status_code': status,
-        'http.server.request.duration': (performance.now() - start) / 1000,
+      const resolve = () => dispatch().catch(failure)
+      let res
+      if (guarded) {
+        let pending
+        try {
+          res = await middleware({ ...event, next: () => (pending ??= resolve()) })
+          if (!(res instanceof Response)) throw new Error('routes/_middleware.server.js: handle must return a Response; return next() or a Response')
+        } catch (err) {
+          res = await failure(err)
+        }
+      } else {
+        res = await resolve()
       }
-      if (m) attrs['http.route'] = m.route.pattern
-      if (status >= 500) attrs['error.type'] = String(status)
-      log[status >= 500 ? 'error' : 'info'](`${request.method} ${m?.route.pattern ?? path}`, attrs)
-      await later(flush(log.records, env), ctx)
-      return md ? withVary(res) : res
+      res = finish(res, { api, headers, cookies: setCookieLines() })
+
+      const status = res.status
+      if (kind) {
+        const attrs = {
+          'http.request.method': request.method,
+          'url.path': path,
+          'http.response.status_code': status,
+          'http.server.request.duration': (performance.now() - start) / 1000,
+        }
+        if (m) attrs['http.route'] = m.route.pattern
+        if (status >= 500) attrs['error.type'] = String(status)
+        log[status >= 500 ? 'error' : 'info'](`${request.method} ${m?.route.pattern ?? path}`, attrs)
+      }
+      await later(flush(log.records.splice(0), env), ctx)
+      return res
     },
   }
 }
 
-async function data(m, { query, request, env, db, kv, files, log }) {
+function finish(res, { api, headers, cookies }) {
+  const location = res.headers.get('location')
+  if (api && res.status >= 300 && res.status < 400 && location) {
+    res = json({ redirect: { status: res.status, location } })
+  }
+  if (!headers.size && !cookies.length) return res
+  const apply = (target) => {
+    for (const [name, value] of headers) target.headers.set(name, value)
+    for (const line of cookies) target.headers.append('set-cookie', line)
+    return target
+  }
+  try {
+    return apply(res)
+  } catch {
+    try {
+      return apply(new Response(res.body, { status: res.status, statusText: res.statusText, headers: res.headers, webSocket: res.webSocket }))
+    } catch {
+      return res
+    }
+  }
+}
+
+async function data(m, event) {
+  const { request } = event
   if (request.method !== 'GET' && request.method !== 'HEAD') return fail('Method not allowed', 405)
   const load = m?.route.server?.load
   if (!load) return fail('Route has no data', 404)
-  return json({ data: (await load({ params: m.params, query, request, env, db, kv, files, log })) ?? null })
+  return json({ data: (await load(event)) ?? null })
 }
 
-async function action(m, name, { query, request, env, db, kv, files, log }) {
+async function action(m, name, event) {
+  const { request } = event
   if (request.method !== 'POST') return fail('Method not allowed', 405)
   let decoded
   try {
@@ -217,8 +313,28 @@ async function action(m, name, { query, request, env, db, kv, files, log }) {
       return fail('Action body is not valid JSON', 400)
     }
   }
-  const result = await actions[decoded]({ input, params: m.params, query, request, env, db, kv, files, log })
+  const result = await actions[decoded]({ ...event, input })
   return result instanceof Response ? result : json(result ?? null)
+}
+
+const METHODS = ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+
+async function endpoint(m, event) {
+  const { route } = m
+  const method = event.request.method
+  const handlers = route.endpoint
+  const headFromGet = method === 'HEAD' && typeof handlers.HEAD !== 'function' && typeof handlers.GET === 'function'
+  const handle = headFromGet ? handlers.GET : METHODS.includes(method) && handlers[method]
+  if (typeof handle !== 'function') {
+    const allow = METHODS.filter((name) => typeof handlers[name] === 'function' || (name === 'HEAD' && typeof handlers.GET === 'function'))
+    return new Response('Method not allowed', { status: 405, headers: { allow: allow.join(', '), 'content-type': 'text/plain; charset=utf-8' } })
+  }
+  const res = await handle(event)
+  if (!(res instanceof Response)) {
+    const got = res === null ? 'null' : Array.isArray(res) ? 'an array' : typeof res
+    throw new Error(`${route.file ?? route.pattern}: ${method} returned ${got}; an endpoint must return a Response. Page data comes from load, writes from actions (.pragma/docs/data.md)`)
+  }
+  return headFromGet ? new Response(null, res) : res
 }
 
 export function earlyHints(html) {
@@ -241,23 +357,30 @@ export function earlyHints(html) {
   return hints.length ? hints.join(', ') : null
 }
 
-async function page(m, { query, request, env, db, kv, files, log }) {
+async function page(m, event) {
   const { route, params } = m
+  const { request, query, log } = event
   let payload
   let body
   let status = 200
   const scope = { data: null, params, query, page: { loading: false, error: null } }
   try {
-    const value = route.server?.load ? await route.server.load({ params, query, request, env, db, kv, files, log }) : null
+    const value = route.server?.load ? await route.server.load(event) : null
     payload = { data: value ?? null }
     scope.data = payload.data
     body = renderPage(route.template, scope, { page: route.page, components: route.components, log })
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    log.error(message, err)
-    payload = { error: { message } }
+    if (err instanceof Redirect) throw err
+    if (err instanceof HttpError) {
+      payload = { error: err.body }
+      status = err.status
+    } else {
+      const message = err instanceof Error ? err.message : String(err)
+      log.error(message, err)
+      payload = { error: { message } }
+      status = 500
+    }
     body = undefined
-    status = 500
   }
   const html = shellWith(route.shell, body, payload, scope)
   const headers = new Headers({ 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, no-cache' })
