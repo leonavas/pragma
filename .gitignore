@@ -10,3 +10,5 @@ build/
 *.log
 .env
 .env.*
+
+site/public/downloads/

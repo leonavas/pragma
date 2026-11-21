@@ -39,12 +39,29 @@ const MIME = {
 
 const toPath = (root) => (root instanceof URL || String(root).startsWith('file:') ? fileURLToPath(root) : String(root))
 
-async function isFile(path) {
+async function statFile(path) {
   try {
-    return (await stat(path)).isFile()
+    const info = await stat(path)
+    return info.isFile() ? info : null
   } catch {
-    return false
+    return null
   }
+}
+
+async function isFile(path) {
+  return (await statFile(path)) !== null
+}
+
+function acceptsEncoding(header, encoding) {
+  if (!header) return false
+  for (const part of header.split(',')) {
+    const [name, ...params] = part.split(';').map((s) => s.trim().toLowerCase())
+    if (name !== encoding) continue
+    const q = params.find((p) => p.startsWith('q='))
+    if (q && Number(q.slice(2)) === 0) continue
+    return true
+  }
+  return false
 }
 
 export function createStatic(root) {
@@ -104,19 +121,44 @@ export function createStatic(root) {
         rel = '/_404.html'
         if (!(await isFile(file))) return new Response('Not found', { status, headers: { 'content-type': 'text/plain; charset=utf-8' } })
       }
-      const info = await stat(file)
-      const etag = `W/"${info.size.toString(16)}-${Math.floor(info.mtimeMs).toString(16)}"`
+      const contentType = MIME[extname(file).toLowerCase()] ?? 'application/octet-stream'
+      let servedFile = file
+      let encoding = null
+      let info = null
+      let hasCompressed = false
+      if (!file.endsWith('.br') && !file.endsWith('.gz')) {
+        const acceptEncoding = request.headers.get('accept-encoding')
+        const brInfo = await statFile(file + '.br')
+        if (brInfo) hasCompressed = true
+        if (brInfo && acceptsEncoding(acceptEncoding, 'br')) {
+          servedFile = file + '.br'
+          encoding = 'br'
+          info = brInfo
+        } else {
+          const gzInfo = await statFile(file + '.gz')
+          if (gzInfo) hasCompressed = true
+          if (gzInfo && acceptsEncoding(acceptEncoding, 'gzip')) {
+            servedFile = file + '.gz'
+            encoding = 'gzip'
+            info = gzInfo
+          }
+        }
+      }
+      if (!info) info = await stat(file)
+      const etag = `W/"${info.size.toString(16)}-${Math.floor(info.mtimeMs).toString(16)}${encoding ? `-${encoding}` : ''}"`
       const headers = {
-        'content-type': MIME[extname(file).toLowerCase()] ?? 'application/octet-stream',
+        'content-type': contentType,
         'cache-control': rel.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
         'x-content-type-options': 'nosniff',
       }
+      if (hasCompressed) headers.vary = 'accept-encoding'
+      if (encoding) headers['content-encoding'] = encoding
       if (status === 200) {
         headers.etag = etag
         if (request.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers })
       }
       headers['content-length'] = String(info.size)
-      return new Response(request.method === 'HEAD' ? null : await readFile(file), { status, headers })
+      return new Response(request.method === 'HEAD' ? null : await readFile(servedFile), { status, headers })
     },
   }
 }

@@ -2,5 +2,5 @@
   "name": "app",
   "lang": "en",
   "webmcp": true,
-  "budgets": { "initialJsKb": 15, "routeJsKb": 10, "cssKb": 15 }
+  "budgets": { "initialJsKb": 15, "routeJsKb": 10, "cssKb": 25 }
 }

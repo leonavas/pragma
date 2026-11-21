@@ -280,10 +280,13 @@ fn same_named_route_components_are_scoped_by_folder() {
     let badge = |ids: &[String]| ids.iter().find(|id| id.starts_with("badge-")).cloned().unwrap_or_else(|| panic!("{ids:?}"));
     let (one_badge, two_badge) = (badge(&one), badge(&two));
     assert_ne!(one_badge, two_badge, "same-named components in different folders share a data-c");
-    let css = fs::read_to_string(out.join("client/assets/app.css")).unwrap();
-    assert!(css.contains(&format!("[data-c=\"{one_badge}\"] .badge-icon {{ width: 1px; }}")), "{css}");
-    assert!(css.contains(&format!("[data-c=\"{two_badge}\"] .badge-icon {{ width: 2px; }}")), "{css}");
-    assert!(!css.contains("[data-c=\"badge\"]") && !css.contains("[data-c=badge]"), "{css}");
+    let one_css = fs::read_to_string(out.join("client/assets/css/one/index.css")).unwrap();
+    let two_css = fs::read_to_string(out.join("client/assets/css/two/index.css")).unwrap();
+    assert!(one_css.contains(&format!("[data-c=\"{one_badge}\"] .badge-icon {{ width: 1px; }}")), "{one_css}");
+    assert!(!one_css.contains(&two_badge), "{one_css}");
+    assert!(two_css.contains(&format!("[data-c=\"{two_badge}\"] .badge-icon {{ width: 2px; }}")), "{two_css}");
+    assert!(!two_css.contains(&one_badge), "{two_css}");
+    assert!(!one_css.contains("[data-c=\"badge\"]") && !two_css.contains("[data-c=badge]"));
     // the runtime finds the component module by the same id
     assert!(page("two").contains(&format!("\"{two_badge}\":\"/assets/routes/two/_components/badge/badge.js\"")), "{}", page("two"));
 }
@@ -658,12 +661,13 @@ fn script_and_style_inside_the_html() {
     assert!(js.contains("export default function ($, $pragma) {") && js.contains("$.count += 1") && js.contains("$pragma.log.info('added')"), "{js}");
     let meter = fs::read_to_string(out.join("client/assets/lib/components/meter/meter.js")).unwrap();
     assert!(meter.contains("$pragma.prop(\"step\", 1)"), "{meter}");
-    let css = fs::read_to_string(out.join("client/assets/app.css")).unwrap();
+    let shop_css = fs::read_to_string(out.join("client/assets/css/shop/index.css")).unwrap();
+    let index_css = fs::read_to_string(out.join("client/assets/css/index.css")).unwrap();
     // styles are scoped: a component's to its root, a page's to its <main data-page="…">
-    assert!(css.contains("/* routes/shop/index.html */") && css.contains(".shop-btn:where([data-page=\"shop/index\"],[data-page=\"shop/index\"] *) { padding: 1rem }"), "{css}");
-    assert!(css.contains("/* lib/components/meter/meter.html */") && css.contains("[data-c=\"meter\"] .x, .meter:where([data-c=\"meter\"],[data-c=\"meter\"] *) { margin: 0 }"), "{css}");
+    assert!(shop_css.contains("/* routes/shop/index.html */") && shop_css.contains(".shop-btn:where([data-page=\"shop/index\"],[data-page=\"shop/index\"] *) { padding: 1rem }"), "{shop_css}");
+    assert!(index_css.contains("/* lib/components/meter/meter.html */") && index_css.contains("[data-c=\"meter\"] .x, .meter:where([data-c=\"meter\"],[data-c=\"meter\"] *) { margin: 0 }"), "{index_css}");
     // :global(…) opts out only what is inside it: `.meter` stays scoped (BUG-S-21)
-    assert!(css.contains("html[data-theme=\"dark\"] .meter:where([data-c=\"meter\"],[data-c=\"meter\"] *) { color: blue }"), "{css}");
+    assert!(index_css.contains("html[data-theme=\"dark\"] .meter:where([data-c=\"meter\"],[data-c=\"meter\"] *) { color: blue }"), "{index_css}");
     assert!(html.contains("<main data-page=\"shop/index\">"), "{html}");
     // diagnostics in an embedded script point at the .html line
     let bad = page.replace("count += 1", "count += 1\n    console.log(count)");
@@ -1424,4 +1428,117 @@ fn json_ld_errors() {
     expect(&d, "html/script", PAGE, 3);
     expect(&d, "html/script", "lib/components/ld/ld.html", 1);
     assert!(!d.iter().any(|x| x.rule == "js/syntax"), "{d:#?}");
+}
+
+#[test]
+fn webmcp_valid_forms_and_notool_stripped() {
+    let html = "<script>\n  let open = true\n  function run() {}\n</script>\n<title>Tools</title>\n<h1>Tools</h1>\n<form toolname=\"search_products\" tooldescription=\"Search the catalog by product name\" toolautosubmit @submit=\"run\">\n  <label for=\"query\">Query</label>\n  <input id=\"query\" name=\"query\" type=\"search\">\n  <input name=\"token\" type=\"hidden\" value=\"abc\">\n  <input type=\"submit\" value=\"Go\">\n</form>\n<form notool @submit=\"run\">\n  <label for=\"pwd\">Password</label>\n  <input id=\"pwd\" type=\"password\">\n  <button>Sign in</button>\n</form>\n<if $open>\n  <form toolname=\"save_draft\" tooldescription=\"Save the current draft text\" @submit=\"run\">\n    <textarea name=\"body\" aria-label=\"Body\" toolparamdescription=\"Draft body text\"></textarea>\n    <button>Save</button>\n  </form>\n</if>\n<else>\n  <form toolname=\"save_draft\" tooldescription=\"Save the alternate draft text\" @submit=\"run\">\n    <input name=\"body\" aria-label=\"Body\" aria-description=\"Alternate draft body\">\n    <button>Save</button>\n  </form>\n</else>";
+    let t = scratch(&[(PAGE, html)]);
+    let app = t.0.join("app");
+    let d = check(&app);
+    assert!(d.is_empty(), "{d:#?}");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Prod }).unwrap();
+    let built = fs::read_to_string(out.join("client/index.html")).unwrap();
+    assert!(built.contains("toolname=\"search_products\""), "{built}");
+    assert!(!built.contains("notool"), "notool must be stripped from built HTML: {built}");
+}
+
+#[test]
+fn webmcp_rules_errors_and_warnings() {
+    let html = "<script>\n  let dyn = 'x'\n  function run() {}\n</script>\n<title>Bad</title>\n<h1>Bad</h1>\n<form @submit=\"run\"><label>A <input name=\"a\"></label></form>\n<form toolname=\"only_name\" @submit=\"run\"><button>Go</button></form>\n<form tooldescription=\"Only a description without a name\" @submit=\"run\"><button>Go</button></form>\n<form toolname=\"bad name!\" tooldescription=\"Invalid characters in tool name\" @submit=\"run\"><button>Go</button></form>\n<form toolname=\"searchProducts\" tooldescription=\"Short\" @submit=\"run\"><input aria-label=\"Unnamed\"><input name=\"no_desc\" aria-label=\"X\"></form>\n<form toolname=\"delete_item\" tooldescription=\"Delete an item permanently from store\" toolautosubmit @submit=\"run\"><button>Del</button></form>\n<form toolname=\"delete_item\" tooldescription=\"Duplicate tool name on same page\" @submit=\"run\"><button>Del</button></form>\n<form notool toolname=\"conflict_tool\" @submit=\"run\"><button>No</button></form>\n<form notool tooldescription=\"Conflict description with notool\" @submit=\"run\"><button>No</button></form>\n<div toolname=\"wrong_tag\" tooldescription=\"Wrong tag\" toolautosubmit notool>x</div>\n<form toolname=\"ok_tool\" tooldescription=\"Tool with misplaced param description\" toolparamdescription=\"wrong\" @submit=\"run\"><button>Ok</button></form>\n<form :toolname=\"$dyn\" tooldescription=\"Dynamic {$dyn} text here\" @submit=\"run\"><button>Dyn</button></form>";
+    let t = scratch(&[(PAGE, html)]);
+    let d = check(&t.0.join("app"));
+    expect(&d, "webmcp/form-tool", PAGE, 7);
+    expect(&d, "webmcp/pair", PAGE, 8);
+    expect(&d, "webmcp/pair", PAGE, 9);
+    expect(&d, "webmcp/name", PAGE, 10);
+    expect(&d, "webmcp/name-style", PAGE, 11);
+    expect(&d, "webmcp/description", PAGE, 11);
+    expect(&d, "webmcp/param-name", PAGE, 11);
+    expect(&d, "webmcp/param-description", PAGE, 11);
+    expect(&d, "webmcp/autosubmit", PAGE, 12);
+    expect(&d, "webmcp/duplicate", PAGE, 13);
+    expect(&d, "webmcp/notool", PAGE, 14);
+    expect(&d, "webmcp/notool", PAGE, 15);
+    expect(&d, "webmcp/attribute", PAGE, 16);
+    expect(&d, "webmcp/notool", PAGE, 16);
+    expect(&d, "webmcp/attribute", PAGE, 17);
+    expect(&d, "webmcp/dynamic", PAGE, 18);
+    assert!(d.iter().any(|x| x.rule == "webmcp/name-style" && x.message.contains("search_products")), "{d:#?}");
+    assert_eq!(d.iter().filter(|x| x.rule == "webmcp/dynamic").count(), 2, "{d:#?}");
+}
+
+#[test]
+fn webmcp_disabled_in_pragma_json() {
+    let cfg = "{\"name\":\"app\",\"webmcp\":false}";
+    let plain = "<script>\n  function run() {}\n</script>\n<title>Off</title>\n<h1>Off</h1>\n<form @submit=\"run\"><label>Q <input name=\"q\"></label></form>";
+    let t = scratch(&[("pragma.json", cfg), (PAGE, plain)]);
+    assert!(check(&t.0.join("app")).is_empty());
+
+    let with_attrs = "<script>\n  function run() {}\n</script>\n<title>Off</title>\n<h1>Off</h1>\n<form toolname=\"search_items\" tooldescription=\"Search items in the list\" @submit=\"run\"><button>Go</button></form>\n<form notool @submit=\"run\"><button>No</button></form>";
+    let t = scratch(&[("pragma.json", cfg), (PAGE, with_attrs)]);
+    let d = check(&t.0.join("app"));
+    expect(&d, "webmcp/disabled", PAGE, 6);
+    expect(&d, "webmcp/disabled", PAGE, 7);
+    assert_eq!(d.iter().filter(|x| x.rule == "webmcp/disabled").count(), 3, "{d:#?}");
+}
+
+#[test]
+fn per_route_css_splitting_and_budget() {
+    let t = scratch(&[
+        ("routes/_layout.html", "<header class=\"p-4\">Nav</header><main data-page><slot></slot></main>"),
+        ("routes/index.html", "<title>Home</title><h1 class=\"text-2xl font-bold\">Home</h1>"),
+        ("routes/plain.html", "<title>Plain</title><p class=\"p-4\">Only layout classes</p>"),
+    ]);
+    let app = t.0.join("app");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: app.clone(), out_dir: out.clone(), mode: Mode::Prod }).unwrap();
+    let index = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let plain = fs::read_to_string(out.join("client/plain.html")).unwrap();
+    assert!(index.contains("data-pragma-route-css>"), "route with page-only classes gets route CSS: {index}");
+    assert!(!plain.contains("data-pragma-route-css"), "route with no extra CSS skips route CSS: {plain}");
+    assert!(!out.join("client/assets/css/plain.css").exists());
+    // cssKb budget checks shared + route CSS per page
+    fs::write(app.join("pragma.json"), "{\n  \"name\": \"tpl\",\n  \"budgets\": { \"cssKb\": 0.1 }\n}\n").unwrap();
+    let d = check(&app);
+    assert!(d.iter().any(|x| x.rule == "app/budget" && x.message.contains("cssKb exceeded in /")), "{d:#?}");
+}
+
+#[test]
+fn prod_precompression_and_speculation_rules() {
+    let t = scratch(&[
+        ("routes/index.html", "<title>Home</title><h1 class=\"text-2xl\">Home</h1><p>Hello world</p>"),
+        ("public/tiny.txt", "small"),
+        ("public/large.txt", &"hello pragma compression ".repeat(40)),
+    ]);
+    let app = t.0.join("app");
+    let prod_out = t.0.join("prod");
+    build(&BuildOptions { root: app.clone(), out_dir: prod_out.clone(), mode: Mode::Prod }).unwrap();
+    let prod_html = fs::read_to_string(prod_out.join("client/index.html")).unwrap();
+    assert!(prod_html.contains("<script type=\"speculationrules\">{\"prefetch\":"), "{prod_html}");
+    assert!(prod_out.join("client/large.txt.br").is_file() && prod_out.join("client/large.txt.gz").is_file());
+    assert!(!prod_out.join("client/tiny.txt.br").exists() && !prod_out.join("client/tiny.txt.gz").exists());
+    assert!(prod_out.join("client/index.html.br").is_file() && prod_out.join("client/index.html.gz").is_file());
+    let dev_out = t.0.join("dev");
+    build(&BuildOptions { root: app, out_dir: dev_out.clone(), mode: Mode::Dev }).unwrap();
+    let dev_html = fs::read_to_string(dev_out.join("client/index.html")).unwrap();
+    assert!(!dev_html.contains("speculationrules"), "{dev_html}");
+    assert!(!dev_out.join("client/large.txt.br").exists() && !dev_out.join("client/large.txt.gz").exists());
+}
+
+#[test]
+fn static_app_with_public_markdown_emits_cloudflare_worker() {
+    let t = scratch(&[
+        ("routes/index.html", "<title>Docs</title><h1>Docs</h1>"),
+        ("public/index.md", "# Docs\n\nHello markdown.\n"),
+    ]);
+    let out = t.0.join("dist");
+    let r = build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Prod }).unwrap();
+    assert!(!r.has_server, "static app with public/*.md should not spawn Node in dev/serve");
+    assert!(out.join("server/worker.js").is_file());
+    assert!(out.join("server/wrangler.jsonc").is_file());
+    assert!(!out.join("server/node.mjs").exists());
+    let worker = fs::read_to_string(out.join("server/worker.js")).unwrap();
+    assert!(worker.contains("createHandler") && worker.contains("routes: [\n  ]"), "{worker}");
 }

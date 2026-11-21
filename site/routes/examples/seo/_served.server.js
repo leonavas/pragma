@@ -1,5 +1,4 @@
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import sources from '../../../utils/sources.json' with { type: 'json' }
 
 const headPattern = /<head>([\s\S]*?)<\/head>/
 const headTagPattern = /<title\b[^>]*>[^<]*<\/title>|<(?:meta|link)\b[^>]*>|<script type="application\/ld\+json">[\s\S]*?<\/script>/g
@@ -65,7 +64,7 @@ function verdictOf(status, values) {
 
 async function pageTagKeys(source) {
   if (!source) return new Set()
-  const fragment = await readFile(join(process.cwd(), source), 'utf8')
+  const fragment = sources[source] ?? ''
   return new Set((fragment.match(headTagPattern) ?? []).map(keyOf))
 }
 

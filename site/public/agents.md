@@ -1,6 +1,6 @@
 # pragma, for your agent
 
-Agents: the full docs are one file at https://pragma.dev/llms-full.txt. This page in HTML: https://pragma.dev/agents. Human version: https://pragma.dev/index.md.
+Agents: the full docs are one file at https://pragma.leonavas.workers.dev/llms-full.txt. This page in HTML: https://pragma.leonavas.workers.dev/agents. Human version: https://pragma.leonavas.workers.dev/index.md.
 
 Everything an agent needs to build with pragma, in files it reads without a browser. Human: copy the prompt, paste it into your coding agent and say what to build.
 
@@ -9,49 +9,52 @@ Everything an agent needs to build with pragma, in files it reads without a brow
 Replace the brackets with your app. The agent reads the docs, installs pragma, creates the app and runs `pragma check --strict` until it passes.
 
 ```
-Read https://pragma.dev/llms-full.txt and create a pragma app that [describe your app]. Install pragma first if the pragma command is missing. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.
+Read https://pragma.leonavas.workers.dev/llms-full.txt and create a pragma app that [describe your app]. Install pragma first if the pragma command is missing. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.
 ```
 
 ## Install and create
 
-One Rust binary. Building it needs Cargo; Node 22 or newer only runs `.server.js` files.
+One Rust binary. Linux x64 binary: [pragma-linux-x64.tar.gz](https://pragma.leonavas.workers.dev/downloads/pragma-linux-x64.tar.gz). Node 22 or newer only runs `.server.js` files.
 
 ```sh
-git clone https://github.com/leonavas/pragma
-cd pragma
-cargo install --path core/cli/crates/pragma-cli
-cd ..
+curl -fsSL https://pragma.leonavas.workers.dev/install.sh | sh
 pragma new my-app
 cd my-app
 pragma dev
+```
+
+Or build from source with Cargo:
+
+```sh
+git clone https://github.com/leonavas/pragma && cd pragma && cargo install --path core/cli/crates/pragma-cli
 ```
 
 ## Files for agents
 
 Same content as the HTML pages, in markdown. No hidden text, nothing written only for agents.
 
-- [/llms-full.txt](https://pragma.dev/llms-full.txt): the app rules and every doc in one file. Start here.
-- [/llms.txt](https://pragma.dev/llms.txt): the index, in the llmstxt.org format.
-- [/index.md](https://pragma.dev/index.md): the landing page.
-- [/agents.md](https://pragma.dev/agents.md): this page.
+- [/llms-full.txt](https://pragma.leonavas.workers.dev/llms-full.txt): the app rules and every doc in one file. Start here.
+- [/llms.txt](https://pragma.leonavas.workers.dev/llms.txt): the index, in the llmstxt.org format.
+- [/index.md](https://pragma.leonavas.workers.dev/index.md): the landing page.
+- [/agents.md](https://pragma.leonavas.workers.dev/agents.md): this page.
 
 A request for `/` or `/agents` with `Accept: text/markdown` gets the markdown file instead of the HTML. One doc per file:
 
-- [App rules (AGENTS.md)](https://pragma.dev/docs/rules.md): the rules every pragma app follows; read first
-- [App structure](https://pragma.dev/docs/structure.md): where each file goes, pragma.json
-- [HTML syntax](https://pragma.dev/docs/syntax.md): HTML directives ({path}, :, ., @, $) and blocks
-- [Components](https://pragma.dev/docs/components.md): components, props, slots
-- [State: script, actions, derived values, stores](https://pragma.dev/docs/state.md): script: state, actions, derived values, mount, stores
-- [Routes and router](https://pragma.dev/docs/routes.md): pages, links, params, query, layout, head tags
-- [Data: load, server actions, skeleton, SSR](https://pragma.dev/docs/data.md): load, server actions, skeleton, SSR
-- [Overlays: modal, alert, dropdown](https://pragma.dev/docs/overlays.md): modal, alert, dropdown
-- [CSS](https://pragma.dev/docs/css.md): styles and theme
-- [Utility classes](https://pragma.dev/docs/classes.md): every utility class
-- [WebMCP: forms are agent tools](https://pragma.dev/docs/webmcp.md): forms as WebMCP tools, markdown for agents
-- [npm packages](https://pragma.dev/docs/packages.md): npm packages: when and which
-- [Performance](https://pragma.dev/docs/performance.md): performance defaults and budgets
-- [Logs](https://pragma.dev/docs/logs.md): OpenTelemetry logs
-- [pragma CLI](https://pragma.dev/docs/cli.md): commands, check rules, deploy
+- [App rules (AGENTS.md)](https://pragma.leonavas.workers.dev/docs/rules.md): the rules every pragma app follows; read first
+- [App structure](https://pragma.leonavas.workers.dev/docs/structure.md): where each file goes, pragma.json
+- [HTML syntax](https://pragma.leonavas.workers.dev/docs/syntax.md): HTML directives ({path}, :, ., @, $) and blocks
+- [Components](https://pragma.leonavas.workers.dev/docs/components.md): components, props, slots
+- [State: script, actions, derived values, stores](https://pragma.leonavas.workers.dev/docs/state.md): script: state, actions, derived values, mount, stores
+- [Routes and router](https://pragma.leonavas.workers.dev/docs/routes.md): pages, links, params, query, layout, head tags
+- [Data: load, server actions, skeleton, SSR](https://pragma.leonavas.workers.dev/docs/data.md): load, server actions, skeleton, SSR
+- [Overlays: modal, alert, dropdown](https://pragma.leonavas.workers.dev/docs/overlays.md): modal, alert, dropdown
+- [CSS](https://pragma.leonavas.workers.dev/docs/css.md): styles and theme
+- [Utility classes](https://pragma.leonavas.workers.dev/docs/classes.md): every utility class
+- [WebMCP: forms are agent tools](https://pragma.leonavas.workers.dev/docs/webmcp.md): forms as WebMCP tools, markdown for agents
+- [npm packages](https://pragma.leonavas.workers.dev/docs/packages.md): npm packages: when and which
+- [Performance](https://pragma.leonavas.workers.dev/docs/performance.md): performance defaults and budgets
+- [Logs](https://pragma.leonavas.workers.dev/docs/logs.md): OpenTelemetry logs
+- [pragma CLI](https://pragma.leonavas.workers.dev/docs/cli.md): commands, check rules, deploy
 
 ## WebMCP tools on this site
 

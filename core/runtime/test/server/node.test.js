@@ -1,3 +1,8 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { request as httpRequest } from 'node:http'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { brotliCompressSync, gzipSync } from 'node:zlib'
 import { test, before, after } from 'node:test'
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
@@ -110,4 +115,111 @@ test('startup log uses the app service name', async () => {
 test('/_otel goes through the handler', async () => {
   const res = await get('/_otel', { method: 'POST', body: JSON.stringify({ resource: {}, logs: [{ body: 'x' }] }) })
   assert.equal(res.status, 204)
+})
+
+test('negotiates markdown on the Node adapter', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pragma-node-md-'))
+  writeFileSync(join(dir, 'index.html'), '<h1>Home</h1>')
+  writeFileSync(join(dir, 'index.md'), '# Home\n')
+  writeFileSync(join(dir, 'plain.html'), '<h1>Plain</h1>')
+  const mdServer = serve(createHandler({ routes: [], service: 'md-app' }), { root: dir, port: 0 })
+  await once(mdServer, 'listening')
+  const mdBase = `http://127.0.0.1:${mdServer.address().port}`
+  try {
+    const md = await fetch(`${mdBase}/`, { headers: { accept: 'text/markdown, text/html' } })
+    assert.equal(md.status, 200)
+    assert.equal(md.headers.get('content-type'), 'text/markdown; charset=utf-8')
+    assert.match(md.headers.get('vary') ?? '', /accept/i)
+    assert.equal(await md.text(), '# Home\n')
+
+    const html = await fetch(`${mdBase}/`, { headers: { accept: 'text/html, text/markdown;q=0.5' } })
+    assert.equal(html.status, 200)
+    assert.equal(html.headers.get('content-type'), 'text/html; charset=utf-8')
+    assert.match(html.headers.get('vary') ?? '', /accept/i)
+    assert.equal(await html.text(), '<h1>Home</h1>')
+
+    const plain = await fetch(`${mdBase}/plain`, { headers: { accept: 'text/markdown' } })
+    assert.equal(plain.status, 200)
+    assert.equal(plain.headers.get('content-type'), 'text/html; charset=utf-8')
+    assert.equal(plain.headers.get('vary'), null)
+  } finally {
+    mdServer.close()
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+function rawGet(url, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(url, { method: 'GET', headers }, (res) => {
+      const chunks = []
+      res.on('data', (c) => chunks.push(c))
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) }))
+    })
+    req.on('error', reject)
+    req.end()
+  })
+}
+
+test('serves precompressed .br and .gz sidecars with matching headers and preserves Vary', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pragma-node-precomp-'))
+  mkdirSync(join(dir, 'assets'), { recursive: true })
+  const js = Buffer.from('console.log("hello world");\n'.repeat(20))
+  const jsBr = brotliCompressSync(js)
+  const jsGz = gzipSync(js)
+  writeFileSync(join(dir, 'assets', 'app.js'), js)
+  writeFileSync(join(dir, 'assets', 'app.js.br'), jsBr)
+  writeFileSync(join(dir, 'assets', 'app.js.gz'), jsGz)
+
+  const html = Buffer.from('<h1>Home</h1>\n'.repeat(20))
+  const htmlBr = brotliCompressSync(html)
+  writeFileSync(join(dir, 'index.html'), html)
+  writeFileSync(join(dir, 'index.html.br'), htmlBr)
+  writeFileSync(join(dir, 'index.md'), '# Home\n')
+
+  const preServer = serve(createHandler({ routes: [], service: 'pre-app' }), { root: dir, port: 0 })
+  await once(preServer, 'listening')
+  const preBase = `http://127.0.0.1:${preServer.address().port}`
+  try {
+    const br = await rawGet(`${preBase}/assets/app.js`, { 'accept-encoding': 'gzip, br' })
+    assert.equal(br.status, 200)
+    assert.equal(br.headers['content-encoding'], 'br')
+    assert.equal(br.headers['content-type'], 'text/javascript; charset=utf-8')
+    assert.equal(br.headers['vary'], 'accept-encoding')
+    assert.equal(br.headers['content-length'], String(jsBr.length))
+    assert.deepEqual(br.body, jsBr)
+    assert.ok(br.headers['etag'])
+
+    const br304 = await rawGet(`${preBase}/assets/app.js`, { 'accept-encoding': 'br', 'if-none-match': br.headers['etag'] })
+    assert.equal(br304.status, 304)
+
+    const gz = await rawGet(`${preBase}/assets/app.js`, { 'accept-encoding': 'br;q=0, gzip' })
+    assert.equal(gz.status, 200)
+    assert.equal(gz.headers['content-encoding'], 'gzip')
+    assert.equal(gz.headers['content-type'], 'text/javascript; charset=utf-8')
+    assert.equal(gz.headers['vary'], 'accept-encoding')
+    assert.equal(gz.headers['content-length'], String(jsGz.length))
+    assert.deepEqual(gz.body, jsGz)
+    assert.notEqual(gz.headers['etag'], br.headers['etag'])
+
+    const plain = await rawGet(`${preBase}/assets/app.js`, { 'accept-encoding': 'identity' })
+    assert.equal(plain.status, 200)
+    assert.equal(plain.headers['content-encoding'], undefined)
+    assert.equal(plain.headers['content-type'], 'text/javascript; charset=utf-8')
+    assert.equal(plain.headers['vary'], 'accept-encoding')
+    assert.equal(plain.headers['content-length'], String(js.length))
+    assert.deepEqual(plain.body, js)
+
+    // When markdown negotiation also adds Vary: Accept, accept-encoding is preserved.
+    const page = await rawGet(`${preBase}/`, { accept: 'text/html', 'accept-encoding': 'br' })
+    assert.equal(page.status, 200)
+    assert.equal(page.headers['content-encoding'], 'br')
+    assert.equal(page.headers['content-type'], 'text/html; charset=utf-8')
+    assert.deepEqual(page.body, htmlBr)
+    const vary = (page.headers['vary'] ?? '').toLowerCase()
+    assert.match(vary, /\baccept-encoding\b/)
+    assert.match(vary, /\baccept\b(?!-)/)
+  } finally {
+    preServer.close()
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

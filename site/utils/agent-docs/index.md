@@ -97,13 +97,21 @@ An agent in the browser sees these forms as WebMCP tools and calls them. You can
 
 ## Install
 
-One Rust binary compiles, checks, serves and bundles npm packages: no Vite, no esbuild, no config. Building it needs Cargo; Node 22 or newer only runs your `.server.js` files.
+One Rust binary compiles, checks, serves and bundles npm packages: no Vite, no esbuild, no config. Node 22 or newer only runs your `.server.js` files.
+
+Linux x64: run the one-line installer or download [pragma-linux-x64.tar.gz]({{origin}}/downloads/pragma-linux-x64.tar.gz).
+
+```sh
+curl -fsSL {{origin}}/install.sh | sh
+pragma -V
+```
+
+From source (any platform with Cargo):
 
 ```sh
 git clone https://github.com/leonavas/pragma
 cd pragma
 cargo install --path core/cli/crates/pragma-cli
-pragma -V
 ```
 
 Then `pragma new my-app`, `cd my-app` and `pragma dev`. [Start with the guide]({{origin}}/guide).

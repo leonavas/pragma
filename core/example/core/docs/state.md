@@ -23,13 +23,17 @@ runtime reapplies the HTML (one render per microtask). No signals, no manual ren
 
   const visible = () => shared.tasks.items.filter(task => query.filter !== 'pending' || !task.done)
 
-  function add() {
-    const title = draft.trim()
+  function add(event) {
+    const title = String(new FormData(event.target).get('title') ?? '').trim()
     error = title.length < 3 ? 'Use at least 3 characters.' : ''
-    if (error) return
+    if (error) {
+      if (event.agentInvoked) event.respondWith(Promise.resolve({ error }))
+      return
+    }
     shared.tasks.add(title)
     draft = ''
     log.info('task added')
+    if (event.agentInvoked) event.respondWith(Promise.resolve({ ok: true, title }))
   }
 
   function toggle(task) {

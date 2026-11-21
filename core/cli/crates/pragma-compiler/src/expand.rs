@@ -17,6 +17,8 @@ pub struct Expanded {
     pub page: Vec<Node>,
     /// By `data-c` id (`Component::id`).
     pub components: BTreeMap<String, Component>,
+    /// Directories of components used directly in `_layout.html`.
+    pub layout_components: BTreeSet<PathBuf>,
 }
 
 type Props = HashMap<String, Option<String>>;
@@ -52,6 +54,8 @@ pub struct Expander<'p> {
     p: &'p Project,
     pub diags: Vec<Diagnostic>,
     used: BTreeMap<String, Component>,
+    layout_used: BTreeSet<PathBuf>,
+    in_layout: bool,
     stack: Vec<&'p Path>,
     scripts: &'p HashMap<PathBuf, ScriptInfo>,
 }
@@ -87,7 +91,7 @@ fn collect_slots(nodes: &[Node], out: &mut BTreeSet<String>) {
 
 impl<'p> Expander<'p> {
     pub fn new(p: &'p Project, scripts: &'p HashMap<PathBuf, ScriptInfo>) -> Self {
-        Expander { p, diags: Vec::new(), used: BTreeMap::new(), stack: Vec::new(), scripts }
+        Expander { p, diags: Vec::new(), used: BTreeMap::new(), layout_used: BTreeSet::new(), in_layout: false, stack: Vec::new(), scripts }
     }
 
     fn err(&mut self, pos: Pos, rule: &'static str, msg: impl Into<String>) {
@@ -133,13 +137,15 @@ impl<'p> Expander<'p> {
             }
             let slots: Slots = HashMap::from([(String::new(), page_nodes.clone())]);
             let lsc = Scope { from: Path::new("routes"), props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: 0 };
+            self.in_layout = true;
             body = self.expand_nodes(&rest, &lsc);
+            self.in_layout = false;
             if page.css.is_some() {
                 name_page_main(&mut body, &page.out_name);
             }
         }
         merge_head(&mut head, own_head);
-        (Expanded { head, body, page: page_nodes, components: self.used }, self.diags)
+        (Expanded { head, body, page: page_nodes, components: self.used, layout_components: self.layout_used }, self.diags)
     }
 
     fn resolve(&self, v: &str, sc: &Scope) -> Res {
@@ -481,6 +487,9 @@ impl<'p> Expander<'p> {
                 self.used.insert(comp.id.clone(), comp.clone());
             }
         }
+        if self.in_layout {
+            self.layout_used.insert(comp.dir.clone());
+        }
         let mut dup = Vec::new();
         if let Some(Node::Element(r)) = nodes.iter_mut().find(|n| matches!(n, Node::Element(_))) {
             r.attrs.insert(0, Attr { name: "data-c".into(), value: Some(comp.id.clone()), pos: r.pos });
@@ -664,7 +673,8 @@ pub struct Scoped<'a> {
     pub ctx: &'a PageCtx<'a>,
     pub diags: Vec<Diagnostic>,
     pub stores: BTreeSet<String>,
-    pub classes: BTreeSet<String>,
+    pub shared_classes: BTreeSet<String>,
+    pub page_classes: BTreeSet<String>,
     /// Owner and outer variables of each open component (for `data-slot`).
     pub outer: Vec<(Owner, Vec<String>)>,
 }
@@ -674,8 +684,8 @@ impl Scoped<'_> {
         self.diags.push(diag(&self.p.files, pos, rule, msg));
     }
 
-    pub fn run(&mut self, body: &[Node]) {
-        self.walk(body, &mut Vec::new(), Owner::None, false);
+    pub fn run(&mut self, body: &[Node], in_page: bool) {
+        self.walk(body, &mut Vec::new(), Owner::None, in_page);
     }
 
     /// Bindings in the page's head tags are rendered by the server, so they need `ssr`.
@@ -738,10 +748,12 @@ impl Scoped<'_> {
             }
             None => vars,
         };
-        if e.is("main") && e.has("data-page") {
+        let is_page_main = e.is("main") && e.has("data-page");
+        if is_page_main {
             in_page = true;
             owner = Owner::Page;
         }
+        let class_in_page = in_page && !is_page_main;
         let comp = e.value("data-c");
         if let Some(c) = comp {
             self.outer.push((owner.clone(), vars.clone()));
@@ -754,7 +766,8 @@ impl Scoped<'_> {
             let lname = a.name.to_ascii_lowercase();
             if lname == "class" {
                 if let Some(v) = &a.value {
-                    self.classes.extend(v.split_whitespace().map(str::to_string));
+                    let target = if class_in_page { &mut self.page_classes } else { &mut self.shared_classes };
+                    target.extend(v.split_whitespace().map(str::to_string));
                 }
                 continue;
             }
@@ -775,7 +788,11 @@ impl Scoped<'_> {
                 }
                 Dir::Show | Dir::If | Dir::ElseIf | Dir::Model => self.path(a.pos, v, vars, &owner, in_page),
                 Dir::Class(c) => {
-                    self.classes.insert(c.to_string());
+                    if class_in_page {
+                        self.page_classes.insert(c.to_string());
+                    } else {
+                        self.shared_classes.insert(c.to_string());
+                    }
                     self.path(a.pos, v, vars, &owner, in_page);
                 }
                 Dir::For => {

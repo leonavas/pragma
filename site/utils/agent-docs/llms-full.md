@@ -6,16 +6,19 @@ This file has everything needed to build a pragma app: install, the loop, the ap
 
 ## Install and create
 
-pragma is one Rust binary. Building it needs Cargo; Node 22 or newer only runs `.server.js` files.
+pragma is one Rust binary. Linux x64 binary: {{origin}}/downloads/pragma-linux-x64.tar.gz. Node 22 or newer only runs `.server.js` files.
 
 ```sh
-git clone https://github.com/leonavas/pragma
-cd pragma
-cargo install --path core/cli/crates/pragma-cli
-cd ..
+curl -fsSL {{origin}}/install.sh | sh
 pragma new my-app
 cd my-app
 pragma dev
+```
+
+Or build from source with Cargo:
+
+```sh
+git clone https://github.com/leonavas/pragma && cd pragma && cargo install --path core/cli/crates/pragma-cli
 ```
 
 ## The loop

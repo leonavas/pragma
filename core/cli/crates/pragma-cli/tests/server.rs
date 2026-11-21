@@ -310,3 +310,97 @@ async fn proxies_server_paths_to_node() {
     site.set_backend(None);
     assert!(get(addr, "/about").await.text().contains("<h1>about</h1>"));
 }
+
+#[tokio::test]
+async fn negotiates_markdown_in_serve_and_dev() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+    std::fs::write(root.join("index.html"), "<h1>Home</h1>").unwrap();
+    std::fs::write(root.join("index.md"), "# Home\n").unwrap();
+    std::fs::create_dir_all(root.join("about")).unwrap();
+    std::fs::write(root.join("about/index.html"), "<h1>About</h1>").unwrap();
+    std::fs::write(root.join("about.md"), "# About\n").unwrap();
+    std::fs::create_dir_all(root.join("plain")).unwrap();
+    std::fs::write(root.join("plain/index.html"), "<h1>Plain</h1>").unwrap();
+
+    for mode in [Mode::Serve, Mode::Dev] {
+        let site = Site::new(root.to_path_buf(), mode);
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(server::serve(listener, site));
+
+        let md = request(addr, "GET", "/", &[("accept", "text/markdown, text/html")]).await;
+        assert_eq!(md.status, 200);
+        assert_eq!(md.header("content-type"), "text/markdown; charset=utf-8");
+        assert!(md.header("vary").to_ascii_lowercase().contains("accept"), "{}", md.header("vary"));
+        assert_eq!(md.text(), "# Home\n");
+
+        let about = request(addr, "GET", "/about", &[("accept", "text/markdown;q=0.9, text/html;q=0.8")]).await;
+        assert_eq!(about.status, 200);
+        assert_eq!(about.header("content-type"), "text/markdown; charset=utf-8");
+        assert_eq!(about.text(), "# About\n");
+
+        let html = request(addr, "GET", "/", &[("accept", "text/html, text/markdown;q=0.5")]).await;
+        assert_eq!(html.status, 200);
+        assert_eq!(html.header("content-type"), "text/html; charset=utf-8");
+        assert!(html.header("vary").to_ascii_lowercase().contains("accept"), "{}", html.header("vary"));
+        assert!(html.text().contains("<h1>Home</h1>"));
+
+        let head = request(addr, "HEAD", "/", &[("accept", "text/markdown")]).await;
+        assert_eq!(head.status, 200);
+        assert_eq!(head.header("content-type"), "text/markdown; charset=utf-8");
+        assert!(head.body.is_empty());
+
+        let plain = request(addr, "GET", "/plain", &[("accept", "text/markdown")]).await;
+        assert_eq!(plain.status, 200);
+        assert_eq!(plain.header("content-type"), "text/html; charset=utf-8");
+        assert!(!plain.header("vary").to_ascii_lowercase().contains("accept"), "{}", plain.header("vary"));
+    }
+}
+
+#[tokio::test]
+async fn serve_uses_precompressed_sidecar_files() {
+    let tmp = tempfile::tempdir().unwrap();
+    let root = tmp.path();
+    std::fs::create_dir_all(root.join("assets")).unwrap();
+    let raw = "console.log('hello');\n".repeat(40);
+    let br_sidecar = b"PRECOMPRESSED-BR-SENTINEL".to_vec();
+    let gz_sidecar = b"PRECOMPRESSED-GZ-SENTINEL".to_vec();
+    std::fs::write(root.join("assets/app.js"), &raw).unwrap();
+    std::fs::write(root.join("assets/app.js.br"), &br_sidecar).unwrap();
+    std::fs::write(root.join("assets/app.js.gz"), &gz_sidecar).unwrap();
+    // File without sidecars still falls back to in-memory precompression.
+    std::fs::write(root.join("assets/fallback.js"), &raw).unwrap();
+
+    let site = Site::new(root.to_path_buf(), Mode::Serve);
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(server::serve(listener, site));
+
+    let br = request(addr, "GET", "/assets/app.js", &[("accept-encoding", "gzip, br")]).await;
+    assert_eq!(br.status, 200);
+    assert_eq!(br.header("content-encoding"), "br");
+    assert_eq!(br.header("content-type"), "text/javascript; charset=utf-8");
+    assert_eq!(br.header("vary"), "accept-encoding");
+    assert_eq!(br.body, br_sidecar);
+
+    let gz = request(addr, "GET", "/assets/app.js", &[("accept-encoding", "br;q=0, gzip")]).await;
+    assert_eq!(gz.status, 200);
+    assert_eq!(gz.header("content-encoding"), "gzip");
+    assert_eq!(gz.header("content-type"), "text/javascript; charset=utf-8");
+    assert_eq!(gz.header("vary"), "accept-encoding");
+    assert_eq!(gz.body, gz_sidecar);
+
+    let plain = get(addr, "/assets/app.js").await;
+    assert_eq!(plain.status, 200);
+    assert_eq!(plain.header("content-encoding"), "");
+    assert_eq!(plain.header("vary"), "accept-encoding");
+    assert_eq!(plain.text(), raw);
+
+    let fallback = request(addr, "GET", "/assets/fallback.js", &[("accept-encoding", "br")]).await;
+    assert_eq!(fallback.status, 200);
+    assert_eq!(fallback.header("content-encoding"), "br");
+    let mut decoded = String::new();
+    brotli::Decompressor::new(&fallback.body[..], 4096).read_to_string(&mut decoded).unwrap();
+    assert_eq!(decoded, raw);
+}

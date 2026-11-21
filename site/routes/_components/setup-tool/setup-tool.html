@@ -4,10 +4,10 @@
   function stepsFor(description) {
     const app = description.replace(/[.\s]+$/, '')
     return [
-      '1. Install pragma (needs Rust and Cargo; Node 22+ only runs .server.js files):',
-      '   git clone https://github.com/leonavas/pragma',
-      '   cd pragma',
-      '   cargo install --path core/cli/crates/pragma-cli',
+      '1. Install pragma (Linux x64 binary; or build from source with Cargo):',
+      '   curl -fsSL ' + location.origin + '/install.sh | sh',
+      '   # binary: ' + location.origin + '/downloads/pragma-linux-x64.tar.gz',
+      '   # source: git clone https://github.com/leonavas/pragma && cd pragma && cargo install --path core/cli/crates/pragma-cli',
       '',
       '2. Create and run the app:',
       '   pragma new my-app',

@@ -48,6 +48,31 @@ function syncHead(doc) {
   for (const el of next) document.head.insertBefore(document.importNode(el, true), at)
 }
 
+function loadRouteCss(href) {
+  const target = new URL(href, location.href).href
+  const existing = [...document.head.querySelectorAll('link[rel=stylesheet][data-pragma-route-css]')].find(el => el.href === target)
+  if (existing) return { el: existing, created: false, ready: Promise.resolve() }
+  const el = document.createElement('link')
+  el.rel = 'stylesheet'
+  el.href = href
+  el.setAttribute('data-pragma-route-css', '')
+  const ready = new Promise(resolve => {
+    el.onload = resolve
+    el.onerror = resolve
+  })
+  const sheets = document.head.querySelectorAll('link[rel=stylesheet]')
+  const last = sheets[sheets.length - 1]
+  if (last) last.after(el)
+  else document.head.append(el)
+  return { el, created: true, ready }
+}
+
+function syncRouteCss(keep) {
+  for (const el of document.head.querySelectorAll('link[rel=stylesheet][data-pragma-route-css]')) {
+    if (el !== keep) el.remove()
+  }
+}
+
 const link = el => {
   const a = el?.closest?.('a[href]')
   return a && !a.target && !a.hasAttribute('download') && !a.hasAttribute('data-reload') && a.origin === location.origin ? a : null
@@ -94,7 +119,7 @@ function observe() {
 export async function navigate(to, pop) {
   const url = new URL(to, location.href), n = ++seq, t0 = performance.now()
   newTrace()
-  let e, doc, route, mods, pending
+  let e, doc, route, mods, pending, css
   try {
     e = await entry(url)
     if (e) {
@@ -103,14 +128,23 @@ export async function navigate(to, pop) {
       for (const m of e.modules ?? []) import(m).catch(noop)
       doc = new DOMParser().parseFromString(await (e.ssr ? fetch(url, { headers: traceHeaders() }).then(r => r.text()) : text(e.html)), 'text/html')
       route = JSON.parse(doc.getElementById('pragma-route').textContent)
+      const nextCss = doc.head.querySelector('link[rel=stylesheet][data-pragma-route-css]')?.getAttribute('href')
+      if (nextCss) css = loadRouteCss(nextCss)
       mods = await importRoute(route)
+      if (css) await css.ready
     }
   } catch (err) {
     log.error('navigation failed', { 'url.path': url.pathname, 'error.message': err.message })
     e = null
   }
-  if (n !== seq) return
-  if (!e) return pop ? location.reload() : location.assign(url)
+  if (n !== seq) {
+    if (css?.created) css.el.remove()
+    return
+  }
+  if (!e) {
+    if (css?.created) css.el.remove()
+    return pop ? location.reload() : location.assign(url)
+  }
 
   positions.set(key, scrollY)
   const stacked = overlay?.closeAll() ?? 0
@@ -124,6 +158,7 @@ export async function navigate(to, pop) {
     main.replaceChildren(...next.childNodes)
     main.dataset.page = next.dataset.page
     syncHead(doc)
+    syncRouteCss(css?.el ?? null)
     const done = enter(route, mods, url, match(route.pattern, url.pathname) ?? {}, doc, pending)
     const y = pop ? positions.get(key) ?? 0 : 0
     if (!pop && url.hash) document.getElementById(decodeURIComponent(url.hash.slice(1)))?.scrollIntoView()

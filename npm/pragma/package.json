@@ -1,0 +1,35 @@
+{
+  "name": "pragma",
+  "version": "0.1.0",
+  "description": "Agent-first web framework CLI in Rust",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/leonavas/pragma.git",
+    "directory": "npm/pragma"
+  },
+  "homepage": "https://github.com/leonavas/pragma",
+  "bugs": {
+    "url": "https://github.com/leonavas/pragma/issues"
+  },
+  "bin": {
+    "pragma": "bin/pragma.js"
+  },
+  "files": [
+    "bin/"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "optionalDependencies": {
+    "@pragma-web/cli-linux-x64": "0.1.0",
+    "@pragma-web/cli-linux-arm64": "0.1.0",
+    "@pragma-web/cli-darwin-arm64": "0.1.0",
+    "@pragma-web/cli-darwin-x64": "0.1.0",
+    "@pragma-web/cli-win32-x64": "0.1.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

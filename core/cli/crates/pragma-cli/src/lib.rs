@@ -13,7 +13,7 @@ use std::time::Instant;
 const HELP: &str = "pragma — HTML, CSS and JS without a framework
 
 usage:
-  pragma new <dir>                              create an app in <dir> (empty or missing)
+  pragma new <dir>                              create an app in <dir> (warns and keeps existing files if not empty)
   pragma dev [--port 5180] [--host 127.0.0.1]   dev server with live reload
   pragma build [--allow-outdated-core]          build dist/ for production (stops if core/ is outdated)
   pragma check [--strict]                       check HTML, CSS, JS and budgets (--strict: warnings become errors)
@@ -119,8 +119,16 @@ fn cmd_new(args: &[String]) -> Result<i32, String> {
     let [dir] = args.positional.as_slice() else {
         return Err("usage: pragma new <dir>".into());
     };
-    let count = new::create(Path::new(dir))?;
-    println!("app created in {dir} ({count} files)\n\n  cd {dir}\n  pragma dev");
+    let created = new::create(Path::new(dir))?;
+    if created.non_empty {
+        let kept = if created.skipped > 0 { format!(" ({} kept)", created.skipped) } else { String::new() };
+        eprintln!("{} directory '{dir}' is not empty; existing files were not overwritten{kept}", report::paint("33", "warning:"));
+    }
+    if dir == "." {
+        println!("app created in {dir} ({} files)\n\n  pragma dev", created.written);
+    } else {
+        println!("app created in {dir} ({} files)\n\n  cd {dir}\n  pragma dev", created.written);
+    }
     Ok(0)
 }
 

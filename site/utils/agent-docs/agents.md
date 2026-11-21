@@ -14,16 +14,19 @@ Read {{origin}}/llms-full.txt and create a pragma app that [describe your app]. 
 
 ## Install and create
 
-One Rust binary. Building it needs Cargo; Node 22 or newer only runs `.server.js` files.
+One Rust binary. Linux x64 binary: [pragma-linux-x64.tar.gz]({{origin}}/downloads/pragma-linux-x64.tar.gz). Node 22 or newer only runs `.server.js` files.
 
 ```sh
-git clone https://github.com/leonavas/pragma
-cd pragma
-cargo install --path core/cli/crates/pragma-cli
-cd ..
+curl -fsSL {{origin}}/install.sh | sh
 pragma new my-app
 cd my-app
 pragma dev
+```
+
+Or build from source with Cargo:
+
+```sh
+git clone https://github.com/leonavas/pragma && cd pragma && cargo install --path core/cli/crates/pragma-cli
 ```
 
 ## Files for agents

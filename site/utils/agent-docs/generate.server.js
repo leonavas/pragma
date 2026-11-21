@@ -1,6 +1,6 @@
 import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises'
 
-const siteOrigin = 'https://pragma.dev'
+const siteOrigin = 'https://pragma.leonavas.workers.dev'
 const siteRoot = new URL('../../', import.meta.url)
 const coreRoot = new URL('../../../core/', import.meta.url)
 const templates = new URL('./', import.meta.url)
@@ -115,7 +115,34 @@ async function writePublic(path, content) {
   process.stdout.write('public/' + path + '  ' + (Buffer.byteLength(content) / 1000).toFixed(1) + ' kB\n')
 }
 
+const sourceExtensions = /\.(?:html|js|css|json|xml|txt)$/
+
+async function collectSources(relativeDir, out) {
+  const entries = await readdir(new URL(relativeDir + '/', siteRoot), { withFileTypes: true })
+  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    const path = relativeDir + '/' + entry.name
+    if (entry.isDirectory()) {
+      await collectSources(path, out)
+    } else if (sourceExtensions.test(entry.name)) {
+      out[path] = await readText(new URL(path, siteRoot))
+    }
+  }
+}
+
+async function generateSources() {
+  const out = {}
+  await collectSources('routes', out)
+  await collectSources('lib', out)
+  for (const path of ['pragma.json', 'package.json', 'public/robots.txt', 'public/sitemap.xml']) {
+    out[path] = await readText(new URL(path, siteRoot))
+  }
+  const code = JSON.stringify(out) + '\n'
+  await writeFile(new URL('utils/sources.json', siteRoot), code)
+  process.stdout.write('utils/sources.json  ' + (Buffer.byteLength(code) / 1000).toFixed(1) + ' kB\n')
+}
+
 async function generate() {
+  await generateSources()
   const loaded = await loadTopics()
   for (const topic of loaded) await writePublic('docs/' + topic.id + '.md', topic.markdown + '\n')
   await writePublic('llms.txt', await fill(await readText(new URL('llms.md', templates)), loaded))

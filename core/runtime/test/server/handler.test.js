@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { compileRoutes, createHandler, matchRoute } from '../../server/handler.js'
+import { compileRoutes, createHandler, earlyHints, matchRoute, prefersMarkdown } from '../../server/handler.js'
 
 const SHELL = `<!doctype html>
 <html lang="en">
@@ -168,7 +168,7 @@ test('SSR with load error: 500, shell intact and pragma-data with error', async 
 test('everything else goes to env.ASSETS', async (t) => {
   capture(t)
   const seen = []
-  const env = { ASSETS: { fetch: (req) => (seen.push(new URL(req.url).pathname), new Response('static')) } }
+  const env = { ASSETS: { fetch: (req) => (req.method !== 'HEAD' && seen.push(new URL(req.url).pathname), new Response('static')) } }
   for (const p of ['/', '/shop/42', '/assets/app.css']) {
     assert.equal(await (await handler.fetch(new Request('http://x' + p), env)).text(), 'static')
   }
@@ -271,4 +271,195 @@ test('OTLP export failure falls back to stdout', async (t) => {
   assert.equal(res.status, 204)
   assert.equal(lines[0].severityText, 'WARN')
   assert.equal(lines[1].body, 'broke')
+})
+
+test('prefersMarkdown compares q values for text/markdown and text/html', () => {
+  assert.equal(prefersMarkdown('text/markdown'), true)
+  assert.equal(prefersMarkdown('text/markdown, text/html'), true)
+  assert.equal(prefersMarkdown('text/markdown;q=0.9, text/html;q=0.9'), true)
+  assert.equal(prefersMarkdown('text/html, text/markdown;q=0.5'), false)
+  assert.equal(prefersMarkdown('text/html, */*'), false)
+  assert.equal(prefersMarkdown(''), false)
+})
+
+test('handler serves markdown for Accept: text/markdown with Vary: Accept', async () => {
+  const files = {
+    '/': { body: '<h1>Home</h1>', type: 'text/html; charset=utf-8' },
+    '/index.md': { body: '# Home\n', type: 'text/plain' },
+    '/about': { body: '<h1>About</h1>', type: 'text/html; charset=utf-8' },
+    '/about.md': { body: '# About\n', type: 'text/plain' },
+    '/plain': { body: '<h1>Plain</h1>', type: 'text/html; charset=utf-8' },
+  }
+  const env = {
+    ASSETS: {
+      async fetch(req) {
+        const { pathname } = new URL(req.url)
+        const f = files[pathname]
+        if (!f) return new Response('Not found', { status: 404 })
+        return new Response(req.method === 'HEAD' ? null : f.body, {
+          status: 200,
+          headers: { 'content-type': f.type },
+        })
+      },
+    },
+  }
+  const h = createHandler({ routes: [], service: 'web' })
+
+  const md = await h.fetch(new Request('http://x/', { headers: { accept: 'text/markdown, text/html' } }), env)
+  assert.equal(md.status, 200)
+  assert.equal(md.headers.get('content-type'), 'text/markdown; charset=utf-8')
+  assert.match(md.headers.get('vary') ?? '', /accept/i)
+  assert.equal(await md.text(), '# Home\n')
+
+  const html = await h.fetch(new Request('http://x/about', { headers: { accept: 'text/html, text/markdown;q=0.5' } }), env)
+  assert.equal(html.status, 200)
+  assert.equal(html.headers.get('content-type'), 'text/html; charset=utf-8')
+  assert.match(html.headers.get('vary') ?? '', /accept/i)
+  assert.equal(await html.text(), '<h1>About</h1>')
+
+  const direct = await h.fetch(new Request('http://x/about.md'), env)
+  assert.equal(direct.status, 200)
+  assert.equal(direct.headers.get('content-type'), 'text/markdown; charset=utf-8')
+  assert.equal(await direct.text(), '# About\n')
+
+  const plain = await h.fetch(new Request('http://x/plain', { headers: { accept: 'text/markdown' } }), env)
+  assert.equal(plain.status, 200)
+  assert.equal(plain.headers.get('content-type'), 'text/html; charset=utf-8')
+  assert.equal(plain.headers.get('vary'), null)
+})
+
+test('SSR 200 emits Link preload/modulepreload headers for Early Hints without duplicates', async (t) => {
+  capture(t)
+  const shell = `<!doctype html>
+<html>
+<head>
+  <link rel="stylesheet" href="/assets/app.css">
+  <link href="/assets/theme.css" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/app.css">
+  <link rel="modulepreload" href="/assets/app.js" crossorigin>
+  <link rel="icon" href="/favicon.ico">
+</head>
+<body><main data-page></main></body>
+</html>`
+  const h = createHandler({
+    routes: [
+      {
+        pattern: '/post/:id',
+        server: {
+          load({ params }) {
+            if (params.id === 'err') throw new Error('boom')
+            return { title: 'ok' }
+          },
+        },
+        ssr: true,
+        template: [['html', '<h1>ok</h1>']],
+        shell,
+      },
+    ],
+    service: 'web',
+  })
+
+  const ok = await h.fetch(new Request('http://x/post/1'), {})
+  assert.equal(ok.status, 200)
+  assert.equal(
+    ok.headers.get('link'),
+    '</assets/app.css>; rel=preload; as=style, </assets/theme.css>; rel=preload; as=style, </assets/app.js>; rel=modulepreload',
+  )
+
+  const head = await h.fetch(new Request('http://x/post/1', { method: 'HEAD' }), {})
+  assert.equal(head.status, 200)
+  assert.equal(head.headers.get('link'), ok.headers.get('link'))
+
+  const err = await h.fetch(new Request('http://x/post/err'), {})
+  assert.equal(err.status, 500)
+  assert.equal(err.headers.get('link'), null)
+
+  const noLinks = await get('/blog/hello')
+  assert.equal(noLinks.status, 200)
+  assert.equal(noLinks.headers.get('link'), null)
+
+  assert.equal(earlyHints('<link rel="stylesheet" href="/a.css"><link rel="modulepreload" href="/b.js">'), '</a.css>; rel=preload; as=style, </b.js>; rel=modulepreload')
+})
+
+test('platform helpers db, kv, files are passed to load and actions and undefined when absent', async (t) => {
+  capture(t)
+  const queries = []
+  const d1 = {
+    prepare(sql) {
+      const make = (args) => ({
+        bind: (...next) => make(next),
+        first: async () => (queries.push({ op: 'first', sql, args }), { id: args[0] ?? 1 }),
+        all: async () => (queries.push({ op: 'all', sql, args }), { results: [{ id: 1 }, { id: 2 }] }),
+        run: async () => (queries.push({ op: 'run', sql, args }), { success: true }),
+      })
+      return make([])
+    },
+  }
+  const kvStore = new Map()
+  const kvBinding = {
+    get: async (k) => kvStore.get(k) ?? null,
+    put: async (k, v) => { kvStore.set(k, v) },
+    delete: async (k) => { kvStore.delete(k) },
+  }
+  const fileStore = new Map()
+  const r2Binding = {
+    get: async (k) => fileStore.get(k) ?? null,
+    put: async (k, v) => { fileStore.set(k, v) },
+    delete: async (k) => { fileStore.delete(k) },
+  }
+
+  const h = createHandler({
+    routes: [
+      {
+        pattern: '/items/:id',
+        server: {
+          async load({ params, env, db, kv, files }) {
+            if (!db && !kv && !files) return { present: false, hasEnv: Boolean(env) }
+            const row = await db.get('SELECT * FROM items WHERE id = ?', params.id)
+            const rows = await db.all('SELECT * FROM items')
+            await kv.put('last', params.id)
+            const last = await kv.get('last')
+            await files.put('note.txt', 'hello')
+            const file = await files.get('note.txt')
+            return { present: true, row, rows, last, file }
+          },
+          actions: {
+            async save({ input, db, kv, files }) {
+              if (!db && !kv && !files) return { present: false }
+              const res = await db.run('INSERT INTO items VALUES (?)', input.name)
+              await kv.delete('last')
+              await files.delete('note.txt')
+              return { present: true, success: res.success, last: await kv.get('last'), file: await files.get('note.txt') }
+            },
+          },
+        },
+        ssr: true,
+        template: [['html', '<p>ok</p>']],
+        shell: SHELL,
+      },
+    ],
+    service: 'web',
+  })
+
+  // Absent bindings -> db, kv, files are undefined
+  const absentData = await (await h.fetch(new Request('http://x/_data/items/1'), {})).json()
+  assert.deepEqual(absentData, { data: { present: false, hasEnv: true } })
+  const absentAction = await (await h.fetch(new Request('http://x/_action/items/1/save', { method: 'POST', body: '{}' }), {})).json()
+  assert.deepEqual(absentAction, { present: false })
+
+  // Present bindings (using BUCKET alias for files)
+  const env = { DB: d1, KV: kvBinding, BUCKET: r2Binding }
+  const dataRes = await (await h.fetch(new Request('http://x/_data/items/42'), env)).json()
+  assert.deepEqual(dataRes, {
+    data: { present: true, row: { id: '42' }, rows: [{ id: 1 }, { id: 2 }], last: '42', file: 'hello' },
+  })
+  const actionRes = await (await h.fetch(new Request('http://x/_action/items/42/save', { method: 'POST', body: JSON.stringify({ name: 'x' }) }), env)).json()
+  assert.deepEqual(actionRes, { present: true, success: true, last: null, file: null })
+
+  // SSR load also receives db, kv, files
+  const ssrRes = await h.fetch(new Request('http://x/items/9'), { DB: d1, KV: kvBinding, FILES: r2Binding })
+  assert.equal(ssrRes.status, 200)
+  const ssrHtml = await ssrRes.text()
+  assert.ok(ssrHtml.includes('"last":"9"'))
+  assert.ok(queries.some((q) => q.op === 'run' && q.args[0] === 'x'))
 })

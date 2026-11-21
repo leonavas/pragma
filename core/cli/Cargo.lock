@@ -2090,6 +2090,8 @@ dependencies = [
 name = "pragma-compiler"
 version = "0.1.0"
 dependencies = [
+ "brotli",
+ "flate2",
  "miniz_oxide 0.8.9",
  "oxc_resolver",
  "pragma-css",

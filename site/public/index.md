@@ -1,16 +1,16 @@
 # The web framework for agents, with rules they can't bend.
 
-Agents: the full docs are one file at https://pragma.dev/llms-full.txt (index: https://pragma.dev/llms.txt). This page in HTML: https://pragma.dev/. For agents: https://pragma.dev/agents.md.
+Agents: the full docs are one file at https://pragma.leonavas.workers.dev/llms-full.txt (index: https://pragma.leonavas.workers.dev/llms.txt). This page in HTML: https://pragma.leonavas.workers.dev/. For agents: https://pragma.leonavas.workers.dev/agents.md.
 
 Send your agent this page. It reads the docs and writes native HTML, CSS and JavaScript. A Rust CLI rejects anything off-spec with the file, the line and the fix. Pages ship prebuilt, with only the JavaScript they use, and every form is a tool an agent can call.
 
-- [Hand it to your agent](https://pragma.dev/agents.md)
-- [Read the examples](https://pragma.dev/examples)
+- [Hand it to your agent](https://pragma.leonavas.workers.dev/agents.md)
+- [Read the examples](https://pragma.leonavas.workers.dev/examples)
 - [Install](#install)
 
 ## This framework is for agents. If you're still reading this instead of asking your agent to try it, it's not for you yet. Come back in 6 months.
 
-[Hand it to your agent](https://pragma.dev/agents.md)
+[Hand it to your agent](https://pragma.leonavas.workers.dev/agents.md)
 
 ## Nobody argues about frameworks anymore. The agent picks one.
 
@@ -160,7 +160,7 @@ routes/index.html:8:4 error [html/unknown-name]
 
 ## Tools for agents on this page
 
-An agent in the browser sees these forms as WebMCP tools and calls them. You can use the same forms. Agents without a browser read the same docs at https://pragma.dev/llms-full.txt.
+An agent in the browser sees these forms as WebMCP tools and calls them. You can use the same forms. Agents without a browser read the same docs at https://pragma.leonavas.workers.dev/llms-full.txt.
 
 - `get_setup_instructions`: Get the commands to install pragma and create an app, plus a prompt for a coding agent, for a short app description
   - `app`: What the app does, in one sentence, written to follow 'create a pragma app that'
@@ -169,33 +169,41 @@ An agent in the browser sees these forms as WebMCP tools and calls them. You can
 - `add_task`: Add a task to the demo to-do list on the pragma landing page
   - `title`: Title of the task, up to 48 characters
 
-[Everything for agents](https://pragma.dev/agents.md)
+[Everything for agents](https://pragma.leonavas.workers.dev/agents.md)
 
 ## Install
 
-One Rust binary compiles, checks, serves and bundles npm packages: no Vite, no esbuild, no config. Building it needs Cargo; Node 22 or newer only runs your `.server.js` files.
+One Rust binary compiles, checks, serves and bundles npm packages: no Vite, no esbuild, no config. Node 22 or newer only runs your `.server.js` files.
+
+Linux x64: run the one-line installer or download [pragma-linux-x64.tar.gz](https://pragma.leonavas.workers.dev/downloads/pragma-linux-x64.tar.gz).
+
+```sh
+curl -fsSL https://pragma.leonavas.workers.dev/install.sh | sh
+pragma -V
+```
+
+From source (any platform with Cargo):
 
 ```sh
 git clone https://github.com/leonavas/pragma
 cd pragma
 cargo install --path core/cli/crates/pragma-cli
-pragma -V
 ```
 
-Then `pragma new my-app`, `cd my-app` and `pragma dev`. [Start with the guide](https://pragma.dev/guide).
+Then `pragma new my-app`, `cd my-app` and `pragma dev`. [Start with the guide](https://pragma.leonavas.workers.dev/guide).
 
 ## Every feature, running on this page's runtime
 
-Each example shows its real source files next to the live result. The code you read is the code that renders. [Browse all examples](https://pragma.dev/examples).
+Each example shows its real source files next to the live result. The code you read is the code that renders. [Browse all examples](https://pragma.leonavas.workers.dev/examples).
 
-- [Syntax](https://pragma.dev/examples/syntax): {path}, bindings, events, blocks
-- [Components](https://pragma.dev/examples/components): one file, props, slots
-- [State and actions](https://pragma.dev/examples/state): let, functions, mount, services
-- [Stores](https://pragma.dev/examples/stores): shared and persisted state
-- [Routing](https://pragma.dev/examples/routing): files as routes, params, query, prefetch
-- [Data and SSR](https://pragma.dev/examples/data): load, server actions, skeletons
-- [Overlays](https://pragma.dev/examples/overlays): modal, alert, dropdown, Back button
-- [Styling](https://pragma.dev/examples/styling): utilities, theme tokens, component CSS
-- [npm packages](https://pragma.dev/examples/packages): tree-shaken per package
-- [Logs](https://pragma.dev/examples/logs): OpenTelemetry, client and server
-- [SEO and head](https://pragma.dev/examples/seo): title, meta, Open Graph
+- [Syntax](https://pragma.leonavas.workers.dev/examples/syntax): {path}, bindings, events, blocks
+- [Components](https://pragma.leonavas.workers.dev/examples/components): one file, props, slots
+- [State and actions](https://pragma.leonavas.workers.dev/examples/state): let, functions, mount, services
+- [Stores](https://pragma.leonavas.workers.dev/examples/stores): shared and persisted state
+- [Routing](https://pragma.leonavas.workers.dev/examples/routing): files as routes, params, query, prefetch
+- [Data and SSR](https://pragma.leonavas.workers.dev/examples/data): load, server actions, skeletons
+- [Overlays](https://pragma.leonavas.workers.dev/examples/overlays): modal, alert, dropdown, Back button
+- [Styling](https://pragma.leonavas.workers.dev/examples/styling): utilities, theme tokens, component CSS
+- [npm packages](https://pragma.leonavas.workers.dev/examples/packages): tree-shaken per package
+- [Logs](https://pragma.leonavas.workers.dev/examples/logs): OpenTelemetry, client and server
+- [SEO and head](https://pragma.leonavas.workers.dev/examples/seo): title, meta, Open Graph

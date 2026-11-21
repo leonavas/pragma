@@ -4,27 +4,45 @@ mod embedded {
     include!(concat!(env!("OUT_DIR"), "/embedded.rs"));
 }
 
-/// Creates the app in `dir`; returns how many files were written.
-pub fn create(dir: &Path) -> Result<usize, String> {
+pub struct Created {
+    pub written: usize,
+    pub skipped: usize,
+    pub non_empty: bool,
+}
+
+/// Creates the app in `dir`; keeps existing files when `dir` is not empty.
+pub fn create(dir: &Path) -> Result<Created, String> {
+    let mut non_empty = false;
     if dir.exists() {
         let mut entries = std::fs::read_dir(dir).map_err(|_| format!("'{}' exists and is not a directory", dir.display()))?;
-        if entries.next().is_some() {
-            return Err(format!("directory '{}' is not empty", dir.display()));
-        }
+        non_empty = entries.next().is_some();
     }
     let name = std::path::absolute(dir)
         .ok()
         .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
         .unwrap_or_else(|| "app".into());
+    let (mut written, mut skipped) = (0, 0);
     for (rel, bytes) in embedded::STARTER {
+        let target = dir.join(rel);
+        if target.exists() {
+            skipped += 1;
+            continue;
+        }
         let content = if *rel == "pragma.json" { rename(bytes, &name) } else { bytes.to_vec() };
-        write(&dir.join(rel), &content)?;
+        write(&target, &content)?;
+        written += 1;
     }
     let core = core_files();
     for (rel, content) in &core {
-        write(&dir.join(rel), content)?;
+        let target = dir.join(rel);
+        if target.exists() {
+            skipped += 1;
+            continue;
+        }
+        write(&target, content)?;
+        written += 1;
     }
-    Ok(embedded::STARTER.len() + core.len())
+    Ok(Created { written, skipped, non_empty })
 }
 
 /// Everything this binary writes under `core/`: (path relative to the app, content).

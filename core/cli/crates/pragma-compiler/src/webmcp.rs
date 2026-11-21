@@ -140,8 +140,8 @@ impl Tools<'_> {
         let named = has(e, "toolname");
         let described = has(e, "tooldescription");
         if has(e, "notool") {
-            if named {
-                self.error(e.pos, "webmcp/notool", "<form> has both notool and toolname: remove notool to keep the tool, or remove the tool attributes to opt out");
+            if named || described || has(e, "toolautosubmit") {
+                self.error(e.pos, "webmcp/notool", "<form> has both notool and tool attributes: remove notool to keep the tool, or remove the tool attributes to opt out");
             }
             return false;
         }

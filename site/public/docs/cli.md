@@ -2,7 +2,7 @@
 
 | Command | Does |
 |---|---|
-| `pragma new <dir>` | creates an app with the fixed structure |
+| `pragma new <dir>` | creates an app with the fixed structure (warns and keeps existing files if `<dir>` is not empty) |
 | `pragma dev [--port 5180] [--host 127.0.0.1]` | dev server with live reload over a WebSocket (any number of tabs); a build error shows an overlay, and pages without errors keep working, `load` included (starts Node ≥ 22 when there is a `.server.js`); prints `app/core-outdated` first when `core/` is older than this `pragma` |
 | `pragma check [--strict]` | checks JS, HTML, CSS, budgets, accessibility and WebMCP tools; `--strict` turns warnings into errors |
 | `pragma build [--allow-outdated-core]` | writes `dist/`; stops with `app/core-outdated` when `core/` is older than this `pragma` (run `pragma upgrade`; `--allow-outdated-core` builds anyway) |

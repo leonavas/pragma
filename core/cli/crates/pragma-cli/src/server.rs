@@ -285,6 +285,29 @@ async fn file_response(site: &Site, rel: &str, status: StatusCode, headers: &Hea
     {
         return not_modified(cache_control, tag);
     }
+    if site.mode == Mode::Serve && !is_sidecar(rel) {
+        let accept = headers.get(header::ACCEPT_ENCODING).and_then(|v| v.to_str().ok()).unwrap_or("");
+        let mut encoded = None;
+        if accepts(accept, "br")
+            && let Ok(bytes) = tokio::fs::read(sidecar_path(&full, "br")).await
+        {
+            encoded = Some((bytes, "br"));
+        } else if accepts(accept, "gzip")
+            && let Ok(bytes) = tokio::fs::read(sidecar_path(&full, "gz")).await
+        {
+            encoded = Some((bytes, "gzip"));
+        }
+        if let Some((bytes, encoding)) = encoded {
+            let mut res = response(status, mime, cache_control, Bytes::from(bytes));
+            let h = res.headers_mut();
+            if let Some(tag) = etag {
+                h.insert(header::ETAG, HeaderValue::from_str(&tag).unwrap());
+            }
+            h.insert(header::VARY, HeaderValue::from_static("accept-encoding"));
+            h.insert(header::CONTENT_ENCODING, HeaderValue::from_static(encoding));
+            return res;
+        }
+    }
     let body = match tokio::fs::read(&full).await {
         Ok(body) => body,
         Err(_) if rel == "_404.html" => {
@@ -438,14 +461,35 @@ fn compressible(path: &str) -> bool {
     mime.starts_with("text/") || mime.contains("json") || mime.contains("xml") || mime == "application/wasm"
 }
 
+fn is_sidecar(rel: &str) -> bool {
+    rel.ends_with(".br") || rel.ends_with(".gz")
+}
+
+fn sidecar_path(path: &Path, ext: &str) -> PathBuf {
+    let mut os = path.as_os_str().to_os_string();
+    os.push(".");
+    os.push(ext);
+    PathBuf::from(os)
+}
+
+fn has_sidecar(root: &Path, rel: &str) -> bool {
+    let path = root.join(rel);
+    sidecar_path(&path, "br").is_file() || sidecar_path(&path, "gz").is_file()
+}
+
+fn read_sidecar(path: &Path, ext: &str) -> Option<Bytes> {
+    std::fs::read(sidecar_path(path, ext)).ok().map(Bytes::from)
+}
+
 // `serve` runs on an immutable dist: compressing once at startup, at max quality and in parallel,
 // keeps CPU off the request path and avoids cache/locks; larger files are served from disk.
+// Precompressed `.br` / `.gz` sidecars on disk are loaded directly without recompressing.
 const MAX_CACHED: u64 = 8 * 1024 * 1024;
 
 fn precompress(root: &Path) -> HashMap<String, Cached> {
     let mut files = Vec::new();
     walk(root, root, &mut files);
-    files.retain(|(rel, meta)| compressible(rel) && meta.len() <= MAX_CACHED);
+    files.retain(|(rel, meta)| !is_sidecar(rel) && meta.len() <= MAX_CACHED && (compressible(rel) || has_sidecar(root, rel)));
     let queue = Mutex::new(files);
     let out = Mutex::new(HashMap::new());
     let workers = std::thread::available_parallelism().map_or(4, |n| n.get());
@@ -454,8 +498,11 @@ fn precompress(root: &Path) -> HashMap<String, Cached> {
             s.spawn(|| {
                 loop {
                     let Some((rel, meta)) = queue.lock().unwrap().pop() else { return };
-                    let Ok(body) = std::fs::read(root.join(&rel)) else { continue };
-                    let (gzip, brotli) = if body.len() >= 256 { (gzip(&body), brotli(&body)) } else { (None, None) };
+                    let path = root.join(&rel);
+                    let Ok(body) = std::fs::read(&path) else { continue };
+                    let can_compress = compressible(&rel) && body.len() >= 256;
+                    let gzip = read_sidecar(&path, "gz").or_else(|| can_compress.then(|| gzip(&body)).flatten());
+                    let brotli = read_sidecar(&path, "br").or_else(|| can_compress.then(|| brotli(&body)).flatten());
                     let cached = Cached { body: Bytes::from(body), gzip, brotli, etag: etag(&meta) };
                     out.lock().unwrap().insert(rel, cached);
                 }

@@ -1,8 +1,8 @@
 <title>pragma for agents: the prompt, the docs and the tools</title>
 <meta name="description" content="Everything an agent needs to build with pragma: a prompt to copy, the docs as markdown and llms.txt, and the WebMCP tools of this site.">
-<link rel="canonical" href="https://pragma.dev/agents">
+<link rel="canonical" href="https://pragma.leonavas.workers.dev/agents">
 <link rel="alternate" type="text/markdown" href="/agents.md">
-<meta property="og:url" content="https://pragma.dev/agents">
+<meta property="og:url" content="https://pragma.leonavas.workers.dev/agents">
 <meta property="og:title" content="pragma for agents: the prompt, the docs and the tools">
 <meta property="og:description" content="Send your agent one URL: the docs as markdown, llms.txt and WebMCP tools.">
 
@@ -23,21 +23,18 @@
     <div class="prose">
       <p>Replace the brackets with your app. The agent reads the docs, installs pragma, creates the app and runs <code>pragma check --strict</code> until it passes.</p>
     </div>
-    <c-terminal title="prompt" copy="Read https://pragma.dev/llms-full.txt and create a pragma app that [describe your app]. Install pragma first if the pragma command is missing. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.">
-      <pre class="whitespace-pre-wrap" tabindex="0" aria-label="Prompt for a coding agent"><code>Read https://pragma.dev/llms-full.txt and create a pragma app that <span class="term-ok">[describe your app]</span>. Install pragma first if the pragma command is missing. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.</code></pre>
+    <c-terminal title="prompt" copy="Read https://pragma.leonavas.workers.dev/llms-full.txt and create a pragma app that [describe your app]. Install pragma first if the pragma command is missing. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.">
+      <pre class="whitespace-pre-wrap" tabindex="0" aria-label="Prompt for a coding agent"><code>Read https://pragma.leonavas.workers.dev/llms-full.txt and create a pragma app that <span class="term-ok">[describe your app]</span>. Install pragma first if the pragma command is missing. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.</code></pre>
     </c-terminal>
   </section>
 
   <section class="doc-section max-w-3xl" aria-labelledby="install">
     <h2 id="install">Install and create</h2>
     <div class="prose">
-      <p>One Rust binary. Building it needs Cargo; Node 22 or newer only runs <code>.server.js</code> files.</p>
+      <p>One Rust binary. On Linux x64, run the installer or <a href="/downloads/pragma-linux-x64.tar.gz" data-reload download>download the binary (.tar.gz)</a>. On other platforms, build from source with Cargo. Node 22 or newer only runs <code>.server.js</code> files.</p>
     </div>
-    <c-terminal title="~" copy="git clone https://github.com/leonavas/pragma && cd pragma && cargo install --path core/cli/crates/pragma-cli && cd .. && pragma new my-app && cd my-app && pragma dev">
-      <pre tabindex="0" aria-label="Commands that install pragma and create an app"><code><span class="term-cmd">git clone https://github.com/leonavas/pragma</span>
-<span class="term-cmd">cd pragma</span>
-<span class="term-cmd">cargo install --path core/cli/crates/pragma-cli</span>
-<span class="term-cmd">cd ..</span>
+    <c-terminal title="~" copy="curl -fsSL https://pragma.leonavas.workers.dev/install.sh | sh && pragma new my-app && cd my-app && pragma dev">
+      <pre tabindex="0" aria-label="Commands that install pragma and create an app"><code><span class="term-cmd">curl -fsSL https://pragma.leonavas.workers.dev/install.sh | sh</span>
 <span class="term-cmd">pragma new my-app</span>
 <span class="term-cmd">cd my-app</span>
 <span class="term-cmd">pragma dev</span></code></pre>

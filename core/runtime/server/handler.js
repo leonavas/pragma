@@ -1,5 +1,6 @@
 import { renderPage, renderHead } from './render.js'
 import { createLogger, flush, fromClient, minSeverity, newSpanId, newTraceId, parseTraceparent, resourceFrom } from './log.js'
+import { createPlatform } from './platform.js'
 
 const OTEL_MAX_BYTES = 256 * 1024
 
@@ -159,12 +160,13 @@ export function createHandler({ routes, service }) {
         min: minSeverity(env),
       })
       const query = Object.fromEntries(url.searchParams)
+      const { db, kv, files } = createPlatform(env)
 
       let res
       try {
-        if (kind === 'data') res = await data(m, { query, request, env, log })
-        else if (kind === 'action') res = await action(m, actionName, { query, request, env, log })
-        else res = await page(m, { query, request, env, log })
+        if (kind === 'data') res = await data(m, { query, request, env, db, kv, files, log })
+        else if (kind === 'action') res = await action(m, actionName, { query, request, env, db, kv, files, log })
+        else res = await page(m, { query, request, env, db, kv, files, log })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
         log.error(message, err)
@@ -187,14 +189,14 @@ export function createHandler({ routes, service }) {
   }
 }
 
-async function data(m, { query, request, env, log }) {
+async function data(m, { query, request, env, db, kv, files, log }) {
   if (request.method !== 'GET' && request.method !== 'HEAD') return fail('Method not allowed', 405)
   const load = m?.route.server?.load
   if (!load) return fail('Route has no data', 404)
-  return json({ data: (await load({ params: m.params, query, request, env, log })) ?? null })
+  return json({ data: (await load({ params: m.params, query, request, env, db, kv, files, log })) ?? null })
 }
 
-async function action(m, name, { query, request, env, log }) {
+async function action(m, name, { query, request, env, db, kv, files, log }) {
   if (request.method !== 'POST') return fail('Method not allowed', 405)
   let decoded
   try {
@@ -215,18 +217,40 @@ async function action(m, name, { query, request, env, log }) {
       return fail('Action body is not valid JSON', 400)
     }
   }
-  const result = await actions[decoded]({ input, params: m.params, query, request, env, log })
+  const result = await actions[decoded]({ input, params: m.params, query, request, env, db, kv, files, log })
   return result instanceof Response ? result : json(result ?? null)
 }
 
-async function page(m, { query, request, env, log }) {
+export function earlyHints(html) {
+  if (!html) return null
+  const seen = new Set()
+  const hints = []
+  for (const match of html.matchAll(/<link\b([^>]*)>/gi)) {
+    const attrs = match[1]
+    const rel = /\brel\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/i.exec(attrs)
+    const href = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/i.exec(attrs)
+    const relVal = (rel?.[1] ?? rel?.[2] ?? rel?.[3] ?? '').trim().toLowerCase()
+    const hrefVal = (href?.[1] ?? href?.[2] ?? href?.[3] ?? '').trim()
+    if (!hrefVal || /[>\r\n]/.test(hrefVal)) continue
+    let hint
+    if (relVal === 'stylesheet') hint = `<${hrefVal}>; rel=preload; as=style`
+    else if (relVal === 'modulepreload') hint = `<${hrefVal}>; rel=modulepreload`
+    else continue
+    if (seen.has(hint)) continue
+    seen.add(hint)
+    hints.push(hint)
+  }
+  return hints.length ? hints.join(', ') : null
+}
+
+async function page(m, { query, request, env, db, kv, files, log }) {
   const { route, params } = m
   let payload
   let body
   let status = 200
   const scope = { data: null, params, query, page: { loading: false, error: null } }
   try {
-    const value = route.server?.load ? await route.server.load({ params, query, request, env, log }) : null
+    const value = route.server?.load ? await route.server.load({ params, query, request, env, db, kv, files, log }) : null
     payload = { data: value ?? null }
     scope.data = payload.data
     body = renderPage(route.template, scope, { page: route.page, components: route.components, log })
@@ -237,10 +261,13 @@ async function page(m, { query, request, env, log }) {
     body = undefined
     status = 500
   }
-  return new Response(request.method === 'HEAD' ? null : shellWith(route.shell, body, payload, scope), {
-    status,
-    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, no-cache' },
-  })
+  const html = shellWith(route.shell, body, payload, scope)
+  const headers = new Headers({ 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, no-cache' })
+  if (status === 200 && !headers.has('link')) {
+    const link = earlyHints(html)
+    if (link) headers.set('link', link)
+  }
+  return new Response(request.method === 'HEAD' ? null : html, { status, headers })
 }
 
 export function shellWith(shell, body, payload, scope) {
