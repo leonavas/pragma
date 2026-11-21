@@ -8,6 +8,8 @@
 | `routes/shop/[id].html` | `/shop/:id` |
 
 - Every `.html` in `routes/` is a route, except names starting with `_`.
+- A `.server.js` without a sibling `.html` is an endpoint that returns a `Response` (`routes/files/[name].server.js` -> `/files/:name`; `data.md`, Endpoints). A page and an endpoint cannot serve the same path (`app/route-conflict`).
+- `routes/_middleware.server.js` runs before every request (`data.md`, Middleware).
 - Having both `x.html` and `x/index.html` is an error (`app/route-conflict`).
 - `[name]` (file or folder) defines a path param. Static segments take priority over params. `[...rest]` is not supported.
 - A page is an HTML fragment without `<html>`, `<head>`, or `<body>`. Top-level `<title>`, `<meta>`, and `<link>` move to `<head>` (see SEO).

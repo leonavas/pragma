@@ -244,6 +244,20 @@ fn module_graph(
             let dir = path.parent().unwrap_or(Path::new(""));
             let pos = lines.pos(&src, imp.start, 0);
             let mut ok = None;
+            if imp.spec == "pragma/server" {
+                let runtime = [".pragma/server/http.js", "core/server/http.js"].into_iter().map(PathBuf::from).find(|f| root.join(f).is_file());
+                match runtime {
+                    _ if client => diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", "'pragma/server' is only for .server.js files; client code gets data from load and calls actions with call()")),
+                    Some(t) => {
+                        queue.push_back(t.clone());
+                        imports.push((imp, Some(t)));
+                        continue;
+                    }
+                    None => diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", "'pragma/server' needs .pragma/server/http.js; run `pragma upgrade`")),
+                }
+                imports.push((imp, None));
+                continue;
+            }
             if imp.spec == "pragma" {
                 // page, component and store scripts lose this import when they become factories
                 diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", "'pragma' is only for page, component and store scripts; pass what a helper needs as arguments"));
@@ -296,6 +310,41 @@ fn module_graph(
         mods.insert(path, Module { src, imports });
     }
     mods
+}
+
+const METHODS: [&str; 7] = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
+
+/// Endpoints export only method handlers; the middleware exports `handle`.
+fn check_endpoints(p: &Project, sources: &HashMap<PathBuf, String>) -> Vec<Diagnostic> {
+    let mut out = Vec::new();
+    for e in &p.endpoints {
+        let Some(src) = sources.get(&e.file) else { continue };
+        let names = pragma_jslint::exported_names(src);
+        let stem = e.file.file_name().map_or(String::new(), |n| n.to_string_lossy().trim_end_matches(".server.js").to_string());
+        for name in &names {
+            if ["load", "actions", "ssr"].contains(&name.as_str()) {
+                out.push(Diagnostic::error(&e.file, 1, 1, "app/endpoint", format!("`{name}` needs a page: add {stem}.html next to this file; an endpoint without a page exports only GET, POST, PUT, PATCH or DELETE")));
+            } else if !METHODS.contains(&name.as_str()) {
+                out.push(Diagnostic::error(&e.file, 1, 1, "app/endpoint", format!("an endpoint exports only HTTP method handlers; move `{name}` to a private helper such as _{stem}.server.js")));
+            }
+        }
+        if !names.iter().any(|n| METHODS.contains(&n.as_str())) {
+            out.push(Diagnostic::error(&e.file, 1, 1, "app/endpoint", format!("no page {stem}.html and no handler: export GET, POST, PUT, PATCH or DELETE returning a Response, or add {stem}.html")));
+        }
+        if let Some(i) = src.find("Response.json(") {
+            let head = &src[..i];
+            let line = head.matches('\n').count() as u32 + 1;
+            let col = (i - head.rfind('\n').map_or(0, |n| n + 1)) as u32 + 1;
+            out.push(Diagnostic::warning(&e.file, line, col, "app/endpoint-json", "endpoint answers JSON: page data comes from load and writes from actions (.pragma/docs/data.md); keep endpoints for files, streams, webhooks and WebSockets"));
+        }
+    }
+    if let Some(m) = &p.middleware
+        && let Some(src) = sources.get(m)
+        && !pragma_jslint::exported_names(src).iter().any(|n| n == "handle")
+    {
+        out.push(Diagnostic::error(m, 1, 1, "app/middleware", "export async function handle({ request, url, cookies, locals, next }) that returns next() or a Response"));
+    }
+    out
 }
 
 fn npm_path(file: &str) -> PathBuf {
@@ -879,7 +928,8 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     }
 
     let has_public_md = p.public_files.iter().any(|f| f.extension().is_some_and(|e| e.eq_ignore_ascii_case("md")));
-    report.has_server = !server_routes.is_empty();
+    diags.extend(check_endpoints(&p, &sources));
+    report.has_server = !server_routes.is_empty() || !p.endpoints.is_empty() || p.middleware.is_some();
     let emit_worker = report.has_server || has_public_md;
     let handler = PathBuf::from(format!("{core_dir}/server/handler.js"));
     // no *.server.js: static-only app, no node in dev/serve (BUG-S-1); still emit Cloudflare worker
@@ -898,13 +948,24 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             entries.push(PathBuf::from(format!("{core_dir}/server/node.mjs")));
         }
         entries.extend(server_routes.iter().map(|r| r.1.clone()));
+        entries.extend(p.endpoints.iter().map(|e| e.file.clone()));
+        entries.extend(p.middleware.clone());
         entries.extend(script_ids.keys().cloned());
         entries.retain(|e| opts.root.join(e).is_file() || sources.contains_key(e));
         let smods = module_graph(&opts.root, &entries, false, &sources, &deps, &mut BTreeMap::new(), &mut diags);
-        for (path, m) in &smods {
+        let server_out = |path: &Path| {
             let rel = rel_str(path);
-            let out_rel = rel.strip_prefix(".pragma/").map_or_else(|| rel.clone(), |rest| format!("core/{rest}"));
-            w.write(&format!("server/{out_rel}"), m.src.as_bytes());
+            rel.strip_prefix(".pragma/").map_or_else(|| rel.clone(), |rest| format!("core/{rest}"))
+        };
+        for (path, m) in &smods {
+            let out_rel = server_out(path);
+            let up = "../".repeat(out_rel.matches('/').count());
+            let to_runtime = |i: &js::Import| {
+                let target = m.imports.iter().find(|(imp, _)| imp.spec == i.spec && i.spec == "pragma/server")?.1.as_ref()?;
+                Some(format!("{}{}", if up.is_empty() { "./" } else { &up }, server_out(target)))
+            };
+            let code = js::rewrite(&m.src, &m.imports.iter().map(|(i, _)| i.clone()).collect::<Vec<_>>(), to_runtime);
+            w.write(&format!("server/{out_rel}"), code.as_bytes());
         }
         let mut worker = String::from("import { createHandler } from './core/server/handler.js'\n");
         for (i, r) in server_routes.iter().enumerate() {
@@ -913,8 +974,18 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         for (m, i) in &script_ids {
             worker.push_str(&format!("import * as m{i} from {}\n", json!(format!("./{}", rel_str(m)))));
         }
+        for (i, e) in p.endpoints.iter().enumerate() {
+            worker.push_str(&format!("import * as e{i} from {}\n", json!(format!("./{}", rel_str(&e.file)))));
+        }
+        if let Some(m) = &p.middleware {
+            worker.push_str(&format!("import {{ handle as middleware }} from {}\n", json!(format!("./{}", rel_str(m)))));
+        }
         worker.push_str("\nexport default createHandler({\n");
-        worker.push_str(&format!("  service: {},\n  routes: [\n", json!(p.config.name)));
+        worker.push_str(&format!("  service: {},\n", json!(p.config.name)));
+        if p.middleware.is_some() {
+            worker.push_str("  middleware,\n");
+        }
+        worker.push_str("  routes: [\n");
         for (i, (pattern, _, ssr, template, shell, scripts)) in server_routes.iter().enumerate() {
             let mut extra = String::new();
             if let Some(m) = &scripts.page {
@@ -926,8 +997,15 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             }
             worker.push_str(&format!("    {{ pattern: {}, server: s{i}, ssr: {ssr}, template: {template}, shell: {shell}{extra} }},\n", json!(pattern)));
         }
+        for (i, e) in p.endpoints.iter().enumerate() {
+            worker.push_str(&format!("    {{ pattern: {}, endpoint: e{i}, file: {} }},\n", json!(e.pattern), json!(rel_str(&e.file))));
+        }
         worker.push_str("  ],\n})\n");
         w.write("server/worker.js", worker.as_bytes());
+        if report.has_server {
+            let routing = json!({ "middleware": p.middleware.is_some(), "endpoints": p.endpoints.iter().map(|e| e.pattern.clone()).collect::<Vec<_>>() });
+            w.write("server/routes.json", serde_json::to_string_pretty(&routing).unwrap().as_bytes());
+        }
         w.write("server/package.json", b"{ \"type\": \"module\" }\n");
         if report.has_server {
             let node = format!(

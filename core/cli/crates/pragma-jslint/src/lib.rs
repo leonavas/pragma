@@ -80,6 +80,7 @@ pub fn lint(path: &Path, source: &str, ctx: &LintContext) -> Vec<Diagnostic> {
     let mut linter = Linter {
         ctx,
         server: is_server_file(path, ctx),
+        middleware: path.file_name().is_some_and(|n| n == "_middleware.server.js"),
         short_ok: false,
         concise_arrow: false,
         found: &mut found,
@@ -122,6 +123,7 @@ fn is_server_file(path: &Path, ctx: &LintContext) -> bool {
 struct Linter<'c> {
     ctx: &'c LintContext,
     server: bool,
+    middleware: bool,
     short_ok: bool,
     concise_arrow: bool,
     found: &'c mut Vec<(u32, &'static str, String)>,
@@ -129,7 +131,8 @@ struct Linter<'c> {
 
 impl Linter<'_> {
     fn check_name(&mut self, name: &str, span: Span) {
-        if !self.ctx.is_core && vague_name(name, self.short_ok) {
+        let framework_name = self.middleware && name == "handle";
+        if !self.ctx.is_core && !framework_name && vague_name(name, self.short_ok) {
             self.report(span, RULE_NAME, format!("name `{name}` does not say what it is or does; use a self-explanatory name (e.g. `product`, `totalItems`, `addToCart`)"));
         }
     }

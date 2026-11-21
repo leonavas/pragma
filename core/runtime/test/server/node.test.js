@@ -21,8 +21,33 @@ const handler = createHandler({
       template: [['html', '<h1>'], ['text', '{data.slug}'], ['html', '</h1>']],
       shell: '<!doctype html><html><head></head><body><main data-page></main></body></html>',
     },
+    {
+      pattern: '/feed/:name',
+      file: 'routes/feed/[name].server.js',
+      endpoint: {
+        GET: ({ cookies }) => {
+          cookies.set('a', '1')
+          cookies.set('b', '2')
+          let release
+          const gate = new Promise((resolve) => (release = resolve))
+          feedGate = release
+          const encoder = new TextEncoder()
+          const body = new ReadableStream({
+            async start(controller) {
+              controller.enqueue(encoder.encode('{"n":1}\n'))
+              await gate
+              controller.enqueue(encoder.encode('{"n":2}\n'))
+              controller.close()
+            },
+          })
+          return new Response(body, { headers: { 'content-type': 'application/x-ndjson' } })
+        },
+      },
+    },
   ],
 })
+
+let feedGate
 
 let server
 let base
@@ -222,4 +247,17 @@ test('serves precompressed .br and .gz sidecars with matching headers and preser
     preServer.close()
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+test('endpoint streams NDJSON chunk by chunk and sends every cookie', async () => {
+  const res = await get('/feed/x')
+  assert.equal(res.headers.get('content-type'), 'application/x-ndjson')
+  assert.deepEqual(res.headers.getSetCookie().map((c) => c.split(';')[0]), ['a=1', 'b=2'])
+  const reader = res.body.getReader()
+  const first = new TextDecoder().decode((await reader.read()).value)
+  assert.equal(first, '{"n":1}\n')
+  feedGate()
+  let rest = ''
+  for (let chunk = await reader.read(); !chunk.done; chunk = await reader.read()) rest += new TextDecoder().decode(chunk.value)
+  assert.equal(rest, '{"n":2}\n')
 })

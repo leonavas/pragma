@@ -12,6 +12,9 @@ The folder structure is fixed. Do not create other top-level folders. Do not edi
     index.html             page / (optional <script> and <style> at top)
     index.js               optional page script file instead of <script>
     index.server.js        optional server data and actions
+    _middleware.server.js  optional; runs before every request
+    files/
+      [name].server.js     endpoint /files/:name (no .html; returns a Response)
     shop/
       _layout.html         optional nested layout for /shop/*
       [id].html            /shop/:id
@@ -49,6 +52,8 @@ The folder structure is fixed. Do not create other top-level folders. Do not edi
 | Root layout | `routes/_layout.html` |
 | Nested layout | `routes/<folder>/_layout.html` |
 | Server-only helper or JSON | `routes/<folder>/_name.server.js`, `_name.json` |
+| Middleware (auth, headers) | `routes/_middleware.server.js` |
+| Endpoint (file, stream, webhook, WebSocket) | `routes/<path>.server.js` without `.html` |
 | Route-local component | `routes/<folder>/_components/<name>/` |
 | Shared component | `lib/components/<name>/` |
 | Shared state store | `lib/state/<name>.js` |
@@ -58,7 +63,7 @@ The folder structure is fixed. Do not create other top-level folders. Do not edi
 
 ## Rules
 
-- A leading `_` makes a file or folder private (not a route). Only `_layout.html` and `_404.html` are special.
+- A leading `_` makes a file or folder private (not a route). Only `_layout.html`, `_404.html`, and `routes/_middleware.server.js` are special.
 - Put at most one `<script>` and one `<style>` at the top level of a page or component `.html` (never in layouts). Or use `.js`/`.css` with the same base name, not both.
 - Do not create `src/`, `pages/`, `styles/`, or `helpers/`.
 - Put CSS in a component or page `<style>`, a component `.css`, or `lib/theme.css`.

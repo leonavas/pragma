@@ -39,6 +39,13 @@ struct Route {
     segments: Vec<Option<String>>,
     html: String,
     ssr: bool,
+    endpoint: bool,
+}
+
+#[derive(Default)]
+struct Routing {
+    routes: Vec<Route>,
+    middleware: bool,
 }
 
 struct Cached {
@@ -51,7 +58,7 @@ struct Cached {
 pub struct Site {
     root: PathBuf,
     mode: Mode,
-    routes: RwLock<Arc<Vec<Route>>>,
+    routing: RwLock<Arc<Routing>>,
     cache: HashMap<String, Cached>,
     events: broadcast::Sender<Event>,
     last_error: Mutex<Option<String>>,
@@ -66,7 +73,7 @@ impl Site {
         let cache = if mode == Mode::Serve { precompress(&root) } else { HashMap::new() };
         let boot = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
         let site = Site {
-            routes: RwLock::new(Arc::new(load_manifest(&root))),
+            routing: RwLock::new(Arc::new(load_routing(&root))),
             root,
             mode,
             cache,
@@ -80,7 +87,7 @@ impl Site {
     }
 
     pub fn reload_manifest(&self) {
-        *self.routes.write().unwrap() = Arc::new(load_manifest(&self.root));
+        *self.routing.write().unwrap() = Arc::new(load_routing(&self.root));
     }
 
     pub fn set_backend(&self, port: Option<u16>) {
@@ -101,8 +108,9 @@ impl Site {
 
     fn match_route(&self, path: &str) -> Option<Route> {
         let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
-        let routes = self.routes.read().unwrap().clone();
-        routes
+        let routing = self.routing.read().unwrap().clone();
+        routing
+            .routes
             .iter()
             .filter(|r| {
                 r.segments.len() == parts.len()
@@ -111,6 +119,10 @@ impl Site {
             // static beats param, segment by segment
             .min_by_key(|r| r.segments.iter().map(Option::is_none).collect::<Vec<_>>())
             .cloned()
+    }
+
+    fn has_middleware(&self) -> bool {
+        self.routing.read().unwrap().middleware
     }
 
     fn static_file(&self, path: &str) -> Option<String> {
@@ -164,6 +176,13 @@ async fn handle(site: Arc<Site>, req: Request<Incoming>) -> Result<Response<Body
     let Some(path) = decode_path(&raw) else {
         return Ok(response(StatusCode::BAD_REQUEST, "text/plain; charset=utf-8", "no-store", Bytes::from_static("invalid path".as_bytes())));
     };
+    if let Some(port) = site.backend()
+        && site.has_middleware()
+        && !path.starts_with("/assets/")
+        && !path.starts_with("/_pragma/")
+    {
+        return Ok(proxy(&site, port, req).await);
+    }
     let markdown = if req.method() == Method::GET || req.method() == Method::HEAD { site.markdown_file(&path) } else { None };
     if let Some(md) = &markdown
         && prefers_markdown(req.headers())
@@ -177,7 +196,7 @@ async fn handle(site: Arc<Site>, req: Request<Incoming>) -> Result<Response<Body
     }
     let route = site.match_route(&path);
     if let Some(port) = site.backend()
-        && (is_server_path(&path) || route.as_ref().is_some_and(|r| r.ssr) && !path.ends_with(".html"))
+        && (is_server_path(&path) || route.as_ref().is_some_and(|r| r.endpoint || r.ssr && !path.ends_with(".html")))
     {
         let mut res = proxy(&site, port, req).await;
         if markdown.is_some() {
@@ -403,24 +422,33 @@ fn decode_path(path: &str) -> Option<String> {
     (!bad).then_some(path)
 }
 
-fn load_manifest(root: &Path) -> Vec<Route> {
-    let Ok(text) = std::fs::read_to_string(root.join("_pragma/manifest.json")) else { return Vec::new() };
-    let Ok(serde_json::Value::Array(items)) = serde_json::from_str(&text) else { return Vec::new() };
-    items
-        .iter()
-        .filter_map(|item| {
-            let pattern = item.get("pattern")?.as_str()?;
+fn segments(pattern: &str) -> Vec<Option<String>> {
+    pattern.split('/').filter(|s| !s.is_empty()).map(|s| if s.starts_with(':') { None } else { Some(s.to_owned()) }).collect()
+}
+
+fn read_json(path: &Path) -> Option<serde_json::Value> {
+    serde_json::from_str(&std::fs::read_to_string(path).ok()?).ok()
+}
+
+/// Pages from the client manifest; endpoints and middleware from `../server/routes.json`.
+fn load_routing(root: &Path) -> Routing {
+    let mut routing = Routing::default();
+    if let Some(serde_json::Value::Array(items)) = read_json(&root.join("_pragma/manifest.json")) {
+        routing.routes.extend(items.iter().filter_map(|item| {
             Some(Route {
-                segments: pattern
-                    .split('/')
-                    .filter(|s| !s.is_empty())
-                    .map(|s| if s.starts_with(':') { None } else { Some(s.to_owned()) })
-                    .collect(),
+                segments: segments(item.get("pattern")?.as_str()?),
                 html: item.get("html")?.as_str()?.to_owned(),
                 ssr: item.get("ssr").and_then(|v| v.as_bool()).unwrap_or(false),
+                endpoint: false,
             })
-        })
-        .collect()
+        }));
+    }
+    if let Some(server) = root.parent().and_then(|dir| read_json(&dir.join("server/routes.json"))) {
+        routing.middleware = server.get("middleware").and_then(|v| v.as_bool()).unwrap_or(false);
+        let endpoints = server.get("endpoints").and_then(|v| v.as_array()).into_iter().flatten();
+        routing.routes.extend(endpoints.filter_map(|p| p.as_str()).map(|p| Route { segments: segments(p), html: String::new(), ssr: false, endpoint: true }));
+    }
+    routing
 }
 
 pub fn mime(path: &str) -> &'static str {

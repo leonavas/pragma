@@ -58,6 +58,8 @@ Fix the root cause; do not work around a rule.
 | `html/json-ld` | Fix invalid JSON or unclosed `{` in JSON-LD strings. Use `{` for a literal brace. |
 | `css/unknown-class`, `css/arbitrary-value` | Use classes from `classes.md` or custom classes per `css.md`. |
 | `app/structure`, `app/route-conflict` | Follow structure and route rules (`structure.md`, `routes.md`). |
+| `app/endpoint`, `app/middleware` | An endpoint exports only `GET`/`POST`/`PUT`/`PATCH`/`DELETE`; the middleware exports `handle` (`data.md`). |
+| `app/endpoint-json` (warning) | An endpoint answers JSON. Use `load` and actions for page data (`data.md`). |
 | `app/package` | Follow package rules (`packages.md`). |
 | `app/pragma-json` | Fix `pragma.json` (`structure.md`). |
 | `app/budget` | Reduce bundle size (`performance.md`). |
@@ -92,7 +94,7 @@ Every `<form>` is an agent tool (`webmcp.md`).
 | Path | Use |
 |---|---|
 | `client/` | HTML per route and assets. |
-| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest and serves `_404.html` with 404). Emitted when the app has a `*.server.js` or a `public/**/*.md`. |
+| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest and serves `_404.html` with 404). Emitted when the app has a `*.server.js` or a `public/**/*.md`. `run_worker_first` sends every request, also prebuilt pages, through the worker, so middleware runs for them. |
 | `server/node.mjs` | Run `node dist/server/node.mjs` (reads `PORT`, default 3000). Emitted when the app has a `*.server.js`. |
 
 Every server (`dev`, `serve`, Workers, Node) returns the matching `.md` from `public/` when `Accept` prefers `text/markdown` (`webmcp.md`).
@@ -158,6 +160,7 @@ Then deploy with `npx wrangler@4 deploy` (no `--config`).
 - Read configuration from `env`, not `process.env`.
 - The generated config has no `nodejs_compat`. If a package needs `node:*` modules, add `"compatibility_flags": ["nodejs_compat"]` to the root `wrangler.jsonc` and tell the user.
 - If a feature cannot work on Workers, stop and tell the user before you change the target.
+- WebSocket endpoints (`status: 101`) work only on Workers. `pragma dev` and `pragma serve` run Node and cannot upgrade; test them with `npx wrangler@4 dev --config dist/server/wrangler.jsonc`.
 
 ### CI (GitHub Actions)
 

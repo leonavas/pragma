@@ -238,9 +238,9 @@ export const actions = {
 ```
 - `ctx.call(name, input)` → `POST /_action/<current path>/<name>` with JSON body; resolves with the JSON result; non-2xx → throws `Error(message)`.
 - Unknown action → 404 `{"error":{"message":"Unknown action: x"}}`; non-JSON body → 400; non-POST → 405.
-- UNDOCUMENTED: actions also receive `query` and `request`; an action may `return new Response(...)` to send a raw response (status/headers/cookies) — `ctx.call` will still try `res.json()`.
+- Documented (`data.md`): actions also receive `query`, `request`, `url`, `cookies`, `locals`, `setHeaders`, `waitUntil`; an action may `return new Response(...)` (status, headers, streaming body pass through).
 - UNDOCUMENTED: `ctx.call` is also available in component modules; it always targets the **current page's** `.server.js`.
-- There are no `/api/*` routes, no GET endpoints, no way to serve non-HTML (RSS, sitemap.xml, JSON) dynamically.
+- A `.server.js` without `.html` is an endpoint (`GET`/`POST`/... returning a `Response`): files, streams, RSS, sitemap.xml, webhooks, WebSockets (Workers only). `routes/_middleware.server.js` runs before every request.
 
 ### 4.4 SSR opt-in [verified: node returns rendered HTML + `#pragma-data`]
 Add to the page's `.server.js`:
@@ -308,7 +308,7 @@ Output: charset, viewport, `<title>`, the layout head tags with the page's tags 
 - Only `:text` on `<title>` and `:<attr>` on `<meta>`/`<link>`, rooted in `data`, `params` or `query`; a binding without `ssr = true` → `html/head`.
 - The server renders them, escaped, before sending. Null/false keeps the static fallback; a `<meta>` left without `content` or a `<link>` without `href` is removed (so `robots` can appear only for a missing entity; see `routes/examples/seo/demo/[slug]`).
 - The router replaces `<title>` and every `<meta>`/`<link>` except charset, viewport, stylesheet and modulepreload with the target document's on each client navigation.
-- `load` still returns JSON only: no headers, status or redirects.
+- `load` sets headers (`setHeaders`), cookies, status (`error()` from `'pragma/server'`) and redirects (`redirect()`).
 
 ### 5.4 What SSR does buy for SEO
 With `ssr = true`, the bound head tags and the `<main>` content (headings, text, links, lists from `data`) are in the first HTML response; without SSR, only content outside `<if>/<for>` blocks is in the HTML (initial text inside `:text` elements is kept, e.g. `<h1 :text="data.x">Fallback</h1>` ships "Fallback").

@@ -156,6 +156,23 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   instead of shipping half-working. Discarded: an exported `head()`/`meta` object in
   `.server.js` (HTML in JS, a second way to write tags), a page `<head>` block (one more
   structure rule for the same thing), evaluating head bindings on the client.
+- **[firm v0]** Request context, redirects, errors, middleware, endpoints (2026-11-21, for
+  apps such as escalei: cookie sessions, auth redirects, R2 files, NDJSON, WebSocket voice).
+  `load`, actions, endpoints and middleware get one context: `cookies` (defaults `httpOnly`,
+  `secure`, `sameSite=lax`, `path=/`; `__Host-` enforced), `setHeaders`, `waitUntil`, `locals`,
+  plus `request`, `url`, `params`, `query`, `env`, `log`. `redirect`/`error` come from
+  `'pragma/server'` (the build rewrites it to `core/server/http.js`) and throw. Wire for
+  `/_data` and `/_action`: redirect = 200 `{"redirect":{status,location}}` (a 30x would be
+  followed silently by `fetch`), error = its status with `{"error": body}`; full documents get a
+  real 30x. Cookies and headers apply to every outgoing response, raw ones included. One
+  `routes/_middleware.server.js` `handle({ ..., next })` runs before every request except
+  `/assets/*`, `/_pragma/*`, `/_otel`; `url` is the page path also for `/_data`/`/_action`, so a
+  path check cannot be bypassed through the internal URLs. A `.server.js` without `.html` is an
+  endpoint with uppercase method handlers returning a `Response` (files, ranges, streams,
+  webhooks; WebSocket only on Workers). *Why:* SvelteKit's `cookies`/`setHeaders`/`locals`/
+  `handle` proved the shape; pragma keeps one middleware (no `sequence`), one context object,
+  no `+server`/`+page` split. Page data still never goes through endpoints: `app/endpoint-json`
+  warns on `Response.json` and a non-`Response` return is a 500 naming the file.
 - **[superseded]** SSR via `HTMLRewriter` on Workers and `lol_html` in `pragma serve`: replaced
   by compiled ops rendered by the JS handler.
 - **[superseded]** "No SSR (SPA + API)".
@@ -311,6 +328,10 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   `env` directly to `load`.
 - **[superseded]** `/api/*` prefix and `pragma serve` forwarding to Node/Deno/Bun: now
   `/_data`, `/_action`, `/_otel`, and `serve` is the dev server without watch.
+- **[firm v0]** `pragma dev`/`serve` also proxy endpoint paths (any method) and, when
+  `routes/_middleware.server.js` exists, every path except `/assets/*` and `/_pragma/*`. The
+  build writes `dist/server/routes.json` (`{ middleware, endpoints }`) for that decision; the
+  client manifest keeps only pages.
 
 ## Tool (Rust CLI)
 

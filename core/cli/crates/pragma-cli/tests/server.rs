@@ -404,3 +404,48 @@ async fn serve_uses_precompressed_sidecar_files() {
     brotli::Decompressor::new(&fallback.body[..], 4096).read_to_string(&mut decoded).unwrap();
     assert_eq!(decoded, raw);
 }
+
+fn routed_app(name: &str, middleware: bool) -> PathBuf {
+    let dir = std::env::temp_dir().join(format!("pragma-routing-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("client/_pragma")).unwrap();
+    std::fs::create_dir_all(dir.join("client/assets")).unwrap();
+    std::fs::create_dir_all(dir.join("server")).unwrap();
+    std::fs::write(dir.join("client/_pragma/manifest.json"), r#"[{"pattern":"/","html":"/index.html","ssr":false}]"#).unwrap();
+    std::fs::write(dir.join("client/index.html"), "<h1>static home</h1>").unwrap();
+    std::fs::write(dir.join("client/assets/app.css"), "body{}").unwrap();
+    let routing = format!(r#"{{"middleware":{middleware},"endpoints":["/files/:name"]}}"#);
+    std::fs::write(dir.join("server/routes.json"), routing).unwrap();
+    dir
+}
+
+async fn start_at(client: PathBuf) -> (SocketAddr, Arc<Site>) {
+    let site = Site::new(client, Mode::Dev);
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(server::serve(listener, site.clone()));
+    site.set_backend(Some(fake_node().await));
+    (addr, site)
+}
+
+#[tokio::test]
+async fn proxies_endpoints_with_any_method() {
+    let dir = routed_app("endpoints", false);
+    let (addr, _site) = start_at(dir.join("client")).await;
+    assert_eq!(get(addr, "/files/a.pdf").await.text(), r#"{"data":"GET /files/a.pdf HTTP/1.1"}"#);
+    let put = request(addr, "PUT", "/files/a.pdf", &[("content-length", "0")]).await;
+    assert_eq!(put.text(), r#"{"data":"PUT /files/a.pdf HTTP/1.1"}"#);
+    assert!(get(addr, "/").await.text().contains("static home"));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[tokio::test]
+async fn middleware_sends_everything_but_assets_to_node() {
+    let dir = routed_app("middleware", true);
+    let (addr, _site) = start_at(dir.join("client")).await;
+    assert_eq!(get(addr, "/").await.text(), r#"{"data":"GET / HTTP/1.1"}"#);
+    assert_eq!(get(addr, "/index.html").await.text(), r#"{"data":"GET /index.html HTTP/1.1"}"#);
+    assert_eq!(get(addr, "/missing").await.text(), r#"{"data":"GET /missing HTTP/1.1"}"#);
+    assert_eq!(get(addr, "/assets/app.css").await.text(), "body{}");
+    let _ = std::fs::remove_dir_all(dir);
+}
