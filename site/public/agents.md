@@ -9,7 +9,7 @@ Everything an agent needs to build with pragma, in files it reads without a brow
 Replace the brackets with your app. The agent reads the docs, installs pragma, creates the app and runs `pragma check --strict` until it passes.
 
 ```
-Read https://pragma.leonavas.com/llms-full.txt and create a pragma app that [describe your app]. Install pragma first if the pragma command is missing. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.
+Read https://pragma.leonavas.com/llms-full.txt and create a pragma app that [describe your app]. Install pragma if missing, or validate the version with pragma -V and .pragma/version and run pragma self-update and pragma upgrade if outdated. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.
 ```
 
 ## Install and create
@@ -29,6 +29,22 @@ Or build from source with Cargo:
 git clone https://github.com/leonavas/pragma && cd pragma && cargo install --path core/cli/crates/pragma-cli
 ```
 
+## Validate version and update
+
+Validate the pragma version before you change code:
+
+- Run `pragma -V` to check the installed CLI version.
+- Compare that version with `.pragma/version` inside the app.
+- Run `pragma self-update` to update the CLI binary from GitHub Releases if the CLI is old.
+- Run `pragma upgrade` inside the app to update `.pragma/` (runtime, docs, `base.css`, `version`) if `.pragma/` is outdated.
+
+```sh
+pragma -V
+cat .pragma/version
+pragma self-update
+pragma upgrade
+```
+
 ## Files for agents
 
 Same content as the HTML pages, in markdown. No hidden text, nothing written only for agents.
@@ -45,7 +61,7 @@ A request for `/` or `/agents` with `Accept: text/markdown` gets the markdown fi
 - [HTML syntax](https://pragma.leonavas.com/docs/syntax.md): HTML directives ({path}, :, ., @, $) and blocks
 - [Components](https://pragma.leonavas.com/docs/components.md): components, props, slots
 - [State: script, actions, derived values, stores](https://pragma.leonavas.com/docs/state.md): script: state, actions, derived values, mount, stores
-- [Routes and router](https://pragma.leonavas.com/docs/routes.md): pages, links, params, query, layout, head tags
+- [Routes and router](https://pragma.leonavas.com/docs/routes.md): pages, links, params, query, layouts (including nested), head tags
 - [Data: load, server actions, skeleton, SSR](https://pragma.leonavas.com/docs/data.md): load, server actions, skeleton, SSR
 - [Overlays: modal, alert, dropdown](https://pragma.leonavas.com/docs/overlays.md): modal, alert, dropdown
 - [CSS](https://pragma.leonavas.com/docs/css.md): styles and theme
@@ -54,7 +70,7 @@ A request for `/` or `/agents` with `Accept: text/markdown` gets the markdown fi
 - [npm packages](https://pragma.leonavas.com/docs/packages.md): npm packages: when and which
 - [Performance](https://pragma.leonavas.com/docs/performance.md): performance defaults and budgets
 - [Logs](https://pragma.leonavas.com/docs/logs.md): OpenTelemetry logs
-- [pragma CLI](https://pragma.leonavas.com/docs/cli.md): commands, check rules, deploy
+- [pragma CLI](https://pragma.leonavas.com/docs/cli.md): commands, self-update, upgrade, check rules, deploy
 
 ## WebMCP tools on this site
 

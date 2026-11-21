@@ -50,7 +50,8 @@ pub fn core_files() -> Vec<(String, &'static [u8])> {
     let runtime = embedded::RUNTIME.iter().map(|(rel, bytes)| (format!(".pragma/{rel}"), *bytes));
     let docs = embedded::DOCS.iter().map(|(rel, bytes)| (format!(".pragma/docs/{rel}"), *bytes));
     let base = std::iter::once((".pragma/base.css".to_owned(), pragma_css::base_css().as_bytes()));
-    runtime.chain(docs).chain(base).collect()
+    let version = std::iter::once((".pragma/version".to_owned(), concat!(env!("CARGO_PKG_VERSION"), "\n").as_bytes()));
+    runtime.chain(docs).chain(base).chain(version).collect()
 }
 
 pub(crate) fn write(path: &Path, content: &[u8]) -> Result<(), String> {

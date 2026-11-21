@@ -9,7 +9,7 @@ Everything an agent needs to build with pragma, in files it reads without a brow
 Replace the brackets with your app. The agent reads the docs, installs pragma, creates the app and runs `pragma check --strict` until it passes.
 
 ```
-Read {{origin}}/llms-full.txt and create a pragma app that [describe your app]. Install pragma first if the pragma command is missing. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.
+Read {{origin}}/llms-full.txt and create a pragma app that [describe your app]. Install pragma if missing, or validate the version with pragma -V and .pragma/version and run pragma self-update and pragma upgrade if outdated. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.
 ```
 
 ## Install and create
@@ -27,6 +27,22 @@ Or build from source with Cargo:
 
 ```sh
 git clone https://github.com/leonavas/pragma && cd pragma && cargo install --path core/cli/crates/pragma-cli
+```
+
+## Validate version and update
+
+Validate the pragma version before you change code:
+
+- Run `pragma -V` to check the installed CLI version.
+- Compare that version with `.pragma/version` inside the app.
+- Run `pragma self-update` to update the CLI binary from GitHub Releases if the CLI is old.
+- Run `pragma upgrade` inside the app to update `.pragma/` (runtime, docs, `base.css`, `version`) if `.pragma/` is outdated.
+
+```sh
+pragma -V
+cat .pragma/version
+pragma self-update
+pragma upgrade
 ```
 
 ## Files for agents

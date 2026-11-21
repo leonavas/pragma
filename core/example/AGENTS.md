@@ -1,62 +1,70 @@
 # AGENTS.md
 
-pragma app: native HTML, CSS and JS, no framework, usable by AI agents. Docs are in `.pragma/docs/`: read the relevant one before changing code.
+A pragma app uses native HTML, CSS, and JS without a framework. Read the relevant file in `.pragma/docs/` before you change code.
+
+## Version check
+
+1. Compare `pragma -V` with `.pragma/version`.
+2. If they differ, or if `pragma check` reports `app/core-outdated`, run `pragma upgrade`.
+3. Run `pragma self-update` to update the CLI binary.
 
 ## Syntax
 
-A page or component is one `.html`: an optional `<script>` and `<style>`, then the markup.
-In the `<script>`, a top-level `let` is state, a function is an action (`@click="add"`) or a
-derived value (`{$total}` in HTML, `total()` in JS), `export let step = 1` is a prop and
-`function mount(el) { …; return cleanup }` runs after mount. Services:
-`import { shared, data, params, query, page, call, navigate, open, close, confirm, log } from 'pragma'`.
-`<style>` is scoped to its component or page (`:global(…)` opts out only what is inside it).
+A page or component is one `.html` file: optional `<script>`, optional `<style>`, then markup.
 
-`{path}` puts a value in text and attribute strings (`<p>Hi {$name}</p>`, `href="/shop/{p.id}"`),
-`:` binds a whole value (`:href`, `:disabled`), `.` binds a class, `@` binds an event, `$` is a
-name from the `<script>` (HTML only: in JS write `name`).
-`@input="search"` passes the event; `@change="toggle(task)"` passes only what it lists (paths,
-literals, `event`, `el`); store functions work directly: `@click="shared.cart.remove(item.id)"`.
-Blocks are tags: `<if v>`, `<else-if v>`, `<else>`, `<for x in v key=x.id>`, `<empty>`.
-`<c-x>` = `lib/components/x/`; `<p-x>` = `_components/x/` in the page's folder.
+- Top-level `let` declares state.
+- A function defines an action (`@click="add"`) or a derived value (`{$total}` in HTML, `total()` in JS).
+- `export let step = 1` declares a prop.
+- `function mount(el) { …; return cleanup }` runs after mount.
+- Import services from `'pragma'`: `import { shared, data, params, query, page, call, navigate, open, close, confirm, log } from 'pragma'`.
+- `<style>` scopes to its component or page (`:global(…)` opts out only its argument).
+- `{path}` inserts escaped text in text and attribute strings (`<p>Hi {$name}</p>`, `href="/shop/{p.id}"`).
+- `:` binds a value (`:href`, `:disabled`). `.` toggles a class. `@` binds an event.
+- `$` references a `<script>` name in HTML only (write `name` in JS).
+- `@input="search"` passes `event`. `@change="toggle(task)"` passes only the listed arguments (paths, literals, `event`, `el`).
+- Call store functions directly: `@click="shared.cart.remove(item.id)"`.
+- Use tags for blocks: `<if v>`, `<else-if v>`, `<else>`, `<for x in v key=x.id>`, `<empty>`.
+- `<c-x>` maps to `lib/components/x/`. `<p-x>` maps to `_components/x/` in the page folder or an ancestor.
+- `routes/_layout.html` is the root layout (`<main data-page><slot></slot></main>`). Any subfolder can add `_layout.html` with `<slot></slot>` (no `<head>`, no `<script>`, no `.server.js`) to wrap routes in that folder and its subfolders.
 
 ## Rules
 
-- Plain JS (ES modules). No TypeScript, no JSDoc types, no `console.*` (use `log.*`).
-- npm packages only when the platform cannot do it; plain JS (ESM preferred), chosen per `packages.md`.
-- No HTML in JS. Never write to the DOM: assign a `let`.
-- Strict HTML: close every non-void tag.
-- Derived values are functions in the script or store (`const total = () => …`), never expressions in HTML.
-- Read `data` inside functions only; it is undefined until the load ends.
-- Stores live in `lib/state/` and are reached only through `shared`.
-- Never write comments. The code is the documentation.
-- Names say what a thing is or does. No vague (`tmp`, `data`, `info`) or short (`t`, `e`) names,
-  except `i`, `j`, `k`, `id`, `ok`, `el`, `url`, `log` and parameters of one-expression arrows.
-- Fixed structure; never edit `.pragma/` (`pragma upgrade` updates it). Reuse components before creating new ones.
-- Overlays only with `c-modal`, `c-alert`, `c-dropdown`.
-- Data comes from `load` in `.server.js`, with a skeleton.
-- CSS: utilities from `classes.md`; a custom class only when a combination repeats 3+ times. No inline `style`.
-- Accessible: a name on every control, `alt`, labels, one `<h1>`.
-- Agent-first: every `<form>` is a WebMCP tool: `toolname` (`snake_case` verb_object), `tooldescription`,
-  `name` and `toolparamdescription` on each field; `notool` for login or password forms (`webmcp.md`).
-- Finish with `pragma check --strict`: zero errors, zero warnings.
+- Validate `pragma -V` against `.pragma/version`. Run `pragma upgrade` on mismatch or `app/core-outdated`.
+- Use plain JS (ES modules). Do not use TypeScript, JSDoc types, or `console.*` (use `log.*`).
+- Add npm packages only when the platform lacks the feature. Prefer plain JS ES modules (`packages.md`).
+- Do not put HTML in JS. Do not mutate the DOM; assign a `let`.
+- Write strict HTML. Close every non-void tag.
+- Compute derived values in functions (`const total = () => …`). Do not write expressions in HTML.
+- Read `data` inside functions only; it is undefined until `load` finishes.
+- Put stores in `lib/state/`. Access stores only through `shared`.
+- Do not write comments.
+- Use descriptive names. Do not use vague (`tmp`, `data`, `info`) or short (`t`, `e`) names, except `i`, `j`, `k`, `id`, `ok`, `el`, `url`, `log`, and parameters of one-expression arrows.
+- Keep the fixed folder structure. Do not edit `.pragma/` (run `pragma upgrade` to update it).
+- Reuse existing components before creating new ones.
+- Build overlays only with `c-modal`, `c-alert`, and `c-dropdown`.
+- Load data with `load` in `.server.js` and render a skeleton.
+- Use utilities from `classes.md`. Create a custom class only when a combination repeats 3+ times. Do not use inline `style`.
+- Follow accessibility rules: name every control, add `alt` and labels, use one `<h1>`.
+- Make every `<form>` a WebMCP tool: set `toolname` (`snake_case` verb_object), `tooldescription`, `name`, and `toolparamdescription` on each field. Add `notool` on login or password forms (`webmcp.md`).
+- Run `pragma check --strict` before you finish. Fix all errors and warnings.
 
 ## To do X, read Y
 
 | Task | Read |
 |---|---|
 | HTML syntax (`{}`, `:`, `.`, `@`, `$`, blocks) | `syntax.md` |
-| where each file goes, `pragma.json` | `structure.md` |
-| pages, links, params, query, layout | `routes.md` |
-| page title, description, canonical, Open Graph | `routes.md` (SEO) |
-| components, props, slots | `components.md` |
+| File locations, `pragma.json`, `.pragma/version` | `structure.md` |
+| Pages, links, params, query, root and nested layouts | `routes.md` |
+| Page title, description, canonical, Open Graph, JSON-LD | `routes.md` (SEO) |
+| Components, props, slots | `components.md` |
 | `<script>`: state, actions, derived values, `mount`, stores | `state.md` |
-| load, server actions, skeleton, SSR | `data.md` |
-| modal, alert, dropdown | `overlays.md` |
-| styles, theme | `css.md`, `classes.md` |
-| forms as agent tools (WebMCP), markdown for agents | `webmcp.md` |
-| performance | `performance.md` |
-| logs | `logs.md` |
-| npm packages (install, which to use) | `packages.md` |
-| commands, `check` rules, deploy | `cli.md` |
+| `load`, server actions, skeleton, SSR | `data.md` |
+| Modal, alert, dropdown | `overlays.md` |
+| Styles, theme | `css.md`, `classes.md` |
+| Forms as agent tools (WebMCP), markdown for agents | `webmcp.md` |
+| Performance | `performance.md` |
+| Logs | `logs.md` |
+| npm packages (install, selection) | `packages.md` |
+| Commands, `check` rules, upgrade, self-update, deploy | `cli.md` |
 
-If unsure, copy the doc's example. If no doc covers it, do the simplest thing that passes `check`.
+Copy the doc example when unsure. If no doc covers a case, use the simplest code that passes `pragma check`.

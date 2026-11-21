@@ -119,7 +119,19 @@ impl<'p> Expander<'p> {
             }
         }
         let sc = Scope { from: &page.dir, props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: None, inst: 0 };
-        let page_nodes = self.expand_nodes(&content, &sc);
+        let mut page_nodes = self.expand_nodes(&content, &sc);
+        if page.out_name != "_404" {
+            for dir in page.dir.ancestors() {
+                if dir == Path::new("routes") || !dir.starts_with("routes") {
+                    break;
+                }
+                if let Some(&nl_id) = p.nested_layouts.get(dir) {
+                    let slots: Slots = HashMap::from([(String::new(), page_nodes)]);
+                    let nl_sc = Scope { from: dir, props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: 0 };
+                    page_nodes = self.expand_nodes(&p.trees[nl_id as usize], &nl_sc);
+                }
+            }
+        }
         let mut head = Vec::new();
         let mut body = Vec::new();
         if let Some(l) = p.layout {

@@ -29,6 +29,13 @@ cargo install --path core/cli/crates/pragma-cli
 
 Then `pragma new my-app`, `cd my-app` and `pragma dev`. [Start with the guide]({{origin}}/guide).
 
+Update the CLI with `pragma self-update` (GitHub Releases). Update `.pragma/` (runtime, docs, `base.css`, `version`) inside an app with `pragma upgrade`.
+
+```sh
+pragma self-update
+pragma upgrade
+```
+
 ## This framework is for agents. If you're still reading this instead of asking your agent to try it, it's not for you yet. Come back in 6 months.
 
 [Hand it to your agent]({{origin}}/agents.md)

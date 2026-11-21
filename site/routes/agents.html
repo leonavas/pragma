@@ -23,8 +23,8 @@
     <div class="prose">
       <p>Replace the brackets with your app. The agent reads the docs, installs pragma, creates the app and runs <code>pragma check --strict</code> until it passes.</p>
     </div>
-    <c-terminal title="prompt" copy="Read https://pragma.leonavas.com/llms-full.txt and create a pragma app that [describe your app]. Install pragma first if the pragma command is missing. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.">
-      <pre class="whitespace-pre-wrap" tabindex="0" aria-label="Prompt for a coding agent"><code>Read https://pragma.leonavas.com/llms-full.txt and create a pragma app that <span class="term-ok">[describe your app]</span>. Install pragma first if the pragma command is missing. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.</code></pre>
+    <c-terminal title="prompt" copy="Read https://pragma.leonavas.com/llms-full.txt and create a pragma app that [describe your app]. Install pragma if missing, or validate the version with pragma -V and .pragma/version and run pragma self-update and pragma upgrade if outdated. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.">
+      <pre class="whitespace-pre-wrap" tabindex="0" aria-label="Prompt for a coding agent"><code>Read https://pragma.leonavas.com/llms-full.txt and create a pragma app that <span class="term-ok">[describe your app]</span>. Install pragma if missing, or validate the version with pragma -V and .pragma/version and run pragma self-update and pragma upgrade if outdated. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.</code></pre>
     </c-terminal>
   </section>
 
@@ -38,6 +38,25 @@
 <span class="term-cmd">pragma new my-app</span>
 <span class="term-cmd">cd my-app</span>
 <span class="term-cmd">pragma dev</span></code></pre>
+    </c-terminal>
+  </section>
+
+  <section class="doc-section max-w-3xl" aria-labelledby="update">
+    <h2 id="update">Validate version and update</h2>
+    <div class="prose">
+      <p>Validate the pragma version before you change code:</p>
+      <ul>
+        <li>Run <code>pragma -V</code> to check the installed CLI version.</li>
+        <li>Compare that version with <code>.pragma/version</code> inside the app.</li>
+        <li>Run <code>pragma self-update</code> to update the CLI binary from GitHub Releases if the CLI is old.</li>
+        <li>Run <code>pragma upgrade</code> inside the app to update <code>.pragma/</code> (runtime, docs, <code>base.css</code>, <code>version</code>) if <code>.pragma/</code> is outdated.</li>
+      </ul>
+    </div>
+    <c-terminal title="~" copy="pragma -V && cat .pragma/version && pragma self-update && pragma upgrade">
+      <pre tabindex="0" aria-label="Commands that validate and update pragma"><code><span class="term-cmd">pragma -V</span>
+<span class="term-cmd">cat .pragma/version</span>
+<span class="term-cmd">pragma self-update</span>
+<span class="term-cmd">pragma upgrade</span></code></pre>
     </c-terminal>
   </section>
 

@@ -1,20 +1,24 @@
 # HTML syntax
 
-`{path}` puts a value in text, `:` binds a value, `.` binds a class, `@` binds an event, `$` is a
-name from the owner's `<script>` (state, prop or function). Conditions and loops are tags. Closed
-list: anything else is an error.
+Pragma HTML uses a closed set of directives and block tags. Any other syntax is an error.
 
-| Write | On | Effect |
+- `{path}` inserts escaped text.
+- `:` binds an attribute or property.
+- `.` toggles a class.
+- `@` binds an event.
+- `$` references a name from the owner `<script>` (state, prop, or function).
+
+| Syntax | Target | Effect |
 |---|---|---|
-| `{path}` | text, attribute value | the value as text (escaped): `<p>Hi {$name}</p>`, `alt="Photo of {p.name}"`, `href="/shop/{p.id}"` |
-| `:<attr>="v"` | element | whole attribute (`:href`, `:disabled`, `:aria-current`); `false`/`null`/`undefined` removes it, `true` sets it empty. `:checked`, `:selected` also set the property. Never `:class`, `:style`, `:on*` |
-| `.<class>="[!]v"` | element | toggles the class |
-| `:show="[!]v"` | element | `hidden` when falsy |
-| `:model="$v"` | input, select, textarea | two-way binding; `$` or `shared` only |
-| `@<event>="fn"` | element | calls the owner's function `fn(event)` (`@input="search"` with `function search(event)`) |
-| `@<event>="fn(a, b)"` | element | calls `fn` with only these arguments: paths (`task`, `$x`, `data.x`), `'text'`, numbers, `true`/`false`/`null`, `event` (the DOM event), `el` (the element with the `@`) |
-| `@<event>="shared.cart.add(item)"` | element | calls a store function (same arguments) |
-| `@open="id"` / `@close` | button | opens/closes an overlay (overlays.md) |
+| `{path}` | Text, attribute string | Inserts escaped text (`<p>Hi {$name}</p>`, `alt="Photo of {p.name}"`, `href="/shop/{p.id}"`). |
+| `:<attr>="v"` | Element | Sets attribute (`:href`, `:disabled`, `:aria-current`). `false`/`null`/`undefined` removes it; `true` sets empty. `:checked` and `:selected` also set the DOM property. Never `:class`, `:style`, `:on*`. |
+| `.<class>="[!]v"` | Element | Toggles the class. |
+| `:show="[!]v"` | Element | Sets `hidden` when falsy. |
+| `:model="$v"` | Input, select, textarea | Two-way binding (`$` or `shared` only). |
+| `@<event>="fn"` | Element | Calls `fn(event)` on the owner (`@input="search"`). |
+| `@<event>="fn(a, b)"` | Element | Calls `fn` with listed arguments only: paths (`task`, `$x`, `data.x`), `'text'`, numbers, `true`/`false`/`null`, `event`, `el`. |
+| `@<event>="shared.cart.add(item)"` | Element | Calls a store function with the same argument rules. |
+| `@open="id"` / `@close` | Button | Opens or closes an overlay (`overlays.md`). |
 
 ## Text: `{path}`
 
@@ -26,26 +30,26 @@ list: anything else is an error.
 <label><input type="checkbox" :model="$done"> {task.title}</label>
 ```
 
-- Only paths (`$x`, `data.x`, `shared.x.y`, `params.x`, `query.x`, `page.x`, a `<for>` variable). No expressions, calls, indexes or `!`.
-- A function from the script is a derived value: `{$total}` calls `total()` on each render.
-- Always escaped text, never HTML. `null`/`undefined` is empty.
-- In an attribute, `{}` builds a string (`alt="Photo of {p.name}"`); for a whole or boolean value use `:attr` (`:disabled="$atMinimum"`).
-- Literal in text whose nearest parent element is `<code>` or `<pre>` (`<code>{x}</code>` shows `{x}`); a child element interpolates (`<pre><span>{$path}</span></pre>`). Directives, blocks and components work everywhere, `<pre>`/`<code>` included (`<pre><code><for line in $lines key=line.id><span>{line.text}</span></for></code></pre>`).
-- Elsewhere write `\{` for a literal brace (`pattern="\d\{3}"`) and `&#36;{path}` for a literal `$` right before a value (`${` is an error).
-- No `{}` in `class` (use `.name="path"`) or in a component prop (pass a path: `:title="$title"`).
-- Without `ssr` the prebuilt HTML shows no value (never raw `{…}`): the runtime fills it at boot. With `ssr` the server renders it.
+- Use paths only (`$x`, `data.x`, `shared.x.y`, `params.x`, `query.x`, `page.x`, `<for>` variable). No expressions, calls, indexes, or `!`.
+- `{$total}` calls derived function `total()` on each render.
+- Output is always escaped text, never HTML. `null` and `undefined` render empty.
+- Use `{}` in attributes to build strings (`alt="Photo of {p.name}"`). Use `:attr` for whole or boolean values (`:disabled="$atMinimum"`).
+- Direct text inside `<code>` or `<pre>` stays literal (`<code>{x}</code>` renders `{x}`). Child elements still interpolate (`<pre><span>{$path}</span></pre>`). Directives, blocks, and components work inside `<code>`/`<pre>`.
+- Write `\{` for a literal brace (`pattern="\d\{3}"`) and `&#36;{path}` for a literal `$` before `{path}` (`${` is an error).
+- Do not use `{}` in `class` (use `.name="path"`) or in component props (use `:title="$title"`).
+- Without `ssr`, prebuilt HTML omits dynamic text until boot. With `ssr`, the server renders it.
 
 ## Blocks
 
-| Write | Effect |
+| Tag | Effect |
 |---|---|
-| `<if [!]v>…</if>` | creates/removes its content |
-| `<else-if [!]v>…</else-if>` | right after `</if>` or `</else-if>`; any number |
-| `<else>…</else>` | right after `</if>` or `</else-if>` |
-| `<for x in v key=x.id>…</for>` | repeats; `key` required, stable and unique |
-| `<empty>…</empty>` | right after `</for>`; shown when the list is empty |
+| `<if [!]v>…</if>` | Inserts or removes its content. |
+| `<else-if [!]v>…</else-if>` | Follows `</if>` or `</else-if>` (any count). |
+| `<else>…</else>` | Follows `</if>` or `</else-if>`. |
+| `<for x in v key=x.id>…</for>` | Repeats per item; `key` must be stable and unique. |
+| `<empty>…</empty>` | Follows `</for>`; renders when the list is empty. |
 
-Paths in block tags are unquoted: `<if page.loading>`, `<if !$open>`, `<for p in data.products key=p.id>`.
+Write block paths without quotes: `<if page.loading>`, `<if !$open>`, `<for p in data.products key=p.id>`.
 
 ```html
 <if page.loading>
@@ -61,21 +65,18 @@ Paths in block tags are unquoted: `<if page.loading>`, `<if !$open>`, `<for p in
 
 ## Values
 
-Only paths `root.a.b`: no expressions, calls, indexes or operators. `!` only in `<if>`,
-`<else-if>`, `:show` and `.class`.
+Use `root.a.b` paths only. Do not use expressions, calls, indexes, or operators. Use `!` only in `<if>`, `<else-if>`, `:show`, and `.class`.
 
 | Root | Value |
 |---|---|
-| `$x` | the owner's state (`let`), prop (`export let`), constant or function |
-| `data` | `load` result |
-| `shared` | stores (`shared.cart.total`) |
-| `params` `query` | path params and query (strings) |
-| `page` | `page.loading`, `page.error` |
-| `<for>` variable | current item |
+| `$x` | Owner state (`let`), prop (`export let`), constant, or function. |
+| `data` | `load` result. |
+| `shared` | Stores (`shared.cart.total`). |
+| `params`, `query` | Path params and query strings. |
+| `page` | `page.loading`, `page.error`. |
+| `<for>` variable | Current loop item. |
 
-Compute every derived value (total, label, filter, flag) in a function of the script or store
-(`const total = () => …`), never in HTML. In a value position (`{}`, `:attr`, `.class`, `:show`,
-`<if>`, `<for>`) the function is called with no arguments.
+Compute every derived value in a script or store function (`const total = () => …`). Value positions (`{}`, `:attr`, `.class`, `:show`, `<if>`, `<for>`) call the function with no arguments.
 
 ## Example
 
@@ -100,21 +101,22 @@ Compute every derived value (total, label, filter, flag) in a function of the sc
 
 ## Owner
 
-- The owner is whoever wrote the element: the page, or the component (with a script) whose `.html` contains it.
-- `$`, `@` and `:model` resolve against the owner. Slot content (and its `{}`) belongs to whoever wrote it.
-- `_layout.html` has no owner: only `shared`, `params` and `query`.
+- The owner is the page or scripted component whose `.html` defines the element.
+- `$`, `@`, and `:model` resolve against the owner. Slot content resolves against its caller.
+- Root and nested `_layout.html` files have no owner; they read only `shared`, `params`, and `query`.
 
 ## Rules
 
-- Each `<if>`, `<else-if>`, `<else>`, `<for>`, `<empty>` contains exactly 1 root element, not another block. Put other directives on that element, not on the block tag.
-- Strict HTML: close every non-void tag. No `<html>`, `<body>`, `<template>`; one `<script>` and one `<style>` per file (state.md, css.md).
-- `@submit` calls `preventDefault()`. Every `<form>` is an agent tool: `toolname`, `tooldescription`, `name` on each field, or `notool` (webmcp.md); read submitted values from `new FormData(event.target)` so agent fills work even without input events. Pass the `<for>` item as an argument: `@click="remove(task)"`. Without parentheses the function gets the event (`@input="search"`); with them it gets only what you list (`@click="reset()"` gets nothing). Use `el`, not `event.currentTarget`, for the element with the `@` (events are delegated).
-- No `$` in events (`@click="increase"`, not `@click="$increase"`): `$` marks values. `:attr` takes a bare path (`:disabled="$atMinimum"`); to build text write `title="Count {$count}"` without the colon.
-- Block tags take one path, no operators: `<if $hasTasks>` with `const hasTasks = () => tasks.length > 0` in the script.
-- For `aria-*` states (`aria-pressed`, `aria-expanded`), return the strings `'true'`/`'false'`: boolean `false` removes the attribute.
-- `:show` hides an element that stays in the DOM; `<if>` creates/removes it. An element with `autofocus` inside a newly inserted block gets focus.
-- In dev, a path that does not exist throws (except under `query`).
-- Markers: `data-page` (layout `<main>`), `data-reload` (`<a>` that does a full page load). Never write `data-c`, `data-tid`, `data-of`, `data-slot`, `data-prop-*`: the build generates them.
-- Never write `data-*` by hand (`html/data-attribute`): `data-*` is the compiled form of the short syntax (`data-text` is `{path}`, `data-on-click` is `@click`). For a dynamic style hook with many values, bind `:data-x="path"` and select it in CSS with `[data-x=value]`; for on/off, use `.name="path"`; for tests, select by role, label or id.
-- `:text` was removed (`html/text-removed`): write `{path}` inside the element.
-- Forbidden: inline `style` and `on*`, `:class` (use `.name`), `{{ }}` and `${ }` outside text directly in `<code>`/`<pre>` (`html/interpolation`), the legacy syntax `state.`, `props.`, and attributes of other frameworks (`v-if`, `x-show`, `on:click`, `*ngIf`, `[disabled]`: `html/unknown-directive`).
+- Each `<if>`, `<else-if>`, `<else>`, `<for>`, and `<empty>` must contain exactly 1 root element (not another block). Put directives on that element, not on the block tag.
+- Write strict HTML and close every non-void tag. Do not use `<html>`, `<body>`, or `<template>`. Put at most one `<script>` and one `<style>` per file (`state.md`, `css.md`).
+- `@submit` calls `preventDefault()` automatically. Every `<form>` is an agent tool (`webmcp.md`); read values with `new FormData(event.target)`.
+- Pass `<for>` items as arguments (`@click="remove(task)"`). Without parentheses, the handler receives `event` (`@input="search"`). With parentheses, it receives only listed arguments (`@click="reset()"` receives none). Use `el` instead of `event.currentTarget` (events are delegated).
+- Omit `$` in event names (`@click="increase"`). `:attr` takes a bare path (`:disabled="$atMinimum"`); use `title="Count {$count}"` without `:` for interpolated strings.
+- Pass one bare path to block tags (`<if $hasTasks>` with `const hasTasks = () => tasks.length > 0`).
+- Return `'true'` or `'false'` strings for `aria-*` states (`aria-pressed`, `aria-expanded`), because boolean `false` removes the attribute.
+- `:show` hides an element in the DOM; `<if>` adds or removes it. `autofocus` inside a newly inserted block receives focus.
+- In dev, missing paths throw (except under `query`).
+- Allowed markers: `data-page` (root layout `<main>`), `data-reload` (full-load `<a>`). Never write `data-c`, `data-tid`, `data-of`, `data-slot`, or `data-prop-*`.
+- Do not write `data-*` attributes by hand (`html/data-attribute`). Bind `:data-x="path"` for multi-value style hooks (`[data-x=value]`), `.name="path"` for on/off states, and role/label/id for tests.
+- `:text` is removed (`html/text-removed`); use `{path}` inside the element.
+- Forbidden: inline `style` and `on*`, `:class`, `{{ }}`/`${ }` outside direct `<code>`/`<pre>` text (`html/interpolation`), legacy `state.`/`props.`, and foreign directives (`v-if`, `x-show`, `on:click`, `*ngIf`, `[disabled]`: `html/unknown-directive`).

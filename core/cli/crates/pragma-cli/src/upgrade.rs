@@ -66,6 +66,12 @@ pub fn upgrade(root: &Path) -> Result<CoreDiff, String> {
     Ok(changes)
 }
 
+pub fn installed_version(root: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(root.join(".pragma/version")).ok()?;
+    let trimmed = text.trim();
+    (!trimmed.is_empty()).then(|| trimmed.to_owned())
+}
+
 /// `app/core-outdated` warning for `pragma check`, when `.pragma/` is not this binary's version.
 pub fn outdated(root: &Path) -> Option<Diagnostic> {
     let changes = diff(root);
@@ -75,11 +81,17 @@ pub fn outdated(root: &Path) -> Option<Diagnostic> {
     let shown: Vec<&str> = changes.paths().take(3).map(String::as_str).collect();
     let more = changes.len().saturating_sub(shown.len());
     let more = if more > 0 { format!(" and {more} more") } else { String::new() };
-    let message = format!(
-        ".pragma/ differs from the version in pragma {} ({}{more}); run `pragma upgrade`",
-        env!("CARGO_PKG_VERSION"),
-        shown.join(", ")
-    );
+    let current = env!("CARGO_PKG_VERSION");
+    let message = match installed_version(root) {
+        Some(from) if from != current => format!(
+            ".pragma/ is at {from}, installed pragma is {current} ({}{more}); run `pragma upgrade`",
+            shown.join(", ")
+        ),
+        _ => format!(
+            ".pragma/ differs from the version in pragma {current} ({}{more}); run `pragma upgrade`",
+            shown.join(", ")
+        ),
+    };
     Some(Diagnostic::warning(".pragma", 1, 1, "app/core-outdated", message))
 }
 

@@ -1,7 +1,6 @@
 # Overlays: modal, alert, dropdown
 
-Always use `c-modal`, `c-alert`, `c-dropdown`. The runtime handles open, close, Esc, Back, focus
-and scroll lock.
+Use `c-modal`, `c-alert`, and `c-dropdown` for all overlays. The runtime handles open, close, Esc, Back, focus, and scroll lock.
 
 ```html
 <button type="button" class="btn" @open="about">About</button>
@@ -41,13 +40,13 @@ async function remove() {
 
 | JS (`import { open, close, confirm } from 'pragma'`) | Effect |
 |---|---|
-| `open(id)` / `close(id)` | open / close |
-| `await confirm(id)` | opens; resolves with the `value` of the clicked `@close` button, or `'cancel'` |
+| `open(id)` / `close(id)` | Opens or closes the overlay. |
+| `await confirm(id)` | Opens the overlay and resolves to the clicked `@close` button's `value`, or `'cancel'`. |
 
 ## Rules
 
 - Back closes the top overlay, not the page. Overlays stack.
 - Modal and alert lock scroll; dropdown does not. Focus returns to the opener.
-- Destructive action: put `autofocus` on the safe button.
-- Open only in response to a user click.
-- Never create `<dialog>`/`[popover]` by hand, call `showModal()`, use `window.confirm`, keep "open" in state, use `role="menu"`, or import `.pragma/overlay.js`.
+- Put `autofocus` on the safe button in destructive confirmations.
+- Open overlays only after a user click.
+- Do not write `<dialog>` or `[popover]` by hand. Do not call `showModal()` or `window.confirm`. Do not store open state in a `let`. Do not use `role="menu"` or import `.pragma/overlay.js`.

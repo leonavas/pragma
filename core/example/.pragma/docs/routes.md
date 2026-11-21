@@ -7,14 +7,16 @@
 | `routes/shop/index.html` | `/shop` |
 | `routes/shop/[id].html` | `/shop/:id` |
 
-- Every `.html` in `routes/` is a route, except names starting with `_`. `x.html` plus `x/index.html` = error.
-- `[name]` (file or folder) = path param; a static segment beats a param. No `[...rest]`, no nested layouts.
-- A page is a fragment: no `<html>`, `<head>`, `<body>`. `<title>`, `<meta>` and `<link>` at the top level of the page go to `<head>` (see SEO).
-- Read params as `params.id`, `query.filter` in HTML and in scripts (`import { params, query } from 'pragma'`). Always strings.
+- Every `.html` in `routes/` is a route, except names starting with `_`.
+- Having both `x.html` and `x/index.html` is an error (`app/route-conflict`).
+- `[name]` (file or folder) defines a path param. Static segments take priority over params. `[...rest]` is not supported.
+- A page is an HTML fragment without `<html>`, `<head>`, or `<body>`. Top-level `<title>`, `<meta>`, and `<link>` move to `<head>` (see SEO).
+- Read params as `params.id` and `query.filter` in HTML and scripts (`import { params, query } from 'pragma'`). Both are always strings.
 
-## Layout
+## Root layout
 
-`routes/_layout.html`:
+`routes/_layout.html` wraps all routes:
+
 ```html
 <head>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -29,13 +31,36 @@
 <main data-page><slot></slot></main>
 ```
 
-- `<head>` is optional and must come first. Its tags go on every page; it is static (no `:` bindings, no `{}`). Exactly one `<main data-page>` containing only `<slot></slot>`.
-- The layout has no script: it reads only `shared`, `params`, `query`. For behavior, use a component with a `<script>`.
-- `routes/_404.html` renders unknown routes. Neither it nor the layout has a `.server.js`.
+- `<head>` is optional and must come first. Its tags apply to every page and must be static (no `:` bindings, no `{}`).
+- Include exactly one `<main data-page>` containing only `<slot></slot>`.
+- The layout has no `<script>` and no `.server.js`. It reads only `shared`, `params`, and `query`. Use a component with `<script>` for behavior.
+- `routes/_404.html` renders unknown routes. It has no `.server.js`.
+
+## Nested layouts
+
+Any subfolder in `routes/` can add `_layout.html` with `<slot></slot>` to wrap routes in that folder and its subfolders.
+
+`routes/shop/_layout.html`:
+```html
+<div class="grid gap-6 md:grid-cols-4">
+  <aside aria-label="Shop menu">
+    <a href="/shop" class="nav-link">All products</a>
+    <a href="/shop/deals" class="nav-link">Deals</a>
+  </aside>
+  <section class="md:col-span-3">
+    <slot></slot>
+  </section>
+</div>
+```
+
+- A nested `_layout.html` wraps the page inside the root `<main data-page>`.
+- A nested `_layout.html` has no `<head>`, no `<script>`, and no `.server.js`.
+- It reads only `shared`, `params`, and `query`.
+- Include one `<slot></slot>` for the child route or inner layout.
 
 ## SEO and link previews
 
-Site-wide tags go in the layout `<head>`. Each page writes its own `<title>`, `<meta>` and `<link>` at the top level; a page tag replaces the layout tag with the same `name`, `property`, `http-equiv` or `rel` (+ `hreflang`); new ones are added.
+Put site-wide tags in `routes/_layout.html` `<head>`. Put page `<title>`, `<meta>`, and `<link>` at the top level of each page. A page tag replaces the layout tag with the same `name`, `property`, `http-equiv`, or `rel` (+ `hreflang`); new tags are added.
 
 `routes/about.html`:
 ```html
@@ -47,7 +72,7 @@ Site-wide tags go in the layout `<head>`. Each page writes its own `<title>`, `<
 <h1>About</h1>
 ```
 
-From server data: write `{path}` in `<title>` and `:<attr>` or `{path}` in a `<meta>`/`<link>` attribute, with `data`, `params` or `query`, and `export const ssr = true` in the page's `.server.js`. The server renders them into the first HTML, so crawlers and link-preview bots (no JS) see them.
+For server data, use `{path}` in `<title>` and `:<attr>` or `{path}` in `<meta>`/`<link>` with `data`, `params`, or `query`. Add `export const ssr = true` in `.server.js` so crawlers and link previews receive them in the first HTML.
 
 `routes/blog/[slug].html`:
 ```html
@@ -69,6 +94,7 @@ From server data: write `{path}` in `<title>` and `:<attr>` or `{path}` in a `<m
 </script>
 <h1>{data.post.title}</h1>
 ```
+
 `routes/blog/[slug].server.js`:
 ```js
 export const ssr = true
@@ -78,16 +104,17 @@ export async function load({ params, request }) {
 }
 ```
 
-- A missing value keeps the tag's static text or attribute; a `<meta>` without `content` or a `<link>` without `href` is dropped.
-- Structured data (JSON-LD): one `<script type="application/ld+json">` per schema, at the top level of the page (never in a component); it goes to `<head>`. It must be valid JSON (`html/json-ld`). `{path}` works only inside its strings (`"headline": "{data.post.title}"`), with `data`, `params` or `query` and `ssr`; the server writes each value JSON-escaped. A literal `{` inside a string is `{`. Without `{}` it is static and needs no `ssr`. Any other `<script type>` is an error (`html/script`).
-- Never put `canonical` or `og:url` in the layout: every page would point to the same URL.
-- `<meta>` and `<link>` anywhere else in a page or component are an error (`html/head`).
-- The router updates `<title>`, `<meta>` and `<link>` on every navigation.
+- Missing values keep the tag's static text or attribute. A `<meta>` without `content` or `<link>` without `href` is dropped.
+- Put JSON-LD `<script type="application/ld+json">` at the top level of a page (never in a component); it moves to `<head>`.
+- JSON-LD must be valid JSON (`html/json-ld`). `{path}` works inside strings with `data`, `params`, or `query` and `ssr`. The server JSON-escapes each value. A literal `{` in a string is `{`. Static JSON-LD needs no `ssr`. Other `<script type>` values trigger `html/script`.
+- Do not put `canonical` or `og:url` in the layout.
+- Do not place `<meta>` or `<link>` outside the page top level or root layout `<head>` (`html/head`).
+- The router updates `<title>`, `<meta>`, and `<link>` on every navigation.
 
 ## Active link
 
-- An `<a href="/path">` (no query or hash) pointing to the current route gets `aria-current="page"` automatically. Style it in `lib/theme.css`: `.nav-link[aria-current="page"]`.
-- For query-based links (filters, tabs), bind `:aria-current` to a derived function returning `'true'` or `false`:
+- `<a href="/path">` (no query or hash) automatically gets `aria-current="page"` on the current route. Style `.nav-link[aria-current="page"]` in `lib/theme.css`.
+- For query links (filters, tabs), bind `:aria-current` to a derived function that returns `'true'` or `false`:
 
 ```html
 <script>
@@ -100,8 +127,8 @@ export async function load({ params, request }) {
 
 ## Navigation
 
-- Use `<a href>`. The router swaps only `<main data-page>`, prefetches links and keeps the layout.
-- Every navigation, including query-only changes, recreates the page state.
-- From JS after an action: `navigate('/shop?filter=sale')` (`import { navigate } from 'pragma'`).
-- Full page load: `<a href="/logout" data-reload>`. Links with `target` or `download` also bypass the router.
-- Never use `<button>` + `navigate` instead of `<a>`, `location.href`, `history.pushState`, or `location` to read params.
+- Use `<a href>`. The router swaps `<main data-page>`, prefetches links, and keeps the root layout.
+- Every navigation, including query-only changes, recreates page state.
+- Navigate from JS after an action with `navigate('/shop?filter=sale')` (`import { navigate } from 'pragma'`).
+- Force a full page load with `<a href="/logout" data-reload>`. Links with `target` or `download` also bypass the router.
+- Do not use `<button>` + `navigate` instead of `<a>`. Do not use `location.href`, `history.pushState`, or `location` to read params.

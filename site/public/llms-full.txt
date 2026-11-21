@@ -21,12 +21,29 @@ Or build from source with Cargo:
 git clone https://github.com/leonavas/pragma && cd pragma && cargo install --path core/cli/crates/pragma-cli
 ```
 
+## Validate version and update
+
+Validate the pragma version before you change code:
+
+1. Run `pragma -V` to check the installed CLI version.
+2. Compare that version with `.pragma/version` inside the app.
+3. Run `pragma self-update` to update the CLI binary from GitHub Releases if the CLI is old.
+4. Run `pragma upgrade` inside the app to update `.pragma/` (runtime, docs, `base.css`, `version`) if `.pragma/` is outdated.
+
+```sh
+pragma -V
+cat .pragma/version
+pragma self-update
+pragma upgrade
+```
+
 ## The loop
 
-1. Read `AGENTS.md` in the app (the rules below), then the doc for the task.
-2. Write the code: one `.html` per page or component, plain JS, utility classes.
-3. Run `pragma check --strict` and fix every error and warning at its cause, never around the rule.
-4. Done when `pragma check --strict` prints no problems. `pragma build` writes `dist/`.
+1. Validate the pragma version (`pragma -V` vs `.pragma/version`); run `pragma self-update` and `pragma upgrade` if outdated.
+2. Read `AGENTS.md` in the app (the rules below), then the doc for the task in `.pragma/docs/`.
+3. Write the code: one `.html` per page or component, plain JS, utility classes.
+4. Run `pragma check --strict` and fix every error and warning at its cause, never around the rule.
+5. Finish when `pragma check --strict` prints no problems. `pragma build` writes `dist/`.
 
 ## Contents
 
@@ -35,7 +52,7 @@ git clone https://github.com/leonavas/pragma && cd pragma && cargo install --pat
 - [HTML syntax](https://pragma.leonavas.com/docs/syntax.md): HTML directives ({path}, :, ., @, $) and blocks
 - [Components](https://pragma.leonavas.com/docs/components.md): components, props, slots
 - [State: script, actions, derived values, stores](https://pragma.leonavas.com/docs/state.md): script: state, actions, derived values, mount, stores
-- [Routes and router](https://pragma.leonavas.com/docs/routes.md): pages, links, params, query, layout, head tags
+- [Routes and router](https://pragma.leonavas.com/docs/routes.md): pages, links, params, query, layouts (including nested), head tags
 - [Data: load, server actions, skeleton, SSR](https://pragma.leonavas.com/docs/data.md): load, server actions, skeleton, SSR
 - [Overlays: modal, alert, dropdown](https://pragma.leonavas.com/docs/overlays.md): modal, alert, dropdown
 - [CSS](https://pragma.leonavas.com/docs/css.md): styles and theme
@@ -44,7 +61,7 @@ git clone https://github.com/leonavas/pragma && cd pragma && cargo install --pat
 - [npm packages](https://pragma.leonavas.com/docs/packages.md): npm packages: when and which
 - [Performance](https://pragma.leonavas.com/docs/performance.md): performance defaults and budgets
 - [Logs](https://pragma.leonavas.com/docs/logs.md): OpenTelemetry logs
-- [pragma CLI](https://pragma.leonavas.com/docs/cli.md): commands, check rules, deploy
+- [pragma CLI](https://pragma.leonavas.com/docs/cli.md): commands, self-update, upgrade, check rules, deploy
 
 ---
 
@@ -52,66 +69,74 @@ Source: https://pragma.leonavas.com/docs/rules.md
 
 # AGENTS.md
 
-pragma app: native HTML, CSS and JS, no framework, usable by AI agents. Docs are in `.pragma/docs/`: read the relevant one before changing code.
+A pragma app uses native HTML, CSS, and JS without a framework. Read the relevant file in `.pragma/docs/` before you change code.
+
+## Version check
+
+1. Compare `pragma -V` with `.pragma/version`.
+2. If they differ, or if `pragma check` reports `app/core-outdated`, run `pragma upgrade`.
+3. Run `pragma self-update` to update the CLI binary.
 
 ## Syntax
 
-A page or component is one `.html`: an optional `<script>` and `<style>`, then the markup.
-In the `<script>`, a top-level `let` is state, a function is an action (`@click="add"`) or a
-derived value (`{$total}` in HTML, `total()` in JS), `export let step = 1` is a prop and
-`function mount(el) { …; return cleanup }` runs after mount. Services:
-`import { shared, data, params, query, page, call, navigate, open, close, confirm, log } from 'pragma'`.
-`<style>` is scoped to its component or page (`:global(…)` opts out only what is inside it).
+A page or component is one `.html` file: optional `<script>`, optional `<style>`, then markup.
 
-`{path}` puts a value in text and attribute strings (`<p>Hi {$name}</p>`, `href="/shop/{p.id}"`),
-`:` binds a whole value (`:href`, `:disabled`), `.` binds a class, `@` binds an event, `$` is a
-name from the `<script>` (HTML only: in JS write `name`).
-`@input="search"` passes the event; `@change="toggle(task)"` passes only what it lists (paths,
-literals, `event`, `el`); store functions work directly: `@click="shared.cart.remove(item.id)"`.
-Blocks are tags: `<if v>`, `<else-if v>`, `<else>`, `<for x in v key=x.id>`, `<empty>`.
-`<c-x>` = `lib/components/x/`; `<p-x>` = `_components/x/` in the page's folder.
+- Top-level `let` declares state.
+- A function defines an action (`@click="add"`) or a derived value (`{$total}` in HTML, `total()` in JS).
+- `export let step = 1` declares a prop.
+- `function mount(el) { …; return cleanup }` runs after mount.
+- Import services from `'pragma'`: `import { shared, data, params, query, page, call, navigate, open, close, confirm, log } from 'pragma'`.
+- `<style>` scopes to its component or page (`:global(…)` opts out only its argument).
+- `{path}` inserts escaped text in text and attribute strings (`<p>Hi {$name}</p>`, `href="/shop/{p.id}"`).
+- `:` binds a value (`:href`, `:disabled`). `.` toggles a class. `@` binds an event.
+- `$` references a `<script>` name in HTML only (write `name` in JS).
+- `@input="search"` passes `event`. `@change="toggle(task)"` passes only the listed arguments (paths, literals, `event`, `el`).
+- Call store functions directly: `@click="shared.cart.remove(item.id)"`.
+- Use tags for blocks: `<if v>`, `<else-if v>`, `<else>`, `<for x in v key=x.id>`, `<empty>`.
+- `<c-x>` maps to `lib/components/x/`. `<p-x>` maps to `_components/x/` in the page folder or an ancestor.
+- `routes/_layout.html` is the root layout (`<main data-page><slot></slot></main>`). Any subfolder can add `_layout.html` with `<slot></slot>` (no `<head>`, no `<script>`, no `.server.js`) to wrap routes in that folder and its subfolders.
 
 ## Rules
 
-- Plain JS (ES modules). No TypeScript, no JSDoc types, no `console.*` (use `log.*`).
-- npm packages only when the platform cannot do it; plain JS (ESM preferred), chosen per `packages.md`.
-- No HTML in JS. Never write to the DOM: assign a `let`.
-- Strict HTML: close every non-void tag.
-- Derived values are functions in the script or store (`const total = () => …`), never expressions in HTML.
-- Read `data` inside functions only; it is undefined until the load ends.
-- Stores live in `lib/state/` and are reached only through `shared`.
-- Never write comments. The code is the documentation.
-- Names say what a thing is or does. No vague (`tmp`, `data`, `info`) or short (`t`, `e`) names,
-  except `i`, `j`, `k`, `id`, `ok`, `el`, `url`, `log` and parameters of one-expression arrows.
-- Fixed structure; never edit `.pragma/` (`pragma upgrade` updates it). Reuse components before creating new ones.
-- Overlays only with `c-modal`, `c-alert`, `c-dropdown`.
-- Data comes from `load` in `.server.js`, with a skeleton.
-- CSS: utilities from `classes.md`; a custom class only when a combination repeats 3+ times. No inline `style`.
-- Accessible: a name on every control, `alt`, labels, one `<h1>`.
-- Agent-first: every `<form>` is a WebMCP tool: `toolname` (`snake_case` verb_object), `tooldescription`,
-  `name` and `toolparamdescription` on each field; `notool` for login or password forms (`webmcp.md`).
-- Finish with `pragma check --strict`: zero errors, zero warnings.
+- Validate `pragma -V` against `.pragma/version`. Run `pragma upgrade` on mismatch or `app/core-outdated`.
+- Use plain JS (ES modules). Do not use TypeScript, JSDoc types, or `console.*` (use `log.*`).
+- Add npm packages only when the platform lacks the feature. Prefer plain JS ES modules (`packages.md`).
+- Do not put HTML in JS. Do not mutate the DOM; assign a `let`.
+- Write strict HTML. Close every non-void tag.
+- Compute derived values in functions (`const total = () => …`). Do not write expressions in HTML.
+- Read `data` inside functions only; it is undefined until `load` finishes.
+- Put stores in `lib/state/`. Access stores only through `shared`.
+- Do not write comments.
+- Use descriptive names. Do not use vague (`tmp`, `data`, `info`) or short (`t`, `e`) names, except `i`, `j`, `k`, `id`, `ok`, `el`, `url`, `log`, and parameters of one-expression arrows.
+- Keep the fixed folder structure. Do not edit `.pragma/` (run `pragma upgrade` to update it).
+- Reuse existing components before creating new ones.
+- Build overlays only with `c-modal`, `c-alert`, and `c-dropdown`.
+- Load data with `load` in `.server.js` and render a skeleton.
+- Use utilities from `classes.md`. Create a custom class only when a combination repeats 3+ times. Do not use inline `style`.
+- Follow accessibility rules: name every control, add `alt` and labels, use one `<h1>`.
+- Make every `<form>` a WebMCP tool: set `toolname` (`snake_case` verb_object), `tooldescription`, `name`, and `toolparamdescription` on each field. Add `notool` on login or password forms (`webmcp.md`).
+- Run `pragma check --strict` before you finish. Fix all errors and warnings.
 
 ## To do X, read Y
 
 | Task | Read |
 |---|---|
 | HTML syntax (`{}`, `:`, `.`, `@`, `$`, blocks) | `syntax.md` |
-| where each file goes, `pragma.json` | `structure.md` |
-| pages, links, params, query, layout | `routes.md` |
-| page title, description, canonical, Open Graph | `routes.md` (SEO) |
-| components, props, slots | `components.md` |
+| File locations, `pragma.json`, `.pragma/version` | `structure.md` |
+| Pages, links, params, query, root and nested layouts | `routes.md` |
+| Page title, description, canonical, Open Graph, JSON-LD | `routes.md` (SEO) |
+| Components, props, slots | `components.md` |
 | `<script>`: state, actions, derived values, `mount`, stores | `state.md` |
-| load, server actions, skeleton, SSR | `data.md` |
-| modal, alert, dropdown | `overlays.md` |
-| styles, theme | `css.md`, `classes.md` |
-| forms as agent tools (WebMCP), markdown for agents | `webmcp.md` |
-| performance | `performance.md` |
-| logs | `logs.md` |
-| npm packages (install, which to use) | `packages.md` |
-| commands, `check` rules, deploy | `cli.md` |
+| `load`, server actions, skeleton, SSR | `data.md` |
+| Modal, alert, dropdown | `overlays.md` |
+| Styles, theme | `css.md`, `classes.md` |
+| Forms as agent tools (WebMCP), markdown for agents | `webmcp.md` |
+| Performance | `performance.md` |
+| Logs | `logs.md` |
+| npm packages (install, selection) | `packages.md` |
+| Commands, `check` rules, upgrade, self-update, deploy | `cli.md` |
 
-If unsure, copy the doc's example. If no doc covers it, do the simplest thing that passes `check`.
+Copy the doc example when unsure. If no doc covers a case, use the simplest code that passes `pragma check`.
 
 ---
 
@@ -119,7 +144,7 @@ Source: https://pragma.leonavas.com/docs/structure.md
 
 # App structure
 
-Fixed. Create no other top-level folders. Never edit `.pragma/`.
+The folder structure is fixed. Do not create other top-level folders. Do not edit `.pragma/`.
 
 ```
 <app>/
@@ -128,42 +153,60 @@ Fixed. Create no other top-level folders. Never edit `.pragma/`.
   package.json             optional: npm packages in dependencies (packages.md)
   routes/
     _layout.html  _404.html
-    index.html             page / (optional <script> and <style> at the top)
-    index.js               the page script as a file, instead of the <script> (optional)
-    index.server.js        data (optional)
+    index.html             page / (optional <script> and <style> at top)
+    index.js               optional page script file instead of <script>
+    index.server.js        optional server data and actions
     shop/
+      _layout.html         optional nested layout for /shop/*
       [id].html            /shop/:id
       _catalog.server.js   private server helper
       _products.json       private data
       _components/<name>/  <p-name>
   lib/
-    components/<name>/     <c-name>; modal, alert, dropdown ship with the starter
-    state/<name>.js        stores (reached through `shared`, never imported)
-    theme.css              tokens and custom classes
+    components/<name>/     <c-name>; starter ships modal, alert, dropdown
+    state/<name>.js        stores (access through `shared`, never import)
+    theme.css              tokens and global custom classes
   utils/                   pure functions
-  public/                  static files (images, fonts, robots.txt, <page>.md for agents), served as-is
-  .pragma/                 framework (runtime, docs, base.css); do not edit
+  public/                  static files (images, fonts, robots.txt, <page>.md for agents)
+  .pragma/                 framework (runtime, docs, base.css, version); do not edit
 ```
 
-`pragma.json`: `name` required; `lang` sets `<html lang>` (default `"en"`); `webmcp` (default
-`true`) makes every `<form>` an agent tool and turns on the `webmcp/*` rules (webmcp.md). Budgets, gzip kB:
-`initialJsKb` all JS a page loads, `routeJsKb` the page's JS outside `.pragma/`, `cssKb` global CSS.
+## `pragma.json`
 
-| Thing | Location |
+- `name` is required.
+- `lang` sets `<html lang>` (default `"en"`).
+- `webmcp` (default `true`) turns every `<form>` into an agent tool and enables `webmcp/*` rules (`webmcp.md`).
+- `budgets` sets gzip kB limits: `initialJsKb` (all JS loaded by a page), `routeJsKb` (page JS outside `.pragma/`), `cssKb` (global CSS).
+
+## `.pragma/` versioning
+
+- `.pragma/version` records the `.pragma/` version.
+- Compare `pragma -V` with `.pragma/version`.
+- Run `pragma upgrade` to update `.pragma/` to match the CLI (`cli.md`).
+- Run `pragma self-update [version]` to update the CLI binary (`cli.md`).
+
+## File locations
+
+| Item | Location |
 |---|---|
-| Page | `routes/<path>.html` (with its `<script>`/`<style>`, or `.js`) + `.server.js` (same base name) |
+| Page | `routes/<path>.html` (with `<script>`/`<style>`, or `.js`) + `.server.js` (same base name) |
+| Root layout | `routes/_layout.html` |
+| Nested layout | `routes/<folder>/_layout.html` |
 | Server-only helper or JSON | `routes/<folder>/_name.server.js`, `_name.json` |
-| Component for one route folder | `routes/<folder>/_components/<name>/` |
+| Route-local component | `routes/<folder>/_components/<name>/` |
 | Shared component | `lib/components/<name>/` |
-| State shared across pages | `lib/state/<name>.js` |
+| Shared state store | `lib/state/<name>.js` |
 | Token, color, global class | `lib/theme.css` |
 | Pure function | `utils/<name>.js` |
-| Markdown of a page for agents | `public/<path>.md` or `public/<path>/index.md` (`/` → `public/index.md`; webmcp.md) |
+| Agent markdown page | `public/<path>.md` or `public/<path>/index.md` (`/` -> `public/index.md`; `webmcp.md`) |
+
+## Rules
 
 - A leading `_` makes a file or folder private (not a route). Only `_layout.html` and `_404.html` are special.
-- `<script>` and `<style>` only once each, at the top level of a page or component `.html` (never in the layout); or the same base name as `.js`/`.css`, not both. No `src/`, `pages/`, `styles/`, `helpers/`.
-- CSS lives in a component's or page's `<style>` (or the component's `.css`), or `lib/theme.css`.
-- Names: component folder = lowercase letters, digits, hyphens; route param `[name]` = letters, digits, `_`; store file = JS identifier.
+- Put at most one `<script>` and one `<style>` at the top level of a page or component `.html` (never in layouts). Or use `.js`/`.css` with the same base name, not both.
+- Do not create `src/`, `pages/`, `styles/`, or `helpers/`.
+- Put CSS in a component or page `<style>`, a component `.css`, or `lib/theme.css`.
+- Naming: component folder uses lowercase letters, digits, hyphens; route param `[name]` uses letters, digits, `_`; store file uses a valid JS identifier.
 
 ---
 
@@ -171,21 +214,25 @@ Source: https://pragma.leonavas.com/docs/syntax.md
 
 # HTML syntax
 
-`{path}` puts a value in text, `:` binds a value, `.` binds a class, `@` binds an event, `$` is a
-name from the owner's `<script>` (state, prop or function). Conditions and loops are tags. Closed
-list: anything else is an error.
+Pragma HTML uses a closed set of directives and block tags. Any other syntax is an error.
 
-| Write | On | Effect |
+- `{path}` inserts escaped text.
+- `:` binds an attribute or property.
+- `.` toggles a class.
+- `@` binds an event.
+- `$` references a name from the owner `<script>` (state, prop, or function).
+
+| Syntax | Target | Effect |
 |---|---|---|
-| `{path}` | text, attribute value | the value as text (escaped): `<p>Hi {$name}</p>`, `alt="Photo of {p.name}"`, `href="/shop/{p.id}"` |
-| `:<attr>="v"` | element | whole attribute (`:href`, `:disabled`, `:aria-current`); `false`/`null`/`undefined` removes it, `true` sets it empty. `:checked`, `:selected` also set the property. Never `:class`, `:style`, `:on*` |
-| `.<class>="[!]v"` | element | toggles the class |
-| `:show="[!]v"` | element | `hidden` when falsy |
-| `:model="$v"` | input, select, textarea | two-way binding; `$` or `shared` only |
-| `@<event>="fn"` | element | calls the owner's function `fn(event)` (`@input="search"` with `function search(event)`) |
-| `@<event>="fn(a, b)"` | element | calls `fn` with only these arguments: paths (`task`, `$x`, `data.x`), `'text'`, numbers, `true`/`false`/`null`, `event` (the DOM event), `el` (the element with the `@`) |
-| `@<event>="shared.cart.add(item)"` | element | calls a store function (same arguments) |
-| `@open="id"` / `@close` | button | opens/closes an overlay (overlays.md) |
+| `{path}` | Text, attribute string | Inserts escaped text (`<p>Hi {$name}</p>`, `alt="Photo of {p.name}"`, `href="/shop/{p.id}"`). |
+| `:<attr>="v"` | Element | Sets attribute (`:href`, `:disabled`, `:aria-current`). `false`/`null`/`undefined` removes it; `true` sets empty. `:checked` and `:selected` also set the DOM property. Never `:class`, `:style`, `:on*`. |
+| `.<class>="[!]v"` | Element | Toggles the class. |
+| `:show="[!]v"` | Element | Sets `hidden` when falsy. |
+| `:model="$v"` | Input, select, textarea | Two-way binding (`$` or `shared` only). |
+| `@<event>="fn"` | Element | Calls `fn(event)` on the owner (`@input="search"`). |
+| `@<event>="fn(a, b)"` | Element | Calls `fn` with listed arguments only: paths (`task`, `$x`, `data.x`), `'text'`, numbers, `true`/`false`/`null`, `event`, `el`. |
+| `@<event>="shared.cart.add(item)"` | Element | Calls a store function with the same argument rules. |
+| `@open="id"` / `@close` | Button | Opens or closes an overlay (`overlays.md`). |
 
 ## Text: `{path}`
 
@@ -197,26 +244,26 @@ list: anything else is an error.
 <label><input type="checkbox" :model="$done"> {task.title}</label>
 ```
 
-- Only paths (`$x`, `data.x`, `shared.x.y`, `params.x`, `query.x`, `page.x`, a `<for>` variable). No expressions, calls, indexes or `!`.
-- A function from the script is a derived value: `{$total}` calls `total()` on each render.
-- Always escaped text, never HTML. `null`/`undefined` is empty.
-- In an attribute, `{}` builds a string (`alt="Photo of {p.name}"`); for a whole or boolean value use `:attr` (`:disabled="$atMinimum"`).
-- Literal in text whose nearest parent element is `<code>` or `<pre>` (`<code>{x}</code>` shows `{x}`); a child element interpolates (`<pre><span>{$path}</span></pre>`). Directives, blocks and components work everywhere, `<pre>`/`<code>` included (`<pre><code><for line in $lines key=line.id><span>{line.text}</span></for></code></pre>`).
-- Elsewhere write `\{` for a literal brace (`pattern="\d\{3}"`) and `&#36;{path}` for a literal `$` right before a value (`${` is an error).
-- No `{}` in `class` (use `.name="path"`) or in a component prop (pass a path: `:title="$title"`).
-- Without `ssr` the prebuilt HTML shows no value (never raw `{…}`): the runtime fills it at boot. With `ssr` the server renders it.
+- Use paths only (`$x`, `data.x`, `shared.x.y`, `params.x`, `query.x`, `page.x`, `<for>` variable). No expressions, calls, indexes, or `!`.
+- `{$total}` calls derived function `total()` on each render.
+- Output is always escaped text, never HTML. `null` and `undefined` render empty.
+- Use `{}` in attributes to build strings (`alt="Photo of {p.name}"`). Use `:attr` for whole or boolean values (`:disabled="$atMinimum"`).
+- Direct text inside `<code>` or `<pre>` stays literal (`<code>{x}</code>` renders `{x}`). Child elements still interpolate (`<pre><span>{$path}</span></pre>`). Directives, blocks, and components work inside `<code>`/`<pre>`.
+- Write `\{` for a literal brace (`pattern="\d\{3}"`) and `&#36;{path}` for a literal `$` before `{path}` (`${` is an error).
+- Do not use `{}` in `class` (use `.name="path"`) or in component props (use `:title="$title"`).
+- Without `ssr`, prebuilt HTML omits dynamic text until boot. With `ssr`, the server renders it.
 
 ## Blocks
 
-| Write | Effect |
+| Tag | Effect |
 |---|---|
-| `<if [!]v>…</if>` | creates/removes its content |
-| `<else-if [!]v>…</else-if>` | right after `</if>` or `</else-if>`; any number |
-| `<else>…</else>` | right after `</if>` or `</else-if>` |
-| `<for x in v key=x.id>…</for>` | repeats; `key` required, stable and unique |
-| `<empty>…</empty>` | right after `</for>`; shown when the list is empty |
+| `<if [!]v>…</if>` | Inserts or removes its content. |
+| `<else-if [!]v>…</else-if>` | Follows `</if>` or `</else-if>` (any count). |
+| `<else>…</else>` | Follows `</if>` or `</else-if>`. |
+| `<for x in v key=x.id>…</for>` | Repeats per item; `key` must be stable and unique. |
+| `<empty>…</empty>` | Follows `</for>`; renders when the list is empty. |
 
-Paths in block tags are unquoted: `<if page.loading>`, `<if !$open>`, `<for p in data.products key=p.id>`.
+Write block paths without quotes: `<if page.loading>`, `<if !$open>`, `<for p in data.products key=p.id>`.
 
 ```html
 <if page.loading>
@@ -232,21 +279,18 @@ Paths in block tags are unquoted: `<if page.loading>`, `<if !$open>`, `<for p in
 
 ## Values
 
-Only paths `root.a.b`: no expressions, calls, indexes or operators. `!` only in `<if>`,
-`<else-if>`, `:show` and `.class`.
+Use `root.a.b` paths only. Do not use expressions, calls, indexes, or operators. Use `!` only in `<if>`, `<else-if>`, `:show`, and `.class`.
 
 | Root | Value |
 |---|---|
-| `$x` | the owner's state (`let`), prop (`export let`), constant or function |
-| `data` | `load` result |
-| `shared` | stores (`shared.cart.total`) |
-| `params` `query` | path params and query (strings) |
-| `page` | `page.loading`, `page.error` |
-| `<for>` variable | current item |
+| `$x` | Owner state (`let`), prop (`export let`), constant, or function. |
+| `data` | `load` result. |
+| `shared` | Stores (`shared.cart.total`). |
+| `params`, `query` | Path params and query strings. |
+| `page` | `page.loading`, `page.error`. |
+| `<for>` variable | Current loop item. |
 
-Compute every derived value (total, label, filter, flag) in a function of the script or store
-(`const total = () => …`), never in HTML. In a value position (`{}`, `:attr`, `.class`, `:show`,
-`<if>`, `<for>`) the function is called with no arguments.
+Compute every derived value in a script or store function (`const total = () => …`). Value positions (`{}`, `:attr`, `.class`, `:show`, `<if>`, `<for>`) call the function with no arguments.
 
 ## Example
 
@@ -271,24 +315,25 @@ Compute every derived value (total, label, filter, flag) in a function of the sc
 
 ## Owner
 
-- The owner is whoever wrote the element: the page, or the component (with a script) whose `.html` contains it.
-- `$`, `@` and `:model` resolve against the owner. Slot content (and its `{}`) belongs to whoever wrote it.
-- `_layout.html` has no owner: only `shared`, `params` and `query`.
+- The owner is the page or scripted component whose `.html` defines the element.
+- `$`, `@`, and `:model` resolve against the owner. Slot content resolves against its caller.
+- Root and nested `_layout.html` files have no owner; they read only `shared`, `params`, and `query`.
 
 ## Rules
 
-- Each `<if>`, `<else-if>`, `<else>`, `<for>`, `<empty>` contains exactly 1 root element, not another block. Put other directives on that element, not on the block tag.
-- Strict HTML: close every non-void tag. No `<html>`, `<body>`, `<template>`; one `<script>` and one `<style>` per file (state.md, css.md).
-- `@submit` calls `preventDefault()`. Every `<form>` is an agent tool: `toolname`, `tooldescription`, `name` on each field, or `notool` (webmcp.md); read submitted values from `new FormData(event.target)` so agent fills work even without input events. Pass the `<for>` item as an argument: `@click="remove(task)"`. Without parentheses the function gets the event (`@input="search"`); with them it gets only what you list (`@click="reset()"` gets nothing). Use `el`, not `event.currentTarget`, for the element with the `@` (events are delegated).
-- No `$` in events (`@click="increase"`, not `@click="$increase"`): `$` marks values. `:attr` takes a bare path (`:disabled="$atMinimum"`); to build text write `title="Count {$count}"` without the colon.
-- Block tags take one path, no operators: `<if $hasTasks>` with `const hasTasks = () => tasks.length > 0` in the script.
-- For `aria-*` states (`aria-pressed`, `aria-expanded`), return the strings `'true'`/`'false'`: boolean `false` removes the attribute.
-- `:show` hides an element that stays in the DOM; `<if>` creates/removes it. An element with `autofocus` inside a newly inserted block gets focus.
-- In dev, a path that does not exist throws (except under `query`).
-- Markers: `data-page` (layout `<main>`), `data-reload` (`<a>` that does a full page load). Never write `data-c`, `data-tid`, `data-of`, `data-slot`, `data-prop-*`: the build generates them.
-- Never write `data-*` by hand (`html/data-attribute`): `data-*` is the compiled form of the short syntax (`data-text` is `{path}`, `data-on-click` is `@click`). For a dynamic style hook with many values, bind `:data-x="path"` and select it in CSS with `[data-x=value]`; for on/off, use `.name="path"`; for tests, select by role, label or id.
-- `:text` was removed (`html/text-removed`): write `{path}` inside the element.
-- Forbidden: inline `style` and `on*`, `:class` (use `.name`), `{{ }}` and `${ }` outside text directly in `<code>`/`<pre>` (`html/interpolation`), the legacy syntax `state.`, `props.`, and attributes of other frameworks (`v-if`, `x-show`, `on:click`, `*ngIf`, `[disabled]`: `html/unknown-directive`).
+- Each `<if>`, `<else-if>`, `<else>`, `<for>`, and `<empty>` must contain exactly 1 root element (not another block). Put directives on that element, not on the block tag.
+- Write strict HTML and close every non-void tag. Do not use `<html>`, `<body>`, or `<template>`. Put at most one `<script>` and one `<style>` per file (`state.md`, `css.md`).
+- `@submit` calls `preventDefault()` automatically. Every `<form>` is an agent tool (`webmcp.md`); read values with `new FormData(event.target)`.
+- Pass `<for>` items as arguments (`@click="remove(task)"`). Without parentheses, the handler receives `event` (`@input="search"`). With parentheses, it receives only listed arguments (`@click="reset()"` receives none). Use `el` instead of `event.currentTarget` (events are delegated).
+- Omit `$` in event names (`@click="increase"`). `:attr` takes a bare path (`:disabled="$atMinimum"`); use `title="Count {$count}"` without `:` for interpolated strings.
+- Pass one bare path to block tags (`<if $hasTasks>` with `const hasTasks = () => tasks.length > 0`).
+- Return `'true'` or `'false'` strings for `aria-*` states (`aria-pressed`, `aria-expanded`), because boolean `false` removes the attribute.
+- `:show` hides an element in the DOM; `<if>` adds or removes it. `autofocus` inside a newly inserted block receives focus.
+- In dev, missing paths throw (except under `query`).
+- Allowed markers: `data-page` (root layout `<main>`), `data-reload` (full-load `<a>`). Never write `data-c`, `data-tid`, `data-of`, `data-slot`, or `data-prop-*`.
+- Do not write `data-*` attributes by hand (`html/data-attribute`). Bind `:data-x="path"` for multi-value style hooks (`[data-x=value]`), `.name="path"` for on/off states, and role/label/id for tests.
+- `:text` is removed (`html/text-removed`); use `{path}` inside the element.
+- Forbidden: inline `style` and `on*`, `:class`, `{{ }}`/`${ }` outside direct `<code>`/`<pre>` text (`html/interpolation`), legacy `state.`/`props.`, and foreign directives (`v-if`, `x-show`, `on:click`, `*ngIf`, `[disabled]`: `html/unknown-directive`).
 
 ---
 
@@ -296,51 +341,50 @@ Source: https://pragma.leonavas.com/docs/components.md
 
 # Components
 
-Search `lib/components/` and `_components/` before creating one.
+Search `lib/components/` and `_components/` before you create a component.
 
 | Tag | Folder | Use when |
 |---|---|---|
-| `<c-name>` | `lib/components/name/` | used by more than one route folder |
-| `<p-name>` | `_components/name/` in the page's folder or an ancestor | used by one route folder only |
+| `<c-name>` | `lib/components/name/` | Shared across multiple route folders. |
+| `<p-name>` | `_components/name/` in the page folder or an ancestor | Used in one route folder only. |
 
-To promote: move the folder to `lib/components/` and rename `p-` to `c-`.
+To promote a `p-` component, move the folder to `lib/components/` and rename `p-` to `c-`.
 
 ```
 name/
-  name.html   required: optional <script> and <style> at the top level, then 1 root element
-              (not <template>, <slot> or a component)
-  name.js     optional, instead of the <script>
-  name.css    optional, instead of the <style>; scoped to the component automatically
+  name.html   required: optional <script> and <style> at top level, then 1 root element
+              (not <template>, <slot>, or another component)
+  name.js     optional: replaces <script>
+  name.css    optional: replaces <style>; scoped automatically
 ```
 
-The `<script>` is the component's state and behavior (state.md); `<style>` (or `name.css`) is
-its CSS. The build scopes every selector to the component (its root and what is inside it):
-`button { … }` never styles a button outside it. `:global(…)` opts out only what is inside it:
-`:global(html[data-theme="dark"]) .x` is this component's `.x` in dark mode; `:global(body.locked)`
-alone is global (css.md). Selectors that already start with `[data-c="name"]` stay as written. Both inline and as a file = `html/duplicate-module`.
-
-`p-` names are private to their folder, styles included: two `<p-badge>` in different folders
-never share CSS (the build gives each its own `data-c` and rewrites `[data-c="badge"]` in its own
-`.css`). Do not select a `p-` component's `data-c` from outside its `.css` (theme, tests): use a
-class, role or label.
+- `<script>` defines state and behavior (`state.md`). `<style>` or `name.css` defines CSS.
+- The build scopes every selector to the component root and its descendants. `button { … }` never matches outside.
+- `:global(…)` opts out only its argument (`:global(html[data-theme="dark"]) .x` targets `.x` in dark mode; `:global(body.locked)` is global; see `css.md`).
+- Selectors starting with `[data-c="name"]` stay as written.
+- Using both inline `<script>`/`<style>` and external `name.js`/`name.css` triggers `html/duplicate-module`.
+- `p-` names and styles are private to their folder. Two `<p-badge>` components in different folders get distinct `data-c` values and never share CSS.
+- Do not select a `p-` component's `data-c` outside its `.css`. Select by class, role, or label.
 
 ## Props
 
-A component with a script declares its props with `export let name = default`:
+Declare props in `<script>` with `export let name = default`:
 
 | Caller writes | Script declares | Inside (`$x` in HTML, `x` in JS) |
 |---|---|---|
 | `label="Hi"` | `export let label = ''` | `'Hi'` |
-| `start="10"` | `export let start = 0` | the number `10`: the default's type converts the text |
+| `start="10"` | `export let start = 0` | `10` (converted to the default's type) |
 | `locked` / `locked="false"` | `export let locked = false` | `true` / `false` |
-| `:product="p"` | `export let product = null` | the object itself, updated on each render |
-| nothing | `export let step = 1` | the default, `1` |
+| `:product="p"` | `export let product = null` | The object itself, updated on each render |
+| omitted | `export let step = 1` | `1` |
 
-- Props are read-only (`js/prop-write`, also via `:model`): copy one into a `let` to change it (`let count = start`).
-- An object or list prop is read-only inside too: it is the caller's data. In dev, writing to it (`files[0].open = true`, `items.push(x)`) throws "props are read-only, also inside". Copy what you change: `let rows = files.map(file => ({ ...file }))`, or ask the owner to change it (an event, a store function).
-- A prop the script does not declare is an error at the call site (`html/unknown-prop`). `class` is not a prop: it is appended to the root's classes. `id` is a prop like any other (`export let id = ''`, then `:id="$id"`).
-- Name props in one lowercase word (`label`, `step`): HTML attributes are case-insensitive.
-- A component **without** a script has build-time props: `$label` is replaced by the caller's text, `:x="path"` by the caller's path; missing, `""` and `"false"` are falsy.
+- Props are read-only (`js/prop-write`, including via `:model`). Copy a prop into a `let` to change it (`let count = start`).
+- Object and array props are deeply read-only. In dev, mutating them throws `"props are read-only, also inside"`. Copy before changing (`let rows = files.map(file => ({ ...file }))`), or update through a store function or event.
+- Passing an undeclared prop triggers `html/unknown-prop`.
+- `class` is not a prop; it appends to the root element's classes.
+- `id` is a normal prop (`export let id = ''`, then `:id="$id"`).
+- Name props as one lowercase word (`label`, `step`); HTML attributes are case-insensitive.
+- Components without a script use build-time props: `$label` replaces with caller text, `:x="path"` with caller path. Missing, `""`, and `"false"` are falsy.
 
 ## Example
 
@@ -384,16 +428,17 @@ Usage:
 </c-modal>
 ```
 
-- `<slot></slot>` receives the children; `<slot name="actions">` receives `slot="actions"`. Filling a slot the component lacks = error.
-- Slot content belongs to whoever wrote it: its `$` and `@` resolve there.
+- `<slot></slot>` receives default children. `<slot name="actions">` receives `slot="actions"`.
+- Filling a slot that does not exist is an error.
+- Slot content belongs to its caller; `$` and `@` resolve in the caller's scope.
 
 ## Rules
 
-- In a component without a script, `@` calls the caller's function.
-- State is per instance. A component's script loads only on pages that use it.
-- No `.server.js` in components: data comes from the page's `load`.
-- Never read or change a child's state: pass props; the child changes a store or calls its own action.
-- No `customElements.define`, no shadow DOM. Overlays: use `c-modal`, `c-alert`, `c-dropdown` (overlays.md).
+- In a scriptless component, `@` calls the caller's function.
+- State is per instance. A component script loads only on pages that use it.
+- Do not put `.server.js` in components; load data in the page's `load`.
+- Do not read or mutate a child's state. Pass props; let the child call its own action or a store function.
+- Do not use `customElements.define` or shadow DOM. Build overlays with `c-modal`, `c-alert`, and `c-dropdown` (`overlays.md`).
 
 ---
 
@@ -401,18 +446,17 @@ Source: https://pragma.leonavas.com/docs/state.md
 
 # State: script, actions, derived values, stores
 
-The top-level `<script>` of a page or component is its state and behavior. Change a `let`; the
-runtime reapplies the HTML (one render per microtask). No signals, no manual render.
+The top-level `<script>` of a page or component defines its state and behavior. Assign a `let` to update HTML (batched once per microtask). Do not use signals or manual renders.
 
-| At the top level of the script | It is |
+| Top-level declaration | Role |
 |---|---|
-| `let draft = ''` | state, one per instance; `$draft` in HTML |
-| `export let step = 1` | a prop (components.md) |
-| `function add() {…}`, used as `@submit="add"` | an action |
-| `const saveLater = debounce(save, 300)`, used as `@input="saveLater"` | an action too: any top-level `const` can be a handler; the runtime calls the function it holds |
-| `const visible = () => …`, used in `{}`, `<for>`, `:attr` | a derived value, recomputed on each render (in JS call it: `visible()`) |
-| `function mount(el) { …; return cleanup }` | external effects after mount (timer, global listener, observer); `el` is the component root (a page: its `<main data-page>`) |
-| `import { shared, data, … } from 'pragma'` | services (below) |
+| `let draft = ''` | Instance state (`$draft` in HTML). |
+| `export let step = 1` | Prop (`components.md`). |
+| `function add() {…}` used as `@submit="add"` | Action. |
+| `const saveLater = debounce(save, 300)` used as `@input="saveLater"` | Action (any top-level `const` holding a function works as a handler). |
+| `const visible = () => …` used in `{}`, `<for>`, `:attr` | Derived value, recomputed on each render (call `visible()` in JS). |
+| `function mount(el) { …; return cleanup }` | Runs external effects after mount (`el` is the component root or `<main data-page>`). |
+| `import { shared, data, … } from 'pragma'` | Runtime services. |
 
 `routes/tasks/index.html`:
 ```html
@@ -457,8 +501,10 @@ runtime reapplies the HTML (one render per microtask). No signals, no manual ren
 </ul>
 ```
 
-A function made by a call (debounce, throttle, once) is a top-level `const`, used directly as the
-handler; no wrapper function:
+## Wrapped handlers
+
+Bind functions returned by helpers (`debounce`, `throttle`, `once`) directly as top-level `const` handlers:
+
 ```html
 <script>
   import { debounce } from 'es-toolkit/function'
@@ -472,10 +518,13 @@ handler; no wrapper function:
 <input aria-label="Draft" :model="$draft" @input="saveLater">
 <p>Saved: {$saved}</p>
 ```
-The build accepts any top-level `const` as a handler; if its value is not a function, the event
-throws in dev (`@input="saveLater" needs a function, but "saveLater" holds …`).
 
-A timer just assigns the `let`:
+If a top-level `const` handler does not hold a function, dev throws when the event fires.
+
+## `mount(el)`
+
+Use `mount(el)` for timers, observers, global listeners, measurements, and focus. Return a cleanup function.
+
 ```js
 let now = Date.now()
 
@@ -485,8 +534,6 @@ function mount() {
 }
 ```
 
-`mount(el)` gets the component's root element, for what needs its own DOM (an observer, a
-measurement, focus):
 ```js
 let lines = 0
 
@@ -496,32 +543,30 @@ function mount(el) {
   return () => observer.disconnect()
 }
 ```
-`mount` runs only in the browser; read from `el`, never write to it (change state instead). It
-may be `async`: the function it resolves to is the cleanup.
 
-What only `mount` needs (a timer id, an observer, a DOM node) is a `const` inside `mount`, not a
-top-level `let`: a top-level `let` is state, renders on every change and keeps a DOM node in the
-instance scope.
+- `mount` runs only in the browser and may be `async` (resolved function is the cleanup).
+- Read from `el`; do not mutate `el`.
+- Declare values used only inside `mount` (timer IDs, observers, DOM nodes) as `const` inside `mount`, not top-level `let`.
 
 ## Derived values
 
-A value computed from state is a function, called on each render: `$total` in HTML, `total()` in
-JS. A top-level `let` or `const` computed from state once is stale (`js/stale-derived`), and a
-function used in JS without `()` is always truthy (`js/derived-call`):
+Compute derived values in functions: `$total` in HTML, `total()` in JS. Computing from state once in a top-level `let`/`const` triggers `js/stale-derived`. Reading a derived function without `()` in JS triggers `js/derived-call`.
+
 ```js
 let count = 0
-let doubled = count * 2            // js/stale-derived: computed once
-const doubled = () => count * 2    // right: `$doubled` in HTML, `doubled()` in JS
+let doubled = count * 2            // js/stale-derived
+const doubled = () => count * 2    // valid: `$doubled` in HTML, `doubled()` in JS
 
 function check() {
-  if (empty) return                // js/derived-call: always true
-  if (empty()) return              // right
+  if (empty) return                // js/derived-call
+  if (empty()) return              // valid
 }
 ```
-`let count = start` (a prop) is fine when an action assigns `count` later: it is state that starts
-from the prop.
 
-A value per item is a field of the rows a derived function returns (`{}` takes paths, not calls):
+`let count = start` (from a prop) is valid when an action reassigns `count` later.
+
+For per-item derived values, return row objects from a derived function (`{}` accepts paths only):
+
 ```js
 const rows = () => items.map(item => ({ item, label: formatPrice(item.price) }))
 ```
@@ -530,24 +575,26 @@ const rows = () => items.map(item => ({ item, label: formatPrice(item.price) }))
   <li>{row.item.name}: {row.label} <button @click="remove(row.item)">x</button></li>
 </for>
 ```
-Keep the original item in the row (`row.item`) and change that one: `{ ...item, label }` is a copy,
-so `item.done = true` on it changes nothing.
+
+Keep the original `item` reference (`row.item`) when mutating it. Spreading `{ ...item, label }` creates a copy that does not update the source.
 
 ## Services (`import { … } from 'pragma'`)
 
 | Name | Use |
 |---|---|
-| `shared` | stores: `shared.tasks.items`, `shared.tasks.add(title)` |
-| `data` | `load` result (data.md); undefined until the load ends |
-| `params` `query` `page` | route params, query, `page.loading`/`page.error` |
-| `call(name, input)` | server action (data.md) |
-| `navigate(url)` | navigate through the router |
-| `open(id)` `close(id)` `confirm(id)` | overlays (overlays.md) |
-| `log` | logs (logs.md) |
+| `shared` | Stores (`shared.tasks.items`, `shared.tasks.add(title)`). |
+| `data` | `load` result (`data.md`); undefined until `load` finishes. |
+| `params`, `query`, `page` | Route params, query strings, `page.loading`, `page.error`. |
+| `call(name, input)` | Calls a server action (`data.md`). |
+| `navigate(url)` | Navigates via the router. |
+| `open(id)`, `close(id)`, `confirm(id)` | Controls overlays (`overlays.md`). |
+| `log` | Emits logs (`logs.md`). |
 
-## Store
+## Stores
 
-`lib/state/tasks.js`, read as `shared.tasks` in HTML and in scripts:
+Create stores in `lib/state/<name>.js`. Access them as `shared.<name>` in HTML and scripts.
+
+`lib/state/tasks.js`:
 ```js
 let items = []
 export const persist = ['items']
@@ -561,18 +608,18 @@ function add(title) {
 
 ## Rules
 
-- State is a deep Proxy: `items.push(x)`, `task.done = true` and reassignment all render, from actions, `await`, timers or promises. Maps, Sets, Dates and class instances are not tracked: assign a new value.
-- Derived values are functions; call them in JS (`total()`). Never keep a derived copy in a `let` updated by actions (`js/stale-derived`, `js/derived-call`).
-- `data` exists only after the load: read it in functions (`js/top-level-data` at the top level), and put the elements that read it inside the `<else>` of `page.loading`.
-- In a script write `count`, never `$count` (`js/dollar-in-script`): `$` is HTML only.
-- Page-only state: the page script. Shared across pages or persisted: a store. A change used by 2+ pages: a store function.
-- Filters, tabs, pagination: in the `query`, read by a derived function.
-- `persist` lists `let` names saved to `localStorage`; only for preferences, drafts and local-only data.
-- A top-level `const` changed in place (`items.push`) does not update the page (`js/const-state`): use `let`.
-- No `var`, no destructuring `let`, no top-level `await` (do it in `mount()` or an action); `export` only declares props (a store exports only `persist`).
-- Reach stores only through `shared`; importing a store file is `js/store-import`.
-- Never write to the DOM (`textContent`, `classList`, `setAttribute`). `addEventListener` only on `window`/`document`, inside `mount`. Never fetch data in `mount`. No custom pub/sub.
-- The old API (`export const state`/`actions`, `ctx.$`, `ctx.update`, `store()`) is an error (`js/legacy-api`).
+- State uses a deep Proxy: `items.push(x)`, `task.done = true`, and reassignment all trigger renders (including from `await`, timers, and promises). Maps, Sets, Dates, and class instances are not tracked; reassign a new value.
+- Define derived values as functions and call them in JS (`total()`). Do not copy derived values into a `let` (`js/stale-derived`, `js/derived-call`).
+- Read `data` inside functions only (`js/top-level-data`). Wrap elements reading `data` inside the `<else>` of `page.loading`.
+- Write `count` in JS, never `$count` (`js/dollar-in-script`).
+- Keep page-only state in the page script. Use a store for shared or persisted state, and put actions shared by 2+ pages in the store.
+- Store filters, tabs, and pagination in `query`, read by a derived function.
+- `persist` saves listed `let` names to `localStorage`; use it only for preferences, drafts, and local-only data.
+- Declare mutated top-level state with `let`, not `const` (`js/const-state`).
+- Do not use `var`, destructuring `let`, or top-level `await`. Use `export` only for props (or `persist` in stores).
+- Access stores only through `shared`; direct store imports trigger `js/store-import`.
+- Do not mutate the DOM (`textContent`, `classList`, `setAttribute`). Call `addEventListener` only on `window` or `document` inside `mount`. Do not fetch data in `mount`. Do not build custom pub/sub.
+- Do not use the legacy API (`export const state`/`actions`, `ctx.$`, `ctx.update`, `store()`): triggers `js/legacy-api`.
 
 ---
 
@@ -587,14 +634,16 @@ Source: https://pragma.leonavas.com/docs/routes.md
 | `routes/shop/index.html` | `/shop` |
 | `routes/shop/[id].html` | `/shop/:id` |
 
-- Every `.html` in `routes/` is a route, except names starting with `_`. `x.html` plus `x/index.html` = error.
-- `[name]` (file or folder) = path param; a static segment beats a param. No `[...rest]`, no nested layouts.
-- A page is a fragment: no `<html>`, `<head>`, `<body>`. `<title>`, `<meta>` and `<link>` at the top level of the page go to `<head>` (see SEO).
-- Read params as `params.id`, `query.filter` in HTML and in scripts (`import { params, query } from 'pragma'`). Always strings.
+- Every `.html` in `routes/` is a route, except names starting with `_`.
+- Having both `x.html` and `x/index.html` is an error (`app/route-conflict`).
+- `[name]` (file or folder) defines a path param. Static segments take priority over params. `[...rest]` is not supported.
+- A page is an HTML fragment without `<html>`, `<head>`, or `<body>`. Top-level `<title>`, `<meta>`, and `<link>` move to `<head>` (see SEO).
+- Read params as `params.id` and `query.filter` in HTML and scripts (`import { params, query } from 'pragma'`). Both are always strings.
 
-## Layout
+## Root layout
 
-`routes/_layout.html`:
+`routes/_layout.html` wraps all routes:
+
 ```html
 <head>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -609,13 +658,36 @@ Source: https://pragma.leonavas.com/docs/routes.md
 <main data-page><slot></slot></main>
 ```
 
-- `<head>` is optional and must come first. Its tags go on every page; it is static (no `:` bindings, no `{}`). Exactly one `<main data-page>` containing only `<slot></slot>`.
-- The layout has no script: it reads only `shared`, `params`, `query`. For behavior, use a component with a `<script>`.
-- `routes/_404.html` renders unknown routes. Neither it nor the layout has a `.server.js`.
+- `<head>` is optional and must come first. Its tags apply to every page and must be static (no `:` bindings, no `{}`).
+- Include exactly one `<main data-page>` containing only `<slot></slot>`.
+- The layout has no `<script>` and no `.server.js`. It reads only `shared`, `params`, and `query`. Use a component with `<script>` for behavior.
+- `routes/_404.html` renders unknown routes. It has no `.server.js`.
+
+## Nested layouts
+
+Any subfolder in `routes/` can add `_layout.html` with `<slot></slot>` to wrap routes in that folder and its subfolders.
+
+`routes/shop/_layout.html`:
+```html
+<div class="grid gap-6 md:grid-cols-4">
+  <aside aria-label="Shop menu">
+    <a href="/shop" class="nav-link">All products</a>
+    <a href="/shop/deals" class="nav-link">Deals</a>
+  </aside>
+  <section class="md:col-span-3">
+    <slot></slot>
+  </section>
+</div>
+```
+
+- A nested `_layout.html` wraps the page inside the root `<main data-page>`.
+- A nested `_layout.html` has no `<head>`, no `<script>`, and no `.server.js`.
+- It reads only `shared`, `params`, and `query`.
+- Include one `<slot></slot>` for the child route or inner layout.
 
 ## SEO and link previews
 
-Site-wide tags go in the layout `<head>`. Each page writes its own `<title>`, `<meta>` and `<link>` at the top level; a page tag replaces the layout tag with the same `name`, `property`, `http-equiv` or `rel` (+ `hreflang`); new ones are added.
+Put site-wide tags in `routes/_layout.html` `<head>`. Put page `<title>`, `<meta>`, and `<link>` at the top level of each page. A page tag replaces the layout tag with the same `name`, `property`, `http-equiv`, or `rel` (+ `hreflang`); new tags are added.
 
 `routes/about.html`:
 ```html
@@ -627,7 +699,7 @@ Site-wide tags go in the layout `<head>`. Each page writes its own `<title>`, `<
 <h1>About</h1>
 ```
 
-From server data: write `{path}` in `<title>` and `:<attr>` or `{path}` in a `<meta>`/`<link>` attribute, with `data`, `params` or `query`, and `export const ssr = true` in the page's `.server.js`. The server renders them into the first HTML, so crawlers and link-preview bots (no JS) see them.
+For server data, use `{path}` in `<title>` and `:<attr>` or `{path}` in `<meta>`/`<link>` with `data`, `params`, or `query`. Add `export const ssr = true` in `.server.js` so crawlers and link previews receive them in the first HTML.
 
 `routes/blog/[slug].html`:
 ```html
@@ -649,6 +721,7 @@ From server data: write `{path}` in `<title>` and `:<attr>` or `{path}` in a `<m
 </script>
 <h1>{data.post.title}</h1>
 ```
+
 `routes/blog/[slug].server.js`:
 ```js
 export const ssr = true
@@ -658,16 +731,17 @@ export async function load({ params, request }) {
 }
 ```
 
-- A missing value keeps the tag's static text or attribute; a `<meta>` without `content` or a `<link>` without `href` is dropped.
-- Structured data (JSON-LD): one `<script type="application/ld+json">` per schema, at the top level of the page (never in a component); it goes to `<head>`. It must be valid JSON (`html/json-ld`). `{path}` works only inside its strings (`"headline": "{data.post.title}"`), with `data`, `params` or `query` and `ssr`; the server writes each value JSON-escaped. A literal `{` inside a string is `{`. Without `{}` it is static and needs no `ssr`. Any other `<script type>` is an error (`html/script`).
-- Never put `canonical` or `og:url` in the layout: every page would point to the same URL.
-- `<meta>` and `<link>` anywhere else in a page or component are an error (`html/head`).
-- The router updates `<title>`, `<meta>` and `<link>` on every navigation.
+- Missing values keep the tag's static text or attribute. A `<meta>` without `content` or `<link>` without `href` is dropped.
+- Put JSON-LD `<script type="application/ld+json">` at the top level of a page (never in a component); it moves to `<head>`.
+- JSON-LD must be valid JSON (`html/json-ld`). `{path}` works inside strings with `data`, `params`, or `query` and `ssr`. The server JSON-escapes each value. A literal `{` in a string is `{`. Static JSON-LD needs no `ssr`. Other `<script type>` values trigger `html/script`.
+- Do not put `canonical` or `og:url` in the layout.
+- Do not place `<meta>` or `<link>` outside the page top level or root layout `<head>` (`html/head`).
+- The router updates `<title>`, `<meta>`, and `<link>` on every navigation.
 
 ## Active link
 
-- An `<a href="/path">` (no query or hash) pointing to the current route gets `aria-current="page"` automatically. Style it in `lib/theme.css`: `.nav-link[aria-current="page"]`.
-- For query-based links (filters, tabs), bind `:aria-current` to a derived function returning `'true'` or `false`:
+- `<a href="/path">` (no query or hash) automatically gets `aria-current="page"` on the current route. Style `.nav-link[aria-current="page"]` in `lib/theme.css`.
+- For query links (filters, tabs), bind `:aria-current` to a derived function that returns `'true'` or `false`:
 
 ```html
 <script>
@@ -680,11 +754,11 @@ export async function load({ params, request }) {
 
 ## Navigation
 
-- Use `<a href>`. The router swaps only `<main data-page>`, prefetches links and keeps the layout.
-- Every navigation, including query-only changes, recreates the page state.
-- From JS after an action: `navigate('/shop?filter=sale')` (`import { navigate } from 'pragma'`).
-- Full page load: `<a href="/logout" data-reload>`. Links with `target` or `download` also bypass the router.
-- Never use `<button>` + `navigate` instead of `<a>`, `location.href`, `history.pushState`, or `location` to read params.
+- Use `<a href>`. The router swaps `<main data-page>`, prefetches links, and keeps the root layout.
+- Every navigation, including query-only changes, recreates page state.
+- Navigate from JS after an action with `navigate('/shop?filter=sale')` (`import { navigate } from 'pragma'`).
+- Force a full page load with `<a href="/logout" data-reload>`. Links with `target` or `download` also bypass the router.
+- Do not use `<button>` + `navigate` instead of `<a>`. Do not use `location.href`, `history.pushState`, or `location` to read params.
 
 ---
 
@@ -692,12 +766,12 @@ Source: https://pragma.leonavas.com/docs/data.md
 
 # Data: load, server actions, skeleton, SSR
 
-| File | Export | Use |
+| File | Export | Purpose |
 |---|---|---|
-| `x.server.js` | `load({ params, query, request, env, log })` | return value becomes `data` (HTML, and `data` from `pragma` in the page script) |
-| `x.server.js` | `actions.name({ input, params, env, log })` | called by `call('name', input)` from `pragma` |
-| `x.server.js` | `ssr = true` | data in the first HTML (SEO, link previews, LCP) |
-| `_name.server.js` | helpers | private to the folder; only `.server.js` files import it |
+| `x.server.js` | `load({ params, query, request, env, log })` | Return value becomes `data` in HTML and page `<script>`. |
+| `x.server.js` | `actions.name({ input, params, env, log })` | Invoked via `call('name', input)` from `'pragma'`. |
+| `x.server.js` | `ssr = true` | Renders `data` into the first HTML (SEO, link previews, LCP). |
+| `_name.server.js` | helpers | Private to the folder; imported only by `.server.js` files. |
 
 `routes/shop/[id].server.js`:
 ```js
@@ -719,7 +793,7 @@ export const actions = {
 }
 ```
 
-The `<script>` of `routes/shop/[id].html`:
+`<script>` of `routes/shop/[id].html`:
 ```html
 <script>
   import { data, params, call, log } from 'pragma'
@@ -741,7 +815,7 @@ The `<script>` of `routes/shop/[id].html`:
 </script>
 ```
 
-`data` is live and reactive: changing `data.product.likes` updates the page.
+`data` is reactive: assigning `data.product.likes` updates the page.
 
 ## Skeleton (page with `load`, without `ssr`)
 
@@ -764,30 +838,33 @@ The `<script>` of `routes/shop/[id].html`:
 </else>
 ```
 
-Keep the title, back link and filters outside the loading chain. Shape the skeleton like the final content.
+Keep titles, back links, and filters outside `<if page.loading>`. Match the skeleton shape to the final content.
+
+## SSR behavior
+
+With `ssr = true`, page and component scripts run once per request on the server so initial `let`s, props, and derived values appear in the first HTML. Keep browser-only code in `mount(el)` and actions.
+
+| With `ssr`, in a page or component script | Server behavior |
+|---|---|
+| Top-level `let`, props, derived functions, slot content | Rendered into the first HTML |
+| `data`, `params`, `query`, `page` | Read-only |
+| `shared`, `call`, `navigate`, `open`, `close`, `confirm` | Throws; script deferred to browser |
+| Top-level `window`, `document`, `localStorage` | Throws; script deferred to browser |
+| Imports of npm packages or `.pragma/` | Skipped; script deferred to browser |
+| Prop passed from a store | Deferred to browser |
+| `mount(el)`, events | Browser only |
+
+When a script is deferred to the browser, its `$x` bindings fill at boot while the rest of the page renders on the server.
 
 ## Rules
 
-- An error thrown in `load` sets `page.error` and returns 500. "Not found" is data: return `{ product: null }`.
-- Every write and everything that uses a secret goes through a server action. Afterwards, update `data` or a `let`.
-- `data` is undefined until the load ends (unless `ssr`): read it inside functions, never at the top level of the script.
-- With `ssr`, page and component scripts also run on the server, once per request, so their initial `let`s, props and derived values are in the first HTML (see the table below). Keep browser-only work in `mount(el)` and actions.
-
-| With `ssr`, in a page or component script | On the server |
-|---|---|
-| top-level `let`, props, derived functions, slot content | rendered into the first HTML |
-| `data`, `params`, `query`, `page` | read-only |
-| `shared`, `call`, `navigate`, `open`, `close`, `confirm` | throw: that script is left to the browser |
-| reading `window`, `document`, `localStorage` at the top level | throws: left to the browser |
-| a script that imports an npm package or `.pragma/` | not run: left to the browser |
-| a prop that comes from a store | left to the browser |
-| `mount(el)`, events | never (browser only) |
-
-"Left to the browser" means its `$x` bindings are filled at boot, as without `ssr`; the rest of the page still renders on the server.
-- Sources: `fetch` with a secret from `env`, a database via `env`, or `import products from './_products.json' with { type: 'json' }`.
-- Default is no SSR. The prebuilt HTML has the content outside `<if>`/`<for>`; the `page.loading` branch is an inert `<template>` and the skeleton appears as soon as `.pragma/boot.js` runs (no skeleton without JS).
-- With `ssr = true` the HTML is the same, rendered with data; the skeleton is never shown. Use it for pages that crawlers or link previews must see, and for head tags or JSON-LD structured data bound to `data` (routes.md, SEO).
-- Never fetch data in `mount` or in a client action, never create `/api/...` routes, never return secrets from `load`. `env` exists only on the server.
+- Throwing in `load` sets `page.error` and returns HTTP 500. Return `{ product: null }` for not-found states.
+- Put every write and every secret-using operation in a server action. Update `data` or a `let` after the call.
+- Read `data` inside functions only (`js/top-level-data`). Without `ssr`, `data` is undefined until `load` finishes.
+- Load data from `fetch` with secrets from `env`, a database via `env`, or `import products from './_products.json' with { type: 'json' }`.
+- Default mode is no SSR: prebuilt HTML holds static content outside `<if>`/`<for>`, and `.pragma/boot.js` renders the skeleton.
+- Enable `ssr = true` when crawlers, link previews, or data-bound `<head>`/JSON-LD tags need server data (`routes.md`).
+- Do not fetch data in `mount` or client actions. Do not create `/api/...` routes. Do not return secrets from `load`. `env` exists only on the server.
 
 ---
 
@@ -795,8 +872,7 @@ Source: https://pragma.leonavas.com/docs/overlays.md
 
 # Overlays: modal, alert, dropdown
 
-Always use `c-modal`, `c-alert`, `c-dropdown`. The runtime handles open, close, Esc, Back, focus
-and scroll lock.
+Use `c-modal`, `c-alert`, and `c-dropdown` for all overlays. The runtime handles open, close, Esc, Back, focus, and scroll lock.
 
 ```html
 <button type="button" class="btn" @open="about">About</button>
@@ -836,16 +912,16 @@ async function remove() {
 
 | JS (`import { open, close, confirm } from 'pragma'`) | Effect |
 |---|---|
-| `open(id)` / `close(id)` | open / close |
-| `await confirm(id)` | opens; resolves with the `value` of the clicked `@close` button, or `'cancel'` |
+| `open(id)` / `close(id)` | Opens or closes the overlay. |
+| `await confirm(id)` | Opens the overlay and resolves to the clicked `@close` button's `value`, or `'cancel'`. |
 
 ## Rules
 
 - Back closes the top overlay, not the page. Overlays stack.
 - Modal and alert lock scroll; dropdown does not. Focus returns to the opener.
-- Destructive action: put `autofocus` on the safe button.
-- Open only in response to a user click.
-- Never create `<dialog>`/`[popover]` by hand, call `showModal()`, use `window.confirm`, keep "open" in state, use `role="menu"`, or import `.pragma/overlay.js`.
+- Put `autofocus` on the safe button in destructive confirmations.
+- Open overlays only after a user click.
+- Do not write `<dialog>` or `[popover]` by hand. Do not call `showModal()` or `window.confirm`. Do not store open state in a `let`. Do not use `role="menu"` or import `.pragma/overlay.js`.
 
 ---
 
@@ -853,30 +929,29 @@ Source: https://pragma.leonavas.com/docs/css.md
 
 # CSS
 
-Use utilities (classes.md) first. Write a custom class only when they are not enough.
+Use utility classes (`classes.md`) first. Write a custom class only when utilities are not enough.
 
-| File | Contains |
+| File | Scope |
 |---|---|
-| `.pragma/base.css` | preflight, layers, `.skeleton`, `[hidden]`, scroll lock. Do not edit. |
-| `lib/theme.css` | tokens and global custom classes (`@layer components`) |
-| component `<style>` or `<name>.css` | that component only: the build scopes every selector to it (root and inside); `:global(…)` opts out; `[data-c="<name>"]` written by hand still works (for `p-` components the build makes it unique per folder) |
-| page `<style>` or `<page>.css` | that page only: scoped to its `<main data-page="…">` the same way |
+| `.pragma/base.css` | Preflight, layers, `.skeleton`, `[hidden]`, scroll lock. Do not edit. |
+| `lib/theme.css` | Tokens and global custom classes (`@layer components`). |
+| Component `<style>` or `<name>.css` | Scoped to that component (root and descendants). `:global(…)` opts out. `[data-c="<name>"]` stays as written (unique per folder for `p-`). |
+| Page `<style>` or `<page>.css` | Scoped to that page's `<main data-page="…">`. |
 
-Scoping adds `:where(…)` to each selector's last part, so it adds no specificity. Write plain
-selectors (`button`, `.row:hover`, `li::marker`). `:global(…)` opts out only what is inside it, for
-something outside the component or page; the rest of the selector stays scoped:
+Scoping appends `:where(…)` to each selector's last part, adding zero specificity. Write plain selectors (`button`, `.row:hover`, `li::marker`). Use `:global(…)` only for parts outside the component or page:
 
-| You write | The build makes | Matches |
+| Written | Compiled | Matches |
 |---|---|---|
-| `.row` | `.row:where(<scope>,<scope> *)` | `.row` of this component only |
-| `:global(html[data-theme="dark"]) .row` | `html[data-theme="dark"] .row:where(…)` | this component's `.row`, in dark mode |
-| `.list :global(.hit)` | `.list:where(…) .hit` | any `.hit` inside this component's `.list` (child components too) |
-| `:global(:root)`, `:global(body.locked)` | `:root`, `body.locked` | global: every part is inside `:global` |
+| `.row` | `.row:where(<scope>,<scope> *)` | `.row` inside this component only |
+| `:global(html[data-theme="dark"]) .row` | `html[data-theme="dark"] .row:where(…)` | This component's `.row` in dark mode |
+| `.list :global(.hit)` | `.list:where(…) .hit` | Any `.hit` inside this component's `.list` (including child components) |
+| `:global(:root)`, `:global(body.locked)` | `:root`, `body.locked` | Global |
 
-An outside ancestor alone needs no `:global`: `html[data-theme="dark"] .row` gives the same result.
+An outside ancestor alone needs no `:global`: `html[data-theme="dark"] .row` compiles identically.
 
-The starter ships the theme-aware tokens `bg-surface`, `text-ink`, `text-muted`, `border-line`
-(they switch in dark mode) and the classes `.card`, `.btn`, `.btn-primary`, `.btn-danger`, `.dialog`.
+## Tokens and dark mode
+
+The starter includes theme-aware tokens (`bg-surface`, `text-ink`, `text-muted`, `border-line`) and classes (`.card`, `.btn`, `.btn-primary`, `.btn-danger`, `.dialog`).
 
 ```css
 @layer tokens {
@@ -894,9 +969,9 @@ The starter ships the theme-aware tokens `bg-surface`, `text-ink`, `text-muted`,
 }
 ```
 
-- `--color-<name>` or `--color-<name>-<shade>` creates `bg-<name>`, `text-<name>-<shade>`, etc. Redefining `--color-primary-*` changes the brand.
+- `--color-<name>` and `--color-<name>-<shade>` generate `bg-<name>`, `text-<name>-<shade>`, and related utilities. Redefine `--color-primary-*` to change the brand color.
 - Redefinable tokens: `--color-*`, `--font-{sans,serif,mono}`, `--radius-*`, `--shadow-*`, `--spacing`.
-- Dark mode: `[data-theme="dark"]` on `<html>`. Use tokens redefined under `[data-theme="dark"]` (like `bg-surface`). Palette colors (`neutral-*`, `primary-*`…) do not switch: pair them with `dark:` (`bg-white dark:bg-neutral-900`).
+- Dark mode uses `[data-theme="dark"]` on `<html>`. Use theme-aware tokens (such as `bg-surface`), or pair palette colors with `dark:` (`bg-white dark:bg-neutral-900`).
 
 ## Theme toggle
 
@@ -913,12 +988,12 @@ function toggle() {
 }
 ```
 
-Never write `data-theme` or read `localStorage` for the theme: use `.pragma/theme.js`.
+Do not write `data-theme` or read `localStorage` for theme state. Use `.pragma/theme.js`.
 
-## Custom class
+## Custom classes
 
-- Create one only when the same combination repeats in 3+ places, or it needs something utilities lack (state selector, animation).
-- Forbidden: `style="..."`, arbitrary values (`w-[37px]`), negative utilities (`-mt-2`), undefined classes, `!important`, ID selectors, external `@import`, single-use custom classes.
+- Create a custom class only when the same combination repeats in 3+ places, or when you need state selectors or animations.
+- Forbidden: inline `style="..."`, arbitrary values (`w-[37px]`), negative utilities (`-mt-2`), undefined classes, `!important`, ID selectors, external `@import`, and single-use custom classes.
 
 ---
 
@@ -1051,10 +1126,7 @@ Source: https://pragma.leonavas.com/docs/webmcp.md
 
 # WebMCP: forms are agent tools
 
-On by default (`"webmcp": true` in `pragma.json`; absent = on). Every `<form>` is a WebMCP
-declarative tool: an AI agent in the browser finds it, fills it and submits it. The browser
-registers the tool while the form is in the page and removes it when the form leaves (router
-navigation included). No JS for this.
+WebMCP is on by default (`"webmcp": true` in `pragma.json`; omitted means `true`). Every `<form>` is a declarative WebMCP tool. The browser registers the tool while the form is mounted and removes it when the form unmounts.
 
 ```html
 <form toolname="search_products" tooldescription="Search the catalog by name or category" toolautosubmit @submit="search">
@@ -1064,26 +1136,23 @@ navigation included). No JS for this.
 </form>
 ```
 
-| Attribute | On | Rule |
+| Attribute | Target | Rule |
 |---|---|---|
-| `toolname` | `<form>` | required with `tooldescription`; lowercase `snake_case` verb_object (`search_products`, `add_task`, `create_order`); unique per page |
-| `tooldescription` | `<form>` | required with `toolname`; one sentence, 4+ words: what it does and when to use it |
-| `toolparamdescription` | input, select, textarea | what to put in the field; without it the agent reads the `<label>` text, then `aria-description` |
-| `toolautosubmit` | `<form>` | the agent submits without a user click. Only safe, reversible forms (search, filter, add). Never delete, pay, buy, cancel, send or transfer |
-| `notool` | `<form>` | not a tool (login, password, payment details); the build removes it |
+| `toolname` | `<form>` | Required with `tooldescription`. Lowercase `snake_case` `verb_object` (`search_products`, `add_task`, `create_order`), unique per page. |
+| `tooldescription` | `<form>` | Required with `toolname`. One sentence of 4+ words describing action and purpose. |
+| `toolparamdescription` | input, select, textarea | Describes the expected input. Without it, agents fall back to `<label>` text, then `aria-description`. |
+| `toolautosubmit` | `<form>` | Submits without user click. Use only on safe, reversible forms (search, filter, add). Never on delete, pay, buy, cancel, send, or transfer. |
+| `notool` | `<form>` | Excludes the form (login, password, payment). Removed at build time. |
 
-- Every field needs `name`: it is the parameter name (`type=submit|reset|button|image` exempt).
-- Use native constraints (`required`, `type`, `min`/`max`, `<select>` options): they describe the parameter.
-- Static values only: no `:toolname`, no `{}` in any tool attribute.
-- Without `toolautosubmit` the browser fills the form, focuses the submit button and the user submits.
-- With `"webmcp": false` every tool attribute is an error (`webmcp/disabled`): remove them.
+- Add `name` to every field (`type=submit|reset|button|image` exempt).
+- Use native constraints (`required`, `type`, `min`/`max`, `<select>` options) to describe parameters.
+- Use static strings only; do not use `:` bindings or `{}` in tool attributes.
+- Without `toolautosubmit`, the browser fills the form and focuses the submit button for the user.
+- With `"webmcp": false`, any tool attribute triggers `webmcp/disabled`.
 
 ## Result to the agent
 
-`@submit="fn"` (no parentheses) gives `fn` the `SubmitEvent`. `event.agentInvoked` is `true` when
-an agent submitted. `@submit` already calls `event.preventDefault()`; call
-`event.respondWith(promise)` before any `await`: the resolved value goes to the model. The agent
-fills the fields directly: read them with `new FormData(event.target)`, not from `:model` state.
+`@submit="fn"` (no parentheses) passes the `SubmitEvent`. `event.agentInvoked` is `true` when an agent submits. Call `event.respondWith(promise)` before any `await`. Read fields from `new FormData(event.target)`, not `:model` state.
 
 ```html
 <script>
@@ -1100,14 +1169,11 @@ fills the fields directly: read them with `new FormData(event.target)`, not from
 </script>
 ```
 
-Return plain JSON the model can read (`{ products: [...] }`, `{ error: 'Use at least 3 characters.' }`).
-For a validation error, respond with it too, so the agent can fix the input and try again.
+Return plain JSON (`{ products: [...] }`, `{ error: 'Use at least 3 characters.' }`). Respond with validation errors too so the agent can retry.
 
 ## CSS
 
-`:tool-form-active` matches the form while an agent fills it; `:tool-submit-active` matches its
-submit button. `.pragma/base.css` styles both with theme tokens; restyle them in `lib/theme.css` or
-the page `<style>`:
+`:tool-form-active` matches a form while an agent fills it. `:tool-submit-active` matches its submit button. `.pragma/base.css` styles both; override them in `lib/theme.css` or page `<style>`:
 
 ```css
 form:tool-form-active { outline: 2px solid var(--color-primary-600); }
@@ -1115,40 +1181,36 @@ form:tool-form-active { outline: 2px solid var(--color-primary-600); }
 
 ## Check rules (`webmcp/*`)
 
-Errors: the tool is broken.
+Errors (broken tool):
 
 | Rule | Fix |
 |---|---|
-| `webmcp/pair` | write both `toolname` and `tooldescription`, or neither |
-| `webmcp/name` | `toolname` with 1–128 chars of `A-Z a-z 0-9 _ . -` |
-| `webmcp/duplicate` | one `toolname` per page (`<if>`/`<else>` branches count separately): rename one |
-| `webmcp/param-name` | `name` on every field of a tool form |
-| `webmcp/dynamic` | tool attributes are static text: no `:` binding, no `{}` |
-| `webmcp/notool` | `notool` only on a `<form>`, never with `toolname` |
-| `webmcp/attribute` | `tooldescription`/`toolautosubmit` only on `<form>`; `toolparamdescription` only on input, select, textarea |
-| `webmcp/disabled` | `"webmcp": false`: remove every tool attribute, or set `"webmcp": true` |
+| `webmcp/pair` | Provide both `toolname` and `tooldescription`, or neither. |
+| `webmcp/name` | Use 1–128 chars from `A-Z a-z 0-9 _ . -` in `toolname`. |
+| `webmcp/duplicate` | Use a unique `toolname` per page (`<if>`/`<else>` branches count separately). |
+| `webmcp/param-name` | Add `name` to every field in a tool form. |
+| `webmcp/dynamic` | Use static text only in tool attributes (no `:` or `{}`). |
+| `webmcp/notool` | Use `notool` only on `<form>`, never with `toolname`. |
+| `webmcp/attribute` | Put `tooldescription`/`toolautosubmit` only on `<form>`, and `toolparamdescription` only on input, select, or textarea. |
+| `webmcp/disabled` | Remove tool attributes when `"webmcp": false`, or set `"webmcp": true`. |
 
-Warnings (errors with `--strict`).
+Warnings (errors with `--strict`):
 
 | Rule | Fix |
 |---|---|
-| `webmcp/form-tool` | add `toolname` + `tooldescription`, or `notool` if agents must not use it |
-| `webmcp/name-style` | lowercase `snake_case` verb_object with at least one `_` (`search_products`) |
-| `webmcp/description` | `tooldescription` of 4+ words |
-| `webmcp/param-description` | `toolparamdescription`, a `<label>` or `aria-description` on the field |
-| `webmcp/autosubmit` | remove `toolautosubmit` from tools named `delete_`, `remove_`, `destroy_`, `pay_`, `buy_`, `purchase_`, `cancel_`, `send_`, `transfer_`… |
+| `webmcp/form-tool` | Add `toolname` + `tooldescription`, or `notool`. |
+| `webmcp/name-style` | Use lowercase `snake_case` `verb_object` with at least one `_` (`search_products`). |
+| `webmcp/description` | Write 4+ words in `tooldescription`. |
+| `webmcp/param-description` | Add `toolparamdescription`, `<label>`, or `aria-description` to the field. |
+| `webmcp/autosubmit` | Remove `toolautosubmit` from destructive or financial tools (`delete_`, `remove_`, `destroy_`, `pay_`, `buy_`, `purchase_`, `cancel_`, `send_`, `transfer_`). |
 
-## Turn it off
+## Disable WebMCP
 
-`pragma.json`: `"webmcp": false`. The `webmcp/*` rules stop, and any tool attribute in the source
-is a `webmcp/disabled` error. Prefer `notool` on single forms.
+Set `"webmcp": false` in `pragma.json` to disable `webmcp/*` checks (existing tool attributes then trigger `webmcp/disabled`). Prefer `notool` on individual forms.
 
 ## Markdown for agents
 
-Agents that fetch pages (not in a browser) ask for `text/markdown`. Put a `.md` next to the page
-in `public/`: `public/index.md` for `/`, `public/pricing.md` or `public/pricing/index.md` for
-`/pricing`. A request whose `Accept` lists `text/markdown` with a q at least as high as `text/html` gets that file; browsers get the HTML.
-No `.md` = HTML for everyone.
+Non-browser agents request `text/markdown`. Add a `.md` file in `public/` matching the route: `public/index.md` for `/`, `public/pricing.md` or `public/pricing/index.md` for `/pricing`. When `Accept` prefers `text/markdown` (quality >= `text/html`), the server returns that `.md` file; otherwise it returns HTML.
 
 ---
 
@@ -1156,8 +1218,7 @@ Source: https://pragma.leonavas.com/docs/packages.md
 
 # npm packages
 
-Add a package only when the platform cannot do the job. First check `Intl`, `fetch`,
-`crypto.randomUUID`, `URLSearchParams`, `structuredClone`.
+Add a package only when the platform cannot do the task. Check `Intl`, `fetch`, `crypto.randomUUID`, `URLSearchParams`, and `structuredClone` first.
 
 ## Install
 
@@ -1165,9 +1226,9 @@ Add a package only when the platform cannot do the job. First check `Intl`, `fet
 npm i date-fns --ignore-scripts
 ```
 
-- The package goes in `dependencies` of `package.json`. Importing a package not listed there = error.
-- Any package manager works (npm, bun, pnpm): pragma reads `package.json` and `node_modules/`.
-- Keep `node_modules/` out of git.
+- List every imported package in `package.json` `dependencies`. Importing an unlisted package is an error.
+- Use any package manager (npm, bun, pnpm); pragma reads `package.json` and `node_modules/`.
+- Exclude `node_modules/` from git.
 
 ## Import
 
@@ -1177,49 +1238,47 @@ import { format } from 'date-fns'
 let today = format(new Date(), 'PPP')
 ```
 
-- Use a quoted specifier, never a template literal.
-- Import from the index or a subpath: the build bundles each package with tree-shaking; only what the app uses ships.
-- Each package becomes `/assets/npm/<package>-<hash>.js` (`@date-fns/tz` → `date-fns__tz`), with `modulepreload`. Code shared by several packages goes to `/assets/npm/_*.js`. Package size counts toward the page budget.
-- `import * as x from 'pkg'` and `import('pkg')` ship the whole package: import names.
-- `process.env.NODE_ENV` becomes `"production"` in build and `"development"` in dev.
+- Use a quoted module specifier; do not use template literals.
+- Import named exports from the index or a subpath. The build tree-shakes each ES module package.
+- Each package outputs `/assets/npm/<package>-<hash>.js` (`@date-fns/tz` -> `date-fns__tz`) with `modulepreload`. Shared chunks go to `/assets/npm/_*.js`. Package size counts toward page budgets.
+- Avoid `import * as x from 'pkg'` and `import('pkg')` when possible; they bundle the whole package.
+- `process.env.NODE_ENV` evaluates to `"production"` in build and `"development"` in dev.
 
-## What works
+## Supported packages
 
-JavaScript packages: ES modules or CommonJS (`require`, `module.exports`), files `.js`, `.mjs`,
-`.cjs` (plus `.json` imported by the package). CommonJS has no tree-shaking: it ships whole.
-Between two options, choose the ES module one.
+Client code supports plain JS packages (`.js`, `.mjs`, `.cjs`, plus imported `.json`) using ES modules or CommonJS. CommonJS packages cannot be tree-shaken and ship whole; prefer ES modules.
 
-| Does not work | Error |
+| Unsupported on client | Error |
 |---|---|
 | TypeScript, JSX, `.vue`, `.svelte`, imported CSS or assets | `app/package` |
-| `node:*` or Node built-ins (`fs`, `path`…) on the client | `app/package` |
-| Importing a name the package does not export | `js/import` |
-| UI frameworks (React, Preact, Vue, Svelte, Solid, lit, jQuery, Alpine…) | `js/import` |
+| `node:*` or Node built-ins (`fs`, `path`) | `app/package` |
+| Importing an export the package does not provide | `js/import` |
+| UI frameworks (React, Preact, Vue, Svelte, Solid, lit, jQuery, Alpine) | `js/import` |
 
-The error points at the import in your file. In `.server.js`, any package from `package.json` works, plus Node built-ins (`fs`, `node:*`) without listing. A built-in name listed in `package.json` (a polyfill such as `buffer`) is bundled as a package.
+In `.server.js`, all `package.json` dependencies and Node built-ins (`fs`, `node:*`) work without extra listing. A built-in name listed in `package.json` (such as `buffer`) bundles as a package.
 
 ## Recommended
 
-| For | Use |
+| Need | Use |
 |---|---|
-| Formatting dates, numbers, currency, plurals, relative time | native `Intl.DateTimeFormat`, `Intl.NumberFormat`, `Intl.PluralRules`, `Intl.RelativeTimeFormat` |
-| Date math (add, difference, start of month) | `date-fns`; time zones: `@date-fns/tz` |
+| Format dates, numbers, currency, plurals, relative time | Native `Intl.DateTimeFormat`, `Intl.NumberFormat`, `Intl.PluralRules`, `Intl.RelativeTimeFormat` |
+| Date math (add, diff, start of month) | `date-fns`; time zones: `@date-fns/tz` |
 | Form or payload validation | `valibot` |
-| Fuzzy search in a list | `fuse.js` |
-| Charts | `chart.js` (draws into a `<canvas>` in the `.html`) |
+| Fuzzy list search | `fuse.js` |
+| Charts | `chart.js` (render into `<canvas>` in `.html`) |
 | Debounce, throttle, group, sort | `es-toolkit` |
-| Unique ID | native `crypto.randomUUID()` |
-| HTTP | native `fetch` |
+| Unique ID | Native `crypto.randomUUID()` |
+| HTTP requests | Native `fetch` |
 
 ## Do not use
 
-| Package | Reason | Use |
+| Package | Reason | Use instead |
 |---|---|---|
-| `moment` | heavy, no tree-shaking | `date-fns`, `Intl` |
-| `lodash` | CommonJS: ships whole (~25 kB gzip) even for one function | `es-toolkit` |
-| `axios` | heavy; `fetch` suffices | `fetch` |
-| `uuid`, `nanoid` | native suffices | `crypto.randomUUID()` |
-| libraries that build HTML (`marked`, template engines, UI kits) | HTML in JS is forbidden | markup in the `.html` |
+| `moment` | Large, no tree-shaking | `date-fns`, `Intl` |
+| `lodash` | CommonJS; ships whole (~25 kB gzip) | `es-toolkit` |
+| `axios` | Large; redundant | `fetch` |
+| `uuid`, `nanoid` | Redundant | `crypto.randomUUID()` |
+| HTML-building libraries (`marked`, template engines, UI kits) | HTML in JS is forbidden | Markup in `.html` |
 
 ---
 
@@ -1227,18 +1286,20 @@ Source: https://pragma.leonavas.com/docs/performance.md
 
 # Performance
 
-Fast by default: prebuilt HTML, `load` fetch starts in `<head>`, per-route CSS (inlined in prod when ≤ 14 kB gzip for zero render-blocking requests), only the JS a page uses, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets, CSS with only used classes, budgets enforced by `check`.
+Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<head>`, per-route CSS (inlined in production when <= 14 kB gzip), per-page JS, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets, unused CSS stripped, and `pragma check` budgets.
+
+## Rules
 
 - Navigate with `<a href>`.
-- Shape skeletons like the final content.
-- `<img>`: always `width` and `height`; `loading="lazy"` below the fold; AVIF/WebP in `public/`.
-- Custom fonts: always `font-display: swap`; avoid `<link rel="preload" as="font">` unless proven faster on slow 4G (font preloads compete with first paint).
-- `<for>` with a stable `key`.
-- A page without interaction has no `.js`.
-- Heavy code used by one page stays in that page; if it runs only after an interaction, `await import()` it inside the action.
-- `load` returns only what the page shows. Run independent calls with `Promise.all`.
-- Never raise a budget in `pragma.json`: shrink the code.
-- Never import large modules in `lib/state/`, fetch data in `mount`, or enable `ssr` by default.
+- Match skeleton shapes to the final content.
+- Set `width` and `height` on every `<img>`. Add `loading="lazy"` below the fold. Store AVIF or WebP images in `public/`.
+- Set `font-display: swap` on custom fonts. Avoid `<link rel="preload" as="font">` unless proven faster on slow 4G.
+- Give `<for>` a stable `key`.
+- Omit `.js` on pages without interaction.
+- Keep heavy single-page code on that page. Load interaction-only code with `await import()` inside the action.
+- Return only displayed fields from `load`. Run independent requests with `Promise.all`.
+- Do not raise budgets in `pragma.json`; reduce code size instead.
+- Do not import large modules in `lib/state/`. Do not fetch data in `mount`. Do not enable `ssr` by default.
 
 ---
 
@@ -1246,9 +1307,11 @@ Source: https://pragma.leonavas.com/docs/logs.md
 
 # Logs
 
-OpenTelemetry on client and server, zero config. In page, component and store scripts use
-`log` from `pragma`; in `load` and server actions the `log` argument; in `utils/`
-`import { log } from '../.pragma/log.js'`.
+Pragma configures OpenTelemetry on client and server automatically.
+
+- In page, component, and store scripts, import `log` from `'pragma'`.
+- In `load` and server actions, use the `log` argument.
+- In `utils/`, import `log` from `'../.pragma/log.js'`.
 
 ```js
 import { call, params, log } from 'pragma'
@@ -1266,18 +1329,20 @@ async function save() {
 }
 ```
 
-| Level | When |
+| Level | Use when |
 |---|---|
-| `debug` | diagnostics (shown in `pragma dev`; off in production unless `PRAGMA_LOG_LEVEL=debug`) |
-| `info` | business event |
-| `warn` | recoverable problem |
-| `error` | failure |
+| `debug` | Diagnostics (shown in `pragma dev`; off in production unless `PRAGMA_LOG_LEVEL=debug`). |
+| `info` | Business event. |
+| `warn` | Recoverable problem. |
+| `error` | Failure. |
 
-- Message: short and fixed. Variable parts go in attributes (`order.id`, `exception.message`, `http.request.method`).
-- Already automatic, do not repeat: unhandled errors, navigation, fetch failures, one span per request, `traceparent`.
-- In `pragma dev`, every client `log.*` also prints to the browser console.
-- Client logs go to `POST /_otel`; on a static host without it (404/405) the client stops sending.
-- Forbidden: `console.*`; logging inside loops or on every keystroke; passwords, tokens, cookies, emails or any personal data.
+## Rules
+
+- Keep messages short and fixed. Put dynamic values in attributes (`order.id`, `exception.message`, `http.request.method`).
+- Do not duplicate automatic logs: unhandled errors, navigation, fetch failures, request spans, and `traceparent`.
+- In `pragma dev`, client `log.*` also prints to the browser console.
+- Client logs send to `POST /_otel`. On static hosts returning 404 or 405, the client stops sending.
+- Forbidden: `console.*`, logging inside loops or on every keystroke, and logging passwords, tokens, cookies, emails, or personal data.
 
 ---
 
@@ -1285,92 +1350,99 @@ Source: https://pragma.leonavas.com/docs/cli.md
 
 # `pragma` CLI
 
-| Command | Does |
+| Command | Action |
 |---|---|
-| `pragma new <dir>` | creates an app with the fixed structure (warns and keeps existing files if `<dir>` is not empty) |
-| `pragma dev [--port 5180] [--host 127.0.0.1]` | dev server with live reload over a WebSocket (any number of tabs); a build error shows an overlay, and pages without errors keep working, `load` included (starts Node ≥ 22 when there is a `.server.js`); prints `app/core-outdated` first when `.pragma/` is older than this `pragma` |
-| `pragma check [--strict]` | checks JS, HTML, CSS, budgets, accessibility and WebMCP tools; `--strict` turns warnings into errors |
-| `pragma build [--allow-outdated-core]` | writes `dist/`; stops with `app/core-outdated` when `.pragma/` is older than this `pragma` (run `pragma upgrade`; `--allow-outdated-core` builds anyway) |
-| `pragma serve [--port 3000] [--host 127.0.0.1]` | serves `dist/` as in production |
-| `pragma upgrade` | makes `.pragma/` (runtime, docs, `base.css`) equal to this `pragma` version; prints each file updated, added or removed; never touches files outside `.pragma/` |
+| `pragma -V` | Prints the installed CLI version. |
+| `pragma new <dir>` | Creates an app with the fixed structure. Warns and keeps existing files if `<dir>` is not empty. |
+| `pragma dev [--port 5180] [--host 127.0.0.1]` | Runs the dev server with WebSocket live reload. Shows an overlay on build errors while valid pages keep working. Starts Node >= 22 when `.server.js` exists. Prints `app/core-outdated` first if `.pragma/` is older than the CLI. |
+| `pragma check [--strict]` | Checks JS, HTML, CSS, budgets, accessibility, and WebMCP tools. `--strict` turns warnings into errors. |
+| `pragma build [--allow-outdated-core]` | Builds `dist/`. Stops with `app/core-outdated` if `.pragma/` is older than the CLI (`--allow-outdated-core` overrides this). |
+| `pragma serve [--port 3000] [--host 127.0.0.1]` | Serves `dist/` as in production. |
+| `pragma upgrade` | Syncs `.pragma/` (runtime, docs, `base.css`, `version`) with the installed CLI version. Prints updated, added, or removed files. Never edits files outside `.pragma/`. |
+| `pragma self-update [version]` | Downloads the latest or specified `pragma` binary from GitHub Releases, verifies `SHA256SUMS.txt`, and replaces the executable. |
 
-Run `pragma check --strict` before finishing: zero errors, zero warnings. Output:
-`file:line:column error|warning [rule] message`. Fix the cause; never work around the rule.
+Run `pragma check --strict` before you finish. Fix all errors and warnings.
+Output format: `file:line:column error|warning [rule] message`.
+Fix the root cause; do not work around a rule.
+
+## Versioning and updates
+
+- `.pragma/version` stores the version of `.pragma/` in the app.
+- Compare `pragma -V` with `.pragma/version`.
+- If they differ, or if `pragma check` reports `app/core-outdated`, run `pragma upgrade`.
+- Run `pragma self-update [version]` to update the CLI binary.
 
 ## Rules
 
 | Rule | Fix |
 |---|---|
-| `js/syntax`, `html/syntax`, `css/syntax` | valid code; HTML: close every non-void tag |
-| `js/html-in-js` | no `innerHTML`, `createElement`, `document.write`…: markup goes in `.html` |
-| `js/console` | `log.*` (logs.md) |
-| `js/jsdoc-types` | no TypeScript or JSDoc types |
-| `js/import` | import only project files, `.pragma/` and `package.json` dependencies (packages.md); `import()` only with a quoted specifier (`import('./chart.js')`), never a variable or `${}` |
-| `js/comment`, `html/comment`, `css/comment` | delete the comment; name things clearly |
-| `js/vague-name` | descriptive names. Flagged: generic words (`tmp`, `data`, `info`, `handler`, `util`…), names ending in a digit, names under 3 chars except `$ i j k id ok el ctx url log` and parameters of expression-body arrows |
-| `js/legacy-api` | old API (`export const state`/`actions`, `export function mount`, `ctx.$`, `ctx.update`, `store()`): top-level `let` for state, functions for actions and derived values, `function mount(el)`, `export let` for props (components.md, state.md) |
-| `js/prop-write` | props are read-only (also through `:model`): copy into a `let` (`let current = start`) |
-| `js/const-state` | a top-level `const` changed in place and read in HTML does not update the page: declare it with `let` |
-| `js/store-import` | reach stores through `shared` (`import { shared } from 'pragma'`, then `shared.cart`) |
-| `js/component-script` | script shape (state.md): no `var`, no destructuring `let`, only `export let` props (stores: only `export const persist`), no top-level `await`, only `pragma`'s names, `$`/`$pragma` reserved |
-| `js/top-level-data` | `data` read when the script starts (before the loader is done): read it inside a function (`const products = () => data.products`) |
-| `js/stale-derived` | a top-level `let`/`const` computed once from state or a prop and never assigned again: make it a function (`const doubled = () => count * 2`), or assign it in an action |
-| `js/derived-call` | a derived function used as a value in JS (`if (empty)`, `` `${total}` ``): call it (`empty()`) |
-| `js/dollar-in-script` | `$x` is HTML only: in a script write `x` |
-| `html/legacy-syntax`, `html/unknown-directive` | syntax.md. Vue, Alpine, Svelte, Angular and React attributes (`v-if`, `x-show`, `v-bind:href`, `on:click`, `*ngIf`, `[disabled]`, `className`) do nothing here: the message names the pragma form (`<if path>`, `:show`, `:href`, `@click`) |
-| `html/data-attribute` | no hand-written `data-*`: reserved ones name their short form (`data-text` → `{path}` inside the element); others suggest `:data-x="path"`, `.name="path"`, `aria-*` or role/label/id |
-| `html/invalid-path`, `html/invalid-root` | only `root.a.b` with a valid root (syntax.md); in `{}` close the brace (`\{` for a literal one); event arguments are paths, `'text'`, numbers, `true`/`false`/`null`, `event` or `el`, never expressions; no `$` in an event name; `:attr` takes a bare path; no operators in `<if>`. Messages suggest the closest name ("did you mean `$count`?") |
-| `html/text-removed` | `:text` was removed: write `{path}` inside the element (`<p>{$name}</p>`) |
-| `html/block`, `html/block-single-root`, `html/for-without-key`, `html/misplaced-else`, `html/misplaced-empty`, `html/outside-template` | block rules (syntax.md) |
-| `html/unknown-name` | declare it at the top level of the owner's script: `let x` (state), `export let x` (prop), `function x()` (action or derived); the layout has no script. For `@click="shared.cart.x(…)"`, `x` must be a function of the store |
-| `html/unknown-prop` | the component's script must declare the prop: `export let name = default` |
-| `html/duplicate-module` | one place per component: `<script>`/`<style>` inside the `.html` or `x.js`/`x.css`, not both |
-| `html/component`, `html/unknown-component` | components.md |
-| `html/layout`, `html/title`, `html/head` | routes.md (SEO) |
-| `html/class` | toggle classes with `.name="path"`, never `:class` or `{}` in `class` (syntax.md) |
-| `html/interpolation` | no `{{ }}`/`${ }`: write `{path}` (syntax.md) |
-| `html/script`, `html/style-inline`, `html/on-inline` | one `<script>` and one `<style>`, at the top level of a page or component `.html`, without attributes (`<script>` takes only `type="module"`); otherwise behavior in a script function, style in classes. JSON-LD `<script type="application/ld+json">` only at the top level of a page (routes.md, SEO) |
-| `html/json-ld` | the JSON-LD is not valid JSON, or a `{` in one of its strings is not closed: fix the JSON at the line shown; a literal `{` in a string is `{` |
-| `css/unknown-class`, `css/arbitrary-value` | classes.md, css.md |
-| `app/structure`, `app/route-conflict` | structure.md, routes.md |
-| `app/package` | packages.md |
-| `app/pragma-json` | valid `pragma.json` (structure.md) |
-| `app/budget` | shrink the code (performance.md) |
-| `app/core-outdated` (warning; an error in `pragma build`) | `.pragma/` differs from this `pragma` version: run `pragma upgrade`; never edit `.pragma/` by hand. An old runtime cannot render what a newer compiler emits (SSR "unknown op") |
+| `js/syntax`, `html/syntax`, `css/syntax` | Write valid syntax. Close every non-void HTML tag. |
+| `js/html-in-js` | Remove `innerHTML`, `createElement`, `document.write`. Put markup in `.html`. |
+| `js/console` | Use `log.*` (`logs.md`). |
+| `js/jsdoc-types` | Remove TypeScript and JSDoc types. |
+| `js/import` | Import only project files, `.pragma/`, and `package.json` dependencies (`packages.md`). Pass a quoted specifier to `import()` (`import('./chart.js')`), never a variable or `${}`. |
+| `js/comment`, `html/comment`, `css/comment` | Delete the comment. Use clear names. |
+| `js/vague-name` | Use descriptive names. Avoid generic words (`tmp`, `data`, `info`, `handler`, `util`), names ending in a digit, and names under 3 chars except `$ i j k id ok el ctx url log` and parameters of expression-body arrows. |
+| `js/legacy-api` | Replace old API (`export const state`/`actions`, `export function mount`, `ctx.$`, `ctx.update`, `store()`). Use top-level `let`, functions, `function mount(el)`, and `export let` (`components.md`, `state.md`). |
+| `js/prop-write` | Do not mutate props (including via `:model`). Copy into a `let` (`let current = start`). |
+| `js/const-state` | Declare mutated state with `let`, not `const`. |
+| `js/store-import` | Access stores through `shared` (`import { shared } from 'pragma'`, then `shared.cart`). |
+| `js/component-script` | Follow script rules (`state.md`): no `var`, no destructuring `let`, only `export let` props (stores export only `persist`), no top-level `await`, only valid `pragma` imports, no `$`/`$pragma` declarations. |
+| `js/top-level-data` | Read `data` inside functions (`const products = () => data.products`), not at top level. |
+| `js/stale-derived` | Convert static derived values to functions (`const doubled = () => count * 2`), or update them in actions. |
+| `js/derived-call` | Call derived functions in JS (`empty()`), not as bare values (`if (empty)`). |
+| `js/dollar-in-script` | Write `x` in JS; `$x` is HTML only. |
+| `html/legacy-syntax`, `html/unknown-directive` | Use pragma syntax (`syntax.md`). Replace foreign attributes (`v-if`, `x-show`, `v-bind:href`, `on:click`, `*ngIf`, `[disabled]`, `className`) with pragma forms (`<if path>`, `:show`, `:href`, `@click`). |
+| `html/data-attribute` | Do not write `data-*` by hand. Use short forms (`{path}` instead of `data-text`), `:data-x="path"`, `.name="path"`, `aria-*`, or role/label/id. |
+| `html/invalid-path`, `html/invalid-root` | Use `root.a.b` with a valid root (`syntax.md`). Close `{}` (`\{` for literal). Pass only paths, `'text'`, numbers, `true`/`false`/`null`, `event`, or `el` to events. Omit `$` in event names. Use bare paths in `:attr` and `<if>`. |
+| `html/text-removed` | Replace `:text` with `{path}` inside the element (`<p>{$name}</p>`). |
+| `html/block`, `html/block-single-root`, `html/for-without-key`, `html/misplaced-else`, `html/misplaced-empty`, `html/outside-template` | Follow block rules (`syntax.md`). |
+| `html/unknown-name` | Declare the name at the top level of the owner script (`let x`, `export let x`, `function x()`). Layouts have no script. In `@click="shared.cart.x(…)"`, `x` must be a store function. |
+| `html/unknown-prop` | Declare the prop in the component script (`export let name = default`). |
+| `html/duplicate-module` | Use inline `<script>`/`<style>` or external `x.js`/`x.css`, not both. |
+| `html/component`, `html/unknown-component` | Follow component rules (`components.md`). |
+| `html/layout`, `html/title`, `html/head` | Follow layout and SEO rules (`routes.md`). |
+| `html/class` | Toggle classes with `.name="path"`. Do not use `:class` or `{}` in `class` (`syntax.md`). |
+| `html/interpolation` | Replace `{{ }}` and `${ }` with `{path}` (`syntax.md`). |
+| `html/script`, `html/style-inline`, `html/on-inline` | Put at most one `<script>` (optional `type="module"`) and one `<style>` at the top level of a page or component `.html`. Put JSON-LD `<script type="application/ld+json">` only at the top level of a page (`routes.md`). |
+| `html/json-ld` | Fix invalid JSON or unclosed `{` in JSON-LD strings. Use `{` for a literal brace. |
+| `css/unknown-class`, `css/arbitrary-value` | Use classes from `classes.md` or custom classes per `css.md`. |
+| `app/structure`, `app/route-conflict` | Follow structure and route rules (`structure.md`, `routes.md`). |
+| `app/package` | Follow package rules (`packages.md`). |
+| `app/pragma-json` | Fix `pragma.json` (`structure.md`). |
+| `app/budget` | Reduce bundle size (`performance.md`). |
+| `app/core-outdated` (warning; error in `pragma build`) | `.pragma/` differs from the CLI version. Run `pragma upgrade`. Do not edit `.pragma/` by hand. |
 
 ## Accessibility (`a11y/*`, warnings; errors with `--strict`)
 
 | Rule | Fix |
 |---|---|
-| `img-alt` | `alt` on every `<img>`; `alt=""` if decorative |
-| `accessible-name` | `<button>`/`<a>` with text, `{path}`, `aria-label` or `title` |
-| `label` | field with `<label for>`, wrapped in `<label>`, or `aria-label` |
-| `dialog-name` | `<dialog>` with `aria-label` or `aria-labelledby` |
-| `click-non-interactive` | `@click` on `<button>`/`<a>`; otherwise add `role` and `tabindex` |
-| `heading` | do not skip heading levels |
-| `single-h1` | one `<h1>` per page (`<if>`/`<else>` branches count separately) |
-| `tabindex` | only `0` or `-1` |
-| `duplicate-id` | unique `id` per page |
-| `iframe-title` | `title` on `<iframe>` |
-| `a-no-href` | every `<a>` has `href`; actions use `<button>` |
+| `img-alt` | Add `alt` to every `<img>`. Use `alt=""` for decorative images. |
+| `accessible-name` | Give `<button>` and `<a>` text, `{path}`, `aria-label`, or `title`. |
+| `label` | Associate fields with `<label for>`, wrap in `<label>`, or add `aria-label`. |
+| `dialog-name` | Add `aria-label` or `aria-labelledby` to `<dialog>`. |
+| `click-non-interactive` | Put `@click` on `<button>` or `<a>`, or add `role` and `tabindex`. |
+| `heading` | Do not skip heading levels. |
+| `single-h1` | Use one `<h1>` per page (`<if>`/`<else>` branches count separately). |
+| `tabindex` | Use only `0` or `-1`. |
+| `duplicate-id` | Use a unique `id` per page. |
+| `iframe-title` | Add `title` to `<iframe>`. |
+| `a-no-href` | Add `href` to every `<a>`. Use `<button>` for actions. |
 
-`:<attr>` and `{}` in the attribute count as the attribute (`:aria-label="task.title"`, `aria-label="Remove {task.title}"`).
+`:<attr>` and `{}` count as setting the attribute (`:aria-label="task.title"`, `aria-label="Remove {task.title}"`).
 
-## WebMCP (`webmcp/*`, only with `"webmcp": true`)
+## WebMCP (`webmcp/*`, active when `"webmcp": true`)
 
-Every `<form>` is an agent tool (webmcp.md). Errors (the tool is broken): `webmcp/pair`,
-`webmcp/name`, `webmcp/duplicate`, `webmcp/param-name`, `webmcp/dynamic`, `webmcp/notool`,
-`webmcp/attribute`; with `"webmcp": false`, any tool attribute is `webmcp/disabled`. Warnings
-(errors with `--strict`): `webmcp/form-tool`, `webmcp/name-style`, `webmcp/description`,
-`webmcp/param-description`, `webmcp/autosubmit`. Each rule and its fix: webmcp.md.
+Every `<form>` is an agent tool (`webmcp.md`).
+- Errors: `webmcp/pair`, `webmcp/name`, `webmcp/duplicate`, `webmcp/param-name`, `webmcp/dynamic`, `webmcp/notool`, `webmcp/attribute`. With `"webmcp": false`, any tool attribute triggers `webmcp/disabled`.
+- Warnings (errors with `--strict`): `webmcp/form-tool`, `webmcp/name-style`, `webmcp/description`, `webmcp/param-description`, `webmcp/autosubmit`.
 
 ## `dist/`
 
 | Path | Use |
 |---|---|
-| `client/` | HTML per route and assets; without `.server.js`, deploy it to static hosting |
-| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (the worker resolves param pages via the manifest and answers `_404.html` with 404) |
-| `server/node.mjs` | `node dist/server/node.mjs` (port from `PORT`, default 3000) |
+| `client/` | HTML per route and assets. Deploy to static hosting when no `.server.js` exists. |
+| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest and serves `_404.html` with 404). |
+| `server/node.mjs` | Run `node dist/server/node.mjs` (reads `PORT`, default 3000). |
 
-Every server (`dev`, `serve`, Workers, Node) answers a request whose `Accept` prefers
-`text/markdown` with the page's `.md` from `public/` when it exists (webmcp.md, Markdown for agents).
+Every server (`dev`, `serve`, Workers, Node) returns the matching `.md` from `public/` when `Accept` prefers `text/markdown` (`webmcp.md`).

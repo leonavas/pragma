@@ -21,12 +21,29 @@ Or build from source with Cargo:
 git clone https://github.com/leonavas/pragma && cd pragma && cargo install --path core/cli/crates/pragma-cli
 ```
 
+## Validate version and update
+
+Validate the pragma version before you change code:
+
+1. Run `pragma -V` to check the installed CLI version.
+2. Compare that version with `.pragma/version` inside the app.
+3. Run `pragma self-update` to update the CLI binary from GitHub Releases if the CLI is old.
+4. Run `pragma upgrade` inside the app to update `.pragma/` (runtime, docs, `base.css`, `version`) if `.pragma/` is outdated.
+
+```sh
+pragma -V
+cat .pragma/version
+pragma self-update
+pragma upgrade
+```
+
 ## The loop
 
-1. Read `AGENTS.md` in the app (the rules below), then the doc for the task.
-2. Write the code: one `.html` per page or component, plain JS, utility classes.
-3. Run `pragma check --strict` and fix every error and warning at its cause, never around the rule.
-4. Done when `pragma check --strict` prints no problems. `pragma build` writes `dist/`.
+1. Validate the pragma version (`pragma -V` vs `.pragma/version`); run `pragma self-update` and `pragma upgrade` if outdated.
+2. Read `AGENTS.md` in the app (the rules below), then the doc for the task in `.pragma/docs/`.
+3. Write the code: one `.html` per page or component, plain JS, utility classes.
+4. Run `pragma check --strict` and fix every error and warning at its cause, never around the rule.
+5. Finish when `pragma check --strict` prints no problems. `pragma build` writes `dist/`.
 
 ## Contents
 

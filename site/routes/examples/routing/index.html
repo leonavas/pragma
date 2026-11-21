@@ -27,7 +27,7 @@
       </table>
     </div>
     <div class="prose">
-      <p>Names starting with <code>_</code> are private; only <code>_layout.html</code> and <code>_404.html</code> are special, any other <code>_x.html</code> is an error. <code>x.html</code> next to <code>x/index.html</code>, or two params in the same folder, is <code>app/route-conflict</code>. There is no <code>[...rest]</code>, no optional param and no nested layout.</p>
+      <p>Names starting with <code>_</code> are private; only <code>_layout.html</code> and <code>_404.html</code> are special, any other <code>_x.html</code> is an error. <code>x.html</code> next to <code>x/index.html</code>, or two params in the same folder, is <code>app/route-conflict</code>. There is no <code>[...rest]</code> and no optional param. Subfolders can define nested layouts with <code>routes/&lt;dir&gt;/_layout.html</code> and <code>&lt;slot&gt;&lt;/slot&gt;</code>.</p>
     </div>
     <c-showcase :source="data.examples.files" caption="A real route under this page. Follow the links: each one is a client-side navigation inside the frame.">
       <c-frame src="/examples/routing/demo" title="Routing demo: posts"></c-frame>
@@ -56,9 +56,9 @@
   </section>
 
   <section class="doc-section" aria-labelledby="layout">
-    <h2 id="layout">One layout and automatic active links</h2>
+    <h2 id="layout">Layouts and automatic active links</h2>
     <div class="prose">
-      <p><code>routes/_layout.html</code> wraps every page. Its optional <code>&lt;head&gt;</code> comes first, is static (a binding there fails check with <code>html/head</code>) and is copied into every page; exactly one <code>&lt;main data-page&gt;</code> holds a lone <code>&lt;slot&gt;</code>. The layout has no <code>&lt;script&gt;</code> and reads only <code>shared</code>, <code>params</code> and <code>query</code>; behavior goes in a component. A <code>&lt;title&gt;</code> in the layout <code>&lt;head&gt;</code> is the fallback for pages without one, and <code>pragma.json</code>'s <code>name</code> is the last resort. A page can also write <code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> at its top level: the build moves them into <code>&lt;head&gt;</code>, replacing the layout's tag with the same name (see <a href="/examples/seo">SEO and head</a>).</p>
+      <p><code>routes/_layout.html</code> wraps every page. Its optional <code>&lt;head&gt;</code> comes first, is static (a binding there fails check with <code>html/head</code>) and is copied into every page; exactly one <code>&lt;main data-page&gt;</code> holds a lone <code>&lt;slot&gt;</code>. Subfolders can add a nested <code>routes/&lt;dir&gt;/_layout.html</code> with a <code>&lt;slot&gt;&lt;/slot&gt;</code> to wrap every page in that folder inside the parent layout. The layout has no <code>&lt;script&gt;</code> and reads only <code>shared</code>, <code>params</code> and <code>query</code>; behavior goes in a component. A <code>&lt;title&gt;</code> in the layout <code>&lt;head&gt;</code> is the fallback for pages without one, and <code>pragma.json</code>'s <code>name</code> is the last resort. A page can also write <code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> at its top level: the build moves them into <code>&lt;head&gt;</code>, replacing the layout's tag with the same name (see <a href="/examples/seo">SEO and head</a>).</p>
       <p>Any routed <code>&lt;a href&gt;</code> without query or hash that points to the current page gets <code>aria-current="page"</code>, in the prebuilt HTML and after every navigation. This site styles <code>.nav-link[aria-current="page"]</code> in green: look at the header above, or at the demo nav in any frame on this page.</p>
     </div>
     <c-showcase :source="data.examples.layout" caption="This site's own layout. The live frame is the same layout around a demo page.">

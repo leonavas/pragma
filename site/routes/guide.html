@@ -48,7 +48,8 @@ usage:
   pragma build                                  build dist/ for production
   pragma check [--strict]                       check HTML, CSS, JS and budgets (--strict: warnings become errors)
   pragma serve [--port 3000] [--host 127.0.0.1] serve dist/ as in production
-  pragma upgrade                                update .pragma/ (runtime, docs, base.css) to this version
+  pragma upgrade                                update .pragma/ (runtime, docs, base.css, version) to this version
+  pragma self-update [version]                  update the pragma CLI binary from GitHub Releases
 
 options:
   -h, --help      show this help
@@ -359,7 +360,7 @@ content-encoding: br
             </li>
             <li><code>/_pragma/manifest.json</code> lists every route with its HTML file, modules, loader and SSR flag. The client router and the Node adapter both read it.</li>
             <li>Data travels as <code>GET /_data/&lt;path&gt;</code> and server actions as <code>POST /_action/&lt;path&gt;/&lt;name&gt;</code>, both with a <code>traceparent</code> header.</li>
-            <li>Not in v0: static generation with data, nested layouts, catch-all routes (<code>[...rest]</code>), per-route CSS, i18n and Speculation Rules.</li>
+            <li>Not in v0: static generation with data, catch-all routes (<code>[...rest]</code>), per-route CSS, i18n and Speculation Rules.</li>
           </ul>
           <p>Next: the <a href="/examples">examples</a> show every feature running, with its source.</p>
         </div>

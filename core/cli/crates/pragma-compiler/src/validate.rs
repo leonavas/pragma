@@ -10,6 +10,7 @@ use std::path::PathBuf;
 pub enum Kind {
     Page,
     Layout,
+    NestedLayout,
     Component,
 }
 
@@ -143,9 +144,24 @@ impl FileCheck<'_> {
                     }
             }
             Kind::Layout => self.layout(tree, file_pos),
+            Kind::NestedLayout => self.nested_layout(tree, file_pos),
             Kind::Page => {}
         }
         self.nodes(tree, None, true);
+    }
+
+    fn nested_layout(&mut self, tree: &[Node], file_pos: Pos) {
+        let mut slots = Vec::new();
+        find_slots(tree, &mut slots);
+        match slots.as_slice() {
+            [] => self.err(file_pos, "html/layout", "a nested layout needs <slot></slot>"),
+            [slot] => {
+                if slot.has("name") {
+                    self.err(slot.pos, "html/layout", "nested layout <slot> cannot have a name");
+                }
+            }
+            [_, second, ..] => self.err(second.pos, "html/layout", "a nested layout cannot have more than one <slot></slot>"),
+        }
     }
 
     fn layout(&mut self, tree: &[Node], file_pos: Pos) {
@@ -566,6 +582,17 @@ fn find_mains<'a>(nodes: &'a [Node], out: &mut Vec<&'a Element>) {
                 out.push(e);
             }
             find_mains(&e.children, out);
+        }
+    }
+}
+
+fn find_slots<'a>(nodes: &'a [Node], out: &mut Vec<&'a Element>) {
+    for n in nodes {
+        if let Node::Element(e) = n {
+            if e.is("slot") {
+                out.push(e);
+            }
+            find_slots(&e.children, out);
         }
     }
 }

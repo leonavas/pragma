@@ -58,6 +58,7 @@ pub struct Project {
     pub trees: Vec<Vec<Node>>,
     pub config: Config,
     pub layout: Option<u32>,
+    pub nested_layouts: HashMap<PathBuf, u32>,
     pub not_found: Option<Page>,
     pub pages: Vec<Page>,
     /// Component folder (`routes/x/_components` or `lib/components`) -> name -> component.
@@ -231,6 +232,7 @@ impl Project {
             trees: Vec::new(),
             config: Config { webmcp: true, ..Config::default() },
             layout: None,
+            nested_layouts: HashMap::new(),
             not_found: None,
             pages: Vec::new(),
             components: HashMap::new(),
@@ -419,10 +421,14 @@ impl Project {
                 if f.ancestors().any(|a| a.file_name().is_some_and(|n| n == "_components")) {
                     continue;
                 }
-                if file_name == "_layout.js" || file_name == "_layout.server.js" {
-                    self.err(f, 1, 1, "app/structure", "the layout cannot have a module in v0");
+                let parent_private = f.parent().is_some_and(|p| p.components().skip(1).any(|c| c.as_os_str().to_string_lossy().starts_with('_')));
+                if file_name == "_layout.html" && !parent_private {
+                    let id = self.add_html(f.clone());
+                    self.nested_layouts.insert(f.parent().unwrap().to_path_buf(), id);
+                } else if file_name == "_layout.js" || file_name == "_layout.server.js" {
+                    self.err(f, 1, 1, "app/structure", "the layout cannot have a module or .server.js");
                 } else if file_name.starts_with('_') && file_name.ends_with(".html") {
-                    self.err(f, 1, 1, "app/structure", "only routes/_layout.html and routes/_404.html are special; nested layouts are not in v0");
+                    self.err(f, 1, 1, "app/structure", "only _layout.html and routes/_404.html are special in routes/");
                 }
                 continue;
             }

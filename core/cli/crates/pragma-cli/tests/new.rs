@@ -10,6 +10,8 @@ fn creates_app_from_embedded_files() {
     assert!(!created.non_empty);
     let base = std::fs::read_to_string(dir.join(".pragma/base.css")).unwrap();
     assert_eq!(base, pragma_css::base_css());
+    let ver = std::fs::read_to_string(dir.join(".pragma/version")).unwrap();
+    assert_eq!(ver.trim(), env!("CARGO_PKG_VERSION"));
 
     let core = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     for (src, dest) in [("starter", ""), ("runtime", ".pragma"), ("docs", ".pragma/docs")] {

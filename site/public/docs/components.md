@@ -1,50 +1,49 @@
 # Components
 
-Search `lib/components/` and `_components/` before creating one.
+Search `lib/components/` and `_components/` before you create a component.
 
 | Tag | Folder | Use when |
 |---|---|---|
-| `<c-name>` | `lib/components/name/` | used by more than one route folder |
-| `<p-name>` | `_components/name/` in the page's folder or an ancestor | used by one route folder only |
+| `<c-name>` | `lib/components/name/` | Shared across multiple route folders. |
+| `<p-name>` | `_components/name/` in the page folder or an ancestor | Used in one route folder only. |
 
-To promote: move the folder to `lib/components/` and rename `p-` to `c-`.
+To promote a `p-` component, move the folder to `lib/components/` and rename `p-` to `c-`.
 
 ```
 name/
-  name.html   required: optional <script> and <style> at the top level, then 1 root element
-              (not <template>, <slot> or a component)
-  name.js     optional, instead of the <script>
-  name.css    optional, instead of the <style>; scoped to the component automatically
+  name.html   required: optional <script> and <style> at top level, then 1 root element
+              (not <template>, <slot>, or another component)
+  name.js     optional: replaces <script>
+  name.css    optional: replaces <style>; scoped automatically
 ```
 
-The `<script>` is the component's state and behavior (state.md); `<style>` (or `name.css`) is
-its CSS. The build scopes every selector to the component (its root and what is inside it):
-`button { … }` never styles a button outside it. `:global(…)` opts out only what is inside it:
-`:global(html[data-theme="dark"]) .x` is this component's `.x` in dark mode; `:global(body.locked)`
-alone is global (css.md). Selectors that already start with `[data-c="name"]` stay as written. Both inline and as a file = `html/duplicate-module`.
-
-`p-` names are private to their folder, styles included: two `<p-badge>` in different folders
-never share CSS (the build gives each its own `data-c` and rewrites `[data-c="badge"]` in its own
-`.css`). Do not select a `p-` component's `data-c` from outside its `.css` (theme, tests): use a
-class, role or label.
+- `<script>` defines state and behavior (`state.md`). `<style>` or `name.css` defines CSS.
+- The build scopes every selector to the component root and its descendants. `button { … }` never matches outside.
+- `:global(…)` opts out only its argument (`:global(html[data-theme="dark"]) .x` targets `.x` in dark mode; `:global(body.locked)` is global; see `css.md`).
+- Selectors starting with `[data-c="name"]` stay as written.
+- Using both inline `<script>`/`<style>` and external `name.js`/`name.css` triggers `html/duplicate-module`.
+- `p-` names and styles are private to their folder. Two `<p-badge>` components in different folders get distinct `data-c` values and never share CSS.
+- Do not select a `p-` component's `data-c` outside its `.css`. Select by class, role, or label.
 
 ## Props
 
-A component with a script declares its props with `export let name = default`:
+Declare props in `<script>` with `export let name = default`:
 
 | Caller writes | Script declares | Inside (`$x` in HTML, `x` in JS) |
 |---|---|---|
 | `label="Hi"` | `export let label = ''` | `'Hi'` |
-| `start="10"` | `export let start = 0` | the number `10`: the default's type converts the text |
+| `start="10"` | `export let start = 0` | `10` (converted to the default's type) |
 | `locked` / `locked="false"` | `export let locked = false` | `true` / `false` |
-| `:product="p"` | `export let product = null` | the object itself, updated on each render |
-| nothing | `export let step = 1` | the default, `1` |
+| `:product="p"` | `export let product = null` | The object itself, updated on each render |
+| omitted | `export let step = 1` | `1` |
 
-- Props are read-only (`js/prop-write`, also via `:model`): copy one into a `let` to change it (`let count = start`).
-- An object or list prop is read-only inside too: it is the caller's data. In dev, writing to it (`files[0].open = true`, `items.push(x)`) throws "props are read-only, also inside". Copy what you change: `let rows = files.map(file => ({ ...file }))`, or ask the owner to change it (an event, a store function).
-- A prop the script does not declare is an error at the call site (`html/unknown-prop`). `class` is not a prop: it is appended to the root's classes. `id` is a prop like any other (`export let id = ''`, then `:id="$id"`).
-- Name props in one lowercase word (`label`, `step`): HTML attributes are case-insensitive.
-- A component **without** a script has build-time props: `$label` is replaced by the caller's text, `:x="path"` by the caller's path; missing, `""` and `"false"` are falsy.
+- Props are read-only (`js/prop-write`, including via `:model`). Copy a prop into a `let` to change it (`let count = start`).
+- Object and array props are deeply read-only. In dev, mutating them throws `"props are read-only, also inside"`. Copy before changing (`let rows = files.map(file => ({ ...file }))`), or update through a store function or event.
+- Passing an undeclared prop triggers `html/unknown-prop`.
+- `class` is not a prop; it appends to the root element's classes.
+- `id` is a normal prop (`export let id = ''`, then `:id="$id"`).
+- Name props as one lowercase word (`label`, `step`); HTML attributes are case-insensitive.
+- Components without a script use build-time props: `$label` replaces with caller text, `:x="path"` with caller path. Missing, `""`, and `"false"` are falsy.
 
 ## Example
 
@@ -88,13 +87,14 @@ Usage:
 </c-modal>
 ```
 
-- `<slot></slot>` receives the children; `<slot name="actions">` receives `slot="actions"`. Filling a slot the component lacks = error.
-- Slot content belongs to whoever wrote it: its `$` and `@` resolve there.
+- `<slot></slot>` receives default children. `<slot name="actions">` receives `slot="actions"`.
+- Filling a slot that does not exist is an error.
+- Slot content belongs to its caller; `$` and `@` resolve in the caller's scope.
 
 ## Rules
 
-- In a component without a script, `@` calls the caller's function.
-- State is per instance. A component's script loads only on pages that use it.
-- No `.server.js` in components: data comes from the page's `load`.
-- Never read or change a child's state: pass props; the child changes a store or calls its own action.
-- No `customElements.define`, no shadow DOM. Overlays: use `c-modal`, `c-alert`, `c-dropdown` (overlays.md).
+- In a scriptless component, `@` calls the caller's function.
+- State is per instance. A component script loads only on pages that use it.
+- Do not put `.server.js` in components; load data in the page's `load`.
+- Do not read or mutate a child's state. Pass props; let the child call its own action or a store function.
+- Do not use `customElements.define` or shadow DOM. Build overlays with `c-modal`, `c-alert`, and `c-dropdown` (`overlays.md`).

@@ -1542,3 +1542,57 @@ fn static_app_with_public_markdown_emits_cloudflare_worker() {
     let worker = fs::read_to_string(out.join("server/worker.js")).unwrap();
     assert!(worker.contains("createHandler") && worker.contains("routes: [\n  ]"), "{worker}");
 }
+
+#[test]
+fn nested_layouts() {
+    let t = app_with(&[
+        ("routes/docs/_components/nav/nav.html", Some("<nav aria-label=\"Docs\"><a href=\"/docs\">Docs</a></nav>")),
+        ("routes/docs/_layout.html", Some("<div class=\"flex\"><p-nav></p-nav><section class=\"p-4\"><slot></slot></section></div>")),
+        ("routes/docs/index.html", Some("<title>Docs</title><h1>Overview</h1>")),
+        ("routes/docs/api/_layout.html", Some("<article class=\"p-2\"><header>API</header><slot></slot></article>")),
+        ("routes/docs/api/index.html", Some("<title>API</title><h1>{data.title}</h1>")),
+        ("routes/docs/api/index.server.js", Some("export const ssr = true\nexport function load() { return { title: 'Ref' } }\n")),
+    ]);
+    let app = t.0.join("app");
+    let d = check(&app);
+    assert!(d.is_empty(), "{d:#?}");
+    let out = t.0.join("dev");
+    build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+
+    // 1 level deep: wrapped by routes/docs/_layout.html (with <p-nav> resolved relative to routes/docs)
+    let docs = fs::read_to_string(out.join("client/docs/index.html")).unwrap();
+    assert!(docs.contains("<main data-page><div class=\"flex\"><nav data-c=\"nav-"), "{docs}");
+    assert!(docs.contains("<h1>Overview</h1></section></div></main>"), "{docs}");
+
+    // 2 levels deep: wrapped outermost-to-innermost (docs -> api -> page) + SSR template includes both
+    let api = fs::read_to_string(out.join("client/docs/api/index.html")).unwrap();
+    let docs_pos = api.find("<div class=\"flex\">").expect("outer nested layout");
+    let api_pos = api.find("<article class=\"p-2\"><header>API</header>").expect("inner nested layout");
+    let h1_pos = api.find("<h1 data-text=\"{data.title}\"></h1>").expect("page content");
+    assert!(docs_pos < api_pos && api_pos < h1_pos, "{api}");
+    let tpl = fs::read_to_string(out.join("templates/docs/api/index.json")).unwrap();
+    assert!(tpl.contains("API") && tpl.contains("data.title"), "SSR template should include nested layout and page ops: {tpl}");
+
+    // Sibling route is not wrapped by nested layouts
+    let home = fs::read_to_string(out.join("client/index.html")).unwrap();
+    assert!(!home.contains("aria-label=\"Docs\"") && !home.contains("<header>API</header>"), "{home}");
+
+    // Validation: missing <slot></slot>
+    let d = check_with(&[("routes/admin/_layout.html", Some("<div>no slot</div>"))]);
+    expect(&d, "html/layout", "routes/admin/_layout.html", 1);
+
+    // Validation: <head> not allowed in nested layout
+    let d = check_with(&[("routes/admin/_layout.html", Some("<head><title>Bad</title></head><div><slot></slot></div>"))]);
+    expect(&d, "html/layout", "routes/admin/_layout.html", 1);
+
+    // Validation: <script> and <main data-page> and _layout.server.js not allowed
+    let d = check_with(&[("routes/admin/_layout.html", Some("<script>let x = 1</script><div><slot></slot></div>"))]);
+    expect(&d, "html/script", "routes/admin/_layout.html", 1);
+    let d = check_with(&[("routes/admin/_layout.html", Some("<main data-page><slot></slot></main>"))]);
+    expect(&d, "html/layout", "routes/admin/_layout.html", 1);
+    let d = check_with(&[
+        ("routes/admin/_layout.html", Some("<div><slot></slot></div>")),
+        ("routes/admin/_layout.server.js", Some("export function load() { return {} }\n")),
+    ]);
+    expect(&d, "app/structure", "routes/admin/_layout.server.js", 1);
+}

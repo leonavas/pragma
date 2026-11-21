@@ -1,7 +1,6 @@
 # npm packages
 
-Add a package only when the platform cannot do the job. First check `Intl`, `fetch`,
-`crypto.randomUUID`, `URLSearchParams`, `structuredClone`.
+Add a package only when the platform cannot do the task. Check `Intl`, `fetch`, `crypto.randomUUID`, `URLSearchParams`, and `structuredClone` first.
 
 ## Install
 
@@ -9,9 +8,9 @@ Add a package only when the platform cannot do the job. First check `Intl`, `fet
 npm i date-fns --ignore-scripts
 ```
 
-- The package goes in `dependencies` of `package.json`. Importing a package not listed there = error.
-- Any package manager works (npm, bun, pnpm): pragma reads `package.json` and `node_modules/`.
-- Keep `node_modules/` out of git.
+- List every imported package in `package.json` `dependencies`. Importing an unlisted package is an error.
+- Use any package manager (npm, bun, pnpm); pragma reads `package.json` and `node_modules/`.
+- Exclude `node_modules/` from git.
 
 ## Import
 
@@ -21,46 +20,44 @@ import { format } from 'date-fns'
 let today = format(new Date(), 'PPP')
 ```
 
-- Use a quoted specifier, never a template literal.
-- Import from the index or a subpath: the build bundles each package with tree-shaking; only what the app uses ships.
-- Each package becomes `/assets/npm/<package>-<hash>.js` (`@date-fns/tz` → `date-fns__tz`), with `modulepreload`. Code shared by several packages goes to `/assets/npm/_*.js`. Package size counts toward the page budget.
-- `import * as x from 'pkg'` and `import('pkg')` ship the whole package: import names.
-- `process.env.NODE_ENV` becomes `"production"` in build and `"development"` in dev.
+- Use a quoted module specifier; do not use template literals.
+- Import named exports from the index or a subpath. The build tree-shakes each ES module package.
+- Each package outputs `/assets/npm/<package>-<hash>.js` (`@date-fns/tz` -> `date-fns__tz`) with `modulepreload`. Shared chunks go to `/assets/npm/_*.js`. Package size counts toward page budgets.
+- Avoid `import * as x from 'pkg'` and `import('pkg')` when possible; they bundle the whole package.
+- `process.env.NODE_ENV` evaluates to `"production"` in build and `"development"` in dev.
 
-## What works
+## Supported packages
 
-JavaScript packages: ES modules or CommonJS (`require`, `module.exports`), files `.js`, `.mjs`,
-`.cjs` (plus `.json` imported by the package). CommonJS has no tree-shaking: it ships whole.
-Between two options, choose the ES module one.
+Client code supports plain JS packages (`.js`, `.mjs`, `.cjs`, plus imported `.json`) using ES modules or CommonJS. CommonJS packages cannot be tree-shaken and ship whole; prefer ES modules.
 
-| Does not work | Error |
+| Unsupported on client | Error |
 |---|---|
 | TypeScript, JSX, `.vue`, `.svelte`, imported CSS or assets | `app/package` |
-| `node:*` or Node built-ins (`fs`, `path`…) on the client | `app/package` |
-| Importing a name the package does not export | `js/import` |
-| UI frameworks (React, Preact, Vue, Svelte, Solid, lit, jQuery, Alpine…) | `js/import` |
+| `node:*` or Node built-ins (`fs`, `path`) | `app/package` |
+| Importing an export the package does not provide | `js/import` |
+| UI frameworks (React, Preact, Vue, Svelte, Solid, lit, jQuery, Alpine) | `js/import` |
 
-The error points at the import in your file. In `.server.js`, any package from `package.json` works, plus Node built-ins (`fs`, `node:*`) without listing. A built-in name listed in `package.json` (a polyfill such as `buffer`) is bundled as a package.
+In `.server.js`, all `package.json` dependencies and Node built-ins (`fs`, `node:*`) work without extra listing. A built-in name listed in `package.json` (such as `buffer`) bundles as a package.
 
 ## Recommended
 
-| For | Use |
+| Need | Use |
 |---|---|
-| Formatting dates, numbers, currency, plurals, relative time | native `Intl.DateTimeFormat`, `Intl.NumberFormat`, `Intl.PluralRules`, `Intl.RelativeTimeFormat` |
-| Date math (add, difference, start of month) | `date-fns`; time zones: `@date-fns/tz` |
+| Format dates, numbers, currency, plurals, relative time | Native `Intl.DateTimeFormat`, `Intl.NumberFormat`, `Intl.PluralRules`, `Intl.RelativeTimeFormat` |
+| Date math (add, diff, start of month) | `date-fns`; time zones: `@date-fns/tz` |
 | Form or payload validation | `valibot` |
-| Fuzzy search in a list | `fuse.js` |
-| Charts | `chart.js` (draws into a `<canvas>` in the `.html`) |
+| Fuzzy list search | `fuse.js` |
+| Charts | `chart.js` (render into `<canvas>` in `.html`) |
 | Debounce, throttle, group, sort | `es-toolkit` |
-| Unique ID | native `crypto.randomUUID()` |
-| HTTP | native `fetch` |
+| Unique ID | Native `crypto.randomUUID()` |
+| HTTP requests | Native `fetch` |
 
 ## Do not use
 
-| Package | Reason | Use |
+| Package | Reason | Use instead |
 |---|---|---|
-| `moment` | heavy, no tree-shaking | `date-fns`, `Intl` |
-| `lodash` | CommonJS: ships whole (~25 kB gzip) even for one function | `es-toolkit` |
-| `axios` | heavy; `fetch` suffices | `fetch` |
-| `uuid`, `nanoid` | native suffices | `crypto.randomUUID()` |
-| libraries that build HTML (`marked`, template engines, UI kits) | HTML in JS is forbidden | markup in the `.html` |
+| `moment` | Large, no tree-shaking | `date-fns`, `Intl` |
+| `lodash` | CommonJS; ships whole (~25 kB gzip) | `es-toolkit` |
+| `axios` | Large; redundant | `fetch` |
+| `uuid`, `nanoid` | Redundant | `crypto.randomUUID()` |
+| HTML-building libraries (`marked`, template engines, UI kits) | HTML in JS is forbidden | Markup in `.html` |

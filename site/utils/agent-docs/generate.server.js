@@ -12,7 +12,7 @@ const topics = [
   { id: 'syntax', summary: 'HTML directives ({path}, :, ., @, $) and blocks' },
   { id: 'components', summary: 'components, props, slots' },
   { id: 'state', summary: 'script: state, actions, derived values, mount, stores' },
-  { id: 'routes', summary: 'pages, links, params, query, layout, head tags' },
+  { id: 'routes', summary: 'pages, links, params, query, layouts (including nested), head tags' },
   { id: 'data', summary: 'load, server actions, skeleton, SSR' },
   { id: 'overlays', summary: 'modal, alert, dropdown' },
   { id: 'css', summary: 'styles and theme' },
@@ -21,7 +21,7 @@ const topics = [
   { id: 'packages', summary: 'npm packages: when and which' },
   { id: 'performance', summary: 'performance defaults and budgets' },
   { id: 'logs', summary: 'OpenTelemetry logs' },
-  { id: 'cli', summary: 'commands, check rules, deploy' },
+  { id: 'cli', summary: 'commands, self-update, upgrade, check rules, deploy' },
 ]
 
 const drift = []

@@ -69,8 +69,12 @@ fn upgrade_restores_core_and_keeps_user_files() {
     assert_eq!(warning.rule, "app/core-outdated");
     assert!(warning.message.contains(".pragma/page.js") && warning.message.contains("pragma upgrade"), "{}", warning.message);
 
+    fs::write(app.join(".pragma/version"), "0.0.1\n").unwrap();
+    let versioned = outdated(app).unwrap();
+    assert!(versioned.message.contains("0.0.1") && versioned.message.contains(env!("CARGO_PKG_VERSION")), "{}", versioned.message);
+
     let changes = upgrade(app).unwrap();
-    assert_eq!(changes.updated, [".pragma/page.js"]);
+    assert_eq!(changes.updated, [".pragma/page.js", ".pragma/version"]);
     assert_eq!(changes.added, [".pragma/docs/cli.md", ".pragma/base.css"]);
     assert_eq!(changes.removed, [".pragma/gone/old.js"]);
     assert_eq!(fs::read(app.join(".pragma/page.js")).unwrap(), page);

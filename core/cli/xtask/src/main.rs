@@ -7,6 +7,11 @@ const TARGETS: &str = "quick | rust | server | client | overlays | e2e | package
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
+    if let Some(cmd) = args.first().map(String::as_str)
+        && cmd == "release"
+    {
+        return release(&Ctx::new(), &args[1..]);
+    }
     let target = match args.as_slice() {
         [cmd] if cmd == "test" => "quick",
         [cmd, target] if cmd == "test" => target.as_str(),
@@ -35,8 +40,99 @@ fn main() -> ExitCode {
 }
 
 fn usage() -> ExitCode {
-    eprintln!("usage: cargo xtask test [{TARGETS}]");
+    eprintln!("usage:\n  cargo xtask test [{TARGETS}]\n  cargo xtask release <version> [--tag]");
     ExitCode::from(2)
+}
+
+fn release(ctx: &Ctx, args: &[String]) -> ExitCode {
+    let mut version: Option<&str> = None;
+    let mut create_tag = false;
+    for arg in args {
+        match arg.as_str() {
+            "--tag" => create_tag = true,
+            v if !v.starts_with('-') && version.is_none() => version = Some(v),
+            _ => return usage(),
+        }
+    }
+    let Some(raw) = version else { return usage() };
+    let ver = raw.strip_prefix('v').unwrap_or(raw);
+    let parts: Vec<&str> = ver.split('.').collect();
+    let valid = parts.len() == 3 && parts.iter().all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()));
+    if !valid {
+        eprintln!("invalid semver '{raw}'; expected X.Y.Z (e.g. 0.2.0)");
+        return ExitCode::from(2);
+    }
+
+    let cargo_toml = ctx.cli.join("Cargo.toml");
+    let src = match std::fs::read_to_string(&cargo_toml) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("cannot read {}: {e}", cargo_toml.display());
+            return ExitCode::FAILURE;
+        }
+    };
+    let mut replaced = false;
+    let updated: Vec<String> = src
+        .lines()
+        .map(|line| {
+            if !replaced && line.trim_start().starts_with("version = \"") {
+                replaced = true;
+                format!("version = \"{ver}\"")
+            } else {
+                line.to_owned()
+            }
+        })
+        .collect();
+    if !replaced {
+        eprintln!("could not find `version = \"...\"` in {}", cargo_toml.display());
+        return ExitCode::FAILURE;
+    }
+    if let Err(e) = std::fs::write(&cargo_toml, format!("{}\n", updated.join("\n"))) {
+        eprintln!("cannot write {}: {e}", cargo_toml.display());
+        return ExitCode::FAILURE;
+    }
+    println!("› updated core/cli/Cargo.toml to {ver}");
+
+    let repo = ctx.core.parent().unwrap();
+    let bin = ctx.cli.join("target/release/pragma");
+    let ok = run(
+        "updating Cargo.lock and building release binary",
+        Command::new("cargo").args(["build", "--release", "--quiet", "-p", "pragma-cli"]).current_dir(&ctx.cli),
+    ) && run("upgrading site/.pragma/", Command::new(&bin).arg("upgrade").current_dir(repo.join("site")))
+        && run("upgrading core/example/.pragma/", Command::new(&bin).arg("upgrade").current_dir(ctx.core.join("example")))
+        && run(
+            "regenerating site agent docs",
+            Command::new("node").arg("site/utils/agent-docs/generate.server.js").current_dir(repo),
+        );
+    if !ok {
+        eprintln!("✗ release preparation failed");
+        return ExitCode::FAILURE;
+    }
+
+    let tag = format!("v{ver}");
+    if create_tag {
+        let tagged = run(
+            &format!("committing release {tag}"),
+            Command::new("git").args(["add", "core", "site"]).current_dir(repo),
+        ) && run(
+            &format!("git commit -m \"Release {tag}\""),
+            Command::new("git").args(["commit", "-m", &format!("Release {tag}")]).current_dir(repo),
+        ) && run(
+            &format!("git tag -a {tag} -m \"Release {tag}\""),
+            Command::new("git").args(["tag", "-a", &tag, "-m", &format!("Release {tag}")]).current_dir(repo),
+        );
+        if !tagged {
+            eprintln!("✗ git commit/tag failed");
+            return ExitCode::FAILURE;
+        }
+        println!("✓ release {tag} committed and tagged");
+        println!("  next: git push origin main --follow-tags");
+    } else {
+        println!("✓ release {tag} prepared");
+        println!("  review changes, then run:");
+        println!("    git add core site && git commit -m \"Release {tag}\" && git tag -a {tag} -m \"Release {tag}\" && git push origin main --follow-tags");
+    }
+    ExitCode::SUCCESS
 }
 
 struct Ctx {

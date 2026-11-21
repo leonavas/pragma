@@ -463,9 +463,12 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let mut classes = validate::ClassCheck::new(project_classes, theme);
 
     let comp_ids: HashSet<u32> = p.all_components().map(|c| c.html).collect();
+    let nested_layout_ids: HashSet<u32> = p.nested_layouts.values().copied().collect();
     for id in 0..p.files.len() as u32 {
         let kind = if Some(id) == p.layout {
             validate::Kind::Layout
+        } else if nested_layout_ids.contains(&id) {
+            validate::Kind::NestedLayout
         } else if comp_ids.contains(&id) {
             validate::Kind::Component
         } else {

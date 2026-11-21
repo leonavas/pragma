@@ -1,17 +1,16 @@
 # State: script, actions, derived values, stores
 
-The top-level `<script>` of a page or component is its state and behavior. Change a `let`; the
-runtime reapplies the HTML (one render per microtask). No signals, no manual render.
+The top-level `<script>` of a page or component defines its state and behavior. Assign a `let` to update HTML (batched once per microtask). Do not use signals or manual renders.
 
-| At the top level of the script | It is |
+| Top-level declaration | Role |
 |---|---|
-| `let draft = ''` | state, one per instance; `$draft` in HTML |
-| `export let step = 1` | a prop (components.md) |
-| `function add() {…}`, used as `@submit="add"` | an action |
-| `const saveLater = debounce(save, 300)`, used as `@input="saveLater"` | an action too: any top-level `const` can be a handler; the runtime calls the function it holds |
-| `const visible = () => …`, used in `{}`, `<for>`, `:attr` | a derived value, recomputed on each render (in JS call it: `visible()`) |
-| `function mount(el) { …; return cleanup }` | external effects after mount (timer, global listener, observer); `el` is the component root (a page: its `<main data-page>`) |
-| `import { shared, data, … } from 'pragma'` | services (below) |
+| `let draft = ''` | Instance state (`$draft` in HTML). |
+| `export let step = 1` | Prop (`components.md`). |
+| `function add() {…}` used as `@submit="add"` | Action. |
+| `const saveLater = debounce(save, 300)` used as `@input="saveLater"` | Action (any top-level `const` holding a function works as a handler). |
+| `const visible = () => …` used in `{}`, `<for>`, `:attr` | Derived value, recomputed on each render (call `visible()` in JS). |
+| `function mount(el) { …; return cleanup }` | Runs external effects after mount (`el` is the component root or `<main data-page>`). |
+| `import { shared, data, … } from 'pragma'` | Runtime services. |
 
 `routes/tasks/index.html`:
 ```html
@@ -56,8 +55,10 @@ runtime reapplies the HTML (one render per microtask). No signals, no manual ren
 </ul>
 ```
 
-A function made by a call (debounce, throttle, once) is a top-level `const`, used directly as the
-handler; no wrapper function:
+## Wrapped handlers
+
+Bind functions returned by helpers (`debounce`, `throttle`, `once`) directly as top-level `const` handlers:
+
 ```html
 <script>
   import { debounce } from 'es-toolkit/function'
@@ -71,10 +72,13 @@ handler; no wrapper function:
 <input aria-label="Draft" :model="$draft" @input="saveLater">
 <p>Saved: {$saved}</p>
 ```
-The build accepts any top-level `const` as a handler; if its value is not a function, the event
-throws in dev (`@input="saveLater" needs a function, but "saveLater" holds …`).
 
-A timer just assigns the `let`:
+If a top-level `const` handler does not hold a function, dev throws when the event fires.
+
+## `mount(el)`
+
+Use `mount(el)` for timers, observers, global listeners, measurements, and focus. Return a cleanup function.
+
 ```js
 let now = Date.now()
 
@@ -84,8 +88,6 @@ function mount() {
 }
 ```
 
-`mount(el)` gets the component's root element, for what needs its own DOM (an observer, a
-measurement, focus):
 ```js
 let lines = 0
 
@@ -95,32 +97,30 @@ function mount(el) {
   return () => observer.disconnect()
 }
 ```
-`mount` runs only in the browser; read from `el`, never write to it (change state instead). It
-may be `async`: the function it resolves to is the cleanup.
 
-What only `mount` needs (a timer id, an observer, a DOM node) is a `const` inside `mount`, not a
-top-level `let`: a top-level `let` is state, renders on every change and keeps a DOM node in the
-instance scope.
+- `mount` runs only in the browser and may be `async` (resolved function is the cleanup).
+- Read from `el`; do not mutate `el`.
+- Declare values used only inside `mount` (timer IDs, observers, DOM nodes) as `const` inside `mount`, not top-level `let`.
 
 ## Derived values
 
-A value computed from state is a function, called on each render: `$total` in HTML, `total()` in
-JS. A top-level `let` or `const` computed from state once is stale (`js/stale-derived`), and a
-function used in JS without `()` is always truthy (`js/derived-call`):
+Compute derived values in functions: `$total` in HTML, `total()` in JS. Computing from state once in a top-level `let`/`const` triggers `js/stale-derived`. Reading a derived function without `()` in JS triggers `js/derived-call`.
+
 ```js
 let count = 0
-let doubled = count * 2            // js/stale-derived: computed once
-const doubled = () => count * 2    // right: `$doubled` in HTML, `doubled()` in JS
+let doubled = count * 2            // js/stale-derived
+const doubled = () => count * 2    // valid: `$doubled` in HTML, `doubled()` in JS
 
 function check() {
-  if (empty) return                // js/derived-call: always true
-  if (empty()) return              // right
+  if (empty) return                // js/derived-call
+  if (empty()) return              // valid
 }
 ```
-`let count = start` (a prop) is fine when an action assigns `count` later: it is state that starts
-from the prop.
 
-A value per item is a field of the rows a derived function returns (`{}` takes paths, not calls):
+`let count = start` (from a prop) is valid when an action reassigns `count` later.
+
+For per-item derived values, return row objects from a derived function (`{}` accepts paths only):
+
 ```js
 const rows = () => items.map(item => ({ item, label: formatPrice(item.price) }))
 ```
@@ -129,24 +129,26 @@ const rows = () => items.map(item => ({ item, label: formatPrice(item.price) }))
   <li>{row.item.name}: {row.label} <button @click="remove(row.item)">x</button></li>
 </for>
 ```
-Keep the original item in the row (`row.item`) and change that one: `{ ...item, label }` is a copy,
-so `item.done = true` on it changes nothing.
+
+Keep the original `item` reference (`row.item`) when mutating it. Spreading `{ ...item, label }` creates a copy that does not update the source.
 
 ## Services (`import { … } from 'pragma'`)
 
 | Name | Use |
 |---|---|
-| `shared` | stores: `shared.tasks.items`, `shared.tasks.add(title)` |
-| `data` | `load` result (data.md); undefined until the load ends |
-| `params` `query` `page` | route params, query, `page.loading`/`page.error` |
-| `call(name, input)` | server action (data.md) |
-| `navigate(url)` | navigate through the router |
-| `open(id)` `close(id)` `confirm(id)` | overlays (overlays.md) |
-| `log` | logs (logs.md) |
+| `shared` | Stores (`shared.tasks.items`, `shared.tasks.add(title)`). |
+| `data` | `load` result (`data.md`); undefined until `load` finishes. |
+| `params`, `query`, `page` | Route params, query strings, `page.loading`, `page.error`. |
+| `call(name, input)` | Calls a server action (`data.md`). |
+| `navigate(url)` | Navigates via the router. |
+| `open(id)`, `close(id)`, `confirm(id)` | Controls overlays (`overlays.md`). |
+| `log` | Emits logs (`logs.md`). |
 
-## Store
+## Stores
 
-`lib/state/tasks.js`, read as `shared.tasks` in HTML and in scripts:
+Create stores in `lib/state/<name>.js`. Access them as `shared.<name>` in HTML and scripts.
+
+`lib/state/tasks.js`:
 ```js
 let items = []
 export const persist = ['items']
@@ -160,15 +162,15 @@ function add(title) {
 
 ## Rules
 
-- State is a deep Proxy: `items.push(x)`, `task.done = true` and reassignment all render, from actions, `await`, timers or promises. Maps, Sets, Dates and class instances are not tracked: assign a new value.
-- Derived values are functions; call them in JS (`total()`). Never keep a derived copy in a `let` updated by actions (`js/stale-derived`, `js/derived-call`).
-- `data` exists only after the load: read it in functions (`js/top-level-data` at the top level), and put the elements that read it inside the `<else>` of `page.loading`.
-- In a script write `count`, never `$count` (`js/dollar-in-script`): `$` is HTML only.
-- Page-only state: the page script. Shared across pages or persisted: a store. A change used by 2+ pages: a store function.
-- Filters, tabs, pagination: in the `query`, read by a derived function.
-- `persist` lists `let` names saved to `localStorage`; only for preferences, drafts and local-only data.
-- A top-level `const` changed in place (`items.push`) does not update the page (`js/const-state`): use `let`.
-- No `var`, no destructuring `let`, no top-level `await` (do it in `mount()` or an action); `export` only declares props (a store exports only `persist`).
-- Reach stores only through `shared`; importing a store file is `js/store-import`.
-- Never write to the DOM (`textContent`, `classList`, `setAttribute`). `addEventListener` only on `window`/`document`, inside `mount`. Never fetch data in `mount`. No custom pub/sub.
-- The old API (`export const state`/`actions`, `ctx.$`, `ctx.update`, `store()`) is an error (`js/legacy-api`).
+- State uses a deep Proxy: `items.push(x)`, `task.done = true`, and reassignment all trigger renders (including from `await`, timers, and promises). Maps, Sets, Dates, and class instances are not tracked; reassign a new value.
+- Define derived values as functions and call them in JS (`total()`). Do not copy derived values into a `let` (`js/stale-derived`, `js/derived-call`).
+- Read `data` inside functions only (`js/top-level-data`). Wrap elements reading `data` inside the `<else>` of `page.loading`.
+- Write `count` in JS, never `$count` (`js/dollar-in-script`).
+- Keep page-only state in the page script. Use a store for shared or persisted state, and put actions shared by 2+ pages in the store.
+- Store filters, tabs, and pagination in `query`, read by a derived function.
+- `persist` saves listed `let` names to `localStorage`; use it only for preferences, drafts, and local-only data.
+- Declare mutated top-level state with `let`, not `const` (`js/const-state`).
+- Do not use `var`, destructuring `let`, or top-level `await`. Use `export` only for props (or `persist` in stores).
+- Access stores only through `shared`; direct store imports trigger `js/store-import`.
+- Do not mutate the DOM (`textContent`, `classList`, `setAttribute`). Call `addEventListener` only on `window` or `document` inside `mount`. Do not fetch data in `mount`. Do not build custom pub/sub.
+- Do not use the legacy API (`export const state`/`actions`, `ctx.$`, `ctx.update`, `store()`): triggers `js/legacy-api`.

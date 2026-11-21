@@ -2,6 +2,7 @@ pub mod dev;
 pub mod new;
 pub mod node;
 pub mod report;
+pub mod self_update;
 pub mod server;
 pub mod upgrade;
 
@@ -19,6 +20,7 @@ usage:
   pragma check [--strict]                       check HTML, CSS, JS and budgets (--strict: warnings become errors)
   pragma serve [--port 3000] [--host 127.0.0.1] serve dist/ as in production
   pragma upgrade                                update .pragma/ (runtime, docs, base.css) to this version
+  pragma self-update [version]                  update the pragma CLI binary from GitHub Releases
 
 options:
   -h, --help      show this help
@@ -56,6 +58,7 @@ pub fn run(args: Vec<String>) -> i32 {
         }
         "serve" => cmd_serve(rest),
         "upgrade" => parse(rest, &[]).and_then(|a| no_positional(&a)).and_then(|_| cmd_upgrade()),
+        "self-update" => cmd_self_update(rest),
         other => Err(format!("unknown command '{other}'; see `pragma --help`")),
     };
     result.unwrap_or_else(|message| {
@@ -184,6 +187,7 @@ fn cmd_check(strict: bool) -> Result<i32, String> {
 fn cmd_upgrade() -> Result<i32, String> {
     let root = app_root()?;
     let version = env!("CARGO_PKG_VERSION");
+    let prev = upgrade::installed_version(&root);
     let changes = upgrade::upgrade(&root)?;
     if changes.is_empty() {
         println!(".pragma/ is already at pragma {version}");
@@ -194,7 +198,27 @@ fn cmd_upgrade() -> Result<i32, String> {
             println!("  {label:<8} {path}");
         }
     }
-    println!(".pragma/ upgraded to pragma {version} ({} file(s) changed); files outside .pragma/ were not touched", changes.len());
+    match prev {
+        Some(from) if from != version => println!(
+            ".pragma/ upgraded from {from} to {version} ({} file(s) changed); files outside .pragma/ were not touched",
+            changes.len()
+        ),
+        _ => println!(
+            ".pragma/ upgraded to pragma {version} ({} file(s) changed); files outside .pragma/ were not touched",
+            changes.len()
+        ),
+    }
+    Ok(0)
+}
+
+fn cmd_self_update(args: &[String]) -> Result<i32, String> {
+    let args = parse(args, &[])?;
+    let requested = match args.positional.as_slice() {
+        [] => None,
+        [v] => Some(v.as_str()),
+        _ => return Err("usage: pragma self-update [version]".into()),
+    };
+    self_update::run(requested)?;
     Ok(0)
 }
 

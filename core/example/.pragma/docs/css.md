@@ -1,29 +1,28 @@
 # CSS
 
-Use utilities (classes.md) first. Write a custom class only when they are not enough.
+Use utility classes (`classes.md`) first. Write a custom class only when utilities are not enough.
 
-| File | Contains |
+| File | Scope |
 |---|---|
-| `.pragma/base.css` | preflight, layers, `.skeleton`, `[hidden]`, scroll lock. Do not edit. |
-| `lib/theme.css` | tokens and global custom classes (`@layer components`) |
-| component `<style>` or `<name>.css` | that component only: the build scopes every selector to it (root and inside); `:global(…)` opts out; `[data-c="<name>"]` written by hand still works (for `p-` components the build makes it unique per folder) |
-| page `<style>` or `<page>.css` | that page only: scoped to its `<main data-page="…">` the same way |
+| `.pragma/base.css` | Preflight, layers, `.skeleton`, `[hidden]`, scroll lock. Do not edit. |
+| `lib/theme.css` | Tokens and global custom classes (`@layer components`). |
+| Component `<style>` or `<name>.css` | Scoped to that component (root and descendants). `:global(…)` opts out. `[data-c="<name>"]` stays as written (unique per folder for `p-`). |
+| Page `<style>` or `<page>.css` | Scoped to that page's `<main data-page="…">`. |
 
-Scoping adds `:where(…)` to each selector's last part, so it adds no specificity. Write plain
-selectors (`button`, `.row:hover`, `li::marker`). `:global(…)` opts out only what is inside it, for
-something outside the component or page; the rest of the selector stays scoped:
+Scoping appends `:where(…)` to each selector's last part, adding zero specificity. Write plain selectors (`button`, `.row:hover`, `li::marker`). Use `:global(…)` only for parts outside the component or page:
 
-| You write | The build makes | Matches |
+| Written | Compiled | Matches |
 |---|---|---|
-| `.row` | `.row:where(<scope>,<scope> *)` | `.row` of this component only |
-| `:global(html[data-theme="dark"]) .row` | `html[data-theme="dark"] .row:where(…)` | this component's `.row`, in dark mode |
-| `.list :global(.hit)` | `.list:where(…) .hit` | any `.hit` inside this component's `.list` (child components too) |
-| `:global(:root)`, `:global(body.locked)` | `:root`, `body.locked` | global: every part is inside `:global` |
+| `.row` | `.row:where(<scope>,<scope> *)` | `.row` inside this component only |
+| `:global(html[data-theme="dark"]) .row` | `html[data-theme="dark"] .row:where(…)` | This component's `.row` in dark mode |
+| `.list :global(.hit)` | `.list:where(…) .hit` | Any `.hit` inside this component's `.list` (including child components) |
+| `:global(:root)`, `:global(body.locked)` | `:root`, `body.locked` | Global |
 
-An outside ancestor alone needs no `:global`: `html[data-theme="dark"] .row` gives the same result.
+An outside ancestor alone needs no `:global`: `html[data-theme="dark"] .row` compiles identically.
 
-The starter ships the theme-aware tokens `bg-surface`, `text-ink`, `text-muted`, `border-line`
-(they switch in dark mode) and the classes `.card`, `.btn`, `.btn-primary`, `.btn-danger`, `.dialog`.
+## Tokens and dark mode
+
+The starter includes theme-aware tokens (`bg-surface`, `text-ink`, `text-muted`, `border-line`) and classes (`.card`, `.btn`, `.btn-primary`, `.btn-danger`, `.dialog`).
 
 ```css
 @layer tokens {
@@ -41,9 +40,9 @@ The starter ships the theme-aware tokens `bg-surface`, `text-ink`, `text-muted`,
 }
 ```
 
-- `--color-<name>` or `--color-<name>-<shade>` creates `bg-<name>`, `text-<name>-<shade>`, etc. Redefining `--color-primary-*` changes the brand.
+- `--color-<name>` and `--color-<name>-<shade>` generate `bg-<name>`, `text-<name>-<shade>`, and related utilities. Redefine `--color-primary-*` to change the brand color.
 - Redefinable tokens: `--color-*`, `--font-{sans,serif,mono}`, `--radius-*`, `--shadow-*`, `--spacing`.
-- Dark mode: `[data-theme="dark"]` on `<html>`. Use tokens redefined under `[data-theme="dark"]` (like `bg-surface`). Palette colors (`neutral-*`, `primary-*`…) do not switch: pair them with `dark:` (`bg-white dark:bg-neutral-900`).
+- Dark mode uses `[data-theme="dark"]` on `<html>`. Use theme-aware tokens (such as `bg-surface`), or pair palette colors with `dark:` (`bg-white dark:bg-neutral-900`).
 
 ## Theme toggle
 
@@ -60,9 +59,9 @@ function toggle() {
 }
 ```
 
-Never write `data-theme` or read `localStorage` for the theme: use `.pragma/theme.js`.
+Do not write `data-theme` or read `localStorage` for theme state. Use `.pragma/theme.js`.
 
-## Custom class
+## Custom classes
 
-- Create one only when the same combination repeats in 3+ places, or it needs something utilities lack (state selector, animation).
-- Forbidden: `style="..."`, arbitrary values (`w-[37px]`), negative utilities (`-mt-2`), undefined classes, `!important`, ID selectors, external `@import`, single-use custom classes.
+- Create a custom class only when the same combination repeats in 3+ places, or when you need state selectors or animations.
+- Forbidden: inline `style="..."`, arbitrary values (`w-[37px]`), negative utilities (`-mt-2`), undefined classes, `!important`, ID selectors, external `@import`, and single-use custom classes.

@@ -1,11 +1,11 @@
 # Data: load, server actions, skeleton, SSR
 
-| File | Export | Use |
+| File | Export | Purpose |
 |---|---|---|
-| `x.server.js` | `load({ params, query, request, env, log })` | return value becomes `data` (HTML, and `data` from `pragma` in the page script) |
-| `x.server.js` | `actions.name({ input, params, env, log })` | called by `call('name', input)` from `pragma` |
-| `x.server.js` | `ssr = true` | data in the first HTML (SEO, link previews, LCP) |
-| `_name.server.js` | helpers | private to the folder; only `.server.js` files import it |
+| `x.server.js` | `load({ params, query, request, env, log })` | Return value becomes `data` in HTML and page `<script>`. |
+| `x.server.js` | `actions.name({ input, params, env, log })` | Invoked via `call('name', input)` from `'pragma'`. |
+| `x.server.js` | `ssr = true` | Renders `data` into the first HTML (SEO, link previews, LCP). |
+| `_name.server.js` | helpers | Private to the folder; imported only by `.server.js` files. |
 
 `routes/shop/[id].server.js`:
 ```js
@@ -27,7 +27,7 @@ export const actions = {
 }
 ```
 
-The `<script>` of `routes/shop/[id].html`:
+`<script>` of `routes/shop/[id].html`:
 ```html
 <script>
   import { data, params, call, log } from 'pragma'
@@ -49,7 +49,7 @@ The `<script>` of `routes/shop/[id].html`:
 </script>
 ```
 
-`data` is live and reactive: changing `data.product.likes` updates the page.
+`data` is reactive: assigning `data.product.likes` updates the page.
 
 ## Skeleton (page with `load`, without `ssr`)
 
@@ -72,27 +72,30 @@ The `<script>` of `routes/shop/[id].html`:
 </else>
 ```
 
-Keep the title, back link and filters outside the loading chain. Shape the skeleton like the final content.
+Keep titles, back links, and filters outside `<if page.loading>`. Match the skeleton shape to the final content.
+
+## SSR behavior
+
+With `ssr = true`, page and component scripts run once per request on the server so initial `let`s, props, and derived values appear in the first HTML. Keep browser-only code in `mount(el)` and actions.
+
+| With `ssr`, in a page or component script | Server behavior |
+|---|---|
+| Top-level `let`, props, derived functions, slot content | Rendered into the first HTML |
+| `data`, `params`, `query`, `page` | Read-only |
+| `shared`, `call`, `navigate`, `open`, `close`, `confirm` | Throws; script deferred to browser |
+| Top-level `window`, `document`, `localStorage` | Throws; script deferred to browser |
+| Imports of npm packages or `.pragma/` | Skipped; script deferred to browser |
+| Prop passed from a store | Deferred to browser |
+| `mount(el)`, events | Browser only |
+
+When a script is deferred to the browser, its `$x` bindings fill at boot while the rest of the page renders on the server.
 
 ## Rules
 
-- An error thrown in `load` sets `page.error` and returns 500. "Not found" is data: return `{ product: null }`.
-- Every write and everything that uses a secret goes through a server action. Afterwards, update `data` or a `let`.
-- `data` is undefined until the load ends (unless `ssr`): read it inside functions, never at the top level of the script.
-- With `ssr`, page and component scripts also run on the server, once per request, so their initial `let`s, props and derived values are in the first HTML (see the table below). Keep browser-only work in `mount(el)` and actions.
-
-| With `ssr`, in a page or component script | On the server |
-|---|---|
-| top-level `let`, props, derived functions, slot content | rendered into the first HTML |
-| `data`, `params`, `query`, `page` | read-only |
-| `shared`, `call`, `navigate`, `open`, `close`, `confirm` | throw: that script is left to the browser |
-| reading `window`, `document`, `localStorage` at the top level | throws: left to the browser |
-| a script that imports an npm package or `.pragma/` | not run: left to the browser |
-| a prop that comes from a store | left to the browser |
-| `mount(el)`, events | never (browser only) |
-
-"Left to the browser" means its `$x` bindings are filled at boot, as without `ssr`; the rest of the page still renders on the server.
-- Sources: `fetch` with a secret from `env`, a database via `env`, or `import products from './_products.json' with { type: 'json' }`.
-- Default is no SSR. The prebuilt HTML has the content outside `<if>`/`<for>`; the `page.loading` branch is an inert `<template>` and the skeleton appears as soon as `.pragma/boot.js` runs (no skeleton without JS).
-- With `ssr = true` the HTML is the same, rendered with data; the skeleton is never shown. Use it for pages that crawlers or link previews must see, and for head tags or JSON-LD structured data bound to `data` (routes.md, SEO).
-- Never fetch data in `mount` or in a client action, never create `/api/...` routes, never return secrets from `load`. `env` exists only on the server.
+- Throwing in `load` sets `page.error` and returns HTTP 500. Return `{ product: null }` for not-found states.
+- Put every write and every secret-using operation in a server action. Update `data` or a `let` after the call.
+- Read `data` inside functions only (`js/top-level-data`). Without `ssr`, `data` is undefined until `load` finishes.
+- Load data from `fetch` with secrets from `env`, a database via `env`, or `import products from './_products.json' with { type: 'json' }`.
+- Default mode is no SSR: prebuilt HTML holds static content outside `<if>`/`<for>`, and `.pragma/boot.js` renders the skeleton.
+- Enable `ssr = true` when crawlers, link previews, or data-bound `<head>`/JSON-LD tags need server data (`routes.md`).
+- Do not fetch data in `mount` or client actions. Do not create `/api/...` routes. Do not return secrets from `load`. `env` exists only on the server.

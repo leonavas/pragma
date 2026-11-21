@@ -1,8 +1,10 @@
 # Logs
 
-OpenTelemetry on client and server, zero config. In page, component and store scripts use
-`log` from `pragma`; in `load` and server actions the `log` argument; in `utils/`
-`import { log } from '../.pragma/log.js'`.
+Pragma configures OpenTelemetry on client and server automatically.
+
+- In page, component, and store scripts, import `log` from `'pragma'`.
+- In `load` and server actions, use the `log` argument.
+- In `utils/`, import `log` from `'../.pragma/log.js'`.
 
 ```js
 import { call, params, log } from 'pragma'
@@ -20,15 +22,17 @@ async function save() {
 }
 ```
 
-| Level | When |
+| Level | Use when |
 |---|---|
-| `debug` | diagnostics (shown in `pragma dev`; off in production unless `PRAGMA_LOG_LEVEL=debug`) |
-| `info` | business event |
-| `warn` | recoverable problem |
-| `error` | failure |
+| `debug` | Diagnostics (shown in `pragma dev`; off in production unless `PRAGMA_LOG_LEVEL=debug`). |
+| `info` | Business event. |
+| `warn` | Recoverable problem. |
+| `error` | Failure. |
 
-- Message: short and fixed. Variable parts go in attributes (`order.id`, `exception.message`, `http.request.method`).
-- Already automatic, do not repeat: unhandled errors, navigation, fetch failures, one span per request, `traceparent`.
-- In `pragma dev`, every client `log.*` also prints to the browser console.
-- Client logs go to `POST /_otel`; on a static host without it (404/405) the client stops sending.
-- Forbidden: `console.*`; logging inside loops or on every keystroke; passwords, tokens, cookies, emails or any personal data.
+## Rules
+
+- Keep messages short and fixed. Put dynamic values in attributes (`order.id`, `exception.message`, `http.request.method`).
+- Do not duplicate automatic logs: unhandled errors, navigation, fetch failures, request spans, and `traceparent`.
+- In `pragma dev`, client `log.*` also prints to the browser console.
+- Client logs send to `POST /_otel`. On static hosts returning 404 or 405, the client stops sending.
+- Forbidden: `console.*`, logging inside loops or on every keystroke, and logging passwords, tokens, cookies, emails, or personal data.

@@ -20,18 +20,26 @@
         <p>One Rust binary compiles, checks, serves and bundles npm packages: no Vite, no esbuild, no config. Node 22 or newer only runs your <code>.server.js</code> files.</p>
         <p>Linux x64: run the one-line installer or <a href="/downloads/pragma-linux-x64.tar.gz" data-reload download>download the binary (.tar.gz)</a>. Other platforms build from source with Cargo.</p>
         <p>Then <code>pragma new my-app</code>, <code>cd my-app</code> and <code>pragma dev</code>.</p>
+        <p>Update the CLI with <code>pragma self-update</code> (GitHub Releases). Update <code>.pragma/</code> (runtime, docs, <code>base.css</code>, <code>version</code>) inside an app with <code>pragma upgrade</code>.</p>
       </div>
       <div class="mt-8 flex flex-wrap gap-3">
         <a href="/downloads/pragma-linux-x64.tar.gz" class="btn btn-primary" data-reload download>Download Linux x64</a>
         <a href="/guide" class="btn">Start with the guide</a>
       </div>
     </div>
-    <c-terminal class="self-start lg:col-span-2" title="~" copy="curl -fsSL https://pragma.leonavas.com/install.sh | sh">
-      <pre tabindex="0" aria-label="Commands that install pragma"><code><span class="term-cmd">curl -fsSL https://pragma.leonavas.com/install.sh | sh</span>
+    <div class="grid gap-6 self-start lg:col-span-2">
+      <c-terminal title="~" copy="curl -fsSL https://pragma.leonavas.com/install.sh | sh">
+        <pre tabindex="0" aria-label="Commands that install pragma"><code><span class="term-cmd">curl -fsSL https://pragma.leonavas.com/install.sh | sh</span>
 <span class="term-cmd">pragma -V</span>
 pragma 0.1.0
 <span class="term-cmd">pragma new my-app &amp;&amp; cd my-app &amp;&amp; pragma dev</span></code></pre>
-    </c-terminal>
+      </c-terminal>
+      <c-terminal title="update" copy="pragma self-update && pragma upgrade">
+        <pre tabindex="0" aria-label="Commands that update pragma and an app"><code><span class="term-cmd">pragma self-update</span>
+<span class="term-dim"># inside an app</span>
+<span class="term-cmd">pragma upgrade</span></code></pre>
+      </c-terminal>
+    </div>
   </div>
 </section>
 

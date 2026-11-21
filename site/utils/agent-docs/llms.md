@@ -2,7 +2,16 @@
 
 > pragma is a web framework built for coding agents. An app is native HTML, CSS and plain JavaScript (never TypeScript) with a closed set of directives; a Rust CLI compiles, lints and validates it and answers every error with the file, the line, the rule and the fix. Pages ship prebuilt with only the JavaScript they use, and every form is a WebMCP tool by default.
 
-To build an app with pragma, read {{origin}}/llms-full.txt: install commands, the app rules (AGENTS.md) and every doc in one file. Each doc is also a separate markdown file below. Every app created with `pragma new` has the same docs in `core/docs/` and the rules in `AGENTS.md`.
+To build an app with pragma, read {{origin}}/llms-full.txt: install commands, version checks, the app rules (AGENTS.md) and every doc in one file. Each doc is also a separate markdown file below. Every app created with `pragma new` has the same docs in `.pragma/docs/`, its version in `.pragma/version`, and the rules in `AGENTS.md`.
+
+## Version and update
+
+Validate the pragma version before you change code:
+
+- Run `pragma -V` to check the installed CLI version.
+- Compare that version with `.pragma/version` inside the app.
+- Run `pragma self-update` to update the CLI binary from GitHub Releases if the CLI is old.
+- Run `pragma upgrade` inside the app to update `.pragma/` (runtime, docs, `base.css`, `version`) if `.pragma/` is outdated.
 
 ## Start
 
