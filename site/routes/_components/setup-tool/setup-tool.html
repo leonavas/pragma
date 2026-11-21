@@ -4,9 +4,9 @@
   function stepsFor(description) {
     const app = description.replace(/[.\s]+$/, '')
     return [
-      '1. Install pragma (Linux x64 binary; or build from source with Cargo):',
-      '   curl -fsSL ' + location.origin + '/install.sh | sh',
-      '   # binary: ' + location.origin + '/downloads/pragma-linux-x64.tar.gz',
+      '1. Install pragma (Linux and macOS; or build from source with Cargo):',
+      '   curl -fsSL https://raw.githubusercontent.com/leonavas/pragma/main/install.sh | sh',
+      '   # binaries: https://github.com/leonavas/pragma/releases/latest',
       '   # source: git clone https://github.com/leonavas/pragma && cd pragma && cargo install --path core/cli/crates/pragma-cli',
       '',
       '2. Create and run the app:',

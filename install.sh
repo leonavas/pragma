@@ -2,7 +2,6 @@
 set -eu
 
 REPO="${PRAGMA_REPO:-leonavas/pragma}"
-ORIGIN="${PRAGMA_ORIGIN:-https://pragma.leonavas.com}"
 INSTALL_DIR="${PRAGMA_INSTALL_DIR:-$HOME/.local/bin}"
 VERSION="${PRAGMA_VERSION:-latest}"
 
@@ -55,12 +54,9 @@ if curl -fsSL "$URL" -o "$TMP_DIR/pragma.tar.gz" 2>/dev/null; then
       fi
     fi
   fi
-elif [ "$VERSION" = "latest" ] && [ "$TARGET" = "x86_64-unknown-linux-gnu" ]; then
-  FALLBACK="$ORIGIN/downloads/pragma-linux-x64.tar.gz"
-  echo "GitHub Release not found yet; falling back to $FALLBACK..."
-  curl -fsSL "$FALLBACK" -o "$TMP_DIR/pragma.tar.gz"
 else
   echo "Failed to download $URL" >&2
+  echo "See the releases at https://github.com/$REPO/releases" >&2
   exit 1
 fi
 

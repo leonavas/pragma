@@ -1,0 +1,86 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cli:
+    name: CLI (linux x64)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core/cli -> target
+
+      - name: Build pragma release binary
+        run: cargo build --release --locked --manifest-path core/cli/Cargo.toml -p pragma-cli
+
+      - name: Print version
+        run: core/cli/target/release/pragma -V
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: pragma-linux-x64
+          path: core/cli/target/release/pragma
+          if-no-files-found: error
+          retention-days: 14
+
+  site:
+    name: Site (check and build)
+    needs: cli
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: pragma-linux-x64
+          path: bin
+
+      - name: Put pragma on PATH
+        run: |
+          chmod +x bin/pragma
+          echo "$GITHUB_WORKSPACE/bin" >> "$GITHUB_PATH"
+
+      - name: Install site packages
+        working-directory: site
+        run: npm ci --ignore-scripts
+
+      - name: Check the site
+        working-directory: site
+        run: pragma check --strict
+
+      - name: Build the site
+        working-directory: site
+        run: pragma build
+
+      - name: Upload site build
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-dist
+          path: site/dist
+          if-no-files-found: error
+          retention-days: 14

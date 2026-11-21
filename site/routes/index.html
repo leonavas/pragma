@@ -15,21 +15,21 @@
 <section id="install" class="wrap" aria-labelledby="install-title">
   <div class="grid gap-10 border-t border-line py-14 lg:grid-cols-3 lg:gap-16 lg:py-20">
     <div>
-      <h2 id="install-title" class="text-2xl font-medium tracking-tight">Install</h2>
+      <h2 id="install-title" class="section-title">Install</h2>
       <div class="prose mt-4 max-w-md">
         <p>One Rust binary compiles, checks, serves and bundles npm packages: no Vite, no esbuild, no config. Node 22 or newer only runs your <code>.server.js</code> files.</p>
-        <p>Linux x64: run the one-line installer or <a href="/downloads/pragma-linux-x64.tar.gz" data-reload download>download the binary (.tar.gz)</a>. Other platforms build from source with Cargo.</p>
+        <p>Linux and macOS: run the one-line installer. Windows: <a href="https://github.com/leonavas/pragma/releases/latest">download the binary from GitHub Releases</a>. Other platforms build from source with Cargo.</p>
         <p>Then <code>pragma new my-app</code>, <code>cd my-app</code> and <code>pragma dev</code>.</p>
         <p>Update the CLI with <code>pragma self-update</code> (GitHub Releases). Update <code>.pragma/</code> (runtime, docs, <code>base.css</code>, <code>version</code>) inside an app with <code>pragma upgrade</code>.</p>
       </div>
       <div class="mt-8 flex flex-wrap gap-3">
-        <a href="/downloads/pragma-linux-x64.tar.gz" class="btn btn-primary" data-reload download>Download Linux x64</a>
+        <a href="https://github.com/leonavas/pragma/releases/latest" class="btn btn-primary">Download from GitHub</a>
         <a href="/guide" class="btn">Start with the guide</a>
       </div>
     </div>
     <div class="grid gap-6 self-start lg:col-span-2">
-      <c-terminal title="~" copy="curl -fsSL https://pragma.leonavas.com/install.sh | sh">
-        <pre tabindex="0" aria-label="Commands that install pragma"><code><span class="term-cmd">curl -fsSL https://pragma.leonavas.com/install.sh | sh</span>
+      <c-terminal title="~" copy="curl -fsSL https://raw.githubusercontent.com/leonavas/pragma/main/install.sh | sh">
+        <pre tabindex="0" aria-label="Commands that install pragma"><code><span class="term-cmd">curl -fsSL https://raw.githubusercontent.com/leonavas/pragma/main/install.sh | sh</span>
 <span class="term-cmd">pragma -V</span>
 pragma 0.1.0
 <span class="term-cmd">pragma new my-app &amp;&amp; cd my-app &amp;&amp; pragma dev</span></code></pre>
@@ -45,14 +45,14 @@ pragma 0.1.0
 
 <section class="wrap" aria-labelledby="callout-title">
   <div class="grid gap-8 border border-line bg-sunken p-8 lg:grid-cols-3 lg:items-center lg:gap-16 lg:p-12">
-    <h2 id="callout-title" class="text-2xl font-medium tracking-tight lg:col-span-2">This framework is for agents. If you're still reading this instead of asking your agent to try it, it's not for you yet. <span class="text-accent">Come back in 6 months.</span></h2>
+    <h2 id="callout-title" class="section-title lg:col-span-2">This framework is for agents. If you're still reading this instead of asking your agent to try it, it's not for you yet. <span class="text-accent">Come back in 6 months.</span></h2>
     <a href="/agents" class="btn btn-primary w-fit">Hand it to your agent</a>
   </div>
 </section>
 
 <section class="wrap" aria-labelledby="why-title">
   <div class="grid gap-10 py-16 lg:grid-cols-3 lg:gap-16 lg:py-24">
-    <h2 id="why-title" class="text-2xl font-medium tracking-tight sm:text-3xl">Nobody argues about frameworks anymore. The agent picks one.</h2>
+    <h2 id="why-title" class="section-title">Nobody argues about frameworks anymore. The agent picks one.</h2>
     <div class="prose lg:col-span-2">
       <p>Most people who build with an LLM don't know frontend. They ask for React or Angular because those are the names they know, and ship slow pages.</p>
       <p>Some don't care and get plain HTML and JavaScript. Nothing beats it on speed. Nothing about it scales: it eats context, turns into a tangle, and the agent loses the thread.</p>
@@ -72,7 +72,7 @@ pragma 0.1.0
 <section class="wrap" aria-labelledby="live-title">
   <div class="grid gap-8 border-t border-line py-16 lg:py-24">
     <div class="max-w-2xl">
-      <h2 id="live-title" class="text-2xl font-medium tracking-tight sm:text-3xl">One file: markup, script and style</h2>
+      <h2 id="live-title" class="section-title">One file: markup, script and style</h2>
       <p class="mt-4 text-muted">A component is one .html file. A top-level <code class="text-ink">let</code> is state, a function is an action or a derived value, and <code class="text-ink">{path}</code> puts a value in the text. Check a task, add one, hide the done ones: each action assigns a variable and the runtime reapplies the bindings. No hooks, no virtual DOM. The form is also a WebMCP tool: an agent in the browser can call <code class="text-ink">add_task</code>.</p>
     </div>
     <c-showcase :source="data.examples.tasks" caption="This is the whole component, read from disk when the page renders: the source you see is the source that runs.">
@@ -86,7 +86,7 @@ pragma 0.1.0
 <section id="tools" class="wrap" aria-labelledby="tools-title">
   <div class="grid gap-10 pb-20 lg:grid-cols-3 lg:gap-16">
     <div>
-      <h2 id="tools-title" class="text-2xl font-medium tracking-tight">Tools for agents on this page</h2>
+      <h2 id="tools-title" class="section-title">Tools for agents on this page</h2>
       <div class="prose mt-4 max-w-md">
         <p>An agent in the browser sees these forms as WebMCP tools and calls them. You can use the same forms. Agents without a browser read the same docs at <a href="/llms-full.txt">/llms-full.txt</a>.</p>
       </div>
@@ -102,7 +102,7 @@ pragma 0.1.0
 <section class="wrap" aria-labelledby="sections-title">
   <div class="grid gap-10 border-t border-line pt-16 lg:grid-cols-3 lg:gap-16">
     <div>
-      <h2 id="sections-title" class="text-2xl font-medium tracking-tight">Every feature, running on this page's runtime</h2>
+      <h2 id="sections-title" class="section-title">Every feature, running on this page's runtime</h2>
       <p class="mt-4 max-w-md text-muted">Each example shows its real source files next to the live result. The code you read is the code that renders.</p>
       <a href="/examples" class="btn mt-8">Browse all examples</a>
     </div>

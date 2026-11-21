@@ -12,10 +12,10 @@ Send your agent this page. It reads the docs and writes native HTML, CSS and Jav
 
 One Rust binary compiles, checks, serves and bundles npm packages: no Vite, no esbuild, no config. Node 22 or newer only runs your `.server.js` files.
 
-Linux x64: run the one-line installer or download [pragma-linux-x64.tar.gz](https://pragma.leonavas.com/downloads/pragma-linux-x64.tar.gz).
+Linux and macOS: run the one-line installer. Windows: download the binary from [GitHub Releases](https://github.com/leonavas/pragma/releases/latest).
 
 ```sh
-curl -fsSL https://pragma.leonavas.com/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/leonavas/pragma/main/install.sh | sh
 pragma -V
 ```
 

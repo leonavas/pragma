@@ -10,6 +10,11 @@ on:
         description: "Version override (without v prefix, defaults to core/cli/Cargo.toml)"
         required: false
         type: string
+      release:
+        description: "Create or update the GitHub Release v<version> from this run"
+        required: false
+        default: false
+        type: boolean
       publish_npm:
         description: "Publish packages to npm"
         required: false
@@ -112,11 +117,32 @@ jobs:
             release-assets/pragma-*
             release-assets/SHA256SUMS.txt
 
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Read the version
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release == true
+        uses: actions/checkout@v4
+        with:
+          path: source
+          sparse-checkout: core/cli/Cargo.toml
+          sparse-checkout-cone-mode: false
+
+      - name: Create or update GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release == true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "${GITHUB_REF_NAME}" release-assets/* --generate-notes --title "${GITHUB_REF_NAME}"
+          GH_REPO: ${{ github.repository }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            version="${INPUT_VERSION:-$(sed -n 's/^version = "\(.*\)"/\1/p' source/core/cli/Cargo.toml | head -n 1)}"
+            tag="v${version}"
+          fi
+          if gh release view "${tag}" > /dev/null 2>&1; then
+            gh release upload "${tag}" release-assets/* --clobber
+          else
+            gh release create "${tag}" release-assets/* --generate-notes --title "${tag}" --target "${GITHUB_SHA}"
+          fi
 
   publish-npm:
     name: Publish npm packages

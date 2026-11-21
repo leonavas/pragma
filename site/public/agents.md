@@ -14,10 +14,10 @@ Read https://pragma.leonavas.com/llms-full.txt and create a pragma app that [des
 
 ## Install and create
 
-One Rust binary. Linux x64 binary: [pragma-linux-x64.tar.gz](https://pragma.leonavas.com/downloads/pragma-linux-x64.tar.gz). Node 22 or newer only runs `.server.js` files.
+One Rust binary. The installer supports Linux and macOS. Binaries for all platforms: [GitHub Releases](https://github.com/leonavas/pragma/releases/latest). Node 22 or newer only runs `.server.js` files.
 
 ```sh
-curl -fsSL https://pragma.leonavas.com/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/leonavas/pragma/main/install.sh | sh
 pragma new my-app
 cd my-app
 pragma dev

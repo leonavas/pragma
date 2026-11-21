@@ -6,10 +6,10 @@ This file has everything needed to build a pragma app: install, the loop, the ap
 
 ## Install and create
 
-pragma is one Rust binary. Linux x64 binary: {{origin}}/downloads/pragma-linux-x64.tar.gz. Node 22 or newer only runs `.server.js` files.
+pragma is one Rust binary. The installer supports Linux and macOS. Binaries for all platforms: https://github.com/leonavas/pragma/releases/latest. Node 22 or newer only runs `.server.js` files.
 
 ```sh
-curl -fsSL {{origin}}/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/leonavas/pragma/main/install.sh | sh
 pragma new my-app
 cd my-app
 pragma dev
