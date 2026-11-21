@@ -36,6 +36,7 @@ export const log = {
   info: (msg, attrs) => emit('info', msg, attrs),
   warn: (msg, attrs) => emit('warn', msg, attrs),
   error: (msg, attrs) => emit('error', msg, attrs),
+  flush: () => flush(),
 }
 
 export function flush(beacon) {

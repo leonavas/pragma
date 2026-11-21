@@ -1,6 +1,5 @@
 <script>
   import { log } from 'pragma'
-  import { flush } from '../../../../../.pragma/log.js'
 
   const severityNumbers = { debug: 5, info: 9, warn: 13, error: 17 }
 
@@ -42,7 +41,7 @@
   }
 
   function sendNow() {
-    flush()
+    log.flush()
   }
 
   function mount() {

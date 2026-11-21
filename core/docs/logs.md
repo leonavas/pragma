@@ -34,5 +34,6 @@ async function save() {
 - Keep messages short and fixed. Put dynamic values in attributes (`order.id`, `exception.message`, `http.request.method`).
 - Do not duplicate automatic logs: unhandled errors, navigation, fetch failures, request spans, and `traceparent`.
 - In `pragma dev`, client `log.*` also prints to the browser console.
-- Client logs send to `POST /_otel`. On static hosts returning 404 or 405, the client stops sending.
+- Client logs send to `POST /_otel` in batches: 2 s after the first record, at 50 records, and with `sendBeacon` when the tab hides. On static hosts returning 404 or 405, the client stops sending.
+- `log.flush()` sends the queued client records now. Call it only when the page must not wait for the next batch (before `location.assign` to another site). The server `log` has no `flush`: its records go out at the end of each request.
 - Forbidden: `console.*`, logging inside loops or on every keystroke, and logging passwords, tokens, cookies, emails, or personal data.
