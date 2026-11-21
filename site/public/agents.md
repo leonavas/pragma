@@ -63,7 +63,7 @@ This page and the landing page expose these tools to agents in the browser, as d
 - `get_setup_instructions`: Get the commands to install pragma and create an app, plus a prompt for a coding agent, for a short app description
   - `app`: What the app does, in one sentence, written to follow 'create a pragma app that'
 - `get_pragma_docs`: Get one pragma framework doc as markdown, by topic; read rules first, then the topic you need
-  - `topic`: Doc to read: rules is AGENTS.md, the others are the files in core/docs
+  - `topic`: Doc to read: rules is AGENTS.md, the others are the files in .pragma/docs
 
 ## Still reading?
 

@@ -1,6 +1,6 @@
 # App structure
 
-Fixed. Create no other top-level folders. Never edit `core/`.
+Fixed. Create no other top-level folders. Never edit `.pragma/`.
 
 ```
 <app>/
@@ -23,12 +23,12 @@ Fixed. Create no other top-level folders. Never edit `core/`.
     theme.css              tokens and custom classes
   utils/                   pure functions
   public/                  static files (images, fonts, robots.txt, <page>.md for agents), served as-is
-  core/                    framework; do not edit
+  .pragma/                 framework (runtime, docs, base.css); do not edit
 ```
 
 `pragma.json`: `name` required; `lang` sets `<html lang>` (default `"en"`); `webmcp` (default
 `true`) makes every `<form>` an agent tool and turns on the `webmcp/*` rules (webmcp.md). Budgets, gzip kB:
-`initialJsKb` all JS a page loads, `routeJsKb` the page's JS outside `core/`, `cssKb` global CSS.
+`initialJsKb` all JS a page loads, `routeJsKb` the page's JS outside `.pragma/`, `cssKb` global CSS.
 
 | Thing | Location |
 |---|---|

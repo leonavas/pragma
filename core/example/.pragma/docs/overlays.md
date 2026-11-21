@@ -50,4 +50,4 @@ async function remove() {
 - Modal and alert lock scroll; dropdown does not. Focus returns to the opener.
 - Destructive action: put `autofocus` on the safe button.
 - Open only in response to a user click.
-- Never create `<dialog>`/`[popover]` by hand, call `showModal()`, use `window.confirm`, keep "open" in state, use `role="menu"`, or import `core/overlay.js`.
+- Never create `<dialog>`/`[popover]` by hand, call `showModal()`, use `window.confirm`, keep "open" in state, use `role="menu"`, or import `.pragma/overlay.js`.

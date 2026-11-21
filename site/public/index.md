@@ -186,7 +186,7 @@ An agent in the browser sees these forms as WebMCP tools and calls them. You can
 - `get_setup_instructions`: Get the commands to install pragma and create an app, plus a prompt for a coding agent, for a short app description
   - `app`: What the app does, in one sentence, written to follow 'create a pragma app that'
 - `get_pragma_docs`: Get one pragma framework doc as markdown, by topic; read rules first, then the topic you need
-  - `topic`: Doc to read: rules is AGENTS.md, the others are the files in core/docs
+  - `topic`: Doc to read: rules is AGENTS.md, the others are the files in .pragma/docs
 - `add_task`: Add a task to the demo to-do list on the pragma landing page
   - `title`: Title of the task, up to 48 characters
 

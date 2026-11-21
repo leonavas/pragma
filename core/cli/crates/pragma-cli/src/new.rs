@@ -45,11 +45,11 @@ pub fn create(dir: &Path) -> Result<Created, String> {
     Ok(Created { written, skipped, non_empty })
 }
 
-/// Everything this binary writes under `core/`: (path relative to the app, content).
+/// Everything this binary writes under `.pragma/`: (path relative to the app, content).
 pub fn core_files() -> Vec<(String, &'static [u8])> {
-    let runtime = embedded::RUNTIME.iter().map(|(rel, bytes)| (format!("core/{rel}"), *bytes));
-    let docs = embedded::DOCS.iter().map(|(rel, bytes)| (format!("core/docs/{rel}"), *bytes));
-    let base = std::iter::once(("core/base.css".to_owned(), pragma_css::base_css().as_bytes()));
+    let runtime = embedded::RUNTIME.iter().map(|(rel, bytes)| (format!(".pragma/{rel}"), *bytes));
+    let docs = embedded::DOCS.iter().map(|(rel, bytes)| (format!(".pragma/docs/{rel}"), *bytes));
+    let base = std::iter::once((".pragma/base.css".to_owned(), pragma_css::base_css().as_bytes()));
     runtime.chain(docs).chain(base).collect()
 }
 

@@ -9,7 +9,7 @@
   <section class="doc-section" aria-labelledby="utilities">
     <h2 id="utilities">Utilities, variants and what check rejects</h2>
     <div class="prose">
-      <p>The card below is styled only with utilities. Variants are <code>hover:</code>, <code>focus:</code>, <code>focus-visible:</code>, <code>active:</code>, <code>disabled:</code>, <code>group-hover:</code>, <code>dark:</code> and the breakpoints <code>sm:</code> to <code>2xl:</code>; they combine (<code>md:hover:bg-primary-600</code>), and colors take an opacity (<code>bg-accent/20</code>). The palette is <code>white</code>, <code>black</code>, <code>transparent</code>, <code>current</code> and the scales <code>neutral</code>, <code>primary</code>, <code>danger</code>, <code>success</code>, <code>warning</code> in shades 50 to 950, and the full list is <code>core/docs/classes.md</code>.</p>
+      <p>The card below is styled only with utilities. Variants are <code>hover:</code>, <code>focus:</code>, <code>focus-visible:</code>, <code>active:</code>, <code>disabled:</code>, <code>group-hover:</code>, <code>dark:</code> and the breakpoints <code>sm:</code> to <code>2xl:</code>; they combine (<code>md:hover:bg-primary-600</code>), and colors take an opacity (<code>bg-accent/20</code>). The palette is <code>white</code>, <code>black</code>, <code>transparent</code>, <code>current</code> and the scales <code>neutral</code>, <code>primary</code>, <code>danger</code>, <code>success</code>, <code>warning</code> in shades 50 to 950, and the full list is <code>.pragma/docs/classes.md</code>.</p>
       <p>Anything else is a check error, not a silent no-op: arbitrary values, negative utilities, unknown classes such as <code>shadow-inner</code>, and <code>style="…"</code>. The other tabs show the output.</p>
     </div>
     <c-showcase :source="data.examples.utilities" caption="Only the classes used in the source end up in the CSS bundle.">
@@ -21,7 +21,7 @@
     <h2 id="tokens">Tokens generate utilities</h2>
     <div class="prose">
       <p>Each <code>--color-&lt;name&gt;</code> or <code>--color-&lt;name&gt;-&lt;shade&gt;</code> in <code>@layer tokens</code> becomes <code>bg-</code>, <code>text-</code>, <code>border-</code> and the other color utilities. These swatches use this site's own tokens; redefining <code>--color-primary-*</code> rebrands every <code>primary</code> utility at once. The starter ships theme-aware <code>bg-surface</code>, <code>text-ink</code>, <code>text-muted</code>, <code>border-line</code> and the classes <code>.card</code>, <code>.btn</code>, <code>.btn-primary</code>, <code>.btn-danger</code>, <code>.dialog</code>.</p>
-      <p>The redefinable tokens are <code>--color-*</code>, <code>--font-sans</code>, <code>--font-serif</code>, <code>--font-mono</code>, <code>--radius-*</code>, <code>--shadow-*</code> and <code>--spacing</code>. A new font name such as <code>--font-display</code> does not create <code>font-display</code>. <code>core/base.css</code> also reads <code>--page-bg</code>, <code>--page-fg</code> and <code>--skeleton-bg</code>, which switch in dark mode, plus <code>--container-*</code> for the <code>max-w-*</code> sizes.</p>
+      <p>The redefinable tokens are <code>--color-*</code>, <code>--font-sans</code>, <code>--font-serif</code>, <code>--font-mono</code>, <code>--radius-*</code>, <code>--shadow-*</code> and <code>--spacing</code>. A new font name such as <code>--font-display</code> does not create <code>font-display</code>. <code>.pragma/base.css</code> also reads <code>--page-bg</code>, <code>--page-fg</code> and <code>--skeleton-bg</code>, which switch in dark mode, plus <code>--container-*</code> for the <code>max-w-*</code> sizes.</p>
     </div>
     <c-showcase :source="data.examples.tokens" caption="The theme.css tab is an excerpt of this site's lib/theme.css. Custom global classes go in @layer components.">
       <p-swatches></p-swatches>
@@ -58,10 +58,10 @@
   <section class="doc-section" aria-labelledby="theme">
     <h2 id="theme">Light and dark theme</h2>
     <div class="prose">
-      <p>Dark mode keys off <code>data-theme="dark"</code>: tokens redefined under <code>[data-theme="dark"]</code> switch on their own, and palette colors pair with <code>dark:</code> (<code>bg-white dark:bg-neutral-900</code>), which matches the element or any ancestor. In an app, <code>setTheme()</code> from <code>core/theme.js</code> sets it on <code>&lt;html&gt;</code> and saves it, as the <code>theme-switch.html</code> tab shows; importing that module also adds an inline script that restores the choice, or follows <code>prefers-color-scheme</code>, before first paint.</p>
-      <p>This site is dark only, so the live box sets <code>data-theme</code> on its own root to keep the switch inside the box. Without the <code>core/theme.js</code> import, dark mode never activates: there is no media-query fallback. The import may also be written in the absolute form <code>'/core/theme.js'</code>.</p>
+      <p>Dark mode keys off <code>data-theme="dark"</code>: tokens redefined under <code>[data-theme="dark"]</code> switch on their own, and palette colors pair with <code>dark:</code> (<code>bg-white dark:bg-neutral-900</code>), which matches the element or any ancestor. In an app, <code>setTheme()</code> from <code>.pragma/theme.js</code> sets it on <code>&lt;html&gt;</code> and saves it, as the <code>theme-switch.html</code> tab shows; importing that module also adds an inline script that restores the choice, or follows <code>prefers-color-scheme</code>, before first paint.</p>
+      <p>This site is dark only, so the live box sets <code>data-theme</code> on its own root to keep the switch inside the box. Without the <code>.pragma/theme.js</code> import, dark mode never activates: there is no media-query fallback. The import may also be written in the absolute form <code>'/.pragma/theme.js'</code>.</p>
     </div>
-    <c-showcase :source="data.examples.theme" caption="--page-bg and --page-fg come from core/base.css; the card uses only palette utilities with dark: variants.">
+    <c-showcase :source="data.examples.theme" caption="--page-bg and --page-fg come from .pragma/base.css; the card uses only palette utilities with dark: variants.">
       <p-theme-preview></p-theme-preview>
     </c-showcase>
   </section>

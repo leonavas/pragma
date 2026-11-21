@@ -61,10 +61,10 @@
   <section class="doc-section" aria-labelledby="utils-log">
     <h2 id="utils-log">Logging from <code>utils/</code></h2>
     <div class="prose">
-      <p>The services from <code>'pragma'</code> belong to page, component and store scripts. A plain module in <code>utils/</code> imports the same client logger from <code>core/log.js</code>; its records join the same batches and the same trace.</p>
+      <p>The services from <code>'pragma'</code> belong to page, component and store scripts. A plain module in <code>utils/</code> imports the same client logger from <code>.pragma/log.js</code>; its records join the same batches and the same trace.</p>
     </div>
     <c-terminal title="utils/currency.js">
-      <pre tabindex="0" aria-label="A utils module that logs"><code>import { log } from '../core/log.js'
+      <pre tabindex="0" aria-label="A utils module that logs"><code>import { log } from '../.pragma/log.js'
 
 const euro = new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' })
 

@@ -15,10 +15,10 @@ const HELP: &str = "pragma — HTML, CSS and JS without a framework
 usage:
   pragma new <dir>                              create an app in <dir> (warns and keeps existing files if not empty)
   pragma dev [--port 5180] [--host 127.0.0.1]   dev server with live reload
-  pragma build [--allow-outdated-core]          build dist/ for production (stops if core/ is outdated)
+  pragma build [--allow-outdated-core]          build dist/ for production (stops if .pragma/ is outdated)
   pragma check [--strict]                       check HTML, CSS, JS and budgets (--strict: warnings become errors)
   pragma serve [--port 3000] [--host 127.0.0.1] serve dist/ as in production
-  pragma upgrade                                update core/ (runtime, docs, base.css) to this version
+  pragma upgrade                                update .pragma/ (runtime, docs, base.css) to this version
 
 options:
   -h, --help      show this help
@@ -139,7 +139,7 @@ fn cmd_dev(args: &[String]) -> Result<i32, String> {
     let root = app_root()?;
     if let Some(warning) = upgrade::outdated(&root) {
         print_diagnostics(&root, &[warning]);
-        eprintln!("{} pages may fail to render with an old core/ (e.g. SSR \"unknown op\"); run `pragma upgrade`\n", report::paint("33", "warning:"));
+        eprintln!("{} pages may fail to render with an old .pragma/ (e.g. SSR \"unknown op\"); run `pragma upgrade`\n", report::paint("33", "warning:"));
     }
     Ok(runtime()?.block_on(dev::run(root, &args.host(), port)))
 }
@@ -186,7 +186,7 @@ fn cmd_upgrade() -> Result<i32, String> {
     let version = env!("CARGO_PKG_VERSION");
     let changes = upgrade::upgrade(&root)?;
     if changes.is_empty() {
-        println!("core/ is already at pragma {version}");
+        println!(".pragma/ is already at pragma {version}");
         return Ok(0);
     }
     for (label, paths) in [("updated", &changes.updated), ("added", &changes.added), ("removed", &changes.removed)] {
@@ -194,7 +194,7 @@ fn cmd_upgrade() -> Result<i32, String> {
             println!("  {label:<8} {path}");
         }
     }
-    println!("core/ upgraded to pragma {version} ({} file(s) changed); files outside core/ were not touched", changes.len());
+    println!(".pragma/ upgraded to pragma {version} ({} file(s) changed); files outside .pragma/ were not touched", changes.len());
     Ok(0)
 }
 

@@ -3,7 +3,7 @@ use pragma_diag::Diagnostic;
 use std::collections::HashSet;
 use std::path::Path;
 
-/// How the app's `core/` differs from the one embedded in this binary (paths relative to the app).
+/// How the app's `.pragma/` differs from the one embedded in this binary (paths relative to the app).
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct CoreDiff {
     pub added: Vec<String>,
@@ -37,13 +37,16 @@ pub fn diff(root: &Path) -> CoreDiff {
     }
     let known: HashSet<&str> = files.iter().map(|(rel, _)| rel.as_str()).collect();
     let mut present = Vec::new();
-    collect(&root.join("core"), "core", &mut present);
+    collect(&root.join(".pragma"), ".pragma", &mut present);
+    if root.join("core/boot.js").is_file() || root.join("core/base.css").is_file() {
+        collect(&root.join("core"), "core", &mut present);
+    }
     present.sort();
     out.removed = present.into_iter().filter(|rel| !known.contains(rel.as_str())).collect();
     out
 }
 
-/// Makes `core/` equal to the embedded version. Writes and removes only inside `core/`.
+/// Makes `.pragma/` equal to the embedded version (and removes legacy `core/`).
 pub fn upgrade(root: &Path) -> Result<CoreDiff, String> {
     let changes = diff(root);
     for (rel, content) in core_files() {
@@ -54,12 +57,16 @@ pub fn upgrade(root: &Path) -> Result<CoreDiff, String> {
     for rel in &changes.removed {
         let path = root.join(rel);
         std::fs::remove_file(&path).map_err(|e| format!("cannot remove '{}': {e}", path.display()))?;
-        remove_empty_dirs(&root.join("core"), &path);
+        let base = if rel.starts_with("core/") { root.join("core") } else { root.join(".pragma") };
+        remove_empty_dirs(&base, &path);
+        if rel.starts_with("core/") {
+            let _ = std::fs::remove_dir(&base);
+        }
     }
     Ok(changes)
 }
 
-/// `app/core-outdated` warning for `pragma check`, when `core/` is not this binary's version.
+/// `app/core-outdated` warning for `pragma check`, when `.pragma/` is not this binary's version.
 pub fn outdated(root: &Path) -> Option<Diagnostic> {
     let changes = diff(root);
     if changes.is_empty() {
@@ -69,14 +76,14 @@ pub fn outdated(root: &Path) -> Option<Diagnostic> {
     let more = changes.len().saturating_sub(shown.len());
     let more = if more > 0 { format!(" and {more} more") } else { String::new() };
     let message = format!(
-        "core/ differs from the version in pragma {} ({}{more}); run `pragma upgrade`",
+        ".pragma/ differs from the version in pragma {} ({}{more}); run `pragma upgrade`",
         env!("CARGO_PKG_VERSION"),
         shown.join(", ")
     );
-    Some(Diagnostic::warning("core", 1, 1, "app/core-outdated", message))
+    Some(Diagnostic::warning(".pragma", 1, 1, "app/core-outdated", message))
 }
 
-/// Before `pragma build`: an outdated `core/` stops the build (the compiler may emit ops the old
+/// Before `pragma build`: an outdated `.pragma/` stops the build (the compiler may emit ops the old
 /// runtime cannot render), unless `allow`. Ok: the warning to print, if any.
 pub fn build_gate(root: &Path, allow: bool) -> Result<Option<Diagnostic>, (Diagnostic, String)> {
     match outdated(root) {
@@ -84,7 +91,7 @@ pub fn build_gate(root: &Path, allow: bool) -> Result<Option<Diagnostic>, (Diagn
         Some(warning) if allow => Ok(Some(warning)),
         Some(mut error) => {
             error.severity = pragma_diag::Severity::Error;
-            Err((error, "core/ is older than this pragma: run `pragma upgrade` first (or `pragma build --allow-outdated-core` to build with it anyway)".into()))
+            Err((error, ".pragma/ is older than this pragma: run `pragma upgrade` first (or `pragma build --allow-outdated-core` to build with it anyway)".into()))
         }
     }
 }
@@ -93,7 +100,7 @@ fn collect(dir: &Path, rel: &str, files: &mut Vec<String>) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
-        if matches!(name.as_str(), "node_modules" | ".git" | ".DS_Store") {
+        if matches!(name.as_str(), "node_modules" | ".git" | ".DS_Store") || (rel == ".pragma" && name == "dev") {
             continue;
         }
         let child = format!("{rel}/{name}");

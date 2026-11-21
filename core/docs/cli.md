@@ -3,11 +3,11 @@
 | Command | Does |
 |---|---|
 | `pragma new <dir>` | creates an app with the fixed structure (warns and keeps existing files if `<dir>` is not empty) |
-| `pragma dev [--port 5180] [--host 127.0.0.1]` | dev server with live reload over a WebSocket (any number of tabs); a build error shows an overlay, and pages without errors keep working, `load` included (starts Node ≥ 22 when there is a `.server.js`); prints `app/core-outdated` first when `core/` is older than this `pragma` |
+| `pragma dev [--port 5180] [--host 127.0.0.1]` | dev server with live reload over a WebSocket (any number of tabs); a build error shows an overlay, and pages without errors keep working, `load` included (starts Node ≥ 22 when there is a `.server.js`); prints `app/core-outdated` first when `.pragma/` is older than this `pragma` |
 | `pragma check [--strict]` | checks JS, HTML, CSS, budgets, accessibility and WebMCP tools; `--strict` turns warnings into errors |
-| `pragma build [--allow-outdated-core]` | writes `dist/`; stops with `app/core-outdated` when `core/` is older than this `pragma` (run `pragma upgrade`; `--allow-outdated-core` builds anyway) |
+| `pragma build [--allow-outdated-core]` | writes `dist/`; stops with `app/core-outdated` when `.pragma/` is older than this `pragma` (run `pragma upgrade`; `--allow-outdated-core` builds anyway) |
 | `pragma serve [--port 3000] [--host 127.0.0.1]` | serves `dist/` as in production |
-| `pragma upgrade` | makes `core/` (runtime, docs, `base.css`) equal to this `pragma` version; prints each file updated, added or removed; never touches files outside `core/` |
+| `pragma upgrade` | makes `.pragma/` (runtime, docs, `base.css`) equal to this `pragma` version; prints each file updated, added or removed; never touches files outside `.pragma/` |
 
 Run `pragma check --strict` before finishing: zero errors, zero warnings. Output:
 `file:line:column error|warning [rule] message`. Fix the cause; never work around the rule.
@@ -20,7 +20,7 @@ Run `pragma check --strict` before finishing: zero errors, zero warnings. Output
 | `js/html-in-js` | no `innerHTML`, `createElement`, `document.write`…: markup goes in `.html` |
 | `js/console` | `log.*` (logs.md) |
 | `js/jsdoc-types` | no TypeScript or JSDoc types |
-| `js/import` | import only project files, `core/` and `package.json` dependencies (packages.md); `import()` only with a quoted specifier (`import('./chart.js')`), never a variable or `${}` |
+| `js/import` | import only project files, `.pragma/` and `package.json` dependencies (packages.md); `import()` only with a quoted specifier (`import('./chart.js')`), never a variable or `${}` |
 | `js/comment`, `html/comment`, `css/comment` | delete the comment; name things clearly |
 | `js/vague-name` | descriptive names. Flagged: generic words (`tmp`, `data`, `info`, `handler`, `util`…), names ending in a digit, names under 3 chars except `$ i j k id ok el ctx url log` and parameters of expression-body arrows |
 | `js/legacy-api` | old API (`export const state`/`actions`, `export function mount`, `ctx.$`, `ctx.update`, `store()`): top-level `let` for state, functions for actions and derived values, `function mount(el)`, `export let` for props (components.md, state.md) |
@@ -51,7 +51,7 @@ Run `pragma check --strict` before finishing: zero errors, zero warnings. Output
 | `app/package` | packages.md |
 | `app/pragma-json` | valid `pragma.json` (structure.md) |
 | `app/budget` | shrink the code (performance.md) |
-| `app/core-outdated` (warning; an error in `pragma build`) | `core/` differs from this `pragma` version: run `pragma upgrade`; never edit `core/` by hand. An old runtime cannot render what a newer compiler emits (SSR "unknown op") |
+| `app/core-outdated` (warning; an error in `pragma build`) | `.pragma/` differs from this `pragma` version: run `pragma upgrade`; never edit `.pragma/` by hand. An old runtime cannot render what a newer compiler emits (SSR "unknown op") |
 
 ## Accessibility (`a11y/*`, warnings; errors with `--strict`)
 

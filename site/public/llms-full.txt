@@ -52,7 +52,7 @@ Source: https://pragma.leonavas.com/docs/rules.md
 
 # AGENTS.md
 
-pragma app: native HTML, CSS and JS, no framework, usable by AI agents. Docs are in `core/docs/`: read the relevant one before changing code.
+pragma app: native HTML, CSS and JS, no framework, usable by AI agents. Docs are in `.pragma/docs/`: read the relevant one before changing code.
 
 ## Syntax
 
@@ -83,7 +83,7 @@ Blocks are tags: `<if v>`, `<else-if v>`, `<else>`, `<for x in v key=x.id>`, `<e
 - Never write comments. The code is the documentation.
 - Names say what a thing is or does. No vague (`tmp`, `data`, `info`) or short (`t`, `e`) names,
   except `i`, `j`, `k`, `id`, `ok`, `el`, `url`, `log` and parameters of one-expression arrows.
-- Fixed structure; never edit `core/` (`pragma upgrade` updates it). Reuse components before creating new ones.
+- Fixed structure; never edit `.pragma/` (`pragma upgrade` updates it). Reuse components before creating new ones.
 - Overlays only with `c-modal`, `c-alert`, `c-dropdown`.
 - Data comes from `load` in `.server.js`, with a skeleton.
 - CSS: utilities from `classes.md`; a custom class only when a combination repeats 3+ times. No inline `style`.
@@ -119,7 +119,7 @@ Source: https://pragma.leonavas.com/docs/structure.md
 
 # App structure
 
-Fixed. Create no other top-level folders. Never edit `core/`.
+Fixed. Create no other top-level folders. Never edit `.pragma/`.
 
 ```
 <app>/
@@ -142,12 +142,12 @@ Fixed. Create no other top-level folders. Never edit `core/`.
     theme.css              tokens and custom classes
   utils/                   pure functions
   public/                  static files (images, fonts, robots.txt, <page>.md for agents), served as-is
-  core/                    framework; do not edit
+  .pragma/                 framework (runtime, docs, base.css); do not edit
 ```
 
 `pragma.json`: `name` required; `lang` sets `<html lang>` (default `"en"`); `webmcp` (default
 `true`) makes every `<form>` an agent tool and turns on the `webmcp/*` rules (webmcp.md). Budgets, gzip kB:
-`initialJsKb` all JS a page loads, `routeJsKb` the page's JS outside `core/`, `cssKb` global CSS.
+`initialJsKb` all JS a page loads, `routeJsKb` the page's JS outside `.pragma/`, `cssKb` global CSS.
 
 | Thing | Location |
 |---|---|
@@ -779,13 +779,13 @@ Keep the title, back link and filters outside the loading chain. Shape the skele
 | `data`, `params`, `query`, `page` | read-only |
 | `shared`, `call`, `navigate`, `open`, `close`, `confirm` | throw: that script is left to the browser |
 | reading `window`, `document`, `localStorage` at the top level | throws: left to the browser |
-| a script that imports an npm package or `core/` | not run: left to the browser |
+| a script that imports an npm package or `.pragma/` | not run: left to the browser |
 | a prop that comes from a store | left to the browser |
 | `mount(el)`, events | never (browser only) |
 
 "Left to the browser" means its `$x` bindings are filled at boot, as without `ssr`; the rest of the page still renders on the server.
 - Sources: `fetch` with a secret from `env`, a database via `env`, or `import products from './_products.json' with { type: 'json' }`.
-- Default is no SSR. The prebuilt HTML has the content outside `<if>`/`<for>`; the `page.loading` branch is an inert `<template>` and the skeleton appears as soon as `core/boot.js` runs (no skeleton without JS).
+- Default is no SSR. The prebuilt HTML has the content outside `<if>`/`<for>`; the `page.loading` branch is an inert `<template>` and the skeleton appears as soon as `.pragma/boot.js` runs (no skeleton without JS).
 - With `ssr = true` the HTML is the same, rendered with data; the skeleton is never shown. Use it for pages that crawlers or link previews must see, and for head tags or JSON-LD structured data bound to `data` (routes.md, SEO).
 - Never fetch data in `mount` or in a client action, never create `/api/...` routes, never return secrets from `load`. `env` exists only on the server.
 
@@ -845,7 +845,7 @@ async function remove() {
 - Modal and alert lock scroll; dropdown does not. Focus returns to the opener.
 - Destructive action: put `autofocus` on the safe button.
 - Open only in response to a user click.
-- Never create `<dialog>`/`[popover]` by hand, call `showModal()`, use `window.confirm`, keep "open" in state, use `role="menu"`, or import `core/overlay.js`.
+- Never create `<dialog>`/`[popover]` by hand, call `showModal()`, use `window.confirm`, keep "open" in state, use `role="menu"`, or import `.pragma/overlay.js`.
 
 ---
 
@@ -857,7 +857,7 @@ Use utilities (classes.md) first. Write a custom class only when they are not en
 
 | File | Contains |
 |---|---|
-| `core/base.css` | preflight, layers, `.skeleton`, `[hidden]`, scroll lock. Do not edit. |
+| `.pragma/base.css` | preflight, layers, `.skeleton`, `[hidden]`, scroll lock. Do not edit. |
 | `lib/theme.css` | tokens and global custom classes (`@layer components`) |
 | component `<style>` or `<name>.css` | that component only: the build scopes every selector to it (root and inside); `:global(…)` opts out; `[data-c="<name>"]` written by hand still works (for `p-` components the build makes it unique per folder) |
 | page `<style>` or `<page>.css` | that page only: scoped to its `<main data-page="…">` the same way |
@@ -901,7 +901,7 @@ The starter ships the theme-aware tokens `bg-surface`, `text-ink`, `text-muted`,
 ## Theme toggle
 
 ```js
-import { theme, setTheme } from '../../../core/theme.js'
+import { theme, setTheme } from '../../../.pragma/theme.js'
 
 let dark = theme() === 'dark'
 
@@ -913,7 +913,7 @@ function toggle() {
 }
 ```
 
-Never write `data-theme` or read `localStorage` for the theme: use `core/theme.js`.
+Never write `data-theme` or read `localStorage` for the theme: use `.pragma/theme.js`.
 
 ## Custom class
 
@@ -1106,7 +1106,7 @@ For a validation error, respond with it too, so the agent can fix the input and 
 ## CSS
 
 `:tool-form-active` matches the form while an agent fills it; `:tool-submit-active` matches its
-submit button. `core/base.css` styles both with theme tokens; restyle them in `lib/theme.css` or
+submit button. `.pragma/base.css` styles both with theme tokens; restyle them in `lib/theme.css` or
 the page `<style>`:
 
 ```css
@@ -1248,7 +1248,7 @@ Source: https://pragma.leonavas.com/docs/logs.md
 
 OpenTelemetry on client and server, zero config. In page, component and store scripts use
 `log` from `pragma`; in `load` and server actions the `log` argument; in `utils/`
-`import { log } from '../core/log.js'`.
+`import { log } from '../.pragma/log.js'`.
 
 ```js
 import { call, params, log } from 'pragma'
@@ -1288,11 +1288,11 @@ Source: https://pragma.leonavas.com/docs/cli.md
 | Command | Does |
 |---|---|
 | `pragma new <dir>` | creates an app with the fixed structure (warns and keeps existing files if `<dir>` is not empty) |
-| `pragma dev [--port 5180] [--host 127.0.0.1]` | dev server with live reload over a WebSocket (any number of tabs); a build error shows an overlay, and pages without errors keep working, `load` included (starts Node ≥ 22 when there is a `.server.js`); prints `app/core-outdated` first when `core/` is older than this `pragma` |
+| `pragma dev [--port 5180] [--host 127.0.0.1]` | dev server with live reload over a WebSocket (any number of tabs); a build error shows an overlay, and pages without errors keep working, `load` included (starts Node ≥ 22 when there is a `.server.js`); prints `app/core-outdated` first when `.pragma/` is older than this `pragma` |
 | `pragma check [--strict]` | checks JS, HTML, CSS, budgets, accessibility and WebMCP tools; `--strict` turns warnings into errors |
-| `pragma build [--allow-outdated-core]` | writes `dist/`; stops with `app/core-outdated` when `core/` is older than this `pragma` (run `pragma upgrade`; `--allow-outdated-core` builds anyway) |
+| `pragma build [--allow-outdated-core]` | writes `dist/`; stops with `app/core-outdated` when `.pragma/` is older than this `pragma` (run `pragma upgrade`; `--allow-outdated-core` builds anyway) |
 | `pragma serve [--port 3000] [--host 127.0.0.1]` | serves `dist/` as in production |
-| `pragma upgrade` | makes `core/` (runtime, docs, `base.css`) equal to this `pragma` version; prints each file updated, added or removed; never touches files outside `core/` |
+| `pragma upgrade` | makes `.pragma/` (runtime, docs, `base.css`) equal to this `pragma` version; prints each file updated, added or removed; never touches files outside `.pragma/` |
 
 Run `pragma check --strict` before finishing: zero errors, zero warnings. Output:
 `file:line:column error|warning [rule] message`. Fix the cause; never work around the rule.
@@ -1305,7 +1305,7 @@ Run `pragma check --strict` before finishing: zero errors, zero warnings. Output
 | `js/html-in-js` | no `innerHTML`, `createElement`, `document.write`…: markup goes in `.html` |
 | `js/console` | `log.*` (logs.md) |
 | `js/jsdoc-types` | no TypeScript or JSDoc types |
-| `js/import` | import only project files, `core/` and `package.json` dependencies (packages.md); `import()` only with a quoted specifier (`import('./chart.js')`), never a variable or `${}` |
+| `js/import` | import only project files, `.pragma/` and `package.json` dependencies (packages.md); `import()` only with a quoted specifier (`import('./chart.js')`), never a variable or `${}` |
 | `js/comment`, `html/comment`, `css/comment` | delete the comment; name things clearly |
 | `js/vague-name` | descriptive names. Flagged: generic words (`tmp`, `data`, `info`, `handler`, `util`…), names ending in a digit, names under 3 chars except `$ i j k id ok el ctx url log` and parameters of expression-body arrows |
 | `js/legacy-api` | old API (`export const state`/`actions`, `export function mount`, `ctx.$`, `ctx.update`, `store()`): top-level `let` for state, functions for actions and derived values, `function mount(el)`, `export let` for props (components.md, state.md) |
@@ -1336,7 +1336,7 @@ Run `pragma check --strict` before finishing: zero errors, zero warnings. Output
 | `app/package` | packages.md |
 | `app/pragma-json` | valid `pragma.json` (structure.md) |
 | `app/budget` | shrink the code (performance.md) |
-| `app/core-outdated` (warning; an error in `pragma build`) | `core/` differs from this `pragma` version: run `pragma upgrade`; never edit `core/` by hand. An old runtime cannot render what a newer compiler emits (SSR "unknown op") |
+| `app/core-outdated` (warning; an error in `pragma build`) | `.pragma/` differs from this `pragma` version: run `pragma upgrade`; never edit `.pragma/` by hand. An old runtime cannot render what a newer compiler emits (SSR "unknown op") |
 
 ## Accessibility (`a11y/*`, warnings; errors with `--strict`)
 

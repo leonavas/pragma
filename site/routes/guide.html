@@ -48,7 +48,7 @@ usage:
   pragma build                                  build dist/ for production
   pragma check [--strict]                       check HTML, CSS, JS and budgets (--strict: warnings become errors)
   pragma serve [--port 3000] [--host 127.0.0.1] serve dist/ as in production
-  pragma upgrade                                update core/ (runtime, docs, base.css) to this version
+  pragma upgrade                                update .pragma/ (runtime, docs, base.css) to this version
 
 options:
   -h, --help      show this help
@@ -56,14 +56,14 @@ options:
         </c-terminal>
         <div class="prose">
           <p>Options take either form, <code>--port 8080</code> or <code>--port=8080</code>. The <code>cargo install</code> output and the clone progress are left out above.</p>
-          <p>To update, run <code>git pull</code> and the same <code>cargo install</code>, then <code>pragma upgrade</code> inside each app. It makes the app's <code>core/</code> (runtime, docs, <code>base.css</code>) match the new binary, prints every file it updated, added or removed, and never touches anything outside <code>core/</code>. Until then <code>pragma check</code> warns with <code>app/core-outdated</code>.</p>
+          <p>To update, run <code>git pull</code> and the same <code>cargo install</code>, then <code>pragma upgrade</code> inside each app. It makes the app's <code>.pragma/</code> (runtime, docs, <code>base.css</code>) match the new binary, prints every file it updated, added or removed, and never touches anything outside <code>.pragma/</code>. Until then <code>pragma check</code> warns with <code>app/core-outdated</code>.</p>
         </div>
       </section>
 
       <section class="doc-section" aria-labelledby="create">
         <h2 id="create">Create an app</h2>
         <div class="prose">
-          <p><code>pragma new</code> writes a working app into an empty or missing folder: a layout, a home page with a modal, an alert and a dropdown, a 404 page, the theme, the runtime in <code>core/</code> and the docs in <code>core/docs/</code>.</p>
+          <p><code>pragma new</code> writes a working app into an empty or missing folder: a layout, a home page with a modal, an alert and a dropdown, a 404 page, the theme, the runtime in <code>.pragma/</code> and the docs in <code>.pragma/docs/</code>.</p>
         </div>
         <c-terminal title="~/projects">
           <pre tabindex="0" aria-label="Creating an app"><code><span class="term-cmd">pragma new my-app</span>
@@ -73,7 +73,7 @@ app created in my-app (41 files)
   pragma dev</code></pre>
         </c-terminal>
         <div class="prose">
-          <p>The app ships an <code>AGENTS.md</code> (and a <code>CLAUDE.md</code> that includes it) with the syntax in a dozen lines, the rules the compiler enforces and a table that maps each task to one file in <code>core/docs/</code>. A coding agent reads that first; you can too. The docs are short on purpose: every page fits in a context window.</p>
+          <p>The app ships an <code>AGENTS.md</code> (and a <code>CLAUDE.md</code> that includes it) with the syntax in a dozen lines, the rules the compiler enforces and a table that maps each task to one file in <code>.pragma/docs/</code>. A coding agent reads that first; you can too. The docs are short on purpose: every page fits in a context window.</p>
         </div>
       </section>
 
@@ -104,7 +104,7 @@ app created in my-app (41 files)
       <section class="doc-section" aria-labelledby="structure">
         <h2 id="structure">Project structure</h2>
         <div class="prose">
-          <p>The layout is fixed, so there is nothing to configure and only one place for each thing. The files below are exactly what <code>pragma new</code> creates, minus <code>core/</code>.</p>
+          <p>The layout is fixed, so there is nothing to configure and only one place for each thing. The files below are exactly what <code>pragma new</code> creates, minus <code>.pragma/</code>.</p>
         </div>
         <c-terminal title="my-app/">
           <pre tabindex="0" aria-label="Files of a new app"><code><span class="term-ink">pragma.json</span>               name, lang and budgets
@@ -119,11 +119,11 @@ app created in my-app (41 files)
   theme.css               tokens and the few custom classes
 <span class="term-ink">utils/</span>                    plain JS modules
 <span class="term-ink">public/</span>                   copied as is: favicon.svg, images, fonts
-<span class="term-ink">core/</span>                     runtime and docs; never edited</code></pre>
+<span class="term-ink">.pragma/</span>                  runtime and docs; never edited</code></pre>
         </c-terminal>
         <div class="prose">
           <ul>
-            <li>Only <code>routes/</code>, <code>lib/</code>, <code>utils/</code>, <code>core/</code> and <code>public/</code> are read. Other top-level files, like a README, are ignored.</li>
+            <li>Only <code>routes/</code>, <code>lib/</code>, <code>utils/</code>, <code>.pragma/</code> and <code>public/</code> are read. Other top-level files, like a README, are ignored.</li>
             <li>A page is <code>routes/x.html</code>, with an optional <code>&lt;script&gt;</code> and <code>&lt;style&gt;</code> at its top level and an optional <code>x.server.js</code> (<code>load</code>, server actions, <code>ssr</code>). A large script can live in <code>x.js</code> beside it instead, never both (<code>html/duplicate-module</code>).</li>
             <li>Anything else in <code>routes/</code> must be private, with a leading underscore: <code>_components/</code>, <code>_products.json</code>, <code>_catalog.server.js</code>.</li>
             <li><code>pragma.json</code> takes exactly <code>name</code> (required: fallback title, log service name, Worker name), <code>lang</code> (default <code>en</code>) and <code>budgets</code>. Unknown keys are errors.</li>
@@ -183,7 +183,7 @@ node restarted on port 43459
 routes/broken.html:6:11 <span class="term-err">error</span> <span class="term-ink">[js/vague-name]</span> name `tmp` does not say what it is or does; use a self-explanatory name (e.g. `product`, `totalItems`, `addToCart`)
  6 |     const tmp = query.trim()
    |           ^
-routes/broken.html:7:5 <span class="term-err">error</span> <span class="term-ink">[js/console]</span> `console` is not allowed; use `log` (`import { log } from 'pragma'`, or core/log.js outside scripts)
+routes/broken.html:7:5 <span class="term-err">error</span> <span class="term-ink">[js/console]</span> `console` is not allowed; use `log` (`import { log } from 'pragma'`, or .pragma/log.js outside scripts)
  7 |     console.log(tmp)
    |     ^
 routes/broken.html:12:1 <span class="term-warn">warning</span> <span class="term-ink">[a11y/img-alt]</span> &lt;img&gt; without alt; use alt="" if the image is decorative
@@ -198,7 +198,7 @@ routes/broken.html:14:1 <span class="term-warn">warning</span> <span class="term
 routes/broken.html:15:1 <span class="term-warn">warning</span> <span class="term-ink">[a11y/heading]</span> skipped heading level: &lt;h1&gt; followed by &lt;h3&gt;
  15 | &lt;h3 class="w-[37px]" :class="$tone"&gt;Recent&lt;/h3&gt;
     | ^
-routes/broken.html:15:5 <span class="term-err">error</span> <span class="term-ink">[css/arbitrary-value]</span> arbitrary value "w-[37px]" is not supported; use a utility from core/docs/classes.md or add a class in lib/theme.css
+routes/broken.html:15:5 <span class="term-err">error</span> <span class="term-ink">[css/arbitrary-value]</span> arbitrary value "w-[37px]" is not supported; use a utility from .pragma/docs/classes.md or add a class in lib/theme.css
  15 | &lt;h3 class="w-[37px]" :class="$tone"&gt;Recent&lt;/h3&gt;
     |     ^
 routes/broken.html:15:22 <span class="term-err">error</span> <span class="term-ink">[html/class]</span> :class is not allowed: write static classes in class="…" and toggle each one with .name="path" (e.g. .text-warning-700="$warn")
@@ -227,7 +227,7 @@ routes/broken.html:19:3 <span class="term-err">error</span> <span class="term-in
             <li><strong>JS</strong>: <code>js/syntax</code>, <code>js/comment</code>, <code>js/console</code>, <code>js/vague-name</code>, <code>js/html-in-js</code> (no <code>innerHTML</code> or <code>createElement</code>), <code>js/jsdoc-types</code>, <code>js/import</code>, and the script rules: <code>js/component-script</code> (no <code>var</code>, no top-level <code>await</code>, <code>export</code> only for props), <code>js/prop-write</code>, <code>js/const-state</code> (a mutated <code>const</code> the markup reads), <code>js/store-import</code> (stores only through <code>shared</code>) and <code>js/legacy-api</code> (the old <code>state(ctx)</code> API, with the migration).</li>
             <li><strong>HTML</strong>: <code>html/syntax</code> (close every non-void tag), <code>html/comment</code>, <code>html/script</code>, <code>html/duplicate-module</code> (a <code>&lt;script&gt;</code> and an <code>x.js</code> for the same file), <code>html/style-inline</code>, <code>html/on-inline</code>, <code>html/legacy-syntax</code>, <code>html/unknown-directive</code>, <code>html/invalid-path</code>, <code>html/invalid-root</code>, the block rules (<code>html/block</code>, <code>html/for-without-key</code>, <code>html/misplaced-else</code>…), <code>html/unknown-name</code>, <code>html/unknown-prop</code>, <code>html/component</code>, <code>html/unknown-component</code>, <code>html/layout</code>, <code>html/title</code>, <code>html/class</code> (no <code>:class</code>), <code>html/text-removed</code> (no <code>:text</code>), <code>html/interpolation</code> (no <code>{{ }}</code> or <code>${ }</code> outside <code>&lt;code&gt;</code>/<code>&lt;pre&gt;</code>), <code>html/data-attribute</code> (no hand-written <code>data-*</code>) and <code>html/head</code> (<code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> only at the top of a page or in the layout head). <code>html/unknown-directive</code> also names the pragma form for Vue, Alpine, Svelte, Angular and React attributes.</li>
             <li><strong>CSS</strong>: <code>css/syntax</code>, <code>css/comment</code>, <code>css/unknown-class</code> (only the utilities in <code>classes.md</code> and classes your CSS defines), <code>css/arbitrary-value</code>.</li>
-            <li><strong>App</strong>: <code>app/structure</code>, <code>app/route-conflict</code>, <code>app/package</code>, <code>app/pragma-json</code>, <code>app/budget</code>, and the warning <code>app/core-outdated</code> when <code>core/</code> differs from the installed binary.</li>
+            <li><strong>App</strong>: <code>app/structure</code>, <code>app/route-conflict</code>, <code>app/package</code>, <code>app/pragma-json</code>, <code>app/budget</code>, and the warning <code>app/core-outdated</code> when <code>.pragma/</code> differs from the installed binary.</li>
             <li><strong>Accessibility</strong>, checked on the expanded page with components inlined: <code>img-alt</code>, <code>accessible-name</code>, <code>label</code>, <code>dialog-name</code>, <code>click-non-interactive</code>, <code>heading</code>, <code>single-h1</code>, <code>tabindex</code>, <code>duplicate-id</code>, <code>iframe-title</code>, <code>a-no-href</code>. A bound attribute counts: <code>:aria-label</code> satisfies <code>aria-label</code>.</li>
           </ul>
         </div>
@@ -236,7 +236,7 @@ routes/broken.html:19:3 <span class="term-err">error</span> <span class="term-in
       <section class="doc-section" aria-labelledby="budgets">
         <h2 id="budgets">Performance budgets</h2>
         <div class="prose">
-          <p>Budgets are gzip kilobytes in <code>pragma.json</code>, enforced by <code>check</code> and <code>build</code>: <code>initialJsKb</code> is all JS a page loads, runtime included; <code>routeJsKb</code> is the page's own JS outside <code>core/</code>, npm packages included; <code>cssKb</code> is the global stylesheet. An omitted key is not checked. Exceeding one is an error in production builds and a warning in dev.</p>
+          <p>Budgets are gzip kilobytes in <code>pragma.json</code>, enforced by <code>check</code> and <code>build</code>: <code>initialJsKb</code> is all JS a page loads, runtime included; <code>routeJsKb</code> is the page's own JS outside <code>.pragma/</code>, npm packages included; <code>cssKb</code> is the global stylesheet. An omitted key is not checked. Exceeding one is an error in production builds and a warning in dev.</p>
         </div>
         <c-terminal title="~/my-app">
           <pre tabindex="0" aria-label="A budget error"><code><span class="term-cmd">cat pragma.json</span>

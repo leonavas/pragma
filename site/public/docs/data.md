@@ -87,12 +87,12 @@ Keep the title, back link and filters outside the loading chain. Shape the skele
 | `data`, `params`, `query`, `page` | read-only |
 | `shared`, `call`, `navigate`, `open`, `close`, `confirm` | throw: that script is left to the browser |
 | reading `window`, `document`, `localStorage` at the top level | throws: left to the browser |
-| a script that imports an npm package or `core/` | not run: left to the browser |
+| a script that imports an npm package or `.pragma/` | not run: left to the browser |
 | a prop that comes from a store | left to the browser |
 | `mount(el)`, events | never (browser only) |
 
 "Left to the browser" means its `$x` bindings are filled at boot, as without `ssr`; the rest of the page still renders on the server.
 - Sources: `fetch` with a secret from `env`, a database via `env`, or `import products from './_products.json' with { type: 'json' }`.
-- Default is no SSR. The prebuilt HTML has the content outside `<if>`/`<for>`; the `page.loading` branch is an inert `<template>` and the skeleton appears as soon as `core/boot.js` runs (no skeleton without JS).
+- Default is no SSR. The prebuilt HTML has the content outside `<if>`/`<for>`; the `page.loading` branch is an inert `<template>` and the skeleton appears as soon as `.pragma/boot.js` runs (no skeleton without JS).
 - With `ssr = true` the HTML is the same, rendered with data; the skeleton is never shown. Use it for pages that crawlers or link previews must see, and for head tags or JSON-LD structured data bound to `data` (routes.md, SEO).
 - Never fetch data in `mount` or in a client action, never create `/api/...` routes, never return secrets from `load`. `env` exists only on the server.

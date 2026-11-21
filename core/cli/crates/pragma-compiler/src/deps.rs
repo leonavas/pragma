@@ -104,8 +104,11 @@ impl Deps {
 }
 
 pub fn asset_path(rel: &str) -> String {
-    match rel.strip_prefix("node_modules/") {
-        Some(rest) => format!("npm/{rest}"),
-        None => rel.to_string(),
+    if let Some(rest) = rel.strip_prefix("node_modules/") {
+        format!("npm/{rest}")
+    } else if let Some(rest) = rel.strip_prefix(".pragma/") {
+        format!("core/{rest}")
+    } else {
+        rel.to_string()
     }
 }

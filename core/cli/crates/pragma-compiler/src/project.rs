@@ -84,6 +84,9 @@ fn walk(root: &Path, rel: &Path, out: &mut Vec<PathBuf>) {
     entries.sort_by_key(|e| e.file_name());
     for e in entries {
         let name = e.file_name();
+        if rel == Path::new(".pragma") && matches!(name.to_str(), Some("dev" | "docs" | "test")) {
+            continue;
+        }
         let path = rel.join(&name);
         match e.file_type() {
             Ok(t) if t.is_dir() => walk(root, &path, out),
@@ -240,7 +243,7 @@ impl Project {
         };
         p.load_config();
         let mut all = Vec::new();
-        for dir in ["routes", "lib", "utils", "core"] {
+        for dir in ["routes", "lib", "utils", ".pragma", "core"] {
             walk(root, Path::new(dir), &mut all);
         }
         walk(root, Path::new("public"), &mut p.public_files);
@@ -249,7 +252,12 @@ impl Project {
         }
         for f in &all {
             let s = rel_str(f);
-            let skip = s.starts_with("core/docs/") || s.starts_with("core/test/") || s.contains("/node_modules/");
+            let skip = s.starts_with(".pragma/docs/")
+                || s.starts_with(".pragma/dev/")
+                || s.starts_with(".pragma/test/")
+                || s.starts_with("core/docs/")
+                || s.starts_with("core/test/")
+                || s.contains("/node_modules/");
             if !skip && (s.ends_with(".js") || s.ends_with(".mjs")) {
                 p.js_files.push(f.clone());
             }

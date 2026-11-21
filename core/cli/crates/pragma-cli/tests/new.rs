@@ -8,11 +8,11 @@ fn creates_app_from_embedded_files() {
     assert!(created.written > 1);
     assert_eq!(created.skipped, 0);
     assert!(!created.non_empty);
-    let base = std::fs::read_to_string(dir.join("core/base.css")).unwrap();
+    let base = std::fs::read_to_string(dir.join(".pragma/base.css")).unwrap();
     assert_eq!(base, pragma_css::base_css());
 
     let core = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
-    for (src, dest) in [("starter", ""), ("runtime", "core"), ("docs", "core/docs")] {
+    for (src, dest) in [("starter", ""), ("runtime", ".pragma"), ("docs", ".pragma/docs")] {
         for entry in std::fs::read_dir(core.join(src)).unwrap().flatten() {
             let name = entry.file_name();
             if entry.path().is_file() && name != "pragma.json" {
@@ -21,7 +21,7 @@ fn creates_app_from_embedded_files() {
             }
         }
     }
-    assert!(!dir.join("core/test").exists(), "runtime tests are not copied to the app");
+    assert!(!dir.join(".pragma/test").exists(), "runtime tests are not copied to the app");
     if let Ok(json) = std::fs::read_to_string(dir.join("pragma.json")) {
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(value["name"], "shop");

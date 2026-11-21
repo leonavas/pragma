@@ -4,7 +4,7 @@ Use utilities (classes.md) first. Write a custom class only when they are not en
 
 | File | Contains |
 |---|---|
-| `core/base.css` | preflight, layers, `.skeleton`, `[hidden]`, scroll lock. Do not edit. |
+| `.pragma/base.css` | preflight, layers, `.skeleton`, `[hidden]`, scroll lock. Do not edit. |
 | `lib/theme.css` | tokens and global custom classes (`@layer components`) |
 | component `<style>` or `<name>.css` | that component only: the build scopes every selector to it (root and inside); `:global(…)` opts out; `[data-c="<name>"]` written by hand still works (for `p-` components the build makes it unique per folder) |
 | page `<style>` or `<page>.css` | that page only: scoped to its `<main data-page="…">` the same way |
@@ -48,7 +48,7 @@ The starter ships the theme-aware tokens `bg-surface`, `text-ink`, `text-muted`,
 ## Theme toggle
 
 ```js
-import { theme, setTheme } from '../../../core/theme.js'
+import { theme, setTheme } from '../../../.pragma/theme.js'
 
 let dark = theme() === 'dark'
 
@@ -60,7 +60,7 @@ function toggle() {
 }
 ```
 
-Never write `data-theme` or read `localStorage` for the theme: use `core/theme.js`.
+Never write `data-theme` or read `localStorage` for the theme: use `.pragma/theme.js`.
 
 ## Custom class
 

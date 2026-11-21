@@ -51,9 +51,9 @@
   <section class="doc-section" aria-labelledby="restyle">
     <h2 id="restyle">They are ordinary components</h2>
     <div class="prose">
-      <p>The three overlays ship in the starter as <code>lib/components/modal</code>, <code>alert</code> and <code>dropdown</code>: one <code>.html</code> each, with no script, that you can restyle like any other component. The behavior lives in <code>core/overlay.js</code>, which the build adds only to pages that contain a <code>&lt;dialog&gt;</code> or <code>[popover]</code>.</p>
+      <p>The three overlays ship in the starter as <code>lib/components/modal</code>, <code>alert</code> and <code>dropdown</code>: one <code>.html</code> each, with no script, that you can restyle like any other component. The behavior lives in <code>.pragma/overlay.js</code>, which the build adds only to pages that contain a <code>&lt;dialog&gt;</code> or <code>[popover]</code>.</p>
       <ul>
-        <li>Do not create a <code>&lt;dialog&gt;</code> or <code>[popover]</code> by hand, call <code>showModal()</code>, use <code>window.confirm</code> or <code>role="menu"</code>, or import <code>core/overlay.js</code> yourself.</li>
+        <li>Do not create a <code>&lt;dialog&gt;</code> or <code>[popover]</code> by hand, call <code>showModal()</code>, use <code>window.confirm</code> or <code>role="menu"</code>, or import <code>.pragma/overlay.js</code> yourself.</li>
       </ul>
     </div>
     <c-showcase :source="data.examples.library" caption="These are this site's copies, restyled to its tokens.">

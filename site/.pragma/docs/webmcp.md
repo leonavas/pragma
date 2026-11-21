@@ -55,7 +55,7 @@ For a validation error, respond with it too, so the agent can fix the input and 
 ## CSS
 
 `:tool-form-active` matches the form while an agent fills it; `:tool-submit-active` matches its
-submit button. `core/base.css` styles both with theme tokens; restyle them in `lib/theme.css` or
+submit button. `.pragma/base.css` styles both with theme tokens; restyle them in `lib/theme.css` or
 the page `<style>`:
 
 ```css

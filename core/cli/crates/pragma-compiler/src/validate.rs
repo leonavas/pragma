@@ -45,7 +45,7 @@ impl ClassCheck {
             return;
         }
         if pragma_css::is_arbitrary(class) {
-            out.push(diag(files, pos, "css/arbitrary-value", format!("arbitrary value \"{class}\" is not supported; use a utility from core/docs/classes.md or add a class in lib/theme.css")));
+            out.push(diag(files, pos, "css/arbitrary-value", format!("arbitrary value \"{class}\" is not supported; use a utility from .pragma/docs/classes.md or add a class in lib/theme.css")));
         } else {
             out.push(diag(files, pos, "css/unknown-class", format!("class \"{class}\" is not a supported utility nor defined in the project CSS")));
         }
@@ -554,7 +554,7 @@ fn foreign_directive(name: &str) -> Option<String> {
         ("class", c) => format!("use `.{c}=\"path\"`"),
         ("for-attr", _) => "use `for=\"…\"`".into(),
         ("data" | "init" | "setup", _) => "put state and actions in the page or component .js".into(),
-        _ => "see the closed list in core/docs/syntax.md".into(),
+        _ => "see the closed list in .pragma/docs/syntax.md".into(),
     };
     Some(format!("`{name}` is {framework} syntax and does nothing in pragma; {hint}"))
 }

@@ -101,8 +101,8 @@ fn is_server_file(path: &Path, ctx: &LintContext) -> bool {
             _ => None,
         })
         .collect();
-    // In the app the server runtime lives in core/server/; in the repo, in core/runtime/server/.
-    parts.windows(2).any(|w| w == ["core", "server"]) || (ctx.is_core && parts.contains(&"server"))
+    // In the app the server runtime lives in .pragma/server/ (or legacy core/server/); in the repo, in core/runtime/server/.
+    parts.windows(2).any(|w| w == [".pragma", "server"] || w == ["core", "server"]) || (ctx.is_core && parts.contains(&"server"))
 }
 
 struct Linter<'c> {
@@ -144,7 +144,7 @@ impl Linter<'_> {
             "createElement" | "createElementNS" | "createTextNode" if !self.ctx.is_core => self.report(
                 span,
                 RULE_HTML,
-                format!("`{name}` is only allowed in the runtime (core/); markup lives in .html"),
+                format!("`{name}` is only allowed in the runtime (.pragma/); markup lives in .html"),
             ),
             "console" if matches!(object_name, Some("globalThis" | "window" | "self")) => {
                 self.report(span, RULE_CONSOLE, console_message());
@@ -156,6 +156,7 @@ impl Linter<'_> {
     fn check_specifier(&mut self, specifier: &str, span: Span, literal: bool) {
         if specifier.starts_with("./")
             || specifier.starts_with("../")
+            || specifier.starts_with("/.pragma/")
             || specifier.starts_with("/core/")
         {
             return;
@@ -177,7 +178,7 @@ impl Linter<'_> {
             format!("package import `{specifier}` must use quotes, not a template literal")
         } else {
             format!(
-                "import `{specifier}` is not allowed; use a relative path (./, ../), /core/ or a package from package.json"
+                "import `{specifier}` is not allowed; use a relative path (./, ../), /.pragma/ or a package from package.json"
             )
         };
         self.report(span, RULE_IMPORT, message);
@@ -218,7 +219,7 @@ pub fn package_name(specifier: &str) -> &str {
 }
 
 fn console_message() -> String {
-    "`console` is not allowed; use `log` (`import { log } from 'pragma'`, or core/log.js outside scripts)".to_string()
+    "`console` is not allowed; use `log` (`import { log } from 'pragma'`, or .pragma/log.js outside scripts)".to_string()
 }
 
 impl<'a> Visit<'a> for Linter<'_> {

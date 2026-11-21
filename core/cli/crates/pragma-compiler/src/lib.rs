@@ -563,10 +563,11 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     }
 
     // client JS
-    let boot = PathBuf::from("core/boot.js");
-    let overlay = PathBuf::from("core/overlay.js");
+    let core_dir = if opts.root.join(".pragma/boot.js").is_file() { ".pragma" } else { "core" };
+    let boot = PathBuf::from(format!("{core_dir}/boot.js"));
+    let overlay = PathBuf::from(format!("{core_dir}/overlay.js"));
     if !opts.root.join(&boot).is_file() {
-        diags.push(Diagnostic::error("core/boot.js", 1, 1, "app/structure", "core/boot.js not found; the framework lives in core/ (created by pragma new)"));
+        diags.push(Diagnostic::error(".pragma/boot.js", 1, 1, "app/structure", ".pragma/boot.js not found; the framework lives in .pragma/ (created by pragma new)"));
     }
     let page_entries = |o: &PageOut| -> Vec<PathBuf> {
         let mut e = vec![boot.clone()];
@@ -686,7 +687,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     report.css_gzip_bytes = shared_css_gz;
 
     // pages
-    let theme_js = mods.contains_key(Path::new("core/theme.js"));
+    let theme_js = mods.contains_key(&PathBuf::from(format!("{core_dir}/theme.js")));
     let mut manifest = Vec::new();
     let mut server_routes = Vec::new();
     let boot_url = urls.get(&boot).cloned().unwrap_or_else(|| "/assets/core/boot.js".into());
@@ -818,7 +819,14 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         w.write_client(&format!("client{html_url}"), doc.as_bytes(), prod);
 
         let initial: u64 = modules.iter().map(|m| gz.get(m).copied().unwrap_or(0)).sum();
-        let route_only: u64 = modules.iter().filter(|m| !rel_str(m).starts_with("core/")).map(|m| gz.get(m).copied().unwrap_or(0)).sum();
+        let route_only: u64 = modules
+            .iter()
+            .filter(|m| {
+                let s = rel_str(m);
+                !s.starts_with(".pragma/") && !s.starts_with("core/")
+            })
+            .map(|m| gz.get(m).copied().unwrap_or(0))
+            .sum();
         let total_css_gz = shared_css_gz + route_css_gz;
         report.css_gzip_bytes = report.css_gzip_bytes.max(total_css_gz);
         if !o.is_404 {
@@ -868,7 +876,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let has_public_md = p.public_files.iter().any(|f| f.extension().is_some_and(|e| e.eq_ignore_ascii_case("md")));
     report.has_server = !server_routes.is_empty();
     let emit_worker = report.has_server || has_public_md;
-    let handler = PathBuf::from("core/server/handler.js");
+    let handler = PathBuf::from(format!("{core_dir}/server/handler.js"));
     // no *.server.js: static-only app, no node in dev/serve (BUG-S-1); still emit Cloudflare worker
     // when public/**/*.md exists so Accept: text/markdown negotiation works on Cloudflare Workers.
     if emit_worker && opts.root.join(&handler).is_file() {
@@ -882,14 +890,16 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         }
         let mut entries = vec![handler.clone()];
         if report.has_server {
-            entries.push(PathBuf::from("core/server/node.mjs"));
+            entries.push(PathBuf::from(format!("{core_dir}/server/node.mjs")));
         }
         entries.extend(server_routes.iter().map(|r| r.1.clone()));
         entries.extend(script_ids.keys().cloned());
         entries.retain(|e| opts.root.join(e).is_file() || sources.contains_key(e));
         let smods = module_graph(&opts.root, &entries, false, &sources, &deps, &mut BTreeMap::new(), &mut diags);
         for (path, m) in &smods {
-            w.write(&format!("server/{}", rel_str(path)), m.src.as_bytes());
+            let rel = rel_str(path);
+            let out_rel = rel.strip_prefix(".pragma/").map_or_else(|| rel.clone(), |rest| format!("core/{rest}"));
+            w.write(&format!("server/{out_rel}"), m.src.as_bytes());
         }
         let mut worker = String::from("import { createHandler } from './core/server/handler.js'\n");
         for (i, r) in server_routes.iter().enumerate() {
@@ -929,7 +939,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         });
         w.write("server/wrangler.jsonc", serde_json::to_string_pretty(&wrangler).unwrap().as_bytes());
     } else if report.has_server {
-        diags.push(Diagnostic::error("core/server/handler.js", 1, 1, "app/structure", "core/server/handler.js not found; required by *.server.js"));
+        diags.push(Diagnostic::error(".pragma/server/handler.js", 1, 1, "app/structure", ".pragma/server/handler.js not found; required by *.server.js"));
     }
 
     for d in ["client", "server", "templates"] {

@@ -2,7 +2,7 @@
 
 OpenTelemetry on client and server, zero config. In page, component and store scripts use
 `log` from `pragma`; in `load` and server actions the `log` argument; in `utils/`
-`import { log } from '../core/log.js'`.
+`import { log } from '../.pragma/log.js'`.
 
 ```js
 import { call, params, log } from 'pragma'
