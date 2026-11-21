@@ -2,6 +2,10 @@ const D = Symbol(), S = Symbol(), L = Symbol(), NONE = { b: [] }
 // Outer scope of each open component; slot content (data-slot="n") uses the one n levels up.
 const outer = []
 let auto = 0
+// Open `data-self` roots (a component inside itself); more than SELF_DEPTH means the data never ends.
+export const SELF_DEPTH = 64
+let deep = 0
+const defs = new Map()
 
 export const hooks = { on() {}, enter: (el, s) => s, remove() {} }
 export const scopeOf = el => el[S]
@@ -41,6 +45,22 @@ export function template(v) {
 }
 
 const str = v => (v == null ? '' : String(v))
+
+// `:--name`: false, null, undefined and '' remove the property; a value that could add declarations is refused.
+function cssValue(v, name) {
+  if (v == null || v === false || v === '') return null
+  v = String(v)
+  if (!/[;{}<]/.test(v)) return v
+  if (self.__pragmaDev) fail(`:--${name} got "${v}": a CSS value cannot contain ; { } or <`)
+  return null
+}
+
+// A component inside itself: its root arrives empty and gets the body from the page's <template data-def>.
+function fillSelf(el, id) {
+  let t = defs.get(id)
+  if (!t?.isConnected) defs.set(id, (t = document.querySelector(`template[data-def="${CSS.escape(id)}"]`) ?? fail(`<${el.getAttribute('data-self')}> renders itself but the page has no <template data-def="${id}">`)))
+  el.append(...t.content.firstElementChild.cloneNode(true).childNodes)
+}
 
 function fill(s, t) {
   let o = t[0]
@@ -96,6 +116,7 @@ function parse(el) {
       case 'text': d.b.push([0, template(value)]); break
       case 'show': d.b.push([1, ...cond(value)]); break
       case 'attr-': d.b.push(value.includes('{') ? [4, template(value), 0, a] : [2, path(value), 0, a]); break
+      case 'var-': d.b.push([6, path(value), 0, a]); break
       case 'class-': d.b.push([3, ...cond(value), a]); break
       case 'with-': (d.w ??= []).push([a, path(value)]); break
       case 'on-': hooks.on(a); d.e = 1; break
@@ -104,10 +125,12 @@ function parse(el) {
         if (self.__pragmaDev && d.m[0] !== 'state' && d.m[0] !== 'shared') fail(`data-model only accepts state or shared: "${value}"`)
         hooks.on('input'); d.e = 1; break
       case 'c': d.x = 1; break
+      case 'self': d.r = 1; break
       case 'page': d.x = 2; break
       case 'slot': d.u = +value
     }
   }
+  if (d.r && !el.firstChild) fillSelf(el, el.getAttribute('data-c'))
   // `{path}` beside child elements: <!--{path}-->text<!--}-->; the text node between them is bound.
   // <!--n{path}--> is slot content: it belongs to the owner n components up.
   for (let n = el.firstChild, m; n; n = n.nextSibling) {
@@ -116,7 +139,7 @@ function parse(el) {
     if (t?.nodeType !== 3) n.after((t = document.createTextNode('')))
     d.b.push([5, path(m[2]), t, +m[1]])
   }
-  return (el[D] = d.b.length || d.w || d.e || d.x || d.u ? d : NONE)
+  return (el[D] = d.b.length || d.w || d.e || d.x || d.u || d.r ? d : NONE)
 }
 
 function bind(el, [t, p, n, a], s) {
@@ -127,6 +150,9 @@ function bind(el, [t, p, n, a], s) {
     if (el.getAttribute(a) !== (v = fill(s, p))) el.setAttribute(a, v)
   } else if (t === 5) {
     if (n.data !== (v = str(get(s, p)))) n.data = v
+  } else if (t === 6) {
+    v = cssValue(get(s, p), a)
+    if (el.style.getPropertyValue('--' + a) !== (v ?? '')) v == null ? el.style.removeProperty('--' + a) : el.style.setProperty('--' + a, v)
   } else if (t === 2) {
     v = get(s, p)
     v = v === false || v == null ? null : v === true ? '' : String(v)
@@ -171,6 +197,7 @@ function visit(el, s, d = el[D] ?? parse(el)) {
     for (const [a, p] of d.w) w[a] = get(s, p)
     s = Object.assign({ __proto__: s }, w)
   }
+  if (d.r && ++deep > SELF_DEPTH) fail(`<${el.getAttribute('data-self')}> is nested more than ${SELF_DEPTH} levels inside itself: stop the recursion on data (a tree without cycles, <if>/<for> around the self call)`)
   if (d.x === 1) outer.push(s)
   if (d.x) s = hooks.enter(el, s, d.x, w)
   for (const b of d.b) bind(el, b, b[0] === 5 && b[3] ? (outer.at(-b[3]) ?? s) : s)
@@ -178,6 +205,7 @@ function visit(el, s, d = el[D] ?? parse(el)) {
   if (el.firstElementChild) walk(el, s)
   if (d.m) model(el, s, d.m)
   if (d.x === 1) outer.pop()
+  if (d.r) deep--
 }
 
 function walk(parent, s) {
@@ -310,6 +338,7 @@ function list(t, d, s) {
 
 export function render(el, s) {
   outer.length = 0
+  deep = 0
   visit(el, s)
   settle()
 }

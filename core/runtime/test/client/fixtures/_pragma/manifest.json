@@ -13,5 +13,6 @@
   { "pattern": "/net", "html": "/net.html", "modules": ["/assets/net.js", "/assets/cart.js"], "loader": false, "ssr": false },
   { "pattern": "/gone", "html": "/gone.html", "modules": ["/assets/cart.js"], "loader": true, "ssr": false },
   { "pattern": "/missing", "html": "/missing.html", "modules": ["/assets/cart.js"], "loader": true, "ssr": false },
-  { "pattern": "/motion", "html": "/motion.html", "modules": ["/assets/motion.js", "/assets/cart.js"], "loader": false, "ssr": false }
+  { "pattern": "/motion", "html": "/motion.html", "modules": ["/assets/motion.js", "/assets/cart.js"], "loader": false, "ssr": false },
+  { "pattern": "/tree", "html": "/tree.html", "modules": ["/assets/tree.js", "/assets/node.js"], "loader": false, "ssr": false }
 ]

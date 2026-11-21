@@ -57,6 +57,9 @@ impl A11y<'_> {
         for n in nodes {
             let Node::Element(e) = n else { continue };
             let tpl = e.is("template");
+            if tpl && e.has("data-def") {
+                continue;
+            }
             let other_branch = tpl && (e.has("data-else-if") || e.has("data-else") || e.has("data-empty"));
             match before {
                 Some((h1, heading)) if other_branch => {

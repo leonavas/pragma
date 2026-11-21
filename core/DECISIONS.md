@@ -108,6 +108,13 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   Edge, Firefox and Safari, and limits are told before coding. *Why:* an agent asked for "a dropdown
   with HTML" shipped `appearance: base-select` (Chrome/Edge only) because it was "the simplest code
   that passes `pragma check`" and `c-dropdown` sends no form value.
+- **[firm]** (2026-11-21) A component may render itself (Svelte's `<svelte:self>`): only
+  directly, only inside `<if>`/`<for>`, only with a `<script>` (live props), never filling slots.
+  The build expands the body once more into a `<template data-def>`; each self call is an empty
+  root with `data-self`, filled by the runtime from it (guard: 64 levels). The server renders 12
+  levels (64 self calls per page) from the same ops; deeper levels render on the client. *Why:*
+  markdown and comment trees need recursion; components are build-time macros, so the open end must
+  be a runtime clone, and the closed rules turn infinite loops into build errors.
 - **[superseded]** "Component syntax" and "how JS finds nodes" (previously open): solved by
   directives.
 
@@ -207,6 +214,12 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   (SPEC §8). *Why:* CSS stops growing, agents already know the names, no naming decisions.
 - **[firm v0]** `base.css` (preflight + layers) and `lib/theme.css` (tokens and custom
   classes); dark theme via `[data-theme="dark"]` and `dark:`; one global hashed CSS.
+- **[firm]** (2026-11-21) Computed values (bar position, width, `--cols`, `--i/--n`) go through CSS
+  custom properties: `:--name="path"` sets `--name` (Svelte `style:--name`); the CSS reads
+  `var(--name)`. `false`/`null`/`undefined`/`""` remove it; a value with `;`, `{`, `}` or `<` is
+  refused (dev throws). Inline `style`, `:style` and arbitrary classes stay errors. *Why:* the style
+  stays in CSS files, one variable per value is easy for agents, and the value cannot add
+  declarations. The server writes `style="--name:value"` (HTML-escaped).
 - **[superseded]** "No Tailwind, preflight only" and "Tailwind v4 vs own CSS".
 - **[superseded]** Per-route CSS: v0 emits one global CSS (per-route CSS is out of v0).
 

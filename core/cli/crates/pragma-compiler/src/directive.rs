@@ -4,6 +4,8 @@
 pub enum Dir<'a> {
     Text,
     Attr(&'a str),
+    /// `:--name="path"`: CSS custom property `--name` on the element.
+    Var(&'a str),
     Class(&'a str),
     Show,
     If,
@@ -19,7 +21,7 @@ pub enum Dir<'a> {
     Close,
     /// `data-page`, `data-reload`, `data-theme`: markers without a path.
     Marker,
-    /// `data-c`, `data-tid`, `data-of`, `data-slot`, `data-prop-*`: written only by the build.
+    /// `data-c`, `data-tid`, `data-of`, `data-slot`, `data-self`, `data-def`, `data-prop-*`: written only by the build.
     Generated,
 }
 
@@ -228,11 +230,13 @@ pub fn parse(name: &str) -> Option<Option<Dir<'_>>> {
         "open" => Dir::Open,
         "close" => Dir::Close,
         "page" | "reload" | "theme" => Dir::Marker,
-        "c" | "tid" | "of" | "slot" => Dir::Generated,
+        "c" | "tid" | "of" | "slot" | "self" | "def" => Dir::Generated,
         _ if rest.starts_with("prop-") => Dir::Generated,
         _ => {
             if let Some(n) = rest.strip_prefix("attr-") {
                 Dir::Attr(n)
+            } else if let Some(n) = rest.strip_prefix("var-") {
+                Dir::Var(n)
             } else if let Some(n) = rest.strip_prefix("class-") {
                 Dir::Class(n)
             } else if let Some(n) = rest.strip_prefix("on-") {
@@ -244,8 +248,30 @@ pub fn parse(name: &str) -> Option<Option<Dir<'_>>> {
             }
         }
     };
-    let empty_arg = matches!(d, Dir::Attr("") | Dir::Class("") | Dir::On("") | Dir::With(""));
+    let empty_arg = matches!(d, Dir::Attr("") | Dir::Var("") | Dir::Class("") | Dir::On("") | Dir::With(""));
     Some(if empty_arg { None } else { Some(d) })
+}
+
+/// Name after `--` in `:--name`: lowercase kebab-case (HTML lowercases attribute names, CSS does not).
+pub fn is_css_var_name(s: &str) -> bool {
+    s.starts_with(|c: char| c.is_ascii_lowercase()) && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// `barLeft`, `bar_left` → `bar-left`.
+pub fn kebab(s: &str) -> String {
+    let mut out = String::new();
+    for c in s.chars() {
+        if c.is_ascii_uppercase() && !out.is_empty() && !out.ends_with('-') {
+            out.push('-');
+        }
+        out.push(if c == '_' { '-' } else { c.to_ascii_lowercase() });
+    }
+    out.trim_start_matches('-').to_string()
+}
+
+/// A CSS custom property value known at build time; `None` when it could add declarations or markup.
+pub fn css_value(v: &str) -> Option<&str> {
+    (!v.contains([';', '{', '}', '<'])).then_some(v.trim())
 }
 
 pub fn is_ident(s: &str) -> bool {
@@ -421,5 +447,21 @@ mod tests {
     #[test]
     fn generated_prop_attribute() {
         assert_eq!(parse("data-prop-step"), Some(Some(Dir::Generated)));
+        assert_eq!(parse("data-self"), Some(Some(Dir::Generated)));
+        assert_eq!(parse("data-def"), Some(Some(Dir::Generated)));
+    }
+
+    #[test]
+    fn css_variable_directive() {
+        assert_eq!(parse("data-var-left"), Some(Some(Dir::Var("left"))));
+        assert_eq!(parse("data-var-"), Some(None));
+        assert!(is_css_var_name("bar-left") && is_css_var_name("x2"));
+        assert_eq!(kebab("barLeft_x"), "bar-left-x");
+        assert!(!is_css_var_name("barLeft") && !is_css_var_name("-x") && !is_css_var_name("") && !is_css_var_name("a_b"));
+        assert_eq!(css_value("12.5"), Some("12.5"));
+        assert_eq!(css_value(" 4px "), Some("4px"));
+        for bad in ["1;color:red", "a{", "}", "<b>"] {
+            assert_eq!(css_value(bad), None, "{bad}");
+        }
     }
 }

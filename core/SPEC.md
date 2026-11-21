@@ -92,6 +92,7 @@ no arguments on each render (`$total`, `shared.cart.total`).
 |---|---|---|
 | `{p}` | text, attribute value | text (escaped); in an attribute, part of a string (`alt="Photo of {p.name}"`) |
 | `:<attribute>="p"` | element | whole attribute; `false`/`null`/`undefined` removes; `true` = empty |
+| `:--<name>="p"` | element or component tag (goes to its root) | CSS custom property `--name` (`style.setProperty`); `false`/`null`/`undefined`/`""` removes; a value with `;` `{` `}` `<` is refused (dev: error); name in lowercase kebab-case (`html/css-var`). Build: `data-var-<name>`; SSR: `["attr","style","--name:{p}"]` |
 | `.<class>="[!]p"` | element | toggles the class |
 | `:show="[!]p"` | element | `hidden` when false |
 | `:model="$p"` | input/select/textarea | two-way; only `$` or `shared` |
@@ -145,6 +146,13 @@ any ancestor up to `routes/`. 1 root element. Expanded at build (macro).
   (`$title` is replaced by its text); `:total="path"` is the caller's path. Falsy: missing,
   `""`, `"false"`; truthy: bare attribute or any other value.
 - `<slot></slot>` receives children; `<slot name="actions">` receives children with `slot="actions"`.
+- **Self call**: a component with a script may render itself, directly, inside `<if>`/`<for>`,
+  without slot content (`html/component` otherwise; indirect cycles too). The build emits the call
+  as its root with no children and `data-self="<tag>"`, and once per page a
+  `<template data-def="<data-c id>">` with the expanded body (at the end of the page content; at
+  the end of the body for layout components). The runtime fills an empty `data-self` root from it
+  and throws past 64 nested levels. SSR ops inline the body for 12 levels (64 calls per page); the
+  rest stays empty for the client.
 - The build marks the root with `data-c="x"` for `c-x`, and `data-c="x-<hash>"` for `p-x` (6 hex
   of the component folder path), so same-named private components in different folders never
   share CSS or the module lookup. The script loads only on pages using the component.

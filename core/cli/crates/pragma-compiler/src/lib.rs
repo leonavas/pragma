@@ -12,6 +12,8 @@ mod sugar;
 mod validate;
 mod webmcp;
 
+pub use compile::{SSR_SELF_CALLS, SSR_SELF_DEPTH};
+
 use pragma_diag::{Diagnostic, Severity};
 use pragma_jslint::script::{self, ScriptInfo, ScriptKind};
 use project::{Component, Page, Project, rel_str};

@@ -202,7 +202,14 @@ fn attrs(element: &mut Element, errors: &mut Vec<SugarError>) {
                 errors.push((attr.pos, "html/invalid-path", msg));
                 continue;
             }
-            if OLD_BLOCK.contains(&name) {
+            if let Some(var) = name.strip_prefix("--") {
+                let written = &attr.name[3..];
+                if !directive::is_css_var_name(written) {
+                    let fix = directive::kebab(written);
+                    errors.push((attr.pos, "html/css-var", format!("`:--{written}`: write the custom property name in lowercase kebab-case (`:--{fix}`), and the same name in CSS (`var(--{fix})`)")));
+                }
+                format!("data-var-{var}")
+            } else if OLD_BLOCK.contains(&name) {
                 let hint = if template || name != "key" { block_hint(name) } else { "<for x in path key=x.field>" };
                 errors.push((attr.pos, "html/legacy-syntax", format!("legacy syntax `{}`: use `{hint}`", attr.name)));
                 format!("data-{name}")
@@ -307,6 +314,7 @@ fn short_form(old: Dir) -> String {
         Dir::Empty => block_hint("empty").into(),
         Dir::Model => ":model".into(),
         Dir::Attr(name) | Dir::With(name) => format!(":{name}"),
+        Dir::Var(name) => format!(":--{name}"),
         Dir::Class(name) => format!(".{name}"),
         Dir::On(event) => format!("@{event}"),
         Dir::Open => "@open".into(),

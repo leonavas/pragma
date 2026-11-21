@@ -12,6 +12,7 @@ Pragma HTML uses a closed set of directives and block tags. Any other syntax is 
 |---|---|---|
 | `{path}` | Text, attribute string | Inserts escaped text (`<p>Hi {$name}</p>`, `alt="Photo of {p.name}"`, `href="/shop/{p.id}"`). |
 | `:<attr>="v"` | Element | Sets attribute (`:href`, `:disabled`, `:aria-current`). `false`/`null`/`undefined` removes it; `true` sets empty. `:checked` and `:selected` also set the DOM property. Never `:class`, `:style`, `:on*`. |
+| `:--<name>="v"` | Element, component tag | Sets the CSS variable `--name` (`:--left="bar.left"`). Numbers stay numbers; `false`/`null`/`undefined`/`""` removes it. Use it in CSS: `left: calc(var(--left) * 1%)` (`css.md`). |
 | `.<class>="[!]v"` | Element | Toggles the class. |
 | `:show="[!]v"` | Element | Sets `hidden` when falsy. |
 | `:model="$v"` | Input, select, textarea | Two-way binding (`$` or `shared` only). |
@@ -142,4 +143,5 @@ Compute every derived value in a script or store function (`const total = () => 
 - Allowed markers: `data-page` (root layout `<main>`), `data-reload` (full-load `<a>`). Never write `data-c`, `data-tid`, `data-of`, `data-slot`, or `data-prop-*`. `data-entering` and `data-leaving` are set by the runtime: use them only in CSS selectors.
 - Do not write `data-*` attributes by hand (`html/data-attribute`). Bind `:data-x="path"` for multi-value style hooks (`[data-x=value]`), `.name="path"` for on/off states, and role/label/id for tests.
 - `:text` is removed (`html/text-removed`); use `{path}` inside the element.
-- Forbidden: inline `style` and `on*`, `:class`, `{{ }}`/`${ }` outside direct `<code>`/`<pre>` text (`html/interpolation`), legacy `state.`/`props.`, and foreign directives (`v-if`, `x-show`, `on:click`, `*ngIf`, `[disabled]`: `html/unknown-directive`).
+- Computed sizes, positions, colors, and counts go in CSS variables: `:--x="path"` on the element, `var(--x)` in CSS (`css.md`). Write the name in lowercase kebab-case (`:--bar-left`, `html/css-var`). A value with `;`, `{`, `}`, or `<` is refused.
+- Forbidden: inline `style` and `on*`, `:style`, `:class`, `{{ }}`/`${ }` outside direct `<code>`/`<pre>` text (`html/interpolation`), legacy `state.`/`props.`, and foreign directives (`v-if`, `x-show`, `on:click`, `*ngIf`, `[disabled]`: `html/unknown-directive`).

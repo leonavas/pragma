@@ -78,6 +78,36 @@ Usage:
 </for>
 ```
 
+## Recursive components (trees)
+
+A component can render itself to show a tree (markdown nodes, nested comments, folders). Put the self call inside `<if>` or `<for>`, so the recursion stops when the data ends.
+
+`lib/components/md-node/md-node.html`:
+```html
+<script>
+  export let node = null
+</script>
+
+<span>
+  <if $node.text>
+    <span>{$node.text}</span>
+  </if>
+  <else-if $node.strong>
+    <strong><for child in $node.children key=child.id><c-md-node :node="child"></c-md-node></for></strong>
+  </else-if>
+  <else>
+    <span><for child in $node.children key=child.id><c-md-node :node="child"></c-md-node></for></span>
+  </else>
+</span>
+```
+
+Usage: `<c-md-node :node="data.message.body"></c-md-node>`.
+
+- The component needs a `<script>` with `export let` props.
+- Call only itself (`<c-a>` inside `<c-a>`). A cycle through another component (`<c-a>` → `<c-b>` → `<c-a>`) is an error.
+- The self call cannot fill slots. Pass data with props.
+- The data must end: more than 64 levels throws an error. With `ssr`, the server renders the first 12 levels; the browser renders the rest.
+
 ## Slots
 
 ```html

@@ -239,7 +239,7 @@ impl FileCheck<'_> {
             let an = a.name.to_ascii_lowercase();
             let v = a.value.as_deref().unwrap_or("");
             if an == "style" {
-                self.err(a.pos, "html/style-inline", "the style attribute is not allowed; use classes");
+                self.err(a.pos, "html/style-inline", format!("the style attribute is not allowed; use classes, and for a computed value (position, size, color) {CSS_VAR_FIX}"));
                 continue;
             }
             if let Some(m) = foreign_directive(&an) {
@@ -414,7 +414,7 @@ impl FileCheck<'_> {
             }
             Dir::Attr(n) => {
                 if n == "style" {
-                    self.err(pos, "html/style-inline", ":style is not allowed: toggle a class with .name=\"path\" (e.g. .hidden=\"$closed\"); for a value with many options bind :data-x=\"path\" and style [data-x=value] in CSS");
+                    self.err(pos, "html/style-inline", format!(":style is not allowed: toggle a class with .name=\"path\" (e.g. .hidden=\"$closed\"); for a value with many options bind :data-x=\"path\" and style [data-x=value] in CSS; for a computed value {CSS_VAR_FIX}"));
                 } else if let Some(ev) = n.strip_prefix("on") {
                     self.err(pos, "html/on-inline", format!(":{n} is not allowed; use @{ev}=\"action\""));
                 } else if n == "class" {
@@ -424,6 +424,7 @@ impl FileCheck<'_> {
                     self.path(pos, &p, false, true);
                 }
             }
+            Dir::Var(_) => self.path(pos, v, false, true),
             Dir::Model => {
                 if !matches!(name, "input" | "select" | "textarea") {
                     self.err(pos, "html/unknown-directive", ":model only on input, select and textarea");
@@ -503,6 +504,8 @@ impl FileCheck<'_> {
     }
 }
 
+const CSS_VAR_FIX: &str = "bind a CSS variable with `:--name=\"path\"` and use it in a CSS rule (`.bar { left: calc(var(--x) * 1%) }` with `:--x=\"$left\"`)";
+
 const ALPINE: &[&str] = &[
     "data", "init", "show", "bind", "on", "text", "html", "model", "modelable", "for", "if", "transition", "effect", "ignore",
     "ref", "cloak", "teleport", "id", "intersect", "mask", "trap", "collapse", "anchor", "sort", "resize",
@@ -563,7 +566,8 @@ fn foreign_directive(name: &str) -> Option<String> {
         ("model" | "modelable", _) => "use `:model=\"$path\"` on input, select or textarea".into(),
         ("bind", "") => "use `:<attribute>=\"path\"`".into(),
         ("bind", "class") | ("class", "") => "use `class=\"…\"` for static classes and `.<class>=\"path\"` to toggle one".into(),
-        ("bind", "style") | ("style", _) => "use classes; toggle one with `.<class>=\"path\"`".into(),
+        ("style", v) if v.starts_with("--") => format!("use `:{v}=\"path\"` and read it in CSS with `var({v})`"),
+        ("bind", "style") | ("style", _) => format!("use classes (toggle one with `.<class>=\"path\"`); for a computed value {CSS_VAR_FIX}"),
         ("bind", a) => format!("use `:{a}=\"path\"`"),
         ("on", "") => "use `@<event>=\"action\"`".into(),
         ("on", ev) => format!("use `@{ev}=\"action\"`"),

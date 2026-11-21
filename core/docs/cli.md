@@ -52,9 +52,10 @@ Fix the root cause; do not work around a rule.
 | `html/duplicate-module` | Use inline `<script>`/`<style>` or external `x.js`/`x.css`, not both. |
 | `html/component`, `html/unknown-component` | Follow component rules (`components.md`). |
 | `html/layout`, `html/title`, `html/head` | Follow layout and SEO rules (`routes.md`). |
+| `html/css-var` | Write `:--name` in lowercase kebab-case. A static value cannot contain `;`, `{`, `}`, or `<` (`css.md`). |
 | `html/class` | Toggle classes with `.name="path"`. Do not use `:class` or `{}` in `class` (`syntax.md`). |
 | `html/interpolation` | Replace `{{ }}` and `${ }` with `{path}` (`syntax.md`). |
-| `html/script`, `html/style-inline`, `html/on-inline` | Put at most one `<script>` (optional `type="module"`) and one `<style>` at the top level of a page or component `.html`. Put JSON-LD `<script type="application/ld+json">` only at the top level of a page (`routes.md`). |
+| `html/script`, `html/style-inline`, `html/on-inline` | Put at most one `<script>` (optional `type="module"`) and one `<style>` at the top level of a page or component `.html`. Replace `style="..."` with classes, or with `:--name="path"` and `var(--name)` in CSS (`css.md`). Put JSON-LD `<script type="application/ld+json">` only at the top level of a page (`routes.md`). |
 | `html/json-ld` | Fix invalid JSON or unclosed `{` in JSON-LD strings. Use `{` for a literal brace. |
 | `css/unknown-class`, `css/arbitrary-value` | Use classes from `classes.md` or custom classes per `css.md`. |
 | `app/structure`, `app/route-conflict` | Follow structure and route rules (`structure.md`, `routes.md`). |

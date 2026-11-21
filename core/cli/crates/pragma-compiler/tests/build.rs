@@ -1683,3 +1683,99 @@ fn pragma_server_is_server_only() {
     let d = check_with(&[("routes/index.js", Some("import { redirect } from 'pragma/server'\n\nexport const go = () => redirect(303, '/')\n"))]);
     assert!(message(&d, "js/import").contains("only for .server.js files"));
 }
+
+#[test]
+fn css_variable_binding() {
+    let t = app_with(&[
+        ("lib/components/bar/bar.html", Some("<div class=\"bar\" :--left=\"$left\" :--tone=\"$tone\"></div>")),
+        ("lib/components/meter/meter.html", Some("<script>\n  export let share = 0\n</script>\n<span class=\"meter\" :--share=\"$share\"></span>")),
+        ("lib/theme.css", Some("@layer components {\n  .btn { padding: 0.5rem 1rem; }\n  .tag, .active { font-size: .75rem; }\n  .bar, .meter, .row { left: calc(var(--left) * 1%); width: calc(var(--share) * 1%); }\n}\n")),
+        ("routes/bars.html", Some("<title>Bars</title>\n<script>\n  let rows = [{ id: 1, left: 10 }]\n</script>\n<ul>\n  <for row in $rows key=row.id><li class=\"row\" :--left=\"row.left\"><c-meter :share=\"row.left\" :--left=\"row.left\"></c-meter></li></for>\n</ul>\n<c-bar left=\"30\" tone=\"false\"></c-bar>")),
+    ]);
+    let app = t.0.join("app");
+    let d = check(&app);
+    assert!(d.is_empty(), "{d:#?}");
+    let out = t.0.join("dev");
+    build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let html = fs::read_to_string(out.join("client/bars.html")).unwrap();
+    assert!(html.contains("<li class=\"row\" data-var-left=\"row.left\">"), "{html}");
+    assert!(html.contains("data-var-share=\"state.share\"") && html.contains("data-with-share=\"row.left\" data-var-left=\"row.left\""), "{html}");
+    assert!(html.contains("<div data-c=\"bar\" class=\"bar\" style=\"--left:30\"></div>"), "{html}");
+}
+
+#[test]
+fn css_variable_rules() {
+    let d = page("<p :--barLeft=\"query.x\">x</p>");
+    expect(&d, "html/css-var", PAGE, 1);
+    assert!(message(&d, "html/css-var").contains("`:--bar-left`"), "{d:#?}");
+    let d = check_with(&[("lib/components/bar/bar.html", Some("<div :--left=\"$left\"></div>")), (PAGE, Some("<c-bar left=\"1;color:red\"></c-bar>"))]);
+    expect(&d, "html/css-var", "lib/components/bar/bar.html", 1);
+    let d = page("<p style=\"left: 3%\">x</p>\n<p :style=\"$css\">y</p>\n<p style:--x=\"a\">z</p>");
+    let styles: Vec<&Diagnostic> = d.iter().filter(|x| x.rule == "html/style-inline").collect();
+    assert_eq!(styles.len(), 2, "{d:#?}");
+    assert!(styles.iter().all(|x| x.message.contains(":--name=\"path\"") && x.message.contains("var(--x)")), "{d:#?}");
+    assert!(message(&d, "html/unknown-directive").contains(":--x=\"path\""), "{d:#?}");
+    expect(&page("<p :--x=\"!data.x\">x</p>"), "html/invalid-path", PAGE, 1);
+}
+
+const TREE_JS: &str = "export let node = null\n";
+const TREE_HTML: &str = "<li class=\"tag\"><span>{$node.name}</span><ul><for child in $node.children key=child.id><c-tree :node=\"child\" :--depth=\"child.depth\"></c-tree></for></ul></li>";
+
+#[test]
+fn component_renders_itself() {
+    let t = app_with(&[
+        ("lib/components/tree/tree.html", Some(TREE_HTML)),
+        ("lib/components/tree/tree.js", Some(TREE_JS)),
+        ("routes/blog/[slug].html", Some("<title>Post</title>\n<ul><c-tree :node=\"data.post.root\"></c-tree></ul>")),
+        ("routes/blog/[slug].js", None),
+    ]);
+    let app = t.0.join("app");
+    let d = check(&app);
+    assert!(d.is_empty(), "{d:#?}");
+    let out = t.0.join("dev");
+    build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let html = fs::read_to_string(out.join("client/blog/[slug].html")).unwrap();
+    let stub = "<li data-c=\"tree\" data-self=\"c-tree\" class=\"tag\" data-with-node=\"child\" data-var-depth=\"child.depth\"></li>";
+    assert_eq!(html.matches(stub).count(), 2, "one in the page, one in the definition: {html}");
+    let def = html.split("<template data-def=\"tree\">").nth(1).expect("definition");
+    assert!(def.starts_with("<li data-c=\"tree\" class=\"tag\"><span data-text=\"{state.node.name}\"></span><ul><template data-for=\"child in state.node.children\""), "{def}");
+    assert!(html.find("<template data-def").unwrap() < html.find("</main>").unwrap(), "the definition goes with the page: {html}");
+    let ops = fs::read_to_string(out.join("templates/blog/[slug].json")).unwrap();
+    assert_eq!(ops.matches("[\"node\",\"path\",\"child\"]").count(), pragma_compiler::SSR_SELF_DEPTH, "{ops}");
+}
+
+#[test]
+fn component_renders_itself_errors() {
+    let tree = |html: &str, js: Option<&str>| {
+        let mut files = vec![("lib/components/tree/tree.html", Some(html)), (PAGE, Some("<c-tree></c-tree>"))];
+        files.extend(js.map(|js| ("lib/components/tree/tree.js", Some(js))));
+        check_with(&files)
+    };
+    let d = tree("<div><c-tree></c-tree></div>", Some(TREE_JS));
+    expect(&d, "html/component", "lib/components/tree/tree.html", 1);
+    assert!(message(&d, "html/component").contains("never stops"), "{d:#?}");
+    let d = tree("<div><if query.open><c-tree></c-tree></if></div>", None);
+    assert!(message(&d, "html/component").contains("add a <script>"), "{d:#?}");
+    let d = tree("<div><if $node><c-tree><p>x</p></c-tree></if></div>", Some(TREE_JS));
+    assert!(message(&d, "html/component").contains("cannot fill slots"), "{d:#?}");
+    let d = check_with(&[
+        ("lib/components/aa/aa.html", Some("<div><if $node><c-bb></c-bb></if></div>")),
+        ("lib/components/aa/aa.js", Some(TREE_JS)),
+        ("lib/components/bb/bb.html", Some("<div><c-aa></c-aa></div>")),
+        (PAGE, Some("<c-aa></c-aa>")),
+    ]);
+    expect(&d, "html/component", "lib/components/bb/bb.html", 1);
+    assert!(message(&d, "html/component").contains("aa → bb → aa"), "{d:#?}");
+}
+
+#[test]
+fn markdown_tree_example_from_the_docs() {
+    let docs = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../docs/components.md")).unwrap();
+    let html = docs.split("`lib/components/md-node/md-node.html`:\n```html\n").nth(1).and_then(|s| s.split("```").next()).unwrap();
+    let d = check_with(&[
+        ("lib/components/md-node/md-node.html", Some(html)),
+        ("routes/blog/[slug].html", Some("<title>Post</title>\n<c-md-node :node=\"data.post.body\"></c-md-node>")),
+        ("routes/blog/[slug].js", None),
+    ]);
+    assert!(d.is_empty(), "{d:#?}");
+}

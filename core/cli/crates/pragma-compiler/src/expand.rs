@@ -58,6 +58,10 @@ pub struct Expander<'p> {
     in_layout: bool,
     stack: Vec<&'p Path>,
     scripts: &'p HashMap<PathBuf, ScriptInfo>,
+    /// `<if>`/`<for>` blocks open around the current point of the innermost component.
+    blocks: usize,
+    /// Body of each component that renders itself, by `data-c` id (`None` while it is built).
+    defs: BTreeMap<String, Option<Element>>,
 }
 
 fn first_element(nodes: &[Node]) -> Option<&Element> {
@@ -65,7 +69,7 @@ fn first_element(nodes: &[Node]) -> Option<&Element> {
 }
 
 fn has_runtime_directive(e: &Element) -> bool {
-    let runtime = |a: &Attr| matches!(directive::parse(&a.name.to_ascii_lowercase()), Some(Some(Dir::Text | Dir::Show | Dir::Attr(_) | Dir::Class(_) | Dir::If | Dir::ElseIf | Dir::For | Dir::On(_) | Dir::Model)));
+    let runtime = |a: &Attr| matches!(directive::parse(&a.name.to_ascii_lowercase()), Some(Some(Dir::Text | Dir::Show | Dir::Attr(_) | Dir::Var(_) | Dir::Class(_) | Dir::If | Dir::ElseIf | Dir::For | Dir::On(_) | Dir::Model)));
     e.attrs.iter().any(runtime) || e.element_children().any(has_runtime_directive)
 }
 
@@ -91,7 +95,7 @@ fn collect_slots(nodes: &[Node], out: &mut BTreeSet<String>) {
 
 impl<'p> Expander<'p> {
     pub fn new(p: &'p Project, scripts: &'p HashMap<PathBuf, ScriptInfo>) -> Self {
-        Expander { p, diags: Vec::new(), used: BTreeMap::new(), layout_used: BTreeSet::new(), in_layout: false, stack: Vec::new(), scripts }
+        Expander { p, diags: Vec::new(), used: BTreeMap::new(), layout_used: BTreeSet::new(), in_layout: false, stack: Vec::new(), scripts, blocks: 0, defs: BTreeMap::new() }
     }
 
     fn err(&mut self, pos: Pos, rule: &'static str, msg: impl Into<String>) {
@@ -132,6 +136,7 @@ impl<'p> Expander<'p> {
                 }
             }
         }
+        page_nodes.extend(self.take_defs());
         let mut head = Vec::new();
         let mut body = Vec::new();
         if let Some(l) = p.layout {
@@ -151,6 +156,7 @@ impl<'p> Expander<'p> {
             let lsc = Scope { from: Path::new("routes"), props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: 0 };
             self.in_layout = true;
             body = self.expand_nodes(&rest, &lsc);
+            body.extend(self.take_defs());
             self.in_layout = false;
             if page.css.is_some() {
                 name_page_main(&mut body, &page.out_name);
@@ -158,6 +164,11 @@ impl<'p> Expander<'p> {
         }
         merge_head(&mut head, own_head);
         (Expanded { head, body, page: page_nodes, components: self.used, layout_components: self.layout_used }, self.diags)
+    }
+
+    /// `<template data-def="id">` of each component that rendered itself, for the runtime to clone.
+    fn take_defs(&mut self) -> Vec<Node> {
+        std::mem::take(&mut self.defs).into_values().flatten().flat_map(|t| [Node::Text("\n".into(), t.pos), Node::Element(t)]).collect()
     }
 
     fn resolve(&self, v: &str, sc: &Scope) -> Res {
@@ -311,6 +322,7 @@ impl<'p> Expander<'p> {
         let mut text: Option<String> = None;
         let mut classes: Vec<String> = Vec::new();
         let mut hidden = false;
+        let mut vars: Vec<String> = Vec::new();
         let mut for_var: Option<String> = None;
         for a in &e.attrs {
             let lname = a.name.to_ascii_lowercase();
@@ -350,7 +362,7 @@ impl<'p> Expander<'p> {
                 _ => {}
             }
             let res = match d {
-                Dir::Show | Dir::Attr(_) | Dir::Class(_) | Dir::If | Dir::ElseIf | Dir::Model => self.resolve(v, sc),
+                Dir::Show | Dir::Attr(_) | Dir::Var(_) | Dir::Class(_) | Dir::If | Dir::ElseIf | Dir::Model => self.resolve(v, sc),
                 Dir::For => {
                     if let Some((var, path)) = directive::parse_for(v) {
                         for_var = Some(var.to_string());
@@ -379,6 +391,14 @@ impl<'p> Expander<'p> {
                             }
                         }
                         Dir::Show => hidden |= prop_truthy(&prop) == neg,
+                        Dir::Var(n) => {
+                            if let Some(value) = prop.map(|p| p.unwrap_or_else(|| "true".into())).filter(|p| p != "false" && !p.is_empty()) {
+                                match directive::css_value(&value) {
+                                    Some(value) => vars.push(format!("--{n}:{value}")),
+                                    None => self.err(a.pos, "html/css-var", format!(":--{n} gets \"{value}\": a CSS value cannot contain ; {{ }} or <")),
+                                }
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -387,6 +407,9 @@ impl<'p> Expander<'p> {
         if !classes.is_empty() {
             merge_class(&mut el, &classes.join(" "));
         }
+        if !vars.is_empty() {
+            el.attrs.push(Attr { name: "style".into(), value: Some(vars.join(";")), pos: e.pos });
+        }
         if hidden && !el.has("hidden") {
             el.attrs.push(Attr { name: "hidden".into(), value: None, pos: e.pos });
         }
@@ -394,6 +417,8 @@ impl<'p> Expander<'p> {
             let tid = self.tid(e.pos, sc.inst);
             el.attrs.push(Attr { name: "data-tid".into(), value: Some(tid), pos: e.pos });
         }
+        let block = el.is("template") && crate::validate::BLOCKS.iter().any(|b| el.has(b));
+        self.blocks += usize::from(block);
         el.children = match text {
             Some(t) => vec![Node::Text(t, e.pos)],
             None => match for_var.filter(|v| sc.aliases.contains_key(v)) {
@@ -405,6 +430,7 @@ impl<'p> Expander<'p> {
                 None => self.expand_nodes(&e.children, sc),
             },
         };
+        self.blocks -= usize::from(block);
         el
     }
 
@@ -422,8 +448,12 @@ impl<'p> Expander<'p> {
             self.err(e.pos, "html/unknown-component", msg);
             return Vec::new();
         };
-        if self.stack.contains(&comp.dir.as_path()) {
-            self.err(e.pos, "html/component", format!("component <{tag}> uses itself (cycle)"));
+        let recursive = self.stack.last() == Some(&comp.dir.as_path());
+        if !recursive && self.stack.contains(&comp.dir.as_path()) {
+            let start = self.stack.iter().position(|d| *d == comp.dir.as_path()).unwrap_or(0);
+            let names: Vec<String> = self.stack[start..].iter().chain([&comp.dir.as_path()]).map(|d| d.file_name().map_or(String::new(), |n| n.to_string_lossy().into_owned())).collect();
+            let msg = format!("component <{tag}> uses itself through other components ({}); only direct recursion works: let <{tag}> render <{tag}> inside <if> or <for>", names.join(" → "));
+            self.err(e.pos, "html/component", msg);
             return Vec::new();
         }
         let mut props: Props = HashMap::new();
@@ -494,6 +524,9 @@ impl<'p> Expander<'p> {
                 n => slots.entry(String::new()).or_default().push(n),
             }
         }
+        if recursive && !self.self_call_ok(e, comp, &tag, &slots) {
+            return Vec::new();
+        }
         let tree = &p.trees[comp.html as usize];
         let mut names = BTreeSet::new();
         collect_slots(tree, &mut names);
@@ -511,9 +544,17 @@ impl<'p> Expander<'p> {
         h.write(&e.pos.line.to_le_bytes());
         h.write(&e.pos.col.to_le_bytes());
         let inner = Scope { from: &comp.scope, props: Some(&props), aliases, bound_props, script: comp.module.is_some(), slots: Some(&slots), inst: h.finish() };
-        self.stack.push(&comp.dir);
-        let mut nodes = self.expand_nodes(std::slice::from_ref(root), &inner);
-        self.stack.pop();
+        let mut nodes = match root {
+            Node::Element(r) if recursive => self.expand_nodes(&[Node::Element(Element { children: Vec::new(), ..r.clone() })], &inner),
+            _ => {
+                self.stack.push(&comp.dir);
+                let outer_blocks = std::mem::replace(&mut self.blocks, 0);
+                let nodes = self.expand_nodes(std::slice::from_ref(root), &inner);
+                self.blocks = outer_blocks;
+                self.stack.pop();
+                nodes
+            }
+        };
         match self.used.get(&comp.id) {
             Some(prev) if prev.dir != comp.dir => {
                 let msg = format!("two components with the id \"{}\" on the same page ({} and {}); rename one", comp.id, rel_str(&prev.dir), rel_str(&comp.dir));
@@ -529,6 +570,9 @@ impl<'p> Expander<'p> {
         let mut dup = Vec::new();
         if let Some(Node::Element(r)) = nodes.iter_mut().find(|n| matches!(n, Node::Element(_))) {
             r.attrs.insert(0, Attr { name: "data-c".into(), value: Some(comp.id.clone()), pos: r.pos });
+            if recursive {
+                r.attrs.insert(1, Attr { name: "data-self".into(), value: Some(tag.clone()), pos: r.pos });
+            }
             if comp.module.is_some() {
                 for (k, v) in static_props {
                     r.attrs.push(Attr { name: format!("data-prop-{k}"), value: Some(v), pos: r.pos });
@@ -549,6 +593,53 @@ impl<'p> Expander<'p> {
             self.err(a.pos, "html/component", format!("{} already exists on the root of <{tag}>", a.name));
         }
         nodes
+    }
+}
+
+/// Components that render themselves (Svelte's `<svelte:self>`): the call inside the component becomes
+/// an empty root marked `data-self`, and the runtime fills it from the page's `<template data-def>`.
+impl<'p> Expander<'p> {
+    fn self_call_ok(&mut self, e: &Element, comp: &'p Component, tag: &str, slots: &Slots) -> bool {
+        let fix = format!("put <{tag}> inside <if> or <for> so the recursion stops on data (e.g. <for child in $node.children key=child.id><{tag} :node=\"child\"></{tag}></for>)");
+        if comp.module.is_none() {
+            self.err(e.pos, "html/component", format!("<{tag}> renders itself, so its props must be live: add a <script> with `export let` props (props of a component without a script are fixed at build time)"));
+            return false;
+        }
+        if self.blocks == 0 {
+            self.err(e.pos, "html/component", format!("<{tag}> renders itself on every render, so it never stops: {fix}"));
+            return false;
+        }
+        if slots.values().flatten().any(|n| !is_blank(n)) {
+            self.err(e.pos, "html/component", format!("<{tag}> inside itself cannot fill slots; pass data with props (:node=\"child\")"));
+            return false;
+        }
+        self.def(comp);
+        true
+    }
+
+    /// Expands the component once with live props and no slot content: the body each self call clones.
+    fn def(&mut self, comp: &'p Component) {
+        if self.defs.contains_key(&comp.id) {
+            return;
+        }
+        self.defs.insert(comp.id.clone(), None);
+        let Some(root) = self.p.trees[comp.html as usize].iter().find(|n| matches!(n, Node::Element(_))) else { return };
+        let (props, slots) = (Props::new(), Slots::new());
+        let mut h = Fnv::new();
+        h.write(comp.id.as_bytes());
+        let inner = Scope { from: &comp.scope, props: Some(&props), aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: h.finish() };
+        let reported = self.diags.len();
+        self.stack.push(&comp.dir);
+        let outer_blocks = std::mem::replace(&mut self.blocks, 0);
+        let nodes = self.expand_nodes(std::slice::from_ref(root), &inner);
+        self.blocks = outer_blocks;
+        self.stack.pop();
+        self.diags.truncate(reported);
+        let Some(Node::Element(mut r)) = nodes.into_iter().find(|n| matches!(n, Node::Element(_))) else { return };
+        r.attrs.insert(0, Attr { name: "data-c".into(), value: Some(comp.id.clone()), pos: r.pos });
+        let pos = r.pos;
+        let def = Element { name: "template".into(), attrs: vec![Attr { name: "data-def".into(), value: Some(comp.id.clone()), pos }], children: vec![Node::Element(r)], pos };
+        self.defs.insert(comp.id.clone(), Some(def));
     }
 }
 
@@ -822,7 +913,7 @@ impl Scoped<'_> {
                         self.path(a.pos, &p, vars, &owner, in_page);
                     }
                 }
-                Dir::Show | Dir::If | Dir::ElseIf | Dir::Model => self.path(a.pos, v, vars, &owner, in_page),
+                Dir::Show | Dir::Var(_) | Dir::If | Dir::ElseIf | Dir::Model => self.path(a.pos, v, vars, &owner, in_page),
                 Dir::Class(c) => {
                     if class_in_page {
                         self.page_classes.insert(c.to_string());
