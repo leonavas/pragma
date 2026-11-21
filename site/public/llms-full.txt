@@ -1670,7 +1670,7 @@ Fix the root cause; do not work around a rule.
 | Rule | Fix |
 |---|---|
 | `js/syntax`, `html/syntax`, `css/syntax` | Write valid syntax. Close every non-void HTML tag. |
-| `js/html-in-js` | Remove `innerHTML`, `createElement`, `document.write`. Put markup in `.html`. |
+| `js/html-in-js` | Remove `innerHTML`, `createElement`, `document.write`. Put markup in `.html`. Strings with markup are allowed only in `.server.js` (e-mail bodies, LLM prompts). |
 | `js/console` | Use `log.*` (`logs.md`). |
 | `js/jsdoc-types` | Remove TypeScript and JSDoc types. |
 | `js/import` | Import only project files, `.pragma/`, and `package.json` dependencies (`packages.md`). Pass a quoted specifier to `import()` (`import('./chart.js')`), never a variable or `${}`. |

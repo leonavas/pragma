@@ -476,3 +476,6 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - [ ] Measure LCP, INP and navigation on simulated slow 4G, with the `tests_1` bench, against
       SvelteKit with prerender or SSR.
 - [ ] Out of v0 (SPEC §13): SSG with data, nested layouts, `[...rest]`, Speculation Rules, i18n.
+
+- **[firm]** `js/html-in-js` string checks apply only to client code. `.server.js` strings may hold markup that never reaches the page DOM (e-mail bodies, LLM prompt tags). DOM APIs (`innerHTML`, `createElement`) stay errors everywhere.
+- **[firm]** `waitUntil` flushes the request logs again when its promise settles, so logs written after the response (background agent turns, e-mails) are not lost.

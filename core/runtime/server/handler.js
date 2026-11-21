@@ -180,10 +180,9 @@ export function createHandler({ routes, middleware, service }) {
           }
         },
         waitUntil(promise) {
-          const tracked = Promise.resolve(promise).catch((err) => {
-            log.error('waitUntil failed', err)
-            return flush(log.records.splice(0), env)
-          })
+          const tracked = Promise.resolve(promise)
+            .catch((err) => log.error('waitUntil failed', err))
+            .then(() => flush(log.records.splice(0), env))
           if (ctx?.waitUntil) ctx.waitUntil(tracked)
         },
       }

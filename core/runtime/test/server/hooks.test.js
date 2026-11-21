@@ -333,3 +333,21 @@ test('waitUntil hands the promise to ctx and logs a rejection', async (t) => {
   assert.ok(waited.length >= 1)
   assert.ok(lines.some((l) => l.body === 'waitUntil failed' && l.attributes['exception.message'] === 'email down'))
 })
+
+test('waitUntil flushes logs written after the response', async (t) => {
+  const lines = []
+  t.mock.method(console, 'log', (line) => lines.push(JSON.parse(line)))
+  const waited = []
+  const handler = app({
+    server: {
+      load({ waitUntil, log }) {
+        waitUntil(new Promise((resolve) => setTimeout(resolve, 5)).then(() => log.info('turn finished')))
+        return {}
+      },
+    },
+  })
+  await call(handler, '/_data/account', undefined, { waitUntil: (p) => waited.push(p) })
+  assert.ok(!lines.some((l) => l.body === 'turn finished'))
+  await Promise.all(waited)
+  assert.ok(lines.some((l) => l.body === 'turn finished'))
+})

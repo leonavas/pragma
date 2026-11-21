@@ -382,3 +382,10 @@ fn server_context_short_names_are_allowed() {
     assert_eq!(rules("export function readBindings({ env, db, kv }) {\n  return [env, db, kv]\n}\n"), Vec::<&str>::new());
     assert_eq!(rules("const xy = 1"), vec!["js/vague-name"]);
 }
+
+#[test]
+fn server_strings_may_hold_markup() {
+    let src = "export const corpo = `<p>Olá ${nome}</p>`\nexport const prompt = '<contexto_turno>'";
+    assert_eq!(diags("routes/_servidor/email.server.js", src, &APP), vec![]);
+    assert_eq!(diags("routes/x.server.js", "el.innerHTML = corpo", &APP), vec![(1, 4, "js/html-in-js")]);
+}

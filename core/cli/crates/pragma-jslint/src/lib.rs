@@ -297,8 +297,9 @@ impl<'a> Visit<'a> for Linter<'_> {
         }
     }
 
+    // Server strings may hold markup that never reaches the page DOM: e-mail bodies, LLM prompts.
     fn visit_string_literal(&mut self, it: &StringLiteral<'a>) {
-        if it.value.as_str().is_some_and(has_markup) {
+        if !self.server && it.value.as_str().is_some_and(has_markup) {
             self.report(
                 it.span,
                 RULE_HTML,
@@ -308,6 +309,10 @@ impl<'a> Visit<'a> for Linter<'_> {
     }
 
     fn visit_template_literal(&mut self, it: &TemplateLiteral<'a>) {
+        if self.server {
+            walk::walk_template_literal(self, it);
+            return;
+        }
         if let Some(quasi) = it.quasis.iter().find(|q| has_markup(q.value.raw.as_str())) {
             self.report(
                 quasi.span,
