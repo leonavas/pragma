@@ -1787,7 +1787,7 @@ Every `<form>` is an agent tool (`webmcp.md`).
 | Path | Use |
 |---|---|
 | `client/` | HTML per route and assets. |
-| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest and serves `_404.html` with 404). Emitted when the app has a `*.server.js` or a `public/**/*.md`. `run_worker_first` sends every request, also prebuilt pages, through the worker, so middleware runs for them. |
+| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest and serves `_404.html` with 404). Emitted when the app has a `*.server.js` or a `public/**/*.md`. `run_worker_first` sends every request, also prebuilt pages, through the worker, so middleware runs for them. `html_handling: "drop-trailing-slash"` serves `/a/index.html` at `/a` (200, no redirect to `/a/`). |
 | `server/node.mjs` | Run `node dist/server/node.mjs` (reads `PORT`, default 3000). Emitted when the app has a `*.server.js`. |
 
 Every server (`dev`, `serve`, Workers, Node) returns the matching `.md` from `public/` when `Accept` prefers `text/markdown` (`webmcp.md`).
@@ -1824,7 +1824,7 @@ Wrangler prints the URL. Then check:
   "name": "my-app",
   "main": "dist/server/worker.js",
   "compatibility_date": "2025-11-01",
-  "assets": { "directory": "dist/client", "binding": "ASSETS", "run_worker_first": true },
+  "assets": { "directory": "dist/client", "binding": "ASSETS", "html_handling": "drop-trailing-slash", "run_worker_first": true },
   "vars": { "PRAGMA_LOG_LEVEL": "info" },
   "d1_databases": [{ "binding": "DB", "database_name": "my-app", "database_id": "<id>" }],
   "kv_namespaces": [{ "binding": "KV", "id": "<id>" }],
@@ -1832,6 +1832,8 @@ Wrangler prints the URL. Then check:
   "routes": [{ "pattern": "app.example.com", "custom_domain": true }]
 }
 ```
+
+Keep `"html_handling": "drop-trailing-slash"` in `assets`. Without it, Workers answers `/a` with a 307 to `/a/` (the build writes `a/index.html`).
 
 Then deploy with `npx wrangler@4 deploy` (no `--config`).
 

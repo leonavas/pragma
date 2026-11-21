@@ -1042,7 +1042,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             "name": p.config.name,
             "main": "worker.js",
             "compatibility_date": "2025-11-01",
-            "assets": { "directory": "../client", "binding": "ASSETS", "run_worker_first": true },
+            "assets": { "directory": "../client", "binding": "ASSETS", "html_handling": "drop-trailing-slash", "run_worker_first": true },
         });
         if !wasm.is_empty() {
             wrangler["rules"] = json!([{ "type": "CompiledWasm", "globs": ["**/*.wasm"], "fallthrough": true }]);

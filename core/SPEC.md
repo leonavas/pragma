@@ -466,7 +466,7 @@ dist/
   client/                 HTML per route, hashed assets, /_pragma/manifest.json
   server/worker.js        Cloudflare Workers entry (if any *.server.js)
   server/node.mjs         Node adapter (node:http) with static files
-  server/wrangler.jsonc   assets dist/client, run_worker_first (no not_found_handling)
+  server/wrangler.jsonc   assets dist/client, html_handling drop-trailing-slash, run_worker_first (no not_found_handling)
   templates/<route>.json  ssr routes only
 ```
 - JS: ES modules, no bundler in v0. Each module minified (oxc) with hashed name; imports

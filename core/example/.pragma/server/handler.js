@@ -109,7 +109,8 @@ export function createHandler({ routes, middleware, service }) {
   async function asset(request, env) {
     const res = await env.ASSETS.fetch(request)
     if (res.status !== 404 || (request.method !== 'GET' && request.method !== 'HEAD')) return res
-    const at = (path) => new URL(path.replace(/index\.html$/, '').replace(/\.html$/, ''), request.url)
+    // Assets use html_handling "drop-trailing-slash": /a/index.html and /a.html are served at /a.
+    const at = (path) => new URL(path.replace(/(\/index)?\.html$/, '') || '/', request.url)
     pages ??= env.ASSETS.fetch(new Request(new URL('/_pragma/manifest.json', request.url)))
       .then((r) => (r.ok ? r.json() : []))
       .then(compileRoutes)
