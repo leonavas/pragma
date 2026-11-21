@@ -99,6 +99,9 @@ impl Tools<'_> {
         for n in nodes {
             let Node::Element(e) = n else { continue };
             let tpl = e.is("template");
+            if tpl && e.has("data-def") {
+                continue;
+            }
             let other_branch = tpl && (e.has("data-else-if") || e.has("data-else") || e.has("data-empty"));
             if other_branch && let Some(names) = &before {
                 branches.extend(std::mem::replace(&mut self.names, names.clone()));

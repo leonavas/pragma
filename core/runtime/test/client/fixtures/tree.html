@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tree</title>
+  <script>self.__pragmaDev=true</script>
+  <link rel="modulepreload" href="/assets/tree.js">
+  <script type="application/json" id="pragma-route">{"pattern":"/tree","page":"/assets/tree.js","components":{"node":"/assets/node.js"},"stores":{},"loader":false,"ssr":false}</script>
+  <script type="module" src="/core/boot.js"></script>
+</head>
+<body>
+  <main data-page>
+    <span id="qty" data-text="{state.count}"></span>
+    <div id="bar" class="bar" style="--fixed:1" data-var-left="state.left" data-var-tone="state.tone"></div>
+    <ul id="rows"><template data-for="row in state.rows" data-key="row.id" data-tid="t1"><li data-var-x="row.x" data-text="{row.id}"></li></template></ul>
+    <ul id="tree"><li data-c="node" class="node" data-with-node="state.root"><span data-text="{state.node.name}"></span><ul><template data-for="child in state.node.children" data-key="child.id" data-tid="t2"><li data-c="node" data-self="c-node" class="node" data-with-node="child" data-var-depth="child.depth"></li></template><li data-c="node" data-self="c-node" class="node" data-with-node="child" data-var-depth="child.depth" data-of="t2" data-key="a" style="--depth:1"><span id="adopted" data-text="{state.node.name}">A</span><ul><template data-for="child in state.node.children" data-key="child.id" data-tid="t9"><li data-c="node" data-self="c-node" class="node" data-with-node="child" data-var-depth="child.depth"></li></template></ul></li></ul></li></ul>
+    <template data-def="node"><li data-c="node" class="node"><span data-text="{state.node.name}"></span><ul><template data-for="child in state.node.children" data-key="child.id" data-tid="t9"><li data-c="node" data-self="c-node" class="node" data-with-node="child" data-var-depth="child.depth"></li></template></ul></li></template>
+  </main>
+</body>
+</html>

@@ -61,7 +61,33 @@ function toggle() {
 
 Do not write `data-theme` or read `localStorage` for theme state. Use `.pragma/theme.js`.
 
+## Values from state: CSS variables
+
+Use `:--name="path"` when a value comes from state or data (position, width, color, column count). Write the CSS once, with `var(--name)`:
+
+```html
+<div class="timeline">
+  <for shift in $shifts key=shift.id>
+    <div class="shift" :--start="shift.start" :--span="shift.span" :--tone="shift.color">{shift.label}</div>
+  </for>
+</div>
+<ul class="grid" :--cols="$columns">…</ul>
+<div class="pill" :--i="$selected" :--n="$options.length">…</div>
+```
+
+```css
+.timeline { position: relative; }
+.shift { position: absolute; left: calc(var(--start) * 1%); width: calc(var(--span) * 1%); background: var(--tone, var(--color-primary-600)); }
+.grid { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); }
+.pill::before { width: calc(100% / var(--n)); translate: calc(var(--i) * 100%) 0; }
+```
+
+- Pass numbers without units (`42`) and add the unit in CSS (`* 1%`, `* 1px`). Compute the number in a script function (`const start = shift => (shift.from - dayStart) / dayLength * 100`).
+- `false`, `null`, `undefined`, and `""` remove the variable; use a fallback (`var(--tone, …)`).
+- On a component tag, `:--name` goes to the component root.
+- The server writes `style="--start:42"` in SSR pages. Do not write `style="..."` yourself (`html/style-inline`).
+
 ## Custom classes
 
 - Create a custom class only when the same combination repeats in 3+ places, or when you need state selectors or animations.
-- Forbidden: inline `style="..."`, arbitrary values (`w-[37px]`), negative utilities (`-mt-2`), undefined classes, `!important`, ID selectors, external `@import`, and single-use custom classes.
+- Forbidden: inline `style="..."` and `:style` (use `:--name`), arbitrary values (`w-[37px]`), negative utilities (`-mt-2`), undefined classes, `!important`, ID selectors, external `@import`, and single-use custom classes.

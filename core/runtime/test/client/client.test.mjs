@@ -560,3 +560,63 @@ test('a const holding a function made by a call is a handler; a non-function thr
   await p.click('#not-a-function')
   assert.match(p.errors.join(), /@click="name" needs a function, but "name" holds string/)
 })
+
+test(':--name sets CSS custom properties: numbers as is, false/null removes, writes only on change', async () => {
+  const p = await open('/tree')
+  const vars = (sel, ...names) => p.$eval(sel, (el, names) => names.map(n => el.style.getPropertyValue(n)), names)
+  assert.deepEqual(await vars('#bar', '--fixed', '--left', '--tone'), ['1', '25', 'red'])
+  assert.deepEqual(await p.$$eval('#rows li', ls => ls.map(l => l.style.getPropertyValue('--x'))), ['10', ''])
+  const writes = await p.evaluate(async () => {
+    const seen = []
+    const mo = new MutationObserver(rs => seen.push(...rs))
+    mo.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true })
+    __page.count = 1
+    await new Promise(r => setTimeout(r))
+    mo.disconnect()
+    return seen.length
+  })
+  assert.equal(writes, 0)
+  await p.evaluate(() => {
+    __page.left = 12.5
+    __page.tone = false
+    __page.rows[1].x = 0
+  })
+  await tick(p)
+  assert.deepEqual(await vars('#bar', '--fixed', '--left', '--tone'), ['1', '12.5', ''])
+  assert.deepEqual(await p.$$eval('#rows li', ls => ls.map(l => l.style.getPropertyValue('--x'))), ['10', '0'])
+  assert.deepEqual(p.errors, [])
+  await p.evaluate(() => { __page.left = '1;color:red' })
+  await tick(p)
+  assert.equal(await p.$eval('#bar', el => el.style.color), '')
+  assert.match(p.errors.join(' | '), /:--left got "1;color:red": a CSS value cannot contain ; \{ \} or </)
+})
+
+test('a component renders itself: tree from data, adopts prerendered levels, depth guard', async () => {
+  const p = await open('/tree')
+  const names = () => p.$$eval('#tree span', s => s.map(x => x.textContent))
+  assert.deepEqual(await names(), ['root', 'A', 'A1', 'B'])
+  assert.deepEqual(await p.$$eval('#tree li[data-self]', ls => ls.map(l => l.style.getPropertyValue('--depth'))), ['1', '2', '1'])
+  assert.equal(await p.locator('#adopted').textContent(), 'A')
+  assert.equal(await p.locator('#tree li[data-key="a"] > span').count(), 1)
+
+  await p.evaluate(() => {
+    __page.root.children[1].children.push({ id: 'b1', name: 'B1', depth: 2, children: [{ id: 'b2', name: 'B2', depth: 3, children: [] }] })
+    __page.root.children[0].name = 'A!'
+  })
+  await tick(p)
+  assert.deepEqual(await names(), ['root', 'A!', 'A1', 'B', 'B1', 'B2'])
+  assert.equal(await p.locator('#adopted').textContent(), 'A!')
+  await p.evaluate(() => { __page.root.children.shift() })
+  await tick(p)
+  assert.deepEqual(await names(), ['root', 'B', 'B1', 'B2'])
+  assert.deepEqual(p.errors, [])
+
+  await p.evaluate(() => {
+    let node = { id: 'n0', name: 'n0', depth: 0, children: [] }
+    const top = node
+    for (let i = 1; i <= 70; i++) node.children.push((node = { id: 'n' + i, name: 'n' + i, depth: i, children: [] }))
+    __page.root = top
+  })
+  await tick(p)
+  assert.match(p.errors.join(' | '), /<c-node> is nested more than 64 levels inside itself/)
+})

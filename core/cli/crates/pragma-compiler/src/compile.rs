@@ -3,7 +3,13 @@ use crate::directive::{self, Dir};
 use crate::html::{Element, Node, VOID, open_tag, push_attr};
 use crate::validate::BLOCKS;
 use serde_json::{Value, json};
-use std::collections::BTreeSet;
+use std::cell::Cell;
+use std::collections::{BTreeMap, BTreeSet};
+
+/// Levels of a component that renders itself that the server renders; deeper ones render on the client.
+pub const SSR_SELF_DEPTH: usize = 12;
+/// Self calls the server renders per page at most (a component that calls itself twice doubles per level).
+pub const SSR_SELF_CALLS: usize = 64;
 
 /// Serializes nodes; `<template>` is emitted with only its root element. `compact` collapses whitespace between tags.
 pub fn write_nodes(nodes: &[Node], out: &mut String, compact: bool) {
@@ -60,17 +66,37 @@ fn server_path(p: &str, vars: &[String]) -> bool {
     matches!(r, "data" | "params" | "query" | "page" | "state") || vars.iter().any(|v| v == r)
 }
 
+struct Ctx<'s> {
+    /// `data-c` ids of components with a script.
+    scripted: &'s BTreeSet<String>,
+    /// Root of each `<template data-def>`: the body a `data-self` call renders.
+    defs: BTreeMap<String, Element>,
+    depth: Cell<usize>,
+    calls: Cell<usize>,
+}
+
+impl Ctx<'_> {
+    /// A `data-self` call the server renders: the call's root with the component's body.
+    fn self_call(&self, e: &Element) -> Option<Element> {
+        if !e.has("data-self") || !e.children.is_empty() || self.depth.get() >= SSR_SELF_DEPTH || self.calls.get() >= SSR_SELF_CALLS {
+            return None;
+        }
+        let def = self.defs.get(e.value("data-c")?)?;
+        self.calls.set(self.calls.get() + 1);
+        Some(Element { children: def.children.clone(), ..e.clone() })
+    }
+}
+
 struct Ops<'s> {
     ops: Vec<Value>,
     /// Ops up to this index cannot receive concatenated html.
     sealed: usize,
-    /// `data-c` ids of components with a script.
-    scripted: &'s BTreeSet<String>,
+    ctx: &'s Ctx<'s>,
 }
 
 impl<'s> Ops<'s> {
-    fn new(scripted: &'s BTreeSet<String>) -> Self {
-        Ops { ops: Vec::new(), sealed: 0, scripted }
+    fn new(ctx: &'s Ctx<'s>) -> Self {
+        Ops { ops: Vec::new(), sealed: 0, ctx }
     }
 
     fn html(&mut self, s: &str) {
@@ -95,14 +121,22 @@ impl<'s> Ops<'s> {
 /// SSR ops of the page content. `scripted`: `data-c` ids of components with a script, whose root
 /// becomes a `comp` op (the server renders it in its own instance scope when it can run it).
 pub fn ops(nodes: &[Node], scripted: &BTreeSet<String>) -> Value {
-    let mut o = Ops::new(scripted);
+    let defs = nodes
+        .iter()
+        .filter_map(|n| match n {
+            Node::Element(t) if t.is("template") => Some((t.value("data-def")?.to_string(), t.element_children().next()?.clone())),
+            _ => None,
+        })
+        .collect();
+    let ctx = Ctx { scripted, defs, depth: Cell::new(0), calls: Cell::new(0) };
+    let mut o = Ops::new(&ctx);
     let mut vars = Vec::new();
     nodes_ops(nodes, &mut o, &mut vars, false);
     Value::Array(o.ops)
 }
 
-fn block(e: &Element, vars: &mut Vec<String>, scripted: &BTreeSet<String>) -> Value {
-    let mut o = Ops::new(scripted);
+fn block(e: &Element, vars: &mut Vec<String>, ctx: &Ctx) -> Value {
+    let mut o = Ops::new(ctx);
     if let Some(root) = e.element_children().next() {
         element_ops(root, &mut o, vars, true);
     }
@@ -139,18 +173,18 @@ fn nodes_ops(nodes: &[Node], o: &mut Ops, vars: &mut Vec<String>, compact: bool)
                 write_element(e, &mut s, false);
                 o.html(&s);
                 let tid = e.value("data-tid").unwrap_or("").to_string();
-                let (slot, scripted) = (slot_of(e), o.scripted);
+                let (slot, ctx) = (slot_of(e), o.ctx);
                 if let Some(v) = e.value("data-if") {
                     let (neg, p) = directive::split_neg(v);
                     chain = server_path(p, vars).then(|| tid.clone());
                     if chain.is_some() {
-                        push_slotted(o, slot, json!(["if", tid, p, neg, block(e, vars, scripted)]));
+                        push_slotted(o, slot, json!(["if", tid, p, neg, block(e, vars, ctx)]));
                     }
                 } else if let Some(v) = e.value("data-else-if") {
                     let (neg, p) = directive::split_neg(v);
                     chain = chain.take().filter(|_| server_path(p, vars));
                     if let Some(id) = &chain {
-                        push_slotted(o, slot, json!(["elif", id, p, neg, block(e, vars, scripted)]));
+                        push_slotted(o, slot, json!(["elif", id, p, neg, block(e, vars, ctx)]));
                     }
                 } else if let Some(v) = e.value("data-for") {
                     chain = None;
@@ -159,14 +193,14 @@ fn nodes_ops(nodes: &[Node], o: &mut Ops, vars: &mut Vec<String>, compact: bool)
                     {
                         let key = e.value("data-key").unwrap_or("").to_string();
                         vars.push(var.to_string());
-                        let body = block(e, vars, scripted);
+                        let body = block(e, vars, ctx);
                         vars.pop();
                         push_slotted(o, slot, json!(["for", tid, var, path, key, body]));
                         chain = Some(tid);
                     }
                 } else if let Some(id) = chain.take() {
                     let kind = if e.has("data-else") { "else" } else { "empty" };
-                    push_slotted(o, slot, json!([kind, id, block(e, vars, scripted)]));
+                    push_slotted(o, slot, json!([kind, id, block(e, vars, ctx)]));
                 }
             }
             Node::Element(e) => {
@@ -180,14 +214,25 @@ fn nodes_ops(nodes: &[Node], o: &mut Ops, vars: &mut Vec<String>, compact: bool)
 /// Slot content (`slot` op) is evaluated outside; inside it, the root of a component with a
 /// script opens its instance scope (`comp` op, with its props: text or a path outside).
 fn element_ops(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
+    if let Some(call) = o.ctx.self_call(e) {
+        o.ctx.depth.set(o.ctx.depth.get() + 1);
+        element_ops(&call, o, vars, seal);
+        o.ctx.depth.set(o.ctx.depth.get() - 1);
+        return;
+    }
+    if e.has("data-self") && e.children.is_empty() {
+        let mut s = String::new();
+        write_element(e, &mut s, false);
+        return o.html(&s);
+    }
     let Some(n) = slot_of(e) else { return component_ops(e, o, vars, seal) };
-    let mut inner = Ops::new(o.scripted);
+    let mut inner = Ops::new(o.ctx);
     component_ops(e, &mut inner, vars, true);
     o.op(json!(["slot", n, inner.ops]));
 }
 
 fn component_ops(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
-    let Some(id) = e.value("data-c").filter(|id| o.scripted.contains(*id)) else { return element_body(e, o, vars, seal) };
+    let Some(id) = e.value("data-c").filter(|id| o.ctx.scripted.contains(*id)) else { return element_body(e, o, vars, seal) };
     let props: Vec<Value> = e
         .attrs
         .iter()
@@ -201,7 +246,7 @@ fn component_ops(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
             }
         })
         .collect();
-    let mut inner = Ops::new(o.scripted);
+    let mut inner = Ops::new(o.ctx);
     element_body(e, &mut inner, vars, true);
     o.op(json!(["comp", id, props, inner.ops]));
 }
@@ -224,6 +269,7 @@ fn element_body(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
     let mut classes: Vec<Value> = Vec::new();
     let mut show: Option<(String, bool)> = None;
     let mut text: Option<String> = None;
+    let mut css_vars: Vec<String> = Vec::new();
     for a in &e.attrs {
         let lname = a.name.to_ascii_lowercase();
         let Some(Some(d)) = directive::parse(&lname) else { continue };
@@ -237,8 +283,13 @@ fn element_body(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
             Dir::Attr(n) => attrs.push((n.to_string(), p.to_string())),
             Dir::Class(n) => classes.push(json!([n, p, neg])),
             Dir::Show => show = Some((p.to_string(), neg)),
+            Dir::Var(n) => css_vars.push(format!("--{n}:{{{p}}}")),
             _ => {}
         }
+    }
+    if !css_vars.is_empty() {
+        let fixed = e.value("style").map(|v| v.replace('{', "\\{")).into_iter();
+        attrs.push(("style".into(), fixed.chain(css_vars).collect::<Vec<_>>().join(";")));
     }
     for a in &e.attrs {
         let lname = a.name.to_ascii_lowercase();
@@ -325,6 +376,26 @@ mod tests {
             ["html", "<!--}--></p>"]
         ]);
         assert_eq!(v, expected);
+    }
+
+    #[test]
+    fn css_variables_render_on_the_server() {
+        let (nodes, _) = parse(r#"<i class="bar" style="--y:1" data-var-x="data.x" data-var-z="shared.ui.z"></i>"#, 0);
+        let expected = json!([
+            ["html", "<i class=\"bar\" data-var-x=\"data.x\" data-var-z=\"shared.ui.z\""],
+            ["attr", "style", "--y:1;--x:{data.x}"],
+            ["html", "></i>"]
+        ]);
+        assert_eq!(ops(&nodes, &BTreeSet::new()), expected);
+    }
+
+    #[test]
+    fn self_calls_render_on_the_server_up_to_a_depth() {
+        let src = r#"<ul data-c="tree"><template data-for="c in state.node.kids" data-key="c.id" data-tid="t1"><ul data-c="tree" data-self="c-tree" data-with-node="c"></ul></template></ul><template data-def="tree"><ul data-c="tree"><template data-for="c in state.node.kids" data-key="c.id" data-tid="t1"><ul data-c="tree" data-self="c-tree" data-with-node="c"></ul></template></ul></template>"#;
+        let (nodes, _) = parse(src, 0);
+        let v = ops(&nodes, &BTreeSet::from(["tree".to_string()])).to_string();
+        assert_eq!(v.matches(r#"["comp","tree""#).count(), 1 + SSR_SELF_DEPTH, "{v}");
+        assert_eq!(v.matches(r#"["for","t1""#).count(), 1 + SSR_SELF_DEPTH, "{v}");
     }
 
     #[test]

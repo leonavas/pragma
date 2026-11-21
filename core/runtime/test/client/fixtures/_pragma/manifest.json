@@ -9,5 +9,6 @@
   { "pattern": "/ssr", "html": "/ssr.html", "modules": ["/assets/ssr.js", "/assets/cart.js"], "loader": true, "ssr": true },
   { "pattern": "/slot", "html": "/slot.html", "modules": ["/assets/slot.js", "/assets/box.js", "/assets/counter.js", "/assets/account.js"], "loader": false, "ssr": false },
   { "pattern": "/overlay", "html": "/overlay.html", "modules": ["/assets/overlay.js", "/assets/cart.js"], "loader": false, "ssr": false },
-  { "pattern": "/template", "html": "/template.html", "modules": ["/assets/template.js", "/assets/inner.js", "/assets/basket.js"], "loader": false, "ssr": false }
+  { "pattern": "/template", "html": "/template.html", "modules": ["/assets/template.js", "/assets/inner.js", "/assets/basket.js"], "loader": false, "ssr": false },
+  { "pattern": "/tree", "html": "/tree.html", "modules": ["/assets/tree.js", "/assets/node.js"], "loader": false, "ssr": false }
 ]
