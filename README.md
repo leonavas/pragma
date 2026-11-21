@@ -21,7 +21,7 @@ and every form is a tool an agent can call.
 - **Native.** A page or a component is one `.html` file: markup, `<script>` and `<style>`. No JSX, no
   virtual DOM, no client framework.
 - **Closed.** One way to do each thing. Anything outside the syntax is a build error, not a convention.
-- **Small.** The starter page loads 10.0 kB of JavaScript (gzip), router and runtime included.
+- **Small.** The starter page loads 12.5 kB of JavaScript (gzip), router and runtime included.
   `pragma build` prints the JS size of each page.
 - **Agent-first.** Every app ships with `AGENTS.md` and its docs. `pragma check` answers with file,
   line, column, rule and fix. Every `<form>` is a WebMCP tool, and a page can answer in markdown.
