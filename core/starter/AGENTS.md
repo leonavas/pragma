@@ -44,6 +44,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - Build overlays only with `c-modal`, `c-alert`, and `c-dropdown`.
 - Use a native `<select>` by default. Use `c-select` for a styled list. Do not style `<select>` with `appearance` (`forms.md`).
 - Load data with `load` in `.server.js` and render a skeleton.
+- Put auth in `routes/_middleware.server.js`. Use `redirect` and `error` from `'pragma/server'`. Use endpoints (`.server.js` without `.html`) only for files, streams, webhooks, and WebSockets (`data.md`).
 - Use utilities from `classes.md`. Create a custom class only when a combination repeats 3+ times. Do not use inline `style`.
 - Follow accessibility rules: name every control, add `alt` and labels, use one `<h1>`.
 - Make every `<form>` a WebMCP tool: set `toolname` (`snake_case` verb_object), `tooldescription`, `name`, and `toolparamdescription` on each field. Add `notool` on login or password forms (`webmcp.md`).
@@ -64,6 +65,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 | Components, props, slots | `components.md` |
 | `<script>`: state, actions, derived values, `mount`, stores | `state.md` |
 | `load`, server actions, skeleton, SSR | `data.md` |
+| Cookies, redirects, errors, middleware (auth), endpoints, streaming | `data.md` |
 | Modal, alert, dropdown | `overlays.md` |
 | Select, styled select (`c-select`), form values | `forms.md` |
 | Styles, theme | `css.md`, `classes.md` |

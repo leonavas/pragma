@@ -322,6 +322,25 @@ export const ssr = false
   `localStorage` or a store), or when a prop comes from a store. The rest of the page still
   renders. Keep browser-only work in `mount(el)` and actions.
 - Error in `load` → `page.error` on the client; 500 with ERROR log on the server.
+- Context of `load`, actions (`{ input, ...context }`), endpoints and middleware:
+  `{ request, url, params, query, env, db, kv, files, log, cookies, locals, setHeaders, waitUntil }`.
+  `url` is the page URL (`/_data/x` → `/x`). `cookies.get/getAll/set/delete`, defaults
+  `Path=/; HttpOnly; Secure; SameSite=Lax` (no `Secure` on plain http localhost; `__Host-` and
+  `__Secure-` always `Secure`). `setHeaders` rejects `set-cookie`. Headers and cookies are applied
+  to the final response, including a returned or middleware-changed `Response`.
+- `import { redirect, error } from 'pragma/server'` (only in server modules; the build rewrites
+  it to `core/server/http.js`). Both throw. `/_data` and `/_action`: redirect → 200
+  `{"redirect":{"status","location"}}` (also a 30x `Response` from an action or middleware);
+  error → its status with `{"error": body}` (`body` = `{ message, ... }`). Documents: redirect →
+  real 30x + `Location`; error → SSR shell with `page.error` and the status, or `_404.html` (404) /
+  plain text. Endpoints: real 30x; error → its status with `{"error": body}`.
+- Action returning a `Response`: passed through untouched (status, headers, streaming body).
+- `routes/_middleware.server.js` exports `handle({ ...context, next })`; runs before every
+  request except `/assets/*`, `/_pragma/*`, `/_otel`; `next()` returns the `Response`; must return
+  a `Response`.
+- Endpoint: `routes/<path>.server.js` without `.html`, exports only `GET`, `HEAD`, `POST`, `PUT`,
+  `PATCH`, `DELETE`, `OPTIONS`; each returns a `Response` (else 500 naming the file). `HEAD`
+  falls back to `GET`; other methods → 405 with `Allow`. WebSocket (101) only on Workers.
 
 ### 5.1 Head tags (SEO, link previews)
 
@@ -498,7 +517,8 @@ Errors with file:line:column, rule and message.
   live reload via a WebSocket at `/_pragma/reload` (CSS swaps without reload; not SSE, because an
   `EventSource` per tab uses up the 6 HTTP/1.1 connections per host). If any `*.server.js`
   exists, starts `node .pragma/dev/server/node.mjs` on an internal port and proxies `/_data`,
-  `/_action`, `/_otel` and ssr pages. A build with errors still writes its outputs (pages without
+  `/_action`, `/_otel`, ssr pages and endpoints (any method); with a middleware, every path
+  except `/assets/*` and `/_pragma/*` (from `server/routes.json`). A build with errors still writes its outputs (pages without
   errors keep working, with the error overlay): node is restarted for it too, so it always serves
   the same build as the client files.
 - `pragma serve`: same server without watch, over `dist/`. Ctrl+C or SIGTERM also stop the
@@ -604,7 +624,9 @@ default `dialog::backdrop` and `.skeleton` (pulsing block honoring `prefers-redu
 export function createHandler({ routes }) → { fetch(request, env, ctx) }
 // routes: [{ pattern: '/shop/:id', server: <.server.js namespace>, ssr: bool,
 //            template: <compiled ops> | null, shell: '<prebuilt page html>' | null,
-//            page?: <page script module>, components?: { '<data-c id>': <component script module> } }]
+//            page?: <page script module>, components?: { '<data-c id>': <component script module> } }
+//          | { pattern: '/files/:name', endpoint: <.server.js namespace>, file: 'routes/files/[name].server.js' }]
+// middleware?: handle from routes/_middleware.server.js
 ```
 - `page`/`components`: the compiled scripts (factories, §4) an `ssr` route renders with, only
   those whose imports are all app code; `render.js` `renderPage(ops, scope, { page, components, log })`
