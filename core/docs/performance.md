@@ -1,11 +1,11 @@
 # Performance
 
-Fast by default: prebuilt HTML, `load` fetch starts in `<head>`, only the JS a page uses, link
-prefetch, hashed assets, CSS with only used classes, budgets enforced by `check`.
+Fast by default: prebuilt HTML, `load` fetch starts in `<head>`, per-route CSS (inlined in prod when ≤ 14 kB gzip for zero render-blocking requests), only the JS a page uses, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets, CSS with only used classes, budgets enforced by `check`.
 
 - Navigate with `<a href>`.
 - Shape skeletons like the final content.
 - `<img>`: always `width` and `height`; `loading="lazy"` below the fold; AVIF/WebP in `public/`.
+- Custom fonts: always `font-display: swap`; avoid `<link rel="preload" as="font">` unless proven faster on slow 4G (font preloads compete with first paint).
 - `<for>` with a stable `key`.
 - A page without interaction has no `.js`.
 - Heavy code used by one page stays in that page; if it runs only after an interaction, `await import()` it inside the action.

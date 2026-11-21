@@ -43,7 +43,7 @@ function syncHead(doc) {
   document.title = doc.title
   const old = [...document.head.children].filter(own), next = [...doc.head.children].filter(own)
   if (old.length === next.length && old.every((el, i) => el.isEqualNode(next[i]))) return
-  const at = document.head.querySelector('link[rel=stylesheet]')
+  const at = document.head.querySelector('link[rel=stylesheet], style[data-pragma-shared-css], style[data-pragma-route-css]')
   for (const el of old) el.remove()
   for (const el of next) document.head.insertBefore(document.importNode(el, true), at)
 }
@@ -67,9 +67,15 @@ function loadRouteCss(href) {
   return { el, created: true, ready }
 }
 
-function syncRouteCss(keep) {
-  for (const el of document.head.querySelectorAll('link[rel=stylesheet][data-pragma-route-css]')) {
+function syncRouteCss(keep, nextStyle) {
+  for (const el of document.head.querySelectorAll('link[rel=stylesheet][data-pragma-route-css], style[data-pragma-route-css]')) {
     if (el !== keep) el.remove()
+  }
+  if (nextStyle) {
+    const style = document.importNode(nextStyle, true)
+    const anchor = document.head.querySelector('style[data-pragma-shared-css], link[rel=stylesheet]')
+    if (anchor) anchor.after(style)
+    else document.head.append(style)
   }
 }
 
@@ -158,7 +164,7 @@ export async function navigate(to, pop) {
     main.replaceChildren(...next.childNodes)
     main.dataset.page = next.dataset.page
     syncHead(doc)
-    syncRouteCss(css?.el ?? null)
+    syncRouteCss(css?.el ?? null, doc.head.querySelector('style[data-pragma-route-css]'))
     const done = enter(route, mods, url, match(route.pattern, url.pathname) ?? {}, doc, pending)
     const y = pop ? positions.get(key) ?? 0 : 0
     if (!pop && url.hash) document.getElementById(decodeURIComponent(url.hash.slice(1)))?.scrollIntoView()

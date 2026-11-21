@@ -671,6 +671,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let boot_url = urls.get(&boot).cloned().unwrap_or_else(|| "/assets/core/boot.js".into());
     for o in &outs {
         let mut route_css_url: Option<String> = None;
+        let mut route_css_src: Option<String> = None;
         let mut route_css_gz: u64 = 0;
         if !o.is_404 {
             let mut rcss = String::new();
@@ -714,6 +715,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
                 w.write_client(&format!("client{url}"), rcss.as_bytes(), prod);
                 route_css_gz = gzip_len(rcss.as_bytes());
                 route_css_url = Some(url);
+                route_css_src = Some(rcss);
             }
         }
         let entries = page_entries(o);
@@ -752,9 +754,20 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             doc.push_str(THEME);
             doc.push('\n');
         }
-        doc.push_str(&format!("<link rel=\"stylesheet\" href=\"{css_url}\">\n"));
-        if let Some(rcss_url) = &route_css_url {
-            doc.push_str(&format!("<link rel=\"stylesheet\" href=\"{rcss_url}\" data-pragma-route-css>\n"));
+        if prod && shared_css_gz + route_css_gz <= 14 * 1024 {
+            doc.push_str("<style data-pragma-shared-css>");
+            doc.push_str(&css.replace("</style", "<\\/style"));
+            doc.push_str("</style>\n");
+            if let Some(rcss) = &route_css_src {
+                doc.push_str("<style data-pragma-route-css>");
+                doc.push_str(&rcss.replace("</style", "<\\/style"));
+                doc.push_str("</style>\n");
+            }
+        } else {
+            doc.push_str(&format!("<link rel=\"stylesheet\" href=\"{css_url}\">\n"));
+            if let Some(rcss_url) = &route_css_url {
+                doc.push_str(&format!("<link rel=\"stylesheet\" href=\"{rcss_url}\" data-pragma-route-css>\n"));
+            }
         }
         if !prod {
             doc.push_str("<script>self.__pragmaDev=true</script>\n");
