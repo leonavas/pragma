@@ -82,6 +82,10 @@ pub fn base_css() -> &'static str {
     &BASE
 }
 
+pub fn base_css_for(used_css: &str) -> String {
+    base::build_for(used_css)
+}
+
 pub fn classes_doc(theme: &Theme) -> String {
     doc::render(&all_colors(theme))
 }

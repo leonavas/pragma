@@ -5,8 +5,29 @@ Agents: the full docs are one file at https://pragma.leonavas.com/llms-full.txt 
 Send your agent this page. It reads the docs and writes native HTML, CSS and JavaScript. A Rust CLI rejects anything off-spec with the file, the line and the fix. Pages ship prebuilt, with only the JavaScript they use, and every form is a tool an agent can call.
 
 - [Hand it to your agent](https://pragma.leonavas.com/agents.md)
-- [Read the examples](https://pragma.leonavas.com/examples)
 - [Install](#install)
+- [Read the examples](https://pragma.leonavas.com/examples)
+
+## Install
+
+One Rust binary compiles, checks, serves and bundles npm packages: no Vite, no esbuild, no config. Node 22 or newer only runs your `.server.js` files.
+
+Linux x64: run the one-line installer or download [pragma-linux-x64.tar.gz](https://pragma.leonavas.com/downloads/pragma-linux-x64.tar.gz).
+
+```sh
+curl -fsSL https://pragma.leonavas.com/install.sh | sh
+pragma -V
+```
+
+From source (any platform with Cargo):
+
+```sh
+git clone https://github.com/leonavas/pragma
+cd pragma
+cargo install --path core/cli/crates/pragma-cli
+```
+
+Then `pragma new my-app`, `cd my-app` and `pragma dev`. [Start with the guide](https://pragma.leonavas.com/guide).
 
 ## This framework is for agents. If you're still reading this instead of asking your agent to try it, it's not for you yet. Come back in 6 months.
 
@@ -170,27 +191,6 @@ An agent in the browser sees these forms as WebMCP tools and calls them. You can
   - `title`: Title of the task, up to 48 characters
 
 [Everything for agents](https://pragma.leonavas.com/agents.md)
-
-## Install
-
-One Rust binary compiles, checks, serves and bundles npm packages: no Vite, no esbuild, no config. Node 22 or newer only runs your `.server.js` files.
-
-Linux x64: run the one-line installer or download [pragma-linux-x64.tar.gz](https://pragma.leonavas.com/downloads/pragma-linux-x64.tar.gz).
-
-```sh
-curl -fsSL https://pragma.leonavas.com/install.sh | sh
-pragma -V
-```
-
-From source (any platform with Cargo):
-
-```sh
-git clone https://github.com/leonavas/pragma
-cd pragma
-cargo install --path core/cli/crates/pragma-cli
-```
-
-Then `pragma new my-app`, `cd my-app` and `pragma dev`. [Start with the guide](https://pragma.leonavas.com/guide).
 
 ## Every feature, running on this page's runtime
 

@@ -1,4 +1,5 @@
 use crate::table::{PALETTE, TONES};
+use std::collections::HashSet;
 use std::fmt::Write;
 
 const PREFLIGHT: &str = include_str!("../assets/preflight.css");
@@ -159,22 +160,115 @@ const PROPERTIES: &str = r#"@property --tw-ring-color {
 "#;
 
 pub fn build() -> String {
-    let mut s = String::with_capacity(PREFLIGHT.len() + 12_000);
+    render(None)
+}
+
+pub fn build_for(used_css: &str) -> String {
+    let mut used = HashSet::new();
+    collect_var_refs(used_css, &mut used);
+    collect_var_refs(PREFLIGHT, &mut used);
+    collect_var_refs(BASE, &mut used);
+    loop {
+        let before = used.len();
+        for line in TOKENS_ROOT.lines().chain(TOKENS_DARK.lines()) {
+            if let Some((name, val)) = decl_var(line)
+                && used.contains(name)
+            {
+                collect_var_refs(val, &mut used);
+            }
+        }
+        if used.len() == before {
+            break;
+        }
+    }
+    render(Some((&used, used_css)))
+}
+
+fn decl_var(line: &str) -> Option<(&str, &str)> {
+    let trimmed = line.trim();
+    if !trimmed.starts_with("--") {
+        return None;
+    }
+    let (name, val) = trimmed.split_once(':')?;
+    Some((name.trim(), val))
+}
+
+fn collect_var_refs(css: &str, out: &mut HashSet<String>) {
+    let mut rest = css;
+    while let Some(i) = rest.find("var(") {
+        let after = rest[i + 4..].trim_start();
+        if after.starts_with("--") {
+            let len = after
+                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+                .unwrap_or(after.len());
+            if len > 2 {
+                out.insert(after[..len].to_string());
+            }
+            rest = &after[len..];
+        } else {
+            rest = after;
+        }
+    }
+}
+
+fn render(filter: Option<(&HashSet<String>, &str)>) -> String {
+    let keep = |name: &str| filter.is_none_or(|(used, _)| used.contains(name));
+    let mut s = String::with_capacity(PREFLIGHT.len() + 4_096);
     s.push_str(LICENSE);
     s.push_str("@layer reset, tokens, base, components, utilities;\n\n@layer reset {\n");
     s.push_str(PREFLIGHT.trim_end());
     s.push_str("\n}\n\n@layer tokens {\n  :root {\n    color-scheme: light;\n");
-    s.push_str("    --color-white: #fff;\n    --color-black: #000;\n");
+    if keep("--color-white") {
+        s.push_str("    --color-white: #fff;\n");
+    }
+    if keep("--color-black") {
+        s.push_str("    --color-black: #000;\n");
+    }
     for (name, tones) in PALETTE {
         for (tone, value) in TONES.iter().zip(tones) {
-            let _ = writeln!(s, "    --color-{name}-{tone}: {value};");
+            let var = format!("--color-{name}-{tone}");
+            if keep(&var) {
+                let _ = writeln!(s, "    {var}: {value};");
+            }
         }
     }
-    s.push_str(TOKENS_ROOT);
-    s.push_str(TOKENS_DARK);
+    for line in TOKENS_ROOT.lines() {
+        match decl_var(line) {
+            Some((name, _)) if !keep(name) => {}
+            _ => {
+                s.push_str(line);
+                s.push('\n');
+            }
+        }
+    }
+    for line in TOKENS_DARK.lines() {
+        match decl_var(line) {
+            Some((name, _)) if !keep(name) => {}
+            _ => {
+                s.push_str(line);
+                s.push('\n');
+            }
+        }
+    }
     s.push('\n');
     s.push_str(BASE);
     s.push('\n');
-    s.push_str(PROPERTIES);
+    match filter {
+        None => s.push_str(PROPERTIES),
+        Some((_, used_css)) => {
+            for block in PROPERTIES.split("@property ") {
+                let block = block.trim();
+                if block.is_empty() {
+                    continue;
+                }
+                let name = block.split_whitespace().next().unwrap_or("");
+                if used_css.contains(name) {
+                    s.push_str("@property ");
+                    s.push_str(block);
+                    s.push('\n');
+                }
+            }
+        }
+    }
     s
 }

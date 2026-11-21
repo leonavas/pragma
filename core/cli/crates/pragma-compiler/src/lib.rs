@@ -638,21 +638,42 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     // Shared CSS (base + theme + layout/_404 components and utilities)
     let shared_names: Vec<String> = shared_classes.iter().filter(|c| !classes.project.contains(*c)).cloned().collect();
     let generated = pragma_css::generate(&shared_names, &classes.theme);
-    let mut css = String::from(pragma_css::base_css());
-    css.push('\n');
-    css.push_str(&theme_src);
-    css.push('\n');
+    let mut shared_tail = String::new();
+    shared_tail.push_str(&theme_src);
+    shared_tail.push('\n');
     for c in shared_components.values() {
         if let Some(s) = comp_css.get(&c.dir) {
-            css.push_str(&format!("/* {} */\n@layer components {{\n{}\n}}\n", rel_str(p.origin(c.css.as_ref().unwrap())), s.trim()));
+            shared_tail.push_str(&format!("/* {} */\n@layer components {{\n{}\n}}\n", rel_str(p.origin(c.css.as_ref().unwrap())), s.trim()));
         }
     }
     if let Some(f) = p.not_found.as_ref().and_then(|pg| pg.css.as_ref())
         && let Some(s) = page_css.get(f)
     {
-        css.push_str(&format!("/* {} */\n@layer components {{\n{}\n}}\n", rel_str(p.origin(f)), s.trim()));
+        shared_tail.push_str(&format!("/* {} */\n@layer components {{\n{}\n}}\n", rel_str(p.origin(f)), s.trim()));
     }
-    css.push_str(&generated.css);
+    shared_tail.push_str(&generated.css);
+    let mut css = if prod {
+        let mut all_used = String::with_capacity(shared_tail.len() + 4096);
+        all_used.push_str(&shared_tail);
+        for s in comp_css.values().chain(page_css.values()) {
+            all_used.push_str(s);
+            all_used.push('\n');
+        }
+        let all_route_names: BTreeSet<String> = outs
+            .iter()
+            .filter(|o| !o.is_404)
+            .flat_map(|o| o.page_classes.iter())
+            .filter(|c| !classes.project.contains(*c) && !shared_classes.contains(*c))
+            .cloned()
+            .collect();
+        let all_route_vec: Vec<String> = all_route_names.into_iter().collect();
+        all_used.push_str(&pragma_css::generate(&all_route_vec, &classes.theme).css);
+        pragma_css::base_css_for(&all_used)
+    } else {
+        String::from(pragma_css::base_css())
+    };
+    css.push('\n');
+    css.push_str(&shared_tail);
     if prod {
         match pragma_css::minify(&css) {
             Ok(m) => css = m,

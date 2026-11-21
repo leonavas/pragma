@@ -5,8 +5,29 @@ Agents: the full docs are one file at {{origin}}/llms-full.txt (index: {{origin}
 Send your agent this page. It reads the docs and writes native HTML, CSS and JavaScript. A Rust CLI rejects anything off-spec with the file, the line and the fix. Pages ship prebuilt, with only the JavaScript they use, and every form is a tool an agent can call.
 
 - [Hand it to your agent]({{origin}}/agents.md)
-- [Read the examples]({{origin}}/examples)
 - [Install](#install)
+- [Read the examples]({{origin}}/examples)
+
+## Install
+
+One Rust binary compiles, checks, serves and bundles npm packages: no Vite, no esbuild, no config. Node 22 or newer only runs your `.server.js` files.
+
+Linux x64: run the one-line installer or download [pragma-linux-x64.tar.gz]({{origin}}/downloads/pragma-linux-x64.tar.gz).
+
+```sh
+curl -fsSL {{origin}}/install.sh | sh
+pragma -V
+```
+
+From source (any platform with Cargo):
+
+```sh
+git clone https://github.com/leonavas/pragma
+cd pragma
+cargo install --path core/cli/crates/pragma-cli
+```
+
+Then `pragma new my-app`, `cd my-app` and `pragma dev`. [Start with the guide]({{origin}}/guide).
 
 ## This framework is for agents. If you're still reading this instead of asking your agent to try it, it's not for you yet. Come back in 6 months.
 
@@ -94,27 +115,6 @@ An agent in the browser sees these forms as WebMCP tools and calls them. You can
 {{tools routes/_components/setup-tool/setup-tool.html routes/_components/docs-tool/docs-tool.html routes/_components/task-list/task-list.html}}
 
 [Everything for agents]({{origin}}/agents.md)
-
-## Install
-
-One Rust binary compiles, checks, serves and bundles npm packages: no Vite, no esbuild, no config. Node 22 or newer only runs your `.server.js` files.
-
-Linux x64: run the one-line installer or download [pragma-linux-x64.tar.gz]({{origin}}/downloads/pragma-linux-x64.tar.gz).
-
-```sh
-curl -fsSL {{origin}}/install.sh | sh
-pragma -V
-```
-
-From source (any platform with Cargo):
-
-```sh
-git clone https://github.com/leonavas/pragma
-cd pragma
-cargo install --path core/cli/crates/pragma-cli
-```
-
-Then `pragma new my-app`, `cd my-app` and `pragma dev`. [Start with the guide]({{origin}}/guide).
 
 ## Every feature, running on this page's runtime
 
