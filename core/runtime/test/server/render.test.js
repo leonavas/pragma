@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { render, renderHead, renderPage, resolve, template } from '../../server/render.js'
+import { render, renderHead, renderPage, resolve, serverServices, template } from '../../server/render.js'
 
 const TPL = '<ul><template data-tid="t1" data-for="item in data.items" data-key="item.id"><li></li></template>'
 const EMPTY = '<template data-empty data-tid="t9"><li>empty</li></template>'
@@ -37,6 +37,22 @@ test('text templates: literals are HTML source, values are escaped, \\{ is a bra
 test('attribute templates are always strings', () => {
   const ops = [['html', '<a'], ['attr', 'href', '/shop/{data.id}?q="{data.q}"'], ['attr', 'title', '{data.missing}'], ['html', '>']]
   assert.equal(render(ops, { data: { id: 7, q: 'a"b', missing: null } }), '<a href="/shop/7?q=&quot;a&quot;b&quot;" title="">')
+})
+
+test(':--name in style: values as the browser sets them; false, null, empty and ; { } < drop the property', () => {
+  const ops = (style) => [['html', '<i'], ['attr', 'style', style], ['html', '></i>']]
+  const data = { a: 12.5, b: 'red', no: false, nil: null, bad: '1;color:red', brace: '}a{', lt: '<x' }
+  assert.equal(render(ops('--y:1;--a:{data.a};--b:{data.b}'), { data }), '<i style="--y:1;--a:12.5;--b:red"></i>')
+  assert.equal(render(ops('--a:{data.no};--b:{data.b};--c:{data.nil}'), { data }), '<i style="--b:red"></i>')
+  assert.equal(render(ops('--y:1;--a:{data.bad};--b:{data.brace};--c:{data.lt}'), { data }), '<i style="--y:1"></i>')
+  assert.equal(render(ops('--a:{data.bad}'), { data }), '<i></i>')
+})
+
+test('browser-only services throw a clear error while the server renders', () => {
+  const services = serverServices({ data: {}, params: {}, query: {}, page: {} }, null)
+  for (const name of ['call', 'stream', 'navigate', 'open', 'close', 'confirm']) {
+    assert.throws(() => services[name]('x'), { message: `${name} runs only in the browser` })
+  }
 })
 
 test('markers beside elements: the server fills the text between them', () => {

@@ -30,7 +30,7 @@ pub const RULE_PACKAGE: &str = "app/package";
 pub const RULE_COMMENT: &str = "js/comment";
 pub const RULE_NAME: &str = "js/vague-name";
 
-const SHORT_OK: &[&str] = &["$", "i", "j", "k", "id", "ok", "el", "ctx", "url", "log"];
+const SHORT_OK: &[&str] = &["$", "i", "j", "k", "id", "ok", "el", "ctx", "url", "log", "db", "kv"];
 const VAGUE: &[&str] = &[
     "tmp", "temp", "aux", "foo", "bar", "baz", "qux", "obj", "arr", "val", "res", "ret", "fn", "func", "cb",
     "data", "dado", "dados", "info", "stuff", "thing", "things", "coisa", "coisas", "algo", "something", "whatever", "teste", "test",

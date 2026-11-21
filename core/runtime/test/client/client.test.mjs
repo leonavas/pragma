@@ -597,6 +597,23 @@ test('call: errors carry status and body; a redirect navigates and resolves to u
   assert.deepEqual(p.errors, [])
 })
 
+test('router: a page fetch redirected by middleware goes to the final URL; a .html to clean URL redirect stays', async () => {
+  const p = await open('/net')
+  const moved = await p.evaluate(async () => {
+    const before = history.length
+    await __net.navigate('/private')
+    await new Promise(r => setTimeout(r, 300))
+    return [location.pathname, document.querySelector('#title')?.textContent, history.length - before]
+  })
+  assert.deepEqual(moved, ['/b', 'Page B', 1])
+  const tidy = await p.evaluate(async () => {
+    await __net.navigate('/tidy')
+    return [location.pathname, document.querySelector('#title')?.textContent]
+  })
+  assert.deepEqual(tidy, ['/tidy', 'Page B'])
+  assert.deepEqual(p.errors, [])
+})
+
 test('navigate with replace uses replaceState', async () => {
   const p = await open('/net')
   const r = await p.evaluate(async () => {

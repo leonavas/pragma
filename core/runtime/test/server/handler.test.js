@@ -161,7 +161,7 @@ test('SSR with load error: 500, shell intact and pragma-data with error', async 
   assert.equal(res.status, 500)
   const html = await res.text()
   assert.ok(html.includes('<p class="skeleton">'))
-  assert.ok(html.includes('<script type="application/json" id="pragma-data">{"error":{"message":"no post"}}</script>'))
+  assert.ok(html.includes('<script type="application/json" id="pragma-data">{"error":{"message":"no post","status":500}}</script>'))
   assert.ok(lines.some((l) => l.severityText === 'ERROR' && l.attributes['exception.message'] === 'no post'))
 })
 

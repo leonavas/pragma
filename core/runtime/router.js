@@ -27,10 +27,19 @@ function entry(url) {
   return manifest.then(m => m.find(e => match(e.pattern, url.pathname)))
 }
 
+const pagePath = u => new URL(u, location.href).pathname.replace(/(\/index)?\.html$/, '').replace(/\/$/, '')
+
+function html(u, anyStatus = false) {
+  return fetch(u, { headers: traceHeaders() }).then(r => {
+    if (r.redirected && pagePath(r.url) !== pagePath(u)) return Promise.reject(Object.assign(new Error(`redirected to ${r.url}`), { moved: r.url }))
+    return r.ok || anyStatus ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))
+  })
+}
+
 function text(u) {
   let p = pages.get(u)
   if (!p) {
-    p = fetch(u, { headers: traceHeaders() }).then(r => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))
+    p = html(u)
     pages.set(u, p)
     p.catch(() => pages.delete(u))
   }
@@ -130,14 +139,14 @@ export function redirect(to, replace = false) {
 async function go(to, pop, replace) {
   const url = new URL(to, location.href), n = ++seq, t0 = performance.now()
   newTrace()
-  let e, doc, route, mods, pending, css
+  let e, doc, route, mods, pending, css, moved
   try {
     e = await entry(url)
     if (e) {
       pending = e.loader && !e.ssr ? fetchData(url) : undefined
       pending?.catch(noop)
       for (const m of e.modules ?? []) import(m).catch(noop)
-      doc = new DOMParser().parseFromString(await (e.ssr ? fetch(url, { headers: traceHeaders() }).then(r => r.text()) : text(e.html)), 'text/html')
+      doc = new DOMParser().parseFromString(await (e.ssr ? html(url, true) : text(e.html)), 'text/html')
       route = JSON.parse(doc.getElementById('pragma-route').textContent)
       const nextCss = doc.head.querySelector('link[rel=stylesheet][data-pragma-route-css]')?.getAttribute('href')
       if (nextCss) css = loadRouteCss(nextCss)
@@ -145,7 +154,8 @@ async function go(to, pop, replace) {
       if (css) await css.ready
     }
   } catch (err) {
-    log.error('navigation failed', { 'url.path': url.pathname, 'error.message': err.message })
+    if (err.moved) moved = err.moved
+    else log.error('navigation failed', { 'url.path': url.pathname, 'error.message': err.message })
     e = null
   }
   if (n !== seq) {
@@ -154,6 +164,7 @@ async function go(to, pop, replace) {
   }
   if (!e) {
     if (css?.created) css.el.remove()
+    if (moved) return redirect(moved, pop || replace)
     return pop ? location.reload() : location[replace ? 'replace' : 'assign'](url)
   }
 

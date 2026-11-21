@@ -155,7 +155,7 @@ test('SSR page: redirect is a real 30x with cookies; error renders the shell wit
   mode = 'error'
   const gone = await call(handler, '/report/1')
   assert.equal(gone.status, 410)
-  assert.match(await gone.text(), /"message":"Report removed"/)
+  assert.match(await gone.text(), /id="pragma-data">\{"error":\{"message":"Report removed","status":410\}\}</)
 })
 
 test('middleware runs for prebuilt pages; redirect, 404 page and pass-through', async (t) => {

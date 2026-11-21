@@ -113,6 +113,7 @@ export async function handle({ url, cookies, locals, env, next }) {
 
 - `next()` returns the `Response`. Return it, change it, or return another `Response`.
 - Check `url.pathname` to choose the protected paths. `url` is the page path also for `/_data` and `/_action`.
+- A redirect also works for client navigation: the router goes to the final URL, so the address bar shows `/login`.
 
 ## Endpoints
 

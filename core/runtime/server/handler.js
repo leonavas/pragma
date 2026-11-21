@@ -372,12 +372,12 @@ async function page(m, event) {
   } catch (err) {
     if (err instanceof Redirect) throw err
     if (err instanceof HttpError) {
-      payload = { error: err.body }
+      payload = { error: { ...err.body, status: err.status } }
       status = err.status
     } else {
       const message = err instanceof Error ? err.message : String(err)
       log.error(message, err)
-      payload = { error: { message } }
+      payload = { error: { message, status: 500 } }
       status = 500
     }
     body = undefined

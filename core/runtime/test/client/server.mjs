@@ -64,8 +64,17 @@ export function start() {
         if (name === 'chat' || name === 'slow') return ndjson(res, name, req.headers.accept)
         return send(res, 200, { name: name, route: path.slice(8, path.lastIndexOf('/')) || '/', input: JSON.parse(body) })
       }
+      if (path === '/private.html') {
+        res.writeHead(303, { location: '/b', 'cache-control': 'no-store' })
+        return res.end()
+      }
+      if (path === '/tidy.html') {
+        res.writeHead(307, { location: '/tidy', 'cache-control': 'no-store' })
+        return res.end()
+      }
       let file
-      if (path.startsWith('/core/')) file = join(runtime, path.slice(6))
+      if (path === '/tidy') file = join(fixtures, 'b.html')
+      else if (path.startsWith('/core/')) file = join(runtime, path.slice(6))
       else if (extname(path)) file = join(fixtures, path)
       else {
         const manifest = JSON.parse(await readFile(join(fixtures, '_pragma/manifest.json'), 'utf8'))

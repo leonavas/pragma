@@ -376,3 +376,9 @@ fn digit_suffix_flags_copies_not_domain_numbers() {
     assert_eq!(rules("const escala12x36 = 1"), Vec::<&str>::new());
     assert_eq!(rules("const carga5x2 = 1"), Vec::<&str>::new());
 }
+
+#[test]
+fn server_context_short_names_are_allowed() {
+    assert_eq!(rules("export function readBindings({ env, db, kv }) {\n  return [env, db, kv]\n}\n"), Vec::<&str>::new());
+    assert_eq!(rules("const xy = 1"), vec!["js/vague-name"]);
+}
