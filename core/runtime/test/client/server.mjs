@@ -19,6 +19,20 @@ function send(res, status, body, type = 'application/json') {
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body))
 }
 
+async function ndjson(res, name, accept) {
+  res.writeHead(200, { 'content-type': 'application/x-ndjson', 'cache-control': 'no-store' })
+  const chat = Buffer.from(JSON.stringify({ accept }) + '\n{"n":1}\n{"n":2,"s":"ã"}\n{"n":3}'), cut = chat.indexOf('ã') + 1
+  const chunks = name === 'chat'
+    ? [chat.subarray(0, chat.indexOf('{"n":2') + 3), chat.subarray(chat.indexOf('{"n":2') + 3, cut), chat.subarray(cut)]
+    : Array.from({ length: 30 }, (_, i) => JSON.stringify({ n: i }) + '\n')
+  for (const c of chunks) {
+    if (res.destroyed) return
+    res.write(c)
+    await wait(150)
+  }
+  res.end()
+}
+
 async function data(path) {
   if (path.startsWith('/product/')) {
     await wait(300)
@@ -26,6 +40,8 @@ async function data(path) {
     return [200, { data: { product: { id, name: 'Product ' + id } } }]
   }
   if (path === '/error') return [500, { error: { message: 'Load went wrong' } }]
+  if (path === '/gone') return [200, { redirect: { status: 303, location: '/b' } }]
+  if (path === '/missing') return [404, { error: { message: 'No product', code: 'missing' } }]
   return [404, { error: { message: 'Route has no data' } }]
 }
 
@@ -42,6 +58,10 @@ export function start() {
         const name = path.slice(path.lastIndexOf('/') + 1)
         await wait(100)
         if (name === 'fail') return send(res, 500, { error: { message: 'Failed' } })
+        if (name === 'go') return send(res, 200, { redirect: { status: 303, location: '/b' } })
+        if (name === 'conflict') return send(res, 409, { error: { message: 'Slot taken', field: 'day' } })
+        if (name === 'plain') return send(res, 400, 'bad input', 'text/plain')
+        if (name === 'chat' || name === 'slow') return ndjson(res, name, req.headers.accept)
         return send(res, 200, { name: name, route: path.slice(8, path.lastIndexOf('/')) || '/', input: JSON.parse(body) })
       }
       let file

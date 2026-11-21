@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gone</title>
+  <script>self.__pragmaDev=true</script>
+
+  <script type="application/json" id="pragma-route">{"pattern":"/gone","page":null,"components":{},"stores":{"cart":"/assets/cart.js"},"loader":true,"ssr":false}</script>
+  <script type="module" src="/core/boot.js"></script>
+</head>
+<body>
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
+  <main data-page>
+    <template data-if="page.loading" data-tid="g1"><p id="sk">loading</p></template>
+    <template data-else><h1 id="gone">should not render</h1></template>
+  </main>
+</body>
+</html>

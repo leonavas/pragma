@@ -129,6 +129,7 @@ export async function load({ params, request }) {
 
 - Use `<a href>`. The router swaps `<main data-page>`, prefetches links, and keeps the root layout.
 - Every navigation, including query-only changes, recreates page state.
-- Navigate from JS after an action with `navigate('/shop?filter=sale')` (`import { navigate } from 'pragma'`).
+- Navigate from JS after an action with `navigate('/shop?filter=sale')` (`import { navigate } from 'pragma'`). `navigate(url, { replace: true })` replaces the current history entry (wizard steps, fixing a URL).
+- A redirect from `load` replaces the history entry; a redirect from an action adds one (`data.md`). A URL on another origin is a full page load.
 - Force a full page load with `<a href="/logout" data-reload>`. Links with `target` or `download` also bypass the router.
 - Do not use `<button>` + `navigate` instead of `<a>`. Do not use `location.href`, `history.pushState`, or `location` to read params.

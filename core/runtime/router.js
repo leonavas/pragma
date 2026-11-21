@@ -4,7 +4,7 @@ import { fetchData } from './loader.js'
 
 const pages = new Map(), seen = new Set(), positions = new Map()
 const noop = () => {}
-let manifest, here, key, seq = 0, io
+let manifest, here, key, seq = 0, io, hops = 0
 
 const where = u => u.pathname + u.search
 const newKey = () => Math.random().toString(36).slice(2)
@@ -116,7 +116,18 @@ function observe() {
   })
 }
 
-export async function navigate(to, pop) {
+export function navigate(to, { replace = false } = {}) {
+  hops = 0
+  return redirect(to, replace)
+}
+
+export function redirect(to, replace = false) {
+  const url = new URL(to, location.href)
+  if (url.origin === location.origin && ++hops <= 20) return go(url, false, replace)
+  location[replace ? 'replace' : 'assign'](url)
+}
+
+async function go(to, pop, replace) {
   const url = new URL(to, location.href), n = ++seq, t0 = performance.now()
   newTrace()
   let e, doc, route, mods, pending, css
@@ -143,13 +154,13 @@ export async function navigate(to, pop) {
   }
   if (!e) {
     if (css?.created) css.el.remove()
-    return pop ? location.reload() : location.assign(url)
+    return pop ? location.reload() : location[replace ? 'replace' : 'assign'](url)
   }
 
   positions.set(key, scrollY)
   const stacked = overlay?.closeAll() ?? 0
   if (pop) key = history.state?.k
-  else history[stacked ? 'replaceState' : 'pushState']({ k: (key = newKey()) }, '', url)
+  else history[stacked || replace ? 'replaceState' : 'pushState']({ k: (key = newKey()) }, '', url)
   here = where(url)
 
   const swap = () => {
@@ -170,7 +181,7 @@ export async function navigate(to, pop) {
   }
   if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) await document.startViewTransition(swap).updateCallbackDone
   else swap()
-  log.info('navigation', { 'url.path': url.pathname, 'pragma.route': route.pattern, 'pragma.navigation': pop ? 'pop' : 'push', 'duration_ms': Math.round(performance.now() - t0) })
+  log.info('navigation', { 'url.path': url.pathname, 'pragma.route': route.pattern, 'pragma.navigation': pop ? 'pop' : replace ? 'replace' : 'push', 'duration_ms': Math.round(performance.now() - t0) })
   observe()
 }
 
@@ -190,7 +201,7 @@ export function startRouter() {
   })
   addEventListener('popstate', ev => {
     if (overlay?.handlePopState(ev) || where(location) === here) return
-    navigate(location.href, true)
+    go(location.href, true)
   })
   const hover = ev => {
     const a = link(ev.target)

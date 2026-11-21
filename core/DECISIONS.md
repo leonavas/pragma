@@ -156,9 +156,31 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   instead of shipping half-working. Discarded: an exported `head()`/`meta` object in
   `.server.js` (HTML in JS, a second way to write tags), a page `<head>` block (one more
   structure rule for the same thing), evaluating head bindings on the client.
+- **[firm v0]** Action and load results keep status and body (2026-11-21): errors answer the
+  real 4xx/5xx with `{ error }` and `call`/`stream` throw `ActionError` with `status` and `body`;
+  redirects travel as 200 `{ redirect: { status, location } }` and the client router follows
+  them (action: push, like SvelteKit `applyAction`; `load`: replace, so Back skips the
+  redirecting URL). `stream()` reads NDJSON from an action that returns a `Response`. *Why:* a
+  409 with the conflicting slots or an AI agent reply streamed line by line was lost behind a
+  generic message; a real 3xx on `fetch` is followed invisibly and the URL never changes.
+  Rejected: a SvelteKit-style `deserialize` envelope for every result (one more shape to learn)
+  and SSE (`EventSource` cannot POST).
 - **[superseded]** SSR via `HTMLRewriter` on Workers and `lol_html` in `pragma serve`: replaced
   by compiled ops rendered by the JS handler.
 - **[superseded]** "No SSR (SPA + API)".
+
+## Motion
+
+- **[firm v0]** Block enter/leave animations are CSS on runtime attributes (2026-11-21):
+  `data-entering` on a block root inserted after the block's first render, `data-leaving` (+
+  `inert`) on a removed one, which stays until its finite CSS animations end
+  (`Animation.finished`, timeout = computed end + 50 ms). No rule → immediate removal;
+  `prefers-reduced-motion` → no wait. Same ideas as Svelte `in:`/`out:` (no intro on first
+  render, outro keeps the node and makes it inert, a block that comes back reuses the node), no
+  JS animation engine and no new syntax. *Why:* ported apps use ~110 transitions; `@starting-style`
+  covers entry but nothing covers exit without keeping the node. Rejected: a `transition`
+  directive (closed syntax, JS easing), `animationend`/`transitionend` listeners (miss
+  descendants and transitions that never start).
 
 ## CSS
 
