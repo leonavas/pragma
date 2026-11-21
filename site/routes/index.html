@@ -13,32 +13,47 @@
 <p-hero></p-hero>
 
 <section id="install" class="wrap" aria-labelledby="install-title">
-  <div class="grid gap-10 border-t border-line py-14 lg:grid-cols-3 lg:gap-16 lg:py-20">
-    <div>
+  <div class="install">
+    <div class="head-row">
       <h2 id="install-title" class="section-title">Install</h2>
-      <div class="prose mt-4 max-w-md">
-        <p>One Rust binary compiles, checks, serves and bundles npm packages: no Vite, no esbuild, no config. Node 22 or newer only runs your <code>.server.js</code> files.</p>
-        <p>Linux and macOS: run the one-line installer. Windows: <a href="https://github.com/leonavas/pragma/releases/latest">download the binary from GitHub Releases</a>. Other platforms build from source with Cargo.</p>
-        <p>Then <code>pragma new my-app</code>, <code>cd my-app</code> and <code>pragma dev</code>.</p>
-        <p>Update the CLI with <code>pragma self-update</code> (GitHub Releases). Update <code>.pragma/</code> (runtime, docs, <code>base.css</code>, <code>version</code>) inside an app with <code>pragma upgrade</code>.</p>
-      </div>
-      <div class="mt-8 flex flex-wrap gap-3">
-        <a href="https://github.com/leonavas/pragma/releases/latest" class="btn btn-primary">Download from GitHub</a>
-        <a href="/guide" class="btn">Start with the guide</a>
-      </div>
+      <p class="head-note">One Rust binary compiles, checks, serves and bundles npm packages: no Vite, no esbuild, no config. Node 22 or newer only runs your <code>.server.js</code> files.</p>
     </div>
-    <div class="grid gap-6 self-start lg:col-span-2">
-      <c-terminal title="~" copy="curl -fsSL https://raw.githubusercontent.com/leonavas/pragma/main/install.sh | sh">
-        <pre tabindex="0" aria-label="Commands that install pragma"><code><span class="term-cmd">curl -fsSL https://raw.githubusercontent.com/leonavas/pragma/main/install.sh | sh</span>
+    <ol class="steps">
+      <li class="step">
+        <div class="step-copy">
+          <h3 class="step-name"><span class="step-number" aria-hidden="true">1</span>Install the CLI</h3>
+          <p>Linux and macOS: run the one-line installer. Windows: <a href="https://github.com/leonavas/pragma/releases/latest">download the binary from GitHub Releases</a>. Other platforms build from source with Cargo.</p>
+        </div>
+        <c-terminal title="~" copy="curl -fsSL https://raw.githubusercontent.com/leonavas/pragma/main/install.sh | sh">
+          <pre tabindex="0" aria-label="Commands that install pragma"><code><span class="term-cmd">curl -fsSL https://raw.githubusercontent.com/leonavas/pragma/main/install.sh | sh</span>
 <span class="term-cmd">pragma -V</span>
-pragma 0.1.0
-<span class="term-cmd">pragma new my-app &amp;&amp; cd my-app &amp;&amp; pragma dev</span></code></pre>
-      </c-terminal>
-      <c-terminal title="update" copy="pragma self-update && pragma upgrade">
-        <pre tabindex="0" aria-label="Commands that update pragma and an app"><code><span class="term-cmd">pragma self-update</span>
+pragma 0.1.0</code></pre>
+        </c-terminal>
+      </li>
+      <li class="step">
+        <div class="step-copy">
+          <h3 class="step-name"><span class="step-number" aria-hidden="true">2</span>Create an app</h3>
+          <p>Then <code>pragma new my-app</code>, <code>cd my-app</code> and <code>pragma dev</code>.</p>
+        </div>
+        <c-terminal title="~" copy="pragma new my-app && cd my-app && pragma dev">
+          <pre tabindex="0" aria-label="Commands that create and run an app"><code><span class="term-cmd">pragma new my-app &amp;&amp; cd my-app &amp;&amp; pragma dev</span></code></pre>
+        </c-terminal>
+      </li>
+      <li class="step">
+        <div class="step-copy">
+          <h3 class="step-name"><span class="step-number" aria-hidden="true">3</span>Keep it current</h3>
+          <p>Update the CLI with <code>pragma self-update</code> (GitHub Releases). Update <code>.pragma/</code> (runtime, docs, <code>base.css</code>, <code>version</code>) inside an app with <code>pragma upgrade</code>.</p>
+        </div>
+        <c-terminal title="update" copy="pragma self-update && pragma upgrade">
+          <pre tabindex="0" aria-label="Commands that update pragma and an app"><code><span class="term-cmd">pragma self-update</span>
 <span class="term-dim"># inside an app</span>
 <span class="term-cmd">pragma upgrade</span></code></pre>
-      </c-terminal>
+        </c-terminal>
+      </li>
+    </ol>
+    <div class="flex flex-wrap gap-3">
+      <a href="https://github.com/leonavas/pragma/releases/latest" class="btn btn-primary">Download from GitHub</a>
+      <a href="/guide" class="btn">Start with the guide</a>
     </div>
   </div>
 </section>
@@ -51,20 +66,24 @@ pragma 0.1.0
 </section>
 
 <section class="wrap" aria-labelledby="why-title">
-  <div class="grid gap-10 py-16 lg:grid-cols-3 lg:gap-16 lg:py-24">
-    <h2 id="why-title" class="section-title">Nobody argues about frameworks anymore. The agent picks one.</h2>
-    <div class="prose lg:col-span-2">
-      <p>Most people who build with an LLM don't know frontend. They ask for React or Angular because those are the names they know, and ship slow pages.</p>
-      <p>Some don't care and get plain HTML and JavaScript. Nothing beats it on speed. Nothing about it scales: it eats context, turns into a tangle, and the agent loses the thread.</p>
-      <p>Some know a bit more and pick SvelteKit, Astro or htmx. Good tools, made for people who read docs.</p>
-      <p><strong>pragma is made for the agent:</strong></p>
-      <ul>
-        <li>The minimum lint that stops the tangle: one way to do each thing, and every error names the rule and the fix.</li>
-        <li>Components and reactivity on what the browser already has: ES modules, <code>&lt;template&gt;</code>, <code>&lt;dialog&gt;</code>, popover, view transitions.</li>
-        <li>One Rust binary compiles, lints and validates. No Vite, no config.</li>
-        <li>Plain JavaScript. Never TypeScript.</li>
-        <li>WebMCP by default: every form is a tool an agent in the browser can call. A page with a .md next to it answers in markdown when an agent asks.</li>
-      </ul>
+  <div class="block">
+    <h2 id="why-title" class="section-title why-title">Nobody argues about frameworks anymore. The agent picks one.</h2>
+    <div class="why">
+      <div class="prose">
+        <p>Most people who build with an LLM don't know frontend. They ask for React or Angular because those are the names they know, and ship slow pages.</p>
+        <p>Some don't care and get plain HTML and JavaScript. Nothing beats it on speed. Nothing about it scales: it eats context, turns into a tangle, and the agent loses the thread.</p>
+        <p>Some know a bit more and pick SvelteKit, Astro or htmx. Good tools, made for people who read docs.</p>
+      </div>
+      <aside class="answer" aria-labelledby="answer-title">
+        <p id="answer-title" class="answer-lead">pragma is made for the agent:</p>
+        <ul class="answer-list">
+          <li>The minimum lint that stops the tangle: one way to do each thing, and every error names the rule and the fix.</li>
+          <li>Components and reactivity on what the browser already has: ES modules, <code>&lt;template&gt;</code>, <code>&lt;dialog&gt;</code>, popover, view transitions.</li>
+          <li>One Rust binary compiles, lints and validates. No Vite, no config.</li>
+          <li>Plain JavaScript. Never TypeScript.</li>
+          <li>WebMCP by default: every form is a tool an agent in the browser can call. A page with a .md next to it answers in markdown when an agent asks.</li>
+        </ul>
+      </aside>
     </div>
   </div>
 </section>
@@ -81,31 +100,138 @@ pragma 0.1.0
   </div>
 </section>
 
-<p-principles></p-principles>
+<section class="wrap" aria-labelledby="principles-title">
+  <div class="block bordered">
+    <h2 id="principles-title" class="section-title">Four constraints, enforced by the compiler</h2>
+    <div class="rules">
+      <article class="rule">
+        <h3 class="rule-name">Native</h3>
+        <p class="rule-text">A page or a component is one .html file: the markup, its &lt;script&gt; and its &lt;style&gt;. Its data comes from the .server.js with the same name. No JSX, no virtual DOM, no framework between you and the platform.</p>
+        <pre class="rule-code"><code>routes/
+  index.html
+  shop/[id].html
+  shop/[id].server.js
+  shop/_components/
+    cart-button/
+      cart-button.html</code></pre>
+      </article>
+      <article class="rule">
+        <h3 class="rule-name">Closed</h3>
+        <p class="rule-text">Braces put a value in text, a colon binds an attribute, a dot a class, an at sign an event, a dollar sign names the script's state. Conditions and loops are tags. Anything outside that list is a build error, not a convention.</p>
+        <pre class="rule-code"><code><span class="text-accent">&lt;for</span> task in $visible
+  key=task.id<span class="text-accent">&gt;</span>
+  &lt;li <span class="text-accent">.done</span>="task.done"&gt;
+    <span class="text-accent">&#123;task.title&#125;</span>
+  &lt;/li&gt;
+<span class="text-accent">&lt;/for&gt;</span></code></pre>
+      </article>
+      <article class="rule">
+        <h3 class="rule-name">Small</h3>
+        <p class="rule-text">The starter page loads 10.0 kB of JavaScript, gzip, router and runtime included. Each page preloads only the modules it imports, and budgets in pragma.json fail the build when a page grows.</p>
+        <pre class="rule-code"><code>page     JS gzip
+/        <span class="text-ink">10.0 KB</span>
+CSS       <span class="text-ink">4.1 KB</span>
+1 page(s)
+dist/ built in 6 ms</code></pre>
+      </article>
+      <article class="rule">
+        <h3 class="rule-name">Agent-first</h3>
+        <p class="rule-text">Every app ships with AGENTS.md and its docs. pragma check answers with file, line, column, rule and fix, so an agent corrects itself in one pass instead of guessing. Every form is a WebMCP tool, and a page can answer in markdown.</p>
+        <pre class="rule-code"><code>routes/index.html:8:4
+error [html/unknown-name]
+  $count is not declared
+  add `let count = …`</code></pre>
+      </article>
+    </div>
+  </div>
+</section>
 
 <section id="tools" class="wrap" aria-labelledby="tools-title">
-  <div class="grid gap-10 pb-20 lg:grid-cols-3 lg:gap-16">
-    <div>
+  <div class="block bordered tools">
+    <div class="tools-intro">
       <h2 id="tools-title" class="section-title">Tools for agents on this page</h2>
-      <div class="prose mt-4 max-w-md">
-        <p>An agent in the browser sees these forms as WebMCP tools and calls them. You can use the same forms. Agents without a browser read the same docs at <a href="/llms-full.txt">/llms-full.txt</a>.</p>
-      </div>
-      <a href="/agents" class="btn mt-8">Everything for agents</a>
+      <p class="head-note">An agent in the browser sees these forms as WebMCP tools and calls them. You can use the same forms. Agents without a browser read the same docs at <a href="/llms-full.txt" class="text-ink">/llms-full.txt</a>.</p>
+      <a href="/agents" class="btn w-fit">Everything for agents</a>
     </div>
-    <div class="grid gap-6 lg:col-span-2 xl:grid-cols-2">
-      <p-setup-tool></p-setup-tool>
-      <p-docs-tool></p-docs-tool>
-    </div>
+    <p-setup-tool></p-setup-tool>
+    <p-docs-tool></p-docs-tool>
   </div>
 </section>
 
 <section class="wrap" aria-labelledby="sections-title">
-  <div class="grid gap-10 border-t border-line pt-16 lg:grid-cols-3 lg:gap-16">
-    <div>
+  <div class="block bordered examples-block">
+    <div class="head-row">
       <h2 id="sections-title" class="section-title">Every feature, running on this page's runtime</h2>
-      <p class="mt-4 max-w-md text-muted">Each example shows its real source files next to the live result. The code you read is the code that renders.</p>
-      <a href="/examples" class="btn mt-8">Browse all examples</a>
+      <div class="head-note">
+        <p>Each example shows its real source files next to the live result. The code you read is the code that renders.</p>
+        <a href="/examples" class="btn mt-6">Browse all examples</a>
+      </div>
     </div>
-    <c-section-nav class="lg:col-span-2" label="Example sections"></c-section-nav>
+    <c-section-nav class="examples" label="Example sections"></c-section-nav>
   </div>
 </section>
+
+<style>
+  .head-row { display: grid; gap: 1rem; }
+  .head-note { max-width: 60ch; color: var(--color-muted); line-height: 1.65; }
+  .head-note code, .step-copy code, .answer-list code { padding: 0.1em 0.35em; background: var(--color-raised); color: var(--color-ink); font-size: 0.8em; }
+
+  .install { display: grid; gap: 2.5rem; padding-block: 3.5rem; border-top: 1px solid var(--color-line); }
+  .steps { display: grid; border-top: 1px solid var(--color-line); }
+  .step { display: grid; gap: 1.25rem; padding-block: 1.75rem; border-bottom: 1px solid var(--color-line); }
+  .step-copy { display: grid; gap: 0.75rem; align-content: start; color: var(--color-muted); line-height: 1.65; }
+  .step-copy a { color: var(--color-ink); text-decoration-color: var(--color-line-strong); }
+  .step-copy a:hover { text-decoration-color: var(--color-accent); }
+  .step-name { display: flex; align-items: baseline; gap: 0.75rem; color: var(--color-ink); font-size: 0.9375rem; font-weight: 500; }
+  .step-number { color: var(--color-accent); font-family: var(--font-display); font-size: 1.375rem; line-height: 1; }
+
+  .block { display: grid; gap: 2.5rem; padding-block: 4rem; }
+  .bordered { border-top: 1px solid var(--color-line); }
+  .why-title { max-width: 30ch; }
+  .why { display: grid; gap: 2.5rem; }
+  .answer { display: grid; gap: 1rem; align-content: start; padding: 1.5rem; border: 1px solid var(--color-line); background: var(--color-sunken); }
+  .answer-lead { color: var(--color-ink); font-weight: 600; }
+  .answer-list { display: grid; gap: 0.875rem; padding-left: 1.1em; color: var(--color-muted); font-size: 0.9375rem; line-height: 1.6; list-style: square; }
+  .answer-list li::marker { color: var(--color-accent); }
+
+  .rules { display: grid; gap: 2.5rem 2rem; }
+  .rule { display: grid; grid-template-rows: subgrid; grid-row: span 3; gap: 0.875rem; min-width: 0; padding-top: 1.25rem; border-top: 1px solid var(--color-accent); }
+  .rule-name { color: var(--color-accent); font-size: 0.875rem; font-weight: 500; }
+  .rule-text { color: var(--color-muted); font-size: 0.9375rem; line-height: 1.65; }
+  .rule-code {
+    margin: 0;
+    padding: 1rem;
+    overflow-x: auto;
+    border: 1px solid var(--color-line);
+    background: var(--color-sunken);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    line-height: 1.75;
+  }
+
+  .tools { gap: 1.5rem; }
+  .tools-intro { display: grid; gap: 1.25rem; align-content: start; margin-bottom: 1rem; }
+  .examples-block { padding-bottom: 0; }
+
+  @media (min-width: 48rem) {
+    .step { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 2.5rem; align-items: start; }
+    .rules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tools { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .tools-intro { grid-column: 1 / -1; }
+    .examples :global(.section-nav-list) { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 2rem; }
+  }
+
+  @media (min-width: 64rem) {
+    .head-row { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 4rem; align-items: start; }
+    .install { gap: 3rem; padding-block: 5rem; }
+    .block { gap: 3rem; padding-block: 6rem; }
+    .why { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 4rem; }
+    .examples :global(.section-nav-list) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+
+  @media (min-width: 80rem) {
+    .rules { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: auto auto 1fr; }
+    .tools { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 2rem; }
+    .tools-intro { grid-column: auto; margin-bottom: 0; }
+  }
+</style>
