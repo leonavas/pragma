@@ -478,7 +478,9 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         fc.run(&p.trees[id as usize], html::Pos { file: id, line: 1, col: 1 });
         diags.extend(fc.diags);
     }
-    diags.extend(webmcp::source(&p.files, &p.trees, p.config.webmcp));
+    if !p.config.webmcp {
+        diags.extend(webmcp::disabled(&p.files, &p.trees));
+    }
 
     let mut outs: Vec<PageOut> = Vec::new();
     let mut shared_classes: BTreeSet<String> = BTreeSet::new();

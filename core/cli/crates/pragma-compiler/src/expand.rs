@@ -195,6 +195,18 @@ impl<'p> Expander<'p> {
         Res::Path(v.to_string())
     }
 
+    /// `:toolname="$x"` in a component with a script: a WebMCP tool attribute is static, so it takes
+    /// the caller's fixed text at build time (`None` inside: the caller left the prop out). `None`:
+    /// not a prop of a scripted component, or the caller bound it to a path.
+    fn caller_text(&self, v: &str, sc: &Scope) -> Option<Option<Option<String>>> {
+        let props = sc.props.filter(|_| sc.script)?;
+        let name = v.strip_prefix("$.").filter(|n| directive::is_ident(n))?.to_ascii_lowercase();
+        if sc.bound_props.contains_key(&name) {
+            return None;
+        }
+        Some(props.get(&name).cloned())
+    }
+
     fn expand_nodes(&mut self, nodes: &[Node], sc: &Scope) -> Vec<Node> {
         let mut out = Vec::new();
         let mut i = 0;
@@ -307,6 +319,15 @@ impl<'p> Expander<'p> {
                 continue;
             };
             let v = a.value.as_deref().unwrap_or("");
+            if let Dir::Attr(n) = d
+                && crate::webmcp::is_tool_attr(n)
+                && let Some(text) = self.caller_text(v, sc)
+            {
+                if let Some(value) = text {
+                    el.attrs.push(Attr { name: n.to_string(), value, pos: a.pos });
+                }
+                continue;
+            }
             match d {
                 Dir::Text => {
                     match self.template(v, sc, true) {
@@ -433,7 +454,10 @@ impl<'p> Expander<'p> {
             }
             if let Some(alias) = lname.strip_prefix("data-with-") {
                 match self.resolve(a.value.as_deref().unwrap_or(""), sc) {
-                    Res::Path(p) if script.is_some() => forward.push(Attr { name: format!("data-with-{alias}"), value: Some(p), pos: a.pos }),
+                    Res::Path(p) if script.is_some() => {
+                        bound_props.insert(alias.to_string(), p.clone());
+                        forward.push(Attr { name: format!("data-with-{alias}"), value: Some(p), pos: a.pos });
+                    }
                     Res::Path(p) => {
                         bound_props.insert(alias.to_string(), p);
                     }

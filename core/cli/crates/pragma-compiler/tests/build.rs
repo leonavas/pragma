@@ -1596,3 +1596,37 @@ fn nested_layouts() {
     ]);
     expect(&d, "app/structure", "routes/admin/_layout.server.js", 1);
 }
+
+fn starter_component(name: &str) -> (String, String) {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../starter/lib/components").join(name);
+    (format!("lib/components/{name}/{name}.html"), fs::read_to_string(dir.join(format!("{name}.html"))).unwrap())
+}
+
+#[test]
+fn webmcp_component_passes_caller_text_to_tool_attribute() {
+    let (select_path, select) = starter_component("select");
+    let (dropdown_path, dropdown) = starter_component("dropdown");
+    let page = "<script>\n  const columns = () => [{ value: 'todo', label: 'To do' }]\n  function add() {}\n</script>\n<title>Board</title>\n<h1>Board</h1>\n<form toolname=\"add_card\" tooldescription=\"Add a card to a column\" @submit=\"add\">\n  <c-select name=\"column\" label=\"Column\" toolparamdescription=\"Column id: todo\" :options=\"$columns\"></c-select>\n  <button>Add</button>\n</form>";
+    let theme = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../starter/lib/theme.css")).unwrap();
+    let t = scratch(&[(PAGE, page), (&select_path, &select), (&dropdown_path, &dropdown), ("lib/theme.css", &theme)]);
+    let app = t.0.join("app");
+    let d = check(&app);
+    assert!(d.is_empty(), "{d:#?}");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: app.clone(), out_dir: out.clone(), mode: Mode::Prod }).unwrap();
+    let built = fs::read_to_string(out.join("client/index.html")).unwrap();
+    assert!(built.contains("toolparamdescription=\"Column id: todo\""), "{built}");
+
+    let missing = page.replace(" toolparamdescription=\"Column id: todo\"", "");
+    fs::write(app.join(PAGE), &missing).unwrap();
+    expect(&check(&app), "webmcp/param-description", &select_path, 32);
+
+    let bound = page.replace("toolparamdescription=\"Column id: todo\"", ":toolparamdescription=\"$columns\"");
+    fs::write(app.join(PAGE), &bound).unwrap();
+    expect(&check(&app), "webmcp/dynamic", &select_path, 32);
+
+    fs::write(app.join("pragma.json"), "{ \"name\": \"tpl\", \"webmcp\": false }").unwrap();
+    fs::write(app.join(PAGE), "<title>Board</title>\n<h1>Board</h1>").unwrap();
+    let d = check(&app);
+    assert!(!d.iter().any(|x| x.rule == "webmcp/disabled"), "{d:#?}");
+}

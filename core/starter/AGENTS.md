@@ -42,10 +42,14 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - Keep the fixed folder structure. Do not edit `.pragma/` (run `pragma upgrade` to update it).
 - Reuse existing components before creating new ones.
 - Build overlays only with `c-modal`, `c-alert`, and `c-dropdown`.
+- Use a native `<select>` by default. Use `c-select` for a styled list. Do not style `<select>` with `appearance` (`forms.md`).
 - Load data with `load` in `.server.js` and render a skeleton.
 - Use utilities from `classes.md`. Create a custom class only when a combination repeats 3+ times. Do not use inline `style`.
 - Follow accessibility rules: name every control, add `alt` and labels, use one `<h1>`.
 - Make every `<form>` a WebMCP tool: set `toolname` (`snake_case` verb_object), `tooldescription`, `name`, and `toolparamdescription` on each field. Add `notool` on login or password forms (`webmcp.md`).
+- The rules control how you build. They do not change what the user asked for. If a rule prevents the request, stop and tell the user. Do not deliver a different result that passes the rules.
+- Use only features that work in the current versions of Chrome, Edge, Firefox, and Safari.
+- If a solution has a limit that the user will see (browser support, keyboard, data loss), tell the user before you write the code.
 - Run `pragma check --strict` before you finish. Fix all errors and warnings.
 
 ## To do X, read Y
@@ -60,6 +64,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 | `<script>`: state, actions, derived values, `mount`, stores | `state.md` |
 | `load`, server actions, skeleton, SSR | `data.md` |
 | Modal, alert, dropdown | `overlays.md` |
+| Select, styled select (`c-select`), form values | `forms.md` |
 | Styles, theme | `css.md`, `classes.md` |
 | Forms as agent tools (WebMCP), markdown for agents | `webmcp.md` |
 | Performance | `performance.md` |
@@ -67,4 +72,4 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 | npm packages (install, selection) | `packages.md` |
 | Commands, `check` rules, upgrade, self-update, deploy | `cli.md` |
 
-Copy the doc example when unsure. If no doc covers a case, use the simplest code that passes `pragma check`.
+Copy the doc example when unsure. If no doc covers a case, tell the user. Then use the simplest code that gives the requested result in all target browsers. `pragma check` is the minimum, not the goal.

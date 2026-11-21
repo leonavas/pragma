@@ -19,7 +19,7 @@ The folder structure is fixed. Do not create other top-level folders. Do not edi
       _products.json       private data
       _components/<name>/  <p-name>
   lib/
-    components/<name>/     <c-name>; starter ships modal, alert, dropdown
+    components/<name>/     <c-name>; starter ships modal, alert, dropdown, select
     state/<name>.js        stores (access through `shared`, never import)
     theme.css              tokens and global custom classes
   utils/                   pure functions

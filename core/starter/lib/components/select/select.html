@@ -1,0 +1,50 @@
+<script>
+  export let name = ''
+  export let label = ''
+  export let value = ''
+  export let options = []
+  export let toolparamdescription = ''
+
+  let selected = value
+
+  const current = () => options.find(option => option.value === selected) ?? options[0]
+  const currentLabel = () => current()?.label ?? ''
+  const listId = () => `${name}-options`
+  const rows = () =>
+    options.map(option => {
+      const chosen = option.value === current()?.value
+      return { option, chosen, pressed: String(chosen) }
+    })
+
+  function choose(option) {
+    selected = option.value
+  }
+
+  function moveFocus(event, el) {
+    const sibling = { ArrowDown: el.nextElementSibling, ArrowUp: el.previousElementSibling }[event.key]
+    if (!sibling) return
+    event.preventDefault()
+    sibling.focus()
+  }
+</script>
+
+<div class="inline-flex" role="group" :aria-label="$label">
+  <select class="sr-only" tabindex="-1" aria-hidden="true" :name="$name" :aria-label="$label" :toolparamdescription="$toolparamdescription" :model="$selected">
+    <for option in $options key=option.value>
+      <option :value="option.value">{option.label}</option>
+    </for>
+  </select>
+  <c-dropdown class="picker" :id="$listId" :label="$currentLabel">
+    <for row in $rows key=row.option.value>
+      <button type="button" :aria-pressed="row.pressed" @click="choose(row.option)" @keydown="moveFocus(event, el)" @close>
+        <span class="flex-1">{row.option.label}</span>
+        <svg class="size-4 text-primary-600" :show="row.chosen" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>
+      </button>
+    </for>
+  </c-dropdown>
+</div>
+
+<style>
+  .picker :global(.btn) { min-width: 10rem; justify-content: space-between; font-weight: 400; }
+  button[aria-pressed="true"] { font-weight: 600; }
+</style>

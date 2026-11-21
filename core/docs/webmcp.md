@@ -21,6 +21,7 @@ WebMCP is on by default (`"webmcp": true` in `pragma.json`; omitted means `true`
 - Add `name` to every field (`type=submit|reset|button|image` exempt).
 - Use native constraints (`required`, `type`, `min`/`max`, `<select>` options) to describe parameters.
 - Use static strings only; do not use `:` bindings or `{}` in tool attributes.
+- Exception: a component passes a tool attribute on from its caller with `:toolparamdescription="$toolparamdescription"` (prop `export let toolparamdescription = ''`). The caller must write fixed text (`<c-select toolparamdescription="…">`); the build writes that text into the attribute.
 - Without `toolautosubmit`, the browser fills the form and focuses the submit button for the user.
 - With `"webmcp": false`, any tool attribute triggers `webmcp/disabled`.
 
@@ -63,7 +64,7 @@ Errors (broken tool):
 | `webmcp/name` | Use 1–128 chars from `A-Z a-z 0-9 _ . -` in `toolname`. |
 | `webmcp/duplicate` | Use a unique `toolname` per page (`<if>`/`<else>` branches count separately). |
 | `webmcp/param-name` | Add `name` to every field in a tool form. |
-| `webmcp/dynamic` | Use static text only in tool attributes (no `:` or `{}`). |
+| `webmcp/dynamic` | Use static text only in tool attributes (no `:` or `{}`). A component prop passed on with `:attr="$prop"` must get fixed text from the caller. |
 | `webmcp/notool` | Use `notool` only on `<form>`, never with `toolname`. |
 | `webmcp/attribute` | Put `tooldescription`/`toolautosubmit` only on `<form>`, and `toolparamdescription` only on input, select, or textarea. |
 | `webmcp/disabled` | Remove tool attributes when `"webmcp": false`, or set `"webmcp": true`. |

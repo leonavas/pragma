@@ -10,15 +10,20 @@ const FIELDS: &[&str] = &["input", "select", "textarea"];
 const NOT_PARAMS: &[&str] = &["submit", "reset", "button", "image"];
 const UNSAFE_PREFIXES: &[&str] = &["delete_", "remove_", "destroy_", "pay_", "buy_", "purchase_", "cancel_", "send_", "transfer_"];
 
-pub fn source(files: &[PathBuf], trees: &[Vec<Node>], enabled: bool) -> Vec<Diagnostic> {
+pub fn is_tool_attr(name: &str) -> bool {
+    TOOL_ATTRS.contains(&name)
+}
+
+/// Tool attributes written with WebMCP off (`webmcp/disabled`).
+pub fn disabled(files: &[PathBuf], trees: &[Vec<Node>]) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     for tree in trees {
-        source_nodes(files, tree, enabled, &mut out);
+        disabled_nodes(files, tree, &mut out);
     }
     out
 }
 
-fn source_nodes(files: &[PathBuf], nodes: &[Node], enabled: bool, out: &mut Vec<Diagnostic>) {
+fn disabled_nodes(files: &[PathBuf], nodes: &[Node], out: &mut Vec<Diagnostic>) {
     for n in nodes {
         let Node::Element(e) = n else { continue };
         if !is_component_tag(&e.name) {
@@ -26,17 +31,15 @@ fn source_nodes(files: &[PathBuf], nodes: &[Node], enabled: bool, out: &mut Vec<
                 let lname = a.name.to_ascii_lowercase();
                 let bound = lname.strip_prefix("data-attr-");
                 let Some(attr) = TOOL_ATTRS.iter().copied().find(|t| bound.unwrap_or(&lname) == *t) else { continue };
-                let file = files[a.pos.file as usize].clone();
-                if !enabled {
-                    let msg = format!("{attr} needs WebMCP, which is off: set \"webmcp\": true in pragma.json, or remove {attr}");
-                    out.push(Diagnostic::error(file, a.pos.line, a.pos.col, "webmcp/disabled", msg));
-                } else if bound.is_some() {
-                    let msg = format!("{attr} must be static: write {} with fixed text, no : binding or {{}}", written(attr));
-                    out.push(Diagnostic::error(file, a.pos.line, a.pos.col, "webmcp/dynamic", msg));
+                // a component passing on its caller's prop (`:toolparamdescription="$toolparamdescription"`)
+                if bound.is_some() && a.value.as_deref().is_some_and(|v| v.starts_with("$.")) {
+                    continue;
                 }
+                let msg = format!("{attr} needs WebMCP, which is off: set \"webmcp\": true in pragma.json, or remove {attr}");
+                out.push(Diagnostic::error(files[a.pos.file as usize].clone(), a.pos.line, a.pos.col, "webmcp/disabled", msg));
             }
         }
-        source_nodes(files, &e.children, enabled, out);
+        disabled_nodes(files, &e.children, out);
     }
 }
 
@@ -117,7 +120,13 @@ impl Tools<'_> {
         let field = FIELDS.contains(&name.as_str());
         for a in &e.attrs {
             let lname = a.name.to_ascii_lowercase();
-            let attr = lname.strip_prefix("data-attr-").unwrap_or(&lname);
+            let bound = lname.strip_prefix("data-attr-");
+            let attr = bound.unwrap_or(&lname);
+            // still bound after expansion: the value is not known at build time
+            if bound.is_some() && is_tool_attr(attr) {
+                let msg = format!("{attr} must be static: write {} with fixed text, no : binding or {{}}; a component can pass it on with :{attr}=\"$prop\" when its caller gives the prop fixed text", written(attr));
+                self.error(a.pos, "webmcp/dynamic", msg);
+            }
             match attr {
                 "toolname" | "tooldescription" | "toolautosubmit" if !form => {
                     self.error(a.pos, "webmcp/attribute", format!("{attr} only goes on <form>: move it from <{name}> to the form"))

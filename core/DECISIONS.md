@@ -101,6 +101,13 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   `false`, other values stay strings.
 - **[firm]** Overlays (modal, alert, popup, dropdown) are always HTML + JS. Back (browser or
   Android) closes the overlay instead of leaving the page. Modal and alert lock scroll (SPEC §6).
+- **[firm]** (2026-11-21) Styled select is `c-select` (starter): `c-dropdown` plus a hidden native
+  `<select name>`, so `FormData` and WebMCP get the value. A component may pass a tool attribute on
+  with `:toolparamdescription="$prop"`; the caller's fixed text is written at build time, a bound
+  value is `webmcp/dynamic`. AGENTS.md: rules do not change the request, target is current Chrome,
+  Edge, Firefox and Safari, and limits are told before coding. *Why:* an agent asked for "a dropdown
+  with HTML" shipped `appearance: base-select` (Chrome/Edge only) because it was "the simplest code
+  that passes `pragma check`" and `c-dropdown` sends no form value.
 - **[superseded]** "Component syntax" and "how JS finds nodes" (previously open): solved by
   directives.
 
