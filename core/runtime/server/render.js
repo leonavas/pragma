@@ -146,8 +146,6 @@ function run(ops, scope, ctx, chain) {
   return out
 }
 
-// Root of a component with a script: rendered with its instance (`state`) when the server can run
-// it; otherwise, or if rendering with it throws, its `state` bindings are left to the client.
 function component([, id, props, body], scope, ctx) {
   const { state: _, ...outside } = scope
   const values = {}
@@ -180,8 +178,6 @@ const readonly = readonlyViews(
   () => 'data, params, query and page are read-only while the server renders',
 )
 
-// What a script's `import { … } from 'pragma'` gives while the server renders: read-only data;
-// stores and browser actions throw, which leaves that page or component to the client.
 export function serverServices({ data, params, query, page }, log) {
   return {
     data: readonly(data), params: readonly(params), query: readonly(query), page: readonly(page), log,
@@ -201,8 +197,6 @@ function instantiate(mod, props, services) {
   }
 }
 
-// SSR of a page: its script and its components' scripts run on the server when the build bundled
-// them (`page`, `components` by data-c id); anything they cannot render stays to the client.
 export function renderPage(ops, scope, { page, components = {}, log } = {}) {
   const services = serverServices(scope, log)
   const ctx = { instance: (id, props) => instantiate(components[id], props, services) }
@@ -227,7 +221,6 @@ const HEAD_TAG = /<(title|meta|link)\b([^>]*)>(?:([^<]*)<\/title>)?(\n?)/g
 const ATTR = /\s([^\s=]+)(?:="([^"]*)")?/g
 const BOUND = /^data-(?:attr-(.+)|(text))$/
 
-// Escaped value of a bound head attribute or title: a template, or a path (`true` = empty attribute).
 function headValue(scope, value) {
   try {
     if (isTemplate(value)) return fill(scope, value)
@@ -250,7 +243,6 @@ function jsonValue(scope, path) {
   }
 }
 
-// JSON-LD: `{path}` inside its strings becomes the value; JSON syntax outside strings is kept.
 function fillJsonLd(body, scope) {
   let out = ''
   let inString = false

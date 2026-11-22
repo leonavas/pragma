@@ -6,6 +6,7 @@ import { fetchData, load, loadResult, call, stream } from './loader.js'
 import { navigate, redirect } from './router.js'
 import { DATA_ID, MAIN, PERSIST_SUFFIX, matchPattern } from './contract.js'
 
+// The build modulepreloads overlay.js only on pages with a dialog or popover.
 let overlayModule = null, overlayLoad = null
 const overlays = () => (overlayLoad ??= import('./overlay.js').then(m => (m.initOverlays(), (overlayModule = m))))
 const open = (...a) => overlays().then(m => m.open(...a))
@@ -171,6 +172,7 @@ function settle(p, result) {
 function loadData(p, doc, pending) {
   if (!p.route.loader) return Promise.resolve()
   const embedded = p.route.ssr && doc.getElementById(DATA_ID)
+  // SSR data is set before the page script runs, so the script sees what the server rendered with.
   if (embedded) {
     const result = loadResult(JSON.parse(embedded.textContent))
     if (!result.redirect) settle(p, result)

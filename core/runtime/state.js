@@ -1,7 +1,5 @@
 import { STORE_KEY, THEME_KEY } from './contract.js'
 
-// Reactive values: a deep Proxy over plain objects and arrays. Every change calls `notify(target, key)`,
-// which page.js turns into one render per microtask. Functions, DOM nodes and class instances are not wrapped.
 const proxies = new WeakMap(), raws = new WeakMap(), persisted = []
 let notify = () => {}
 

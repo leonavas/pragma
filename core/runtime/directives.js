@@ -7,6 +7,7 @@ const IF = 1, FOR = 2, ELSE = 3, ELIF = 4
 export const COMPONENT = 1, PAGE = 2
 
 const D = Symbol(), S = Symbol(), L = Symbol(), NONE = { b: [] }
+// Outer scope of each open component; slot content (data-slot="n") uses the one n levels up.
 const outer = []
 const SELF_DEPTH = 64
 let deep = 0
@@ -65,6 +66,7 @@ function source(id, parent) {
   return src && Object.hasOwn(src, id) ? bodyOf(src, id, NS[parent.namespaceURI]) : fail(`no template body "${id}": the page's template module is missing or out of date`)
 }
 
+// A component inside itself arrives with an empty root; its body is in the template module (`d`).
 function fillSelf(el, id) {
   const src = [pageBodies, layoutBodies].map(m => m?.d).find(d => d && Object.hasOwn(d, id)) ?? fail(`<${el.getAttribute('data-self')}> renders itself but the template module has no definition "${id}"`)
   el.append(...bodyOf(src, id, NS[el.namespaceURI]).cloneNode(true).childNodes)
@@ -76,6 +78,8 @@ function fill(s, t) {
   return o
 }
 
+// The build writes `fn`, `fn(arg, …)` or `shared.store.fn(…)`; arg: path, 'text', "text", number,
+// true, false, null, event or el.
 const EVENT = {}, EL = {}
 const LITERAL = { true: true, false: false, null: null }
 function call(v) {
@@ -136,6 +140,8 @@ function parse(el) {
     }
   }
   if (d.self && !el.firstChild) fillSelf(el, el.getAttribute('data-c'))
+  // The build writes `{path}` beside child elements as <!--{path}-->text<!--}-->; <!--n{path}--> is slot
+  // content of the owner n components up.
   for (let n = el.firstChild, m; n; n = n.nextSibling) {
     if (n.nodeType !== 8 || !(m = /^(\d*)\{(.*)\}$/.exec(n.data))) continue
     let t = n.nextSibling
@@ -160,6 +166,7 @@ function bind(el, [t, p, n, a], s) {
     v = get(s, p)
     v = v === false || v == null ? null : v === true ? '' : String(v)
     if (el.getAttribute(a) !== v) v == null ? el.removeAttribute(a) : el.setAttribute(a, v)
+    // Once the user touches it, the attribute no longer drives the state: set the property.
     if ((a === 'checked' || a === 'selected') && el[a] !== (v != null)) el[a] = v != null
   } else {
     v = !get(s, p) === n

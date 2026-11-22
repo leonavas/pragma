@@ -12,8 +12,6 @@ const anchored = CSS.supports('position-try-fallbacks', 'flip-block')
 const get = id => typeof id == 'string' ? document.getElementById(id) : id
 const entry = el => stack.find(e => e.el == el)
 
-// A dialog leaves like a block: `data-leaving` + inert until its CSS animations end, then close().
-// It leaves the stack at once (history, scroll lock, confirm()); focus returns once it is closed.
 function hide(el) {
   if (el.popover) return el.hidePopover()
   if (el[LEAVE]) return
@@ -72,7 +70,6 @@ function refocus(el, o) {
 
 // data-placement="bottom-start" (default) | "bottom-end" | "top-start" | "top-end": side of the
 // trigger, then the edge both share. Flips to the other side or edge when there is no room.
-// CSS anchor positioning where supported (follows scroll and resize); otherwise measured once.
 const AREA = { bottom: 'block-end', top: 'block-start', start: 'span-inline-end', end: 'span-inline-start' }
 function place(el, o) {
   const [side, edge] = (el.dataset.placement || 'bottom-start').split('-'), s = el.style
