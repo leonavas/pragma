@@ -159,7 +159,12 @@ any ancestor up to `routes/`. 1 root element. Expanded at build (macro).
 
 ### Rendered block DOM (client and SSR identical)
 
-The generated `<template>` stays in the DOM. Each instance is inserted as a sibling right after
+The generated `<template>` stays in the DOM as an empty anchor: the build moves its body to one
+`<template data-tpl="<tid>">` per page (at the end of the page content; at the end of the body for
+the layout), and the runtime and SSR clone it from there, so a list item or a self call never
+carries the bodies of its inner blocks. The tid is a hash of the body (equal bodies share one;
+`l…` outside `<main data-page>`, `t…` inside); blocks inside `<svg>`/`<math>` keep their body.
+Each instance is inserted as a sibling right after
 the template of the branch that produced it, with `data-of="<tid>"` (the `data-tid` of the
 `if`/`for` opening the chain) and, in `for`, `data-key="<value>"`. Updates diff by key; existing
 nodes are not recreated.

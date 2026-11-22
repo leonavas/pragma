@@ -1424,7 +1424,8 @@ fn directives_and_blocks_work_inside_pre_and_code() {
     let html = fs::read_to_string(out.join("client/index.html")).unwrap();
     for want in [
         "<pre data-attr-aria-label=\"state.path\"><code><template data-for=\"line in state.lines\" data-key=\"line.n\"",
-        "<span data-attr-data-n=\"line.n\" data-text=\"{line.text}\"></span></template></code></pre>",
+        "\"></template></code></pre>",
+        "\"><span data-attr-data-n=\"line.n\" data-text=\"{line.text}\"></span></template>",
         "<pre>$ curl {url} <span data-text=\"{state.path}\"></span><b data-c=\"tag\">A</b></pre>",
         "<code>{literal}</code>",
     ] {
@@ -1862,7 +1863,7 @@ fn component_renders_itself() {
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
     let html = fs::read_to_string(out.join("client/blog/[slug].html")).unwrap();
     let stub = "<li data-c=\"tree\" data-self=\"c-tree\" class=\"tag\" data-with-node=\"child\" data-var-depth=\"child.depth\"></li>";
-    assert_eq!(html.matches(stub).count(), 2, "one in the page, one in the definition: {html}");
+    assert_eq!(html.matches(stub).count(), 1, "the page and the definition share the body of the <for>: {html}");
     let def = html.split("<template data-def=\"tree\">").nth(1).expect("definition");
     assert!(def.starts_with("<li data-c=\"tree\" class=\"tag\"><span data-text=\"{state.node.name}\"></span><ul><template data-for=\"child in state.node.children\""), "{def}");
     assert!(html.find("<template data-def").unwrap() < html.find("</main>").unwrap(), "the definition goes with the page: {html}");

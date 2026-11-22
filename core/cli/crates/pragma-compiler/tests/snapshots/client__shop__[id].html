@@ -26,15 +26,17 @@
   <span data-text="{shared.cart.total}"></span>
 </header>
 <main data-page>
-<template data-if="page.loading" data-tid="tab343cf"><div class="skeleton h-8"></div></template>
-<template data-else data-tid="t46bd2e7"><article>
+<template data-if="page.loading" data-tid="t26767f2"></template>
+<template data-else data-tid="t2b31592"></template>
+
+<template data-tpl="t26767f2"><div class="skeleton h-8"></div></template>
+<template data-tpl="t2b31592"><article>
     <h1 data-text="{data.product.name}"></h1>
     <strong data-c="price-cead5e" class="text-primary-600" data-text="{data.product.price}"></strong>
     <a data-attr-href="data.product.url" data-class-hidden="!data.product.url" href="#">view</a>
     <span data-text="Product {params.id}"></span>
     <input data-model="state.qty" aria-label="Quantity">
-  </article></template>
-</main>
+  </article></template></main>
 <footer class="text-sm text-neutral-500" data-text="{query.ref}"></footer>
 </body>
 </html>

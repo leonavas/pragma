@@ -7,7 +7,7 @@ let auto = 0
 // Open `data-self` roots (a component inside itself); more than SELF_DEPTH means the data never ends.
 export const SELF_DEPTH = 64
 let deep = 0
-const defs = new Map()
+const defs = new Map(), tpls = new Map()
 
 export const hooks = { on() {}, enter: (el, s) => s, remove() {} }
 export const scopeOf = el => el[S]
@@ -61,12 +61,18 @@ function cssValue(v, name) {
   return null
 }
 
+function source(cache, attr, id, missing) {
+  let t = cache.get(id)
+  if (!t?.isConnected) cache.set(id, (t = document.querySelector(`template[${attr}="${CSS.escape(id)}"]`) ?? fail(missing())))
+  return body(t).firstElementChild
+}
+
 // A component inside itself: its root arrives empty and gets the body from the page's <template data-def>.
 function fillSelf(el, id) {
-  let t = defs.get(id)
-  if (!t?.isConnected) defs.set(id, (t = document.querySelector(`template[data-def="${CSS.escape(id)}"]`) ?? fail(`<${el.getAttribute('data-self')}> renders itself but the page has no <template data-def="${id}">`)))
-  el.append(...body(t).firstElementChild.cloneNode(true).childNodes)
+  el.append(...source(defs, 'data-def', id, () => `<${el.getAttribute('data-self')}> renders itself but the page has no <template data-def="${id}">`).cloneNode(true).childNodes)
 }
+
+const root = (t, d) => body(t).firstElementChild ?? (d.s ? source(tpls, 'data-tpl', d.s, () => `the page has no <template data-tpl="${d.s}">`) : null)
 
 function fill(s, t) {
   let o = t[0]
@@ -111,7 +117,8 @@ function parse(el) {
     } else if (el.hasAttribute('data-else') || el.hasAttribute('data-empty')) d.t = 3
     else if ((v = el.getAttribute('data-else-if')) != null) [d.p, d.n] = cond(v), (d.t = 4)
     d.u = +el.getAttribute('data-slot')
-    if (d.t < 3) d.id = el.getAttribute('data-tid') ?? (el.setAttribute('data-tid', (v = 't' + auto++)), v)
+    d.s = el.getAttribute('data-tid')
+    if (d.t < 3) d.id = d.s ?? (el.setAttribute('data-tid', (v = 't' + auto++)), v)
     return (el[D] = d.t ? d : NONE)
   }
   const d = { b: [] }
@@ -235,7 +242,7 @@ let leaving = [], entering = [], focusing = null
 const reduced = matchMedia('(prefers-reduced-motion: reduce)')
 
 function clone(t, d, id) {
-  const n = body(t).firstElementChild.cloneNode(true)
+  const n = root(t, d).cloneNode(true)
   n.setAttribute('data-of', id)
   if (d.r && !reduced.matches) {
     n.setAttribute('data-entering', '')

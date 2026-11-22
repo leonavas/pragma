@@ -122,6 +122,12 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   Edge, Firefox and Safari, and limits are told before coding. *Why:* an agent asked for "a dropdown
   with HTML" shipped `appearance: base-select` (Chrome/Edge only) because it was "the simplest code
   that passes `pragma check`" and `c-dropdown` sends no form value.
+- **[firm]** (2026-11-22) Block bodies once per page: each block `<template>` is an empty anchor
+  and its body goes to one `<template data-tpl="<tid>">` per page; the tid is a hash of the body.
+  *Why:* a cloned list item or self call carried every inner block body (one chat line of
+  escalei `/app/[id]` cloned 66 kB and 234 nested templates; now 220 B), and equal bodies from
+  repeated components are emitted once (365 → 317 kB). Separate `l`/`t` prefixes keep the
+  persistent layout and the swapped page from sharing an id.
 - **[firm]** (2026-11-21) A component may render itself (Svelte's `<svelte:self>`): only
   directly, only inside `<if>`/`<for>`, only with a `<script>` (live props), never filling slots.
   The build expands the body once more into a `<template data-def>`; each self call is an empty

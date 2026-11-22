@@ -1,10 +1,11 @@
 //! Output: final HTML and compiled ops for SSR (SPEC §3 "Compiled format").
 use crate::directive::{self, Dir};
-use crate::html::{Element, Node, VOID, open_tag, push_attr};
+use crate::html::{Attr, Element, Node, VOID, open_tag, push_attr};
 use crate::validate::BLOCKS;
+use crate::{Fnv, short_hash};
 use serde_json::{Value, json};
 use std::cell::Cell;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 /// Levels of a component that renders itself that the server renders; deeper ones render on the client.
 pub const SSR_SELF_DEPTH: usize = 12;
@@ -59,6 +60,66 @@ pub fn write_element(e: &Element, out: &mut String, compact: bool) {
     out.push('>');
 }
 
+pub fn hoist(nodes: &mut Vec<Node>, prefix: char) {
+    let mut h = Hoisted { prefix, ids: HashMap::new(), bodies: HashMap::new(), out: Vec::new() };
+    hoist_nodes(nodes, &mut h, false);
+    for t in h.out {
+        nodes.push(Node::Text("\n".into(), t.pos));
+        nodes.push(Node::Element(t));
+    }
+}
+
+struct Hoisted {
+    prefix: char,
+    ids: HashMap<String, String>,
+    bodies: HashMap<String, String>,
+    out: Vec<Element>,
+}
+
+impl Hoisted {
+    fn id(&mut self, body: &str) -> (String, bool) {
+        if let Some(id) = self.bodies.get(body) {
+            return (id.clone(), false);
+        }
+        let mut h = Fnv::new();
+        h.write(body.as_bytes());
+        let mut id = format!("{}{}", self.prefix, &short_hash(h.finish())[..7]);
+        while self.ids.contains_key(&id) {
+            h.write(b"#");
+            id = format!("{}{}", self.prefix, &short_hash(h.finish())[..7]);
+        }
+        self.ids.insert(id.clone(), body.to_string());
+        self.bodies.insert(body.to_string(), id.clone());
+        (id, true)
+    }
+}
+
+fn hoist_nodes(nodes: &mut [Node], h: &mut Hoisted, foreign: bool) {
+    for n in nodes {
+        let Node::Element(e) = n else { continue };
+        if e.is("main") && e.has("data-page") {
+            hoist(&mut e.children, 't');
+            continue;
+        }
+        let foreign = foreign || e.is("svg") || e.is("math");
+        hoist_nodes(&mut e.children, h, foreign);
+        if foreign || !e.is("template") || !BLOCKS.iter().any(|b| e.has(b)) {
+            continue;
+        }
+        let mut body = String::new();
+        for c in e.element_children() {
+            write_element(c, &mut body, true);
+        }
+        let (id, new) = h.id(&body);
+        let children = std::mem::take(&mut e.children);
+        e.remove("data-tid");
+        e.attrs.push(Attr { name: "data-tid".into(), value: Some(id.clone()), pos: e.pos });
+        if new {
+            h.out.push(Element { name: "template".into(), attrs: vec![Attr { name: "data-tpl".into(), value: Some(id), pos: e.pos }], children, pos: e.pos });
+        }
+    }
+}
+
 /// Roots the server can render; `shared` is left to the client. `state` gets ops too: the server
 /// renders them when it runs the page or component script (`comp` op), else leaves them.
 fn server_path(p: &str, vars: &[String]) -> bool {
@@ -71,6 +132,7 @@ struct Ctx<'s> {
     scripted: &'s BTreeSet<String>,
     /// Root of each `<template data-def>`: the body a `data-self` call renders.
     defs: BTreeMap<String, Element>,
+    tpls: HashMap<String, Element>,
     depth: Cell<usize>,
     calls: Cell<usize>,
 }
@@ -128,16 +190,32 @@ pub fn ops(nodes: &[Node], scripted: &BTreeSet<String>) -> Value {
             _ => None,
         })
         .collect();
-    let ctx = Ctx { scripted, defs, depth: Cell::new(0), calls: Cell::new(0) };
+    let mut tpls = HashMap::new();
+    collect_tpls(nodes, &mut tpls);
+    let ctx = Ctx { scripted, defs, tpls, depth: Cell::new(0), calls: Cell::new(0) };
     let mut o = Ops::new(&ctx);
     let mut vars = Vec::new();
     nodes_ops(nodes, &mut o, &mut vars, false);
     Value::Array(o.ops)
 }
 
+fn collect_tpls(nodes: &[Node], tpls: &mut HashMap<String, Element>) {
+    for n in nodes {
+        let Node::Element(e) = n else { continue };
+        match e.value("data-tpl") {
+            Some(id) if e.is("template") => {
+                if let Some(root) = e.element_children().next() {
+                    tpls.insert(id.to_string(), root.clone());
+                }
+            }
+            _ => collect_tpls(&e.children, tpls),
+        }
+    }
+}
+
 fn block(e: &Element, vars: &mut Vec<String>, ctx: &Ctx) -> Value {
     let mut o = Ops::new(ctx);
-    if let Some(root) = e.element_children().next() {
+    if let Some(root) = e.element_children().next().or_else(|| ctx.tpls.get(e.value("data-tid")?)) {
         element_ops(root, &mut o, vars, true);
     }
     Value::Array(o.ops)
@@ -434,5 +512,25 @@ mod tests {
         let (nodes, _) = parse(r#"<p data-c="box" data-with-open="false" data-with-n="-2.5" data-with-label='"a b"' data-with-items="data.items"></p>"#, 0);
         let v = ops(&nodes, &BTreeSet::from(["box".to_string()]));
         assert_eq!(v[0][2], json!([["open", "text", false], ["n", "text", -2.5], ["label", "text", "a b"], ["items", "path", "data.items"]]));
+    }
+
+    #[test]
+    fn hoists_block_bodies_once() {
+        let src = r#"<main data-page><ul><template data-for="x in data.xs" data-key="x.id" data-tid="a"><li><template data-if="x.on" data-tid="b"><b>on</b></template></li></template></ul><template data-if="data.on" data-tid="c"><b>on</b></template></main><svg><template data-if="data.on" data-tid="d"><g></g></template></svg><template data-if="data.on" data-tid="e"><b>on</b></template>"#;
+        let (mut nodes, _) = parse(src, 0);
+        hoist(&mut nodes, 'l');
+        let mut out = String::new();
+        write_nodes(&nodes, &mut out, true);
+        let on = out.split("<b>on</b>").count() - 1;
+        assert_eq!(on, 2, "once inside <main>, once outside, never inside the item: {out}");
+        assert!(out.contains(r#"<svg><template data-if="data.on" data-tid="d"><g></g></template></svg>"#), "{out}");
+        let tid = |attrs: &str| out.split(attrs).nth(1).and_then(|r| r.split('"').nth(1)).unwrap().to_string();
+        let (inner, page, layout) = (tid(r#"data-if="x.on" data-tid="#), tid(r#"data-if="data.on" data-tid="#), out.rsplit(r#"data-if="data.on" data-tid=""#).next().unwrap().split('"').next().unwrap().to_string());
+        assert_eq!(inner, page, "equal bodies share one id: {out}");
+        assert!(page.starts_with('t') && layout.starts_with('l'), "{out}");
+        let main = out.split("</main>").next().unwrap();
+        assert!(main.contains(&format!(r#"<template data-tpl="{page}"><b>on</b></template>"#)) && main.contains(r#"<template data-for="x in data.xs" data-key="x.id" data-tid="t"#), "{out}");
+        let v = ops(&nodes, &BTreeSet::new());
+        assert!(v.to_string().contains(&format!(r#"["if","{inner}","x.on",false,[["html","<b"],["html",">on</b>"]]]"#)), "the server renders hoisted bodies: {v}");
     }
 }

@@ -32,8 +32,8 @@
   <button class="btn" data-on-click="toggle" data-open="about">Toggle</button>
   <div data-c="card" class="card p-4 mt-4" data-class-featured="state.featured" data-prop-heading="Featured" data-prop-featured="true">
   <h2 class="text-lg" data-text="{state.heading}"></h2>
-  <template data-if="state.featured" data-tid="te2ffd2e"><span class="badge">★</span></template>
-  <template data-else data-tid="tb27dc23"><span>-</span></template>
+  <template data-if="state.featured" data-tid="tf8062a7"></template>
+  <template data-else data-tid="t7e7f119"></template>
   
     <p>Card body</p>
     
@@ -41,21 +41,27 @@
   <footer><button class="btn" data-on-click="buy">Buy</button><button class="btn" data-on-click="toggle" data-text="{state.open}" data-slot="1"></button></footer>
 </div>
   <ul data-show="state.open">
-    <template data-for="item in state.items" data-key="item.id" data-tid="t132a051"><li>
-        <span data-text="{item.name}"></span>
-        <template data-if="item.promo" data-tid="t097d4db"><div data-c="card" class="card p-4" data-class-featured="state.featured" data-prop-heading="Promo">
+    <template data-for="item in state.items" data-key="item.id" data-tid="tadc0cb3"></template>
+    <template data-empty data-tid="t4a5bdae"></template>
+  </ul>
+</section>
+
+<template data-tpl="tf8062a7"><span class="badge">★</span></template>
+<template data-tpl="t7e7f119"><span>-</span></template>
+<template data-tpl="tfcea263"><div data-c="card" class="card p-4" data-class-featured="state.featured" data-prop-heading="Promo">
   <h2 class="text-lg" data-text="{state.heading}"></h2>
-  <template data-if="state.featured" data-tid="t78ae42f"><span class="badge">★</span></template>
-  <template data-else data-tid="t95cf9e5"><span>-</span></template>
+  <template data-if="state.featured" data-tid="tf8062a7"></template>
+  <template data-else data-tid="t7e7f119"></template>
   <b>promo</b>
   <footer><button class="btn" data-on-click="buy">Buy</button><small>no actions</small></footer>
 </div></template>
-        <template data-else data-tid="tfe24ed6"><i>normal</i></template>
+<template data-tpl="t663bad0"><i>normal</i></template>
+<template data-tpl="tadc0cb3"><li>
+        <span data-text="{item.name}"></span>
+        <template data-if="item.promo" data-tid="tfcea263"></template>
+        <template data-else data-tid="t663bad0"></template>
       </li></template>
-    <template data-empty data-tid="t26a3a4d"><li>Nothing</li></template>
-  </ul>
-</section>
-</main>
+<template data-tpl="t4a5bdae"><li>Nothing</li></template></main>
 <footer class="text-sm text-neutral-500" data-text="{query.ref}"></footer>
 </body>
 </html>

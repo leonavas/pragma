@@ -687,6 +687,12 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         } else {
             sc.page_classes
         };
+        if p.layout.is_some() {
+            compile::hoist(&mut exp.page, 't');
+            compile::hoist(&mut exp.body, 'l');
+        } else {
+            compile::hoist(&mut exp.page, 'l');
+        }
         outs.push(PageOut { page, exp, loader, ssr, stores: sc.stores, page_classes, is_404, overlays });
     }
 

@@ -869,6 +869,16 @@ test('a component renders itself: tree from data, adopts prerendered levels, dep
   await p.evaluate(() => { __page.root.children.shift() })
   await tick(p)
   assert.deepEqual(await names(), ['root', 'B', 'B1', 'B2'])
+  assert.deepEqual(await p.$$eval('#tree template', ts => ts.map(t => t.content.childElementCount)), [0, 0, 0, 0], 'items clone empty anchors, the body stays in <template data-tpl>')
+  assert.deepEqual(p.errors, [])
+
+  await p.evaluate(() => document.querySelector('#go-b').click())
+  await p.waitForFunction(() => document.title === 'Page B')
+  await p.goBack()
+  await p.waitForFunction(() => document.querySelector('#tree span')?.textContent === 'root')
+  await p.evaluate(() => { __page.root.children[1].children.push({ id: 'b1', name: 'B1', depth: 2, children: [] }) })
+  await tick(p)
+  assert.deepEqual(await names(), ['root', 'A', 'A1', 'B', 'B1'], 'after a page swap the new page templates are used')
   assert.deepEqual(p.errors, [])
 
   await p.evaluate(() => {

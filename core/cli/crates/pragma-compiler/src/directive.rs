@@ -21,7 +21,7 @@ pub enum Dir<'a> {
     Close,
     /// `data-page`, `data-reload`, `data-theme`: markers without a path.
     Marker,
-    /// `data-c`, `data-tid`, `data-of`, `data-slot`, `data-self`, `data-def`, `data-prop-*`: written only by the build.
+    /// `data-c`, `data-tid`, `data-tpl`, `data-of`, `data-slot`, `data-self`, `data-def`, `data-prop-*`: written only by the build.
     Generated,
 }
 
@@ -230,7 +230,7 @@ pub fn parse(name: &str) -> Option<Option<Dir<'_>>> {
         "open" => Dir::Open,
         "close" => Dir::Close,
         "page" | "reload" | "theme" => Dir::Marker,
-        "c" | "tid" | "of" | "slot" | "self" | "def" => Dir::Generated,
+        "c" | "tid" | "tpl" | "of" | "slot" | "self" | "def" => Dir::Generated,
         _ if rest.starts_with("prop-") => Dir::Generated,
         _ => {
             if let Some(n) = rest.strip_prefix("attr-") {
@@ -498,6 +498,7 @@ mod tests {
         assert_eq!(parse("data-prop-step"), Some(Some(Dir::Generated)));
         assert_eq!(parse("data-self"), Some(Some(Dir::Generated)));
         assert_eq!(parse("data-def"), Some(Some(Dir::Generated)));
+        assert_eq!(parse("data-tpl"), Some(Some(Dir::Generated)));
     }
 
     #[test]
