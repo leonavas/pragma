@@ -290,7 +290,9 @@
     padding: 2rem 1rem;
     overflow-x: auto;
   }
-  [data-c="showcase"] .showcase-stage > * { max-width: 100%; }
+  @layer components {
+    [data-c="showcase"] .showcase-stage > * { max-width: 100%; }
+  }
   @keyframes showcase-check {
     from { stroke-dashoffset: 16; }
   }
