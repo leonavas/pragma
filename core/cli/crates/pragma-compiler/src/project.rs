@@ -107,14 +107,8 @@ pub fn is_component_tag(tag: &str) -> bool {
 }
 
 pub fn comment_positions(src: &str, open: &str) -> Vec<(u32, u32)> {
-    src.match_indices(open)
-        .map(|(i, _)| {
-            let head = &src[..i];
-            let line = head.matches('\n').count() as u32 + 1;
-            let col = (i - head.rfind('\n').map_or(0, |n| n + 1)) as u32 + 1;
-            (line, col)
-        })
-        .collect()
+    let lines = html::LineIndex::new(src);
+    src.match_indices(open).map(|(i, _)| lines.pos(src, i, 0)).map(|p| (p.line, p.col)).collect()
 }
 
 pub fn is_component_name(s: &str) -> bool {

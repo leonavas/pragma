@@ -2096,3 +2096,35 @@ fn workers_modules_stay_external_in_server_code() {
     let src = "import { env } from 'cloudflare:workers'\nlet open = false\nlet items = []\nfunction toggle() { return env }\n";
     expect(&check_with(&[("routes/index.js", Some(src))]), "app/package", "routes/index.js", 1);
 }
+
+#[test]
+fn layout_block_bodies_carry_no_aria_current_of_the_first_page() {
+    let layout = fs::read_to_string(fixture().join("routes/_layout.html")).unwrap().replace("<main data-page>", "<if shared.cart.isEmpty><nav><a href=\"/\">Menu home</a></nav></if>\n<main data-page>");
+    let t = app_with(&[("routes/_layout.html", Some(&layout)), (PAGE, Some("<if shared.cart.isEmpty><a href=\"/\">Page home</a></if>"))]);
+    let out = t.0.join("out");
+    build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let html = page_html(&out, "index.html");
+    assert!(html.contains("<a href=\"/\" aria-current=\"page\">Home</a>"), "a layout link outside blocks is marked: {html}");
+    assert!(html.contains("<a href=\"/\">Menu home</a>"), "a layout block body is shared by every page: {html}");
+    assert!(html.contains("<a href=\"/\" aria-current=\"page\">Page home</a>"), "a page block body belongs to its page: {html}");
+}
+
+#[test]
+fn model_with_a_wrong_root_is_one_error() {
+    let d = page("<input :model=\"data.x\" aria-label=\"x\">");
+    assert_eq!(d.iter().filter(|x| x.rule == "html/invalid-root").count(), 1, "{d:#?}");
+    expect(&d, "html/invalid-root", PAGE, 1);
+}
+
+#[test]
+fn columns_count_characters_after_non_ascii_text() {
+    let col = |d: &[Diagnostic], rule: &str| d.iter().find(|x| x.rule == rule).map(|x| (x.line, x.column)).unwrap_or_else(|| panic!("{rule}: {d:#?}"));
+    let theme = fs::read_to_string(fixture().join("lib/theme.css")).unwrap();
+    let line = theme.lines().count() as u32 + 1;
+    let d = check_with(&[("lib/theme.css", Some(&format!("{theme}\n.é{{}} /* x */\n")))]);
+    assert_eq!(col(&d, "css/comment"), (line + 1, 6));
+    assert_eq!(col(&page("<p>é</p><!-- x -->"), "html/comment"), (1, 9));
+    assert_eq!(col(&page("<p>é {{x}}</p>"), "html/interpolation"), (1, 6));
+    let d = check_with(&[("routes/products.server.js", Some("export function GET() {\n  return 'é' ? Response.json({}) : null\n}\n"))]);
+    assert_eq!(col(&d, "app/endpoint-json"), (2, 16));
+}

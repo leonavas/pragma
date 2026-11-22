@@ -177,13 +177,6 @@ fn markup_of(nodes: &[html::Node], out: &mut pragma_css::prune::Markup) {
     }
 }
 
-fn line_col(src: &str, offset: usize) -> (u32, u32) {
-    let before = &src[..offset.min(src.len())];
-    let line = before.matches('\n').count() as u32 + 1;
-    let col = before.rsplit('\n').next().map_or(0, |l| l.chars().count()) as u32 + 1;
-    (line, col)
-}
-
 fn sort_diags(mut d: Vec<Diagnostic>) -> Vec<Diagnostic> {
     d.sort_by(|a, b| (&a.file, a.line, a.column, a.rule, &a.message).cmp(&(&b.file, b.line, b.column, b.rule, &b.message)));
     d.dedup();
@@ -440,9 +433,7 @@ fn check_endpoints(p: &Project, sources: &HashMap<PathBuf, String>) -> Vec<Diagn
             out.push(Diagnostic::error(&e.file, 1, 1, "app/endpoint", format!("no page {stem}.html and no handler: export GET, POST, PUT, PATCH or DELETE returning a Response, or add {stem}.html")));
         }
         if let Some(i) = src.find("Response.json(") {
-            let head = &src[..i];
-            let line = head.matches('\n').count() as u32 + 1;
-            let col = (i - head.rfind('\n').map_or(0, |n| n + 1)) as u32 + 1;
+            let (line, col) = html::line_col(src, i);
             out.push(Diagnostic::warning(&e.file, line, col, "app/endpoint-json", "endpoint answers JSON: page data comes from load and writes from actions (.pragma/docs/data.md); keep endpoints for files, streams, webhooks and WebSockets"));
         }
     }
@@ -549,15 +540,20 @@ fn any_element(nodes: &[html::Node], f: &impl Fn(&html::Element) -> bool) -> boo
 }
 
 /// `aria-current="page"` on links `href="/path"` to the page itself (the router keeps it updated).
-fn mark_current(nodes: &mut [html::Node], path: &str) {
+/// Layout block and self-call bodies are left alone: the runtime renders them from the module of
+/// the page the app booted on, on every later page too.
+fn mark_current(nodes: &mut [html::Node], path: &str, in_page: bool) {
     for n in nodes {
-        if let html::Node::Element(e) = n {
-            let routed = !["target", "download", "data-reload", "aria-current"].iter().any(|a| e.has(a));
-            if e.is("a") && routed && e.value("href") == Some(path) {
-                e.attrs.push(html::Attr { name: "aria-current".into(), value: Some("page".into()), pos: e.pos });
-            }
-            mark_current(&mut e.children, path);
+        let html::Node::Element(e) = n else { continue };
+        if !in_page && e.is("template") {
+            continue;
         }
+        let routed = !["target", "download", "data-reload", "aria-current"].iter().any(|a| e.has(a));
+        if e.is("a") && routed && e.value("href") == Some(path) {
+            e.attrs.push(html::Attr { name: "aria-current".into(), value: Some("page".into()), pos: e.pos });
+        }
+        let in_page = in_page || (e.is("main") && e.has("data-page"));
+        mark_current(&mut e.children, path, in_page);
     }
 }
 
@@ -611,7 +607,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     css_comment(Path::new("lib/theme.css"), &theme_src, &mut diags);
     let theme = pragma_css::parse_theme(&theme_src);
     for (class, offset) in pragma_css::prune::utility_redefinitions(&theme_src, &|c| pragma_css::is_utility_with_css(c, &theme)) {
-        let (line, col) = line_col(&theme_src, offset);
+        let (line, col) = html::line_col(&theme_src, offset);
         diags.push(Diagnostic::error(
             "lib/theme.css",
             line,
@@ -655,7 +651,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             owners::root_of(&p.trees[p.find_component(from, local, &name)?.html as usize])
         };
         for (offset, selector, global) in owners::unmatched(css, OWNED, &p.trees[html as usize], &root) {
-            let (line, col) = line_col(css, offset);
+            let (line, col) = html::line_col(css, offset);
             diags.push(Diagnostic::warning(
                 file,
                 line,
@@ -694,8 +690,8 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         let (mut exp, d) = expand::Expander::new(&p, &scripts).owned(&owned).page(page);
         diags.extend(d);
         if !is_404 && !page.pattern.contains(':') {
-            mark_current(&mut exp.body, &page.pattern);
-            mark_current(&mut exp.page, &page.pattern);
+            mark_current(&mut exp.body, &page.pattern, false);
+            mark_current(&mut exp.page, &page.pattern, true);
         }
         diags.extend(a11y::check(&p.files, if p.layout.is_some() { &exp.body } else { &exp.page }));
         if p.config.webmcp {

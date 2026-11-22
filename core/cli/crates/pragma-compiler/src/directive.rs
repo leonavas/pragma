@@ -157,7 +157,7 @@ pub fn parse_call(v: &str) -> Result<Call<'_>, String> {
             "event" => Arg::Event,
             "el" => Arg::El,
             "true" | "false" | "null" => Arg::Literal(arg),
-            _ if arg.starts_with(['\'', '"']) || arg.parse::<f64>().is_ok_and(|n| n.is_finite()) => Arg::Literal(arg),
+            _ if arg.starts_with(['\'', '"']) || is_call_number(arg) => Arg::Literal(arg),
             _ if check_path(arg, false).is_ok() => Arg::Path(arg),
             _ => return Err(format!("\"{v}\": argument `{}` must be a path, a simple literal ('text', 2, true), event or el; no expressions: compute it in a function of the script", source_form(arg))),
         });
@@ -305,6 +305,20 @@ impl Literal {
     }
 }
 
+/// Number grammars, both read again by the runtime (core/runtime/directives.js), which must accept
+/// the same sets: a value literal (`:attr`, `:--name`, props) is `-?\d+(\.\d+)?`; an event call
+/// argument is any finite number Rust's `f64` parser reads (also `.5`, `1.`, `1e3`, `+1`).
+fn is_value_number(v: &str) -> bool {
+    let digits = v.strip_prefix('-').unwrap_or(v);
+    let (int, frac) = digits.split_once('.').unwrap_or((digits, "0"));
+    let all_digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    all_digits(int) && all_digits(frac)
+}
+
+fn is_call_number(v: &str) -> bool {
+    v.parse::<f64>().is_ok_and(|n| n.is_finite())
+}
+
 pub fn literal(v: &str) -> Option<Literal> {
     let v = v.trim();
     match v {
@@ -317,10 +331,7 @@ pub fn literal(v: &str) -> Option<Literal> {
         let inner = v[1..].strip_suffix(q)?;
         return (!inner.contains(q)).then(|| Literal::Text(inner.to_string()));
     }
-    let digits = v.strip_prefix('-').unwrap_or(v);
-    let (int, frac) = digits.split_once('.').unwrap_or((digits, "0"));
-    let all_digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
-    (all_digits(int) && all_digits(frac)).then(|| Literal::Number(v.to_string()))
+    is_value_number(v).then(|| Literal::Number(v.to_string()))
 }
 
 pub fn is_ident(s: &str) -> bool {

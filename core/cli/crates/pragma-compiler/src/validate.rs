@@ -329,12 +329,7 @@ impl FileCheck<'_> {
 
     fn interpolation(&mut self, s: &str, pos: Pos, in_text: bool) {
         if let Some((i, m)) = ["{{", "${"].iter().filter_map(|m| s.find(*m).map(|i| (i, *m))).min() {
-            let before = &s[..i];
-            let pos = match before.rfind('\n').filter(|_| in_text) {
-                Some(nl) => Pos { line: pos.line + before.matches('\n').count() as u32, col: (i - nl) as u32, ..pos },
-                None if in_text => Pos { col: pos.col + i as u32, ..pos },
-                None => pos,
-            };
+            let pos = if in_text { pos.advance(s, i) } else { pos };
             let close = if m == "{{" { "}}" } else { "}" };
             let dollar = if m == "${" { "; for a literal $ before a value write &#36;{path}" } else { "" };
             self.err(pos, "html/interpolation", format!("{m} {close} is not pragma syntax: write {{path}} in text and attributes (e.g. <p>Hi {{$name}}</p>, alt=\"Photo of {{p.name}}\"){dollar}; inside <code> or <pre> it is shown as text"));
@@ -347,13 +342,7 @@ impl FileCheck<'_> {
             Some(Node::Text(t, p)) => (t.as_str(), *p),
             _ => ("", e.pos),
         };
-        let at = |off: usize| {
-            let before = &text[..off.min(text.len())];
-            match before.rfind('\n') {
-                Some(nl) => Pos { line: start.line + before.matches('\n').count() as u32, col: before[nl + 1..].chars().count() as u32 + 1, ..start },
-                None => Pos { col: start.col + before.chars().count() as u32, ..start },
-            }
-        };
+        let at = |off: usize| start.advance(text, off);
         if let Err((off, msg)) = directive::json_ld_check(text) {
             self.err(at(off), "html/json-ld", format!("invalid JSON-LD: {msg}"));
             return;
@@ -431,10 +420,6 @@ impl FileCheck<'_> {
                     self.err(pos, "html/unknown-directive", ":model only on input, select and textarea");
                 }
                 self.path(pos, v, false, false);
-                let alias = self.kind == Kind::Component && !directive::ROOTS.contains(&directive::root(v));
-                if !alias && !matches!(directive::root(v), "state" | "shared" | "props" | "$") && directive::check_path(v, false).is_ok() {
-                    self.err(pos, "html/invalid-root", ":model only accepts $ or shared");
-                }
             }
             Dir::Else | Dir::Empty => {
                 if !v.is_empty() {

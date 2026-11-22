@@ -68,6 +68,7 @@ impl Element {
     }
 }
 
+/// Line and column of a byte offset, both from 1; a column counts characters, not bytes.
 pub struct LineIndex {
     starts: Vec<usize>,
 }
@@ -80,9 +81,23 @@ impl LineIndex {
     }
 
     pub fn pos(&self, src: &str, offset: usize, file: u32) -> Pos {
+        let offset = offset.min(src.len());
         let line = self.starts.partition_point(|&s| s <= offset) - 1;
         let col = src[self.starts[line]..offset].chars().count();
         Pos { file, line: line as u32 + 1, col: col as u32 + 1 }
+    }
+}
+
+pub fn line_col(src: &str, offset: usize) -> (u32, u32) {
+    let p = LineIndex::new(src).pos(src, offset, 0);
+    (p.line, p.col)
+}
+
+impl Pos {
+    /// Position of byte `offset` of `text`, a text that starts at `self`.
+    pub fn advance(self, text: &str, offset: usize) -> Pos {
+        let (line, col) = line_col(text, offset);
+        if line == 1 { Pos { col: self.col + col - 1, ..self } } else { Pos { line: self.line + line - 1, col, ..self } }
     }
 }
 
