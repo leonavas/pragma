@@ -138,6 +138,11 @@ fn text<'a>(src: &'a str, t: &Tok) -> &'a str {
     &src[t.start..t.end]
 }
 
+fn is_plain_template(src: &str, t: &Tok) -> bool {
+    let s = text(src, t);
+    s.len() >= 2 && s.starts_with('`') && s.ends_with('`')
+}
+
 fn str_import(src: &str, t: &Tok, dynamic: bool) -> Import {
     Import { start: t.start + 1, end: t.end - 1, spec: src[t.start + 1..t.end - 1].to_string(), dynamic }
 }
@@ -164,7 +169,7 @@ pub fn imports(src: &str) -> Vec<Import> {
         }
         if word == "import" && text(src, next) == "(" {
             if let (Some(s), true) = (toks.get(i + 2), is(i + 3, ")"))
-                && s.kind == Kind::Str {
+                && (s.kind == Kind::Str || is_plain_template(src, s)) {
                     out.push(str_import(src, s, true));
                 }
             continue;

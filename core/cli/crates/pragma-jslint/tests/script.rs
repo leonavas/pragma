@@ -17,7 +17,7 @@ fn has(code: &str, want: &str) {
 /// The output must be a valid module.
 #[track_caller]
 fn parses(code: &str) {
-    let diags = pragma_jslint::lint(Path::new("lib/x.js"), code, &pragma_jslint::LintContext { is_core: true });
+    let diags = pragma_jslint::lint(Path::new("lib/x.js"), code);
     assert!(!diags.iter().any(|d| d.rule == "js/syntax"), "{diags:#?}\n{code}");
 }
 

@@ -1,5 +1,5 @@
 use crate::node::Node;
-use crate::report::{diagnostics_json, dim, print_diagnostics, red};
+use crate::report::{self, diagnostics_json, print_diagnostics};
 use crate::server::{self, Event, Mode, Site};
 use notify::{EventKind, RecursiveMode, Watcher};
 use pragma_compiler::{BuildOptions, BuildReport};
@@ -25,13 +25,13 @@ pub async fn run_with(root: PathBuf, host: &str, port: u16, cf_config: Option<Pa
     let listener = match TcpListener::bind((host, port)).await {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("{} cannot listen on {host}:{port}: {e}", red("error"));
+            eprintln!("{} cannot listen on {host}:{port}: {e}", report::err().red("error"));
             return 1;
         }
     };
     let mut node = Node::new(out.join("server/node.mjs"), root.clone(), true);
     if let Some(config) = cf_config {
-        println!("{}", dim(&format!("Cloudflare bindings from {}", config.file_name().unwrap_or_default().to_string_lossy())));
+        println!("{}", report::out().dim(&format!("Cloudflare bindings from {}", config.file_name().unwrap_or_default().to_string_lossy())));
         node = node.with_cloudflare(config);
     }
     node.sync(&site).await;
@@ -44,7 +44,7 @@ pub async fn run_with(root: PathBuf, host: &str, port: u16, cf_config: Option<Pa
     let _watcher = match watch(&root, tx) {
         Ok(w) => w,
         Err(e) => {
-            eprintln!("{} cannot watch '{}': {e}", red("error"), root.display());
+            eprintln!("{} cannot watch '{}': {e}", report::err().red("error"), root.display());
             node.stop().await;
             return 1;
         }
@@ -55,7 +55,7 @@ pub async fn run_with(root: PathBuf, host: &str, port: u16, cf_config: Option<Pa
                 let Some(batch) = batch else { break };
                 let css_only = batch.iter().all(|p| p.extension().is_some_and(|e| e == "css"));
                 let names: Vec<_> = batch.iter().map(|p| p.strip_prefix(&root).unwrap_or(p).display().to_string()).collect();
-                println!("{}", dim(&format!("changed: {}", names.join(", "))));
+                println!("{}", report::out().dim(&format!("changed: {}", names.join(", "))));
                 let ok = rebuild(&root, &out, &site).await;
                 // the build writes its outputs even with errors elsewhere: node must serve the same
                 // build as the client files, or a new page's `load` answers 404 (BUG-S-8)
@@ -96,7 +96,7 @@ async fn rebuild(root: &Path, out: &Path, site: &Site) -> bool {
     match result {
         Ok(report) => {
             print_diagnostics(root, &report.warnings);
-            println!("{}", dim(&format!("compiled in {} ms", started.elapsed().as_millis())));
+            println!("{}", report::out().dim(&format!("compiled in {} ms", started.elapsed().as_millis())));
             true
         }
         Err(diagnostics) => {

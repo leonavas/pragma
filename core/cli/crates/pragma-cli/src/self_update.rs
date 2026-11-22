@@ -22,42 +22,34 @@ pub fn run(requested: Option<&str>) -> Result<(), String> {
     let ext = if cfg!(windows) { "zip" } else { "tar.gz" };
     let archive = format!("pragma-{target}.{ext}");
     let base = format!("https://github.com/{repo}/releases/download/{tag}");
-    let archive_url = format!("{base}/{archive}");
-    let sums_url = format!("{base}/SHA256SUMS.txt");
 
-    let tmp = temp_dir()?;
-    let archive_path = tmp.join(&archive);
-    let sums_path = tmp.join("SHA256SUMS.txt");
-
+    let tmp = TempDir::new()?;
     println!("downloading pragma {tag} ({target})...");
-    download(&archive_url, &archive_path)?;
-    if download(&sums_url, &sums_path).is_ok() {
-        verify_checksum(&archive_path, &sums_path, &archive)?;
-    }
-
-    let extracted = extract(&archive_path, &tmp)?;
+    let extracted = fetch_verified(&base, &archive, &tmp.0)?;
     let exe = env::current_exe().map_err(|e| format!("cannot locate current pragma executable: {e}"))?;
     replace_exe(&extracted, &exe)?;
-    let _ = fs::remove_dir_all(&tmp);
 
     println!("updated pragma from {current} to {next}");
     println!("run `pragma upgrade` inside your apps to update .pragma/");
     Ok(())
 }
 
+/// Release targets: (`std::env::consts::OS`, `ARCH`, Rust target). release.yml, install.sh and
+/// npm/scripts/stage.mjs list the same targets (tests/contracts.rs).
+pub const TARGETS: &[(&str, &str, &str)] = &[
+    ("linux", "x86_64", "x86_64-unknown-linux-gnu"),
+    ("linux", "aarch64", "aarch64-unknown-linux-gnu"),
+    ("macos", "x86_64", "x86_64-apple-darwin"),
+    ("macos", "aarch64", "aarch64-apple-darwin"),
+    ("windows", "x86_64", "x86_64-pc-windows-msvc"),
+];
+
 fn target_triple() -> Result<&'static str, String> {
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    return Ok("x86_64-unknown-linux-gnu");
-    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-    return Ok("aarch64-unknown-linux-gnu");
-    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    return Ok("x86_64-apple-darwin");
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    return Ok("aarch64-apple-darwin");
-    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-    return Ok("x86_64-pc-windows-msvc");
-    #[allow(unreachable_code)]
-    Err("self-update is not supported on this platform; rebuild from source with Cargo".into())
+    TARGETS
+        .iter()
+        .find(|(os, arch, _)| *os == env::consts::OS && *arch == env::consts::ARCH)
+        .map(|(_, _, target)| *target)
+        .ok_or_else(|| "self-update is not supported on this platform; rebuild from source with Cargo".into())
 }
 
 fn normalize_tag(input: &str) -> Result<String, String> {
@@ -99,6 +91,18 @@ fn download(url: &str, dest: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Downloads `archive` and `SHA256SUMS.txt` from `base` into `dir`, checks the archive against its
+/// line in the sums and extracts the binary.
+fn fetch_verified(base: &str, archive: &str, dir: &Path) -> Result<PathBuf, String> {
+    let archive_path = dir.join(archive);
+    let sums_path = dir.join("SHA256SUMS.txt");
+    download(&format!("{base}/{archive}"), &archive_path)?;
+    download(&format!("{base}/SHA256SUMS.txt"), &sums_path)
+        .map_err(|_| format!("cannot download SHA256SUMS.txt from {base}; pragma was not updated, because the archive cannot be verified"))?;
+    verify_checksum(&archive_path, &sums_path, archive)?;
+    extract(&archive_path, dir)
+}
+
 fn verify_checksum(archive_path: &Path, sums_path: &Path, archive_name: &str) -> Result<(), String> {
     let sums = fs::read_to_string(sums_path).map_err(|e| format!("cannot read checksums: {e}"))?;
     let expected = sums
@@ -111,7 +115,7 @@ fn verify_checksum(archive_path: &Path, sums_path: &Path, archive_name: &str) ->
         })
         .next();
     let Some(expected) = expected else {
-        return Ok(());
+        return Err(format!("SHA256SUMS.txt has no checksum for {archive_name}; pragma was not updated, because the archive cannot be verified"));
     };
     let actual = sha256_file(archive_path)?;
     if actual != expected {
@@ -203,18 +207,48 @@ fn replace_exe(new_bin: &Path, target: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn temp_dir() -> Result<PathBuf, String> {
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_nanos());
-    let dir = env::temp_dir().join(format!("pragma-self-update-{}-{nanos}", std::process::id()));
-    fs::create_dir_all(&dir).map_err(|e| format!("cannot create temp dir: {e}"))?;
-    Ok(dir)
+struct TempDir(PathBuf);
+
+impl TempDir {
+    fn new() -> Result<TempDir, String> {
+        let nanos = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+        let dir = env::temp_dir().join(format!("pragma-self-update-{}-{nanos}", std::process::id()));
+        fs::create_dir_all(&dir).map_err(|e| format!("cannot create temp dir: {e}"))?;
+        Ok(TempDir(dir))
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn installs_only_an_archive_that_matches_its_checksum() {
+        let release = tempfile::tempdir().unwrap();
+        let archive = "pragma-test.tar.gz";
+        fs::write(release.path().join("pragma"), "binary").unwrap();
+        assert!(Command::new("tar").args(["-czf", archive, "pragma"]).current_dir(release.path()).status().unwrap().success());
+        let base = format!("file://{}", release.path().display());
+        let fetch = || fetch_verified(&base, archive, TempDir::new().unwrap().0.as_path());
+
+        assert!(fetch().unwrap_err().contains("cannot download SHA256SUMS.txt"));
+        fs::write(release.path().join("SHA256SUMS.txt"), "abc  pragma-other.tar.gz\n").unwrap();
+        assert!(fetch().unwrap_err().contains("no checksum for pragma-test.tar.gz"));
+        fs::write(release.path().join("SHA256SUMS.txt"), format!("abc  {archive}\n")).unwrap();
+        assert!(fetch().unwrap_err().contains("checksum mismatch"));
+        let sum = sha256_file(&release.path().join(archive)).unwrap();
+        fs::write(release.path().join("SHA256SUMS.txt"), format!("{sum}  {archive}\n")).unwrap();
+        let dir = TempDir::new().unwrap();
+        let installed = fetch_verified(&base, archive, &dir.0).unwrap();
+        assert_eq!(fs::read_to_string(installed).unwrap(), "binary");
+    }
 
     #[test]
     fn normalizes_version_tags() {

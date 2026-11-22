@@ -1,4 +1,4 @@
-use crate::report::{dim, paint, red};
+use crate::report::{self, Paint};
 use crate::server::Site;
 use serde_json::Value;
 use std::hash::{Hash, Hasher};
@@ -50,7 +50,7 @@ impl Node {
         self.fingerprint = fingerprint;
         let port = match std::net::TcpListener::bind("127.0.0.1:0").and_then(|l| l.local_addr()) {
             Ok(addr) => addr.port(),
-            Err(e) => return eprintln!("{} no free port for node: {e}", red("error")),
+            Err(e) => return eprintln!("{} no free port for node: {e}", report::err().red("error")),
         };
         let mut cmd = Command::new("node");
         if self.dev && std::env::var_os("PRAGMA_LOG_LEVEL").is_none() {
@@ -70,14 +70,14 @@ impl Node {
             .spawn();
         let mut child = match spawned {
             Ok(child) => child,
-            Err(e) => return eprintln!("{} cannot start `node {}`: {e} (is Node >= 22 installed?)", red("error"), self.entry.display()),
+            Err(e) => return eprintln!("{} cannot start `node {}`: {e} (is Node >= 22 installed?)", report::err().red("error"), self.entry.display()),
         };
         let pretty = std::io::stdout().is_terminal();
         if let Some(out) = child.stdout.take() {
             tokio::spawn(async move {
                 let mut lines = BufReader::new(out).lines();
                 while let Ok(Some(line)) = lines.next_line().await {
-                    println!("{}", if pretty { format_log(&line) } else { line });
+                    println!("{}", if pretty { format_log(&line, report::out()) } else { line });
                 }
             });
         }
@@ -85,7 +85,7 @@ impl Node {
             tokio::spawn(async move {
                 let mut lines = BufReader::new(err).lines();
                 while let Ok(Some(line)) = lines.next_line().await {
-                    eprintln!("{} {line}", dim("node"));
+                    eprintln!("{} {line}", report::err().dim("node"));
                 }
             });
         }
@@ -102,9 +102,9 @@ impl Node {
             tokio::time::sleep(Duration::from_millis(25)).await;
         };
         if ready {
-            println!("{}", dim(&format!("node {} on port {port}", if restarting { "restarted" } else { "running" })));
+            println!("{}", report::out().dim(&format!("node {} on port {port}", if restarting { "restarted" } else { "running" })));
         } else {
-            eprintln!("{} node server did not start; see the output above", red("error"));
+            eprintln!("{} node server did not start; see the output above", report::err().red("error"));
         }
         site.set_backend(Some(port));
         self.child = Some(child);
@@ -165,15 +165,15 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 /// OTel JSON record (one per line, as `core/server/log.js` prints) to a readable line.
-pub fn format_log(line: &str) -> String {
+pub fn format_log(line: &str, paint: Paint) -> String {
     let Ok(Value::Object(rec)) = serde_json::from_str::<Value>(line) else { return line.to_owned() };
     let Some(level) = rec.get("severityText").and_then(Value::as_str) else { return line.to_owned() };
     let body = rec.get("body").map(text).unwrap_or_default();
     let painted = match level {
-        "ERROR" | "FATAL" => red(&format!("{level:5}")),
-        "WARN" => paint("33", &format!("{level:5}")),
-        "DEBUG" | "TRACE" => dim(&format!("{level:5}")),
-        _ => paint("36", &format!("{level:5}")),
+        "ERROR" | "FATAL" => paint.red(&format!("{level:5}")),
+        "WARN" => paint.yellow(&format!("{level:5}")),
+        "DEBUG" | "TRACE" => paint.dim(&format!("{level:5}")),
+        _ => paint.cyan(&format!("{level:5}")),
     };
     let mut out = format!("{painted} {body}");
     let mut stack = None;
@@ -181,7 +181,7 @@ pub fn format_log(line: &str) -> String {
         if key == "exception.stacktrace" {
             stack = Some(value);
         } else {
-            out.push_str(&dim(&format!(" {key}={value}")));
+            out.push_str(&paint.dim(&format!(" {key}={value}")));
         }
     }
     let service = match rec.get("resource") {
@@ -189,11 +189,11 @@ pub fn format_log(line: &str) -> String {
         _ => None,
     };
     if let Some(service) = service {
-        out.push_str(&dim(&format!(" ({service})")));
+        out.push_str(&paint.dim(&format!(" ({service})")));
     }
     if let Some(stack) = stack {
         out.push('\n');
-        out.push_str(&dim(&stack));
+        out.push_str(&paint.dim(&stack));
     }
     out
 }
@@ -207,7 +207,7 @@ pub fn print_client_logs(body: &[u8]) {
         if let Value::Object(map) = &mut record {
             map.insert("resource".into(), resource.clone());
         }
-        println!("{}", format_log(&record.to_string()));
+        println!("{}", format_log(&record.to_string(), report::out()));
     }
 }
 
@@ -252,10 +252,10 @@ mod tests {
     #[test]
     fn formats_otel_record() {
         let line = r#"{"timeUnixNano":"1","severityNumber":9,"severityText":"INFO","body":"GET /shop","attributes":{"http.response.status_code":200},"resource":{"service.name":"app"}}"#;
-        let out = format_log(line);
+        let out = format_log(line, report::out());
         assert!(out.contains("GET /shop"));
         assert!(out.contains("http.response.status_code=200"));
         assert!(out.contains("(app)"));
-        assert_eq!(format_log("plain text"), "plain text");
+        assert_eq!(format_log("plain text", report::out()), "plain text");
     }
 }

@@ -6,7 +6,7 @@ pub mod self_update;
 pub mod server;
 pub mod upgrade;
 
-use report::{dim, print_diagnostics, print_summary, red};
+use report::{print_diagnostics, print_summary};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -67,7 +67,7 @@ pub fn run(args: Vec<String>) -> i32 {
         other => Err(format!("unknown command '{other}'; see `pragma --help`")),
     };
     result.unwrap_or_else(|message| {
-        eprintln!("{} {message}", red("error:"));
+        eprintln!("{} {message}", report::err().red("error:"));
         1
     })
 }
@@ -130,7 +130,7 @@ fn cmd_new(args: &[String]) -> Result<i32, String> {
     let created = new::create(Path::new(dir))?;
     if created.non_empty {
         let kept = if created.skipped > 0 { format!(" ({} kept)", created.skipped) } else { String::new() };
-        eprintln!("{} directory '{dir}' is not empty; existing files were not overwritten{kept}", report::paint("33", "warning:"));
+        eprintln!("{} directory '{dir}' is not empty; existing files were not overwritten{kept}", report::err().yellow("warning:"));
     }
     if dir == "." {
         println!("app created in {dir} ({} files)\n\n  pragma dev", created.written);
@@ -147,7 +147,7 @@ fn cmd_dev(args: &[String], cf: bool) -> Result<i32, String> {
     let root = app_root()?;
     if let Some(warning) = upgrade::outdated(&root) {
         print_diagnostics(&root, &[warning]);
-        eprintln!("{} pages may fail to render with an old .pragma/ (e.g. SSR \"unknown op\"); run `pragma upgrade`\n", report::paint("33", "warning:"));
+        eprintln!("{} pages may fail to render with an old .pragma/ (e.g. SSR \"unknown op\"); run `pragma upgrade`\n", report::err().yellow("warning:"));
     }
     let cf_config = if cf { Some(node::cloudflare_config(&root)?) } else { None };
     Ok(runtime()?.block_on(dev::run_with(root, &args.host(), port, cf_config)))
@@ -168,7 +168,7 @@ fn cmd_build(allow_outdated_core: bool) -> Result<i32, String> {
         Ok(report) => {
             print_diagnostics(&root, &report.warnings);
             print_summary(&report);
-            println!("{}", dim(&format!("dist/ built in {} ms", started.elapsed().as_millis())));
+            println!("{}", report::out().dim(&format!("dist/ built in {} ms", started.elapsed().as_millis())));
             Ok(0)
         }
         Err(diagnostics) => {
@@ -204,15 +204,14 @@ fn cmd_upgrade() -> Result<i32, String> {
             println!("  {label:<8} {path}");
         }
     }
+    let untouched = if changes.removes_legacy_files() {
+        "the old core/ files listed above were removed; your other files were not touched"
+    } else {
+        "files outside .pragma/ were not touched"
+    };
     match prev {
-        Some(from) if from != version => println!(
-            ".pragma/ upgraded from {from} to {version} ({} file(s) changed); files outside .pragma/ were not touched",
-            changes.len()
-        ),
-        _ => println!(
-            ".pragma/ upgraded to pragma {version} ({} file(s) changed); files outside .pragma/ were not touched",
-            changes.len()
-        ),
+        Some(from) if from != version => println!(".pragma/ upgraded from {from} to {version} ({} file(s) changed); {untouched}", changes.len()),
+        _ => println!(".pragma/ upgraded to pragma {version} ({} file(s) changed); {untouched}", changes.len()),
     }
     Ok(0)
 }
@@ -279,7 +278,7 @@ fn cmd_serve(args: &[String]) -> Result<i32, String> {
     runtime()?.block_on(async move {
         let started = Instant::now();
         let site = tokio::task::spawn_blocking(move || server::Site::new(client, server::Mode::Serve)).await.map_err(|e| e.to_string())?;
-        println!("{}", dim(&format!("files compressed in {} ms", started.elapsed().as_millis())));
+        println!("{}", report::out().dim(&format!("files compressed in {} ms", started.elapsed().as_millis())));
         let listener = tokio::net::TcpListener::bind((host.as_str(), port)).await.map_err(|e| format!("cannot listen on {host}:{port}: {e}"))?;
         let mut node = node::Node::new(root.join("dist/server/node.mjs"), root.clone(), false);
         node.sync(&site).await;

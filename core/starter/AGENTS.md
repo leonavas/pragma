@@ -39,7 +39,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - Read `data` inside functions only; it is undefined until `load` finishes.
 - Put stores in `lib/state/`. Access stores only through `shared`.
 - Do not write comments.
-- Use descriptive names. Do not use vague (`tmp`, `data`, `info`) or short (`t`, `e`) names, except `i`, `j`, `k`, `id`, `ok`, `el`, `url`, `log`, and parameters of one-expression arrows.
+- Use descriptive names. Do not use vague (`tmp`, `data`, `info`) or short (`t`, `e`) names, except `$`, `i`, `j`, `k`, `id`, `ok`, `el`, `ctx`, `url`, `log`, `db`, `kv`, and parameters of one-expression arrows.
 - Keep the fixed folder structure. Do not edit `.pragma/` (run `pragma upgrade` to update it).
 - Reuse existing components before creating new ones.
 - Build overlays only with `c-modal`, `c-alert`, and `c-dropdown`.

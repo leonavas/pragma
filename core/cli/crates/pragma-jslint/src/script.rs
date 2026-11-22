@@ -2,7 +2,7 @@
 //! a per-instance factory `export default function ($, $pragma) { …; return { functions, consts } }`:
 //! top-level `let x` → reactive state `$.x`, `export let p = d` → prop `$pragma.prop("p", d)` read as
 //! `$.p`, names imported from the virtual module `pragma` → `$pragma.name`; imports are hoisted.
-use crate::{LineIndex, parse};
+use crate::{LineIndex, legacy, parse};
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
     ArrayExpressionElement, ArrowFunctionExpression, AssignmentExpression, AssignmentTargetPropertyIdentifier, AwaitExpression,
@@ -230,7 +230,7 @@ impl Transform<'_> {
                         }
                         self.pragma_imports.push(d.span);
                         self.remove(d.span);
-                    } else if d.source.value.as_str().is_some_and(|s| s.ends_with("core/state.js")) {
+                    } else if d.source.value.as_str().is_some_and(|s| s.ends_with(legacy::STATE_MODULE)) {
                         self.err(d.span.start, RULE_LEGACY, "old API: /core/state.js `store()` → a store is plain top-level `let` values and functions; persist fields with `export const persist = ['field']`");
                     } else if !self.leading {
                         self.imports.push(self.text(d.span).split_whitespace().collect::<Vec<_>>().join(" "));

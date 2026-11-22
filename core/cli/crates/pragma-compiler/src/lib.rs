@@ -578,7 +578,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         if let Some(s) = p.read(f) {
             let app = ["routes/", "lib/", "utils/"].iter().any(|d| rel_str(f).starts_with(d));
             if app {
-                diags.extend(pragma_jslint::lint(f, &s, &pragma_jslint::LintContext { is_core: false }));
+                diags.extend(pragma_jslint::lint(f, &s));
             }
             sources.insert(f.clone(), s);
         }
@@ -586,7 +586,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     // a <script> in an .html is linted like a file (diagnostics move to the .html at the end)
     for (path, (code, _)) in &p.embedded {
         if rel_str(path).ends_with(".js") {
-            diags.extend(pragma_jslint::lint(path, code, &pragma_jslint::LintContext { is_core: false }));
+            diags.extend(pragma_jslint::lint(path, code));
             sources.insert(path.clone(), code.clone());
         }
     }
