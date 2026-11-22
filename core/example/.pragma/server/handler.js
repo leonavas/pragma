@@ -110,7 +110,8 @@ export function createHandler({ routes, middleware, service }) {
     const res = await env.ASSETS.fetch(request)
     if (res.status !== 404 || (request.method !== 'GET' && request.method !== 'HEAD')) return res
     // Assets use html_handling "drop-trailing-slash": /a/index.html and /a.html are served at /a.
-    const at = (path) => new URL(path.replace(/(\/index)?\.html$/, '') || '/', request.url)
+    // A dynamic page file (/shop/[id].html) is fetched encoded: a raw [ ] path gets a redirect, not the file.
+    const at = (path) => new URL(encodeURI(path.replace(/(\/index)?\.html$/, '')) || '/', request.url)
     pages ??= env.ASSETS.fetch(new Request(new URL('/_pragma/manifest.json', request.url)))
       .then((r) => (r.ok ? r.json() : []))
       .then(compileRoutes)

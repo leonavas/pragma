@@ -27,7 +27,8 @@ function entry(url) {
   return manifest.then(m => m.find(e => match(e.pattern, url.pathname)))
 }
 
-const pagePath = u => new URL(u, location.href).pathname.replace(/(\/index)?\.html$/, '').replace(/\/$/, '')
+// Decoded: the assets binding redirects a raw /a/[id].html to the encoded /a/%5Bid%5D, the same page.
+const pagePath = u => decodeURI(new URL(u, location.href).pathname).replace(/(\/index)?\.html$/, '').replace(/\/$/, '')
 
 function html(u, anyStatus = false) {
   return fetch(u, { headers: traceHeaders() }).then(r => {
