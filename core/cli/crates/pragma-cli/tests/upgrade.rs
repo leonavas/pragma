@@ -74,8 +74,9 @@ fn upgrade_restores_core_and_keeps_user_files() {
     assert!(versioned.message.contains("0.0.1") && versioned.message.contains(env!("CARGO_PKG_VERSION")), "{}", versioned.message);
 
     let changes = upgrade(app).unwrap();
-    assert_eq!(changes.updated, [".pragma/page.js", ".pragma/version"]);
-    assert_eq!(changes.added, [".pragma/docs/cli.md", ".pragma/base.css"]);
+    let sorted = |paths: &[String]| paths.iter().cloned().collect::<std::collections::BTreeSet<String>>();
+    assert_eq!(sorted(&changes.updated), [".pragma/page.js", ".pragma/version"].map(String::from).into());
+    assert_eq!(sorted(&changes.added), [".pragma/base.css", ".pragma/docs/cli.md"].map(String::from).into());
     assert_eq!(changes.removed, [".pragma/gone/old.js"]);
     assert_eq!(fs::read(app.join(".pragma/page.js")).unwrap(), page);
     assert_eq!(fs::read(app.join(".pragma/base.css")).unwrap(), base);
@@ -84,4 +85,41 @@ fn upgrade_restores_core_and_keeps_user_files() {
     assert_eq!(fs::read_to_string(app.join("routes/index.html")).unwrap(), "<h1>mine</h1>");
     assert_eq!(fs::read_to_string(app.join("AGENTS.md")).unwrap(), "mine");
     assert!(diff(app).is_empty());
+}
+
+#[test]
+fn upgrade_from_the_core_layout_removes_only_its_files() {
+    let tmp = tempfile::tempdir().unwrap();
+    let app = tmp.path();
+    create(app).unwrap();
+    for (rel, text) in [("core/base.css", "old"), ("core/boot.js", "old"), ("core/docs/cli.md", "old"), ("core/mine/notes.txt", "keep"), ("core/server/db.js", "keep")] {
+        fs::create_dir_all(app.join(rel).parent().unwrap()).unwrap();
+        fs::write(app.join(rel), text).unwrap();
+    }
+
+    let warning = outdated(app).unwrap();
+    assert!(warning.message.contains("core/base.css") && !warning.message.contains("core/mine"), "{}", warning.message);
+
+    let out = Command::new(env!("CARGO_BIN_EXE_pragma")).arg("upgrade").current_dir(app).output().unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(out.status.code(), Some(0), "{stdout}");
+    assert!(stdout.contains("removed  core/base.css") && stdout.contains("removed  core/docs/cli.md"), "{stdout}");
+    assert!(!stdout.contains("core/mine") && !stdout.contains("core/server/db.js"), "{stdout}");
+    assert!(stdout.contains("the old core/ files listed above were removed"), "{stdout}");
+    assert_eq!(fs::read_to_string(app.join("core/mine/notes.txt")).unwrap(), "keep");
+    assert_eq!(fs::read_to_string(app.join("core/server/db.js")).unwrap(), "keep");
+    assert!(!app.join("core/docs").exists() && !app.join("core/boot.js").exists());
+    assert!(diff(app).is_empty());
+}
+
+#[test]
+fn upgrade_removes_an_emptied_core_folder() {
+    let tmp = tempfile::tempdir().unwrap();
+    let app = tmp.path();
+    create(app).unwrap();
+    fs::create_dir_all(app.join("core/server")).unwrap();
+    fs::write(app.join("core/boot.js"), "old").unwrap();
+    fs::write(app.join("core/server/handler.js"), "old").unwrap();
+    assert_eq!(upgrade(app).unwrap().removed, ["core/boot.js", "core/server/handler.js"]);
+    assert!(!app.join("core").exists());
 }

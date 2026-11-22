@@ -16,6 +16,7 @@ path = "src/main.rs"
 pragma-diag.workspace = true
 pragma-compiler.workspace = true
 pragma-css.workspace = true
+pragma-jslint.workspace = true
 tokio = { version = "1.54", features = ["rt-multi-thread", "macros", "net", "fs", "process", "io-util", "signal", "sync", "time"] }
 hyper = { version = "1.12", features = ["server", "client", "http1"] }
 hyper-util = { version = "0.1.21", features = ["tokio", "client-legacy", "http1"] }

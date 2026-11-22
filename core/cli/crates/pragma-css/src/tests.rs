@@ -374,18 +374,10 @@ fn every_used_token_is_defined() {
     let base = base_css();
     let colors = all_colors(&Theme::default());
     let g = generate(&every_class(&colors), &Theme::default());
-    let mut rest = g.css.as_str();
-    while let Some(i) = rest.find("var(--") {
-        let after = &rest[i + 4..];
-        let end = after.find([',', ')']).unwrap();
-        let name = &after[..end];
+    for name in crate::scan::var_names(&g.css) {
         if !name.starts_with("--tw-") {
-            assert!(
-                base.contains(&format!("{name}:")),
-                "token {name} not defined in base.css"
-            );
+            assert!(base.contains(&format!("{name}:")), "token {name} not defined in base.css");
         }
-        rest = &after[end..];
     }
 }
 

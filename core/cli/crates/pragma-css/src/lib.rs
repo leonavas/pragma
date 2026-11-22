@@ -3,6 +3,7 @@
 mod base;
 mod doc;
 pub mod prune;
+mod scan;
 pub mod scope;
 mod table;
 pub mod urls;
@@ -29,7 +30,7 @@ pub struct Generated {
 
 /// Reads declared colors (`--color-<name>: …`) from a theme CSS. Uses in `var()` do not count.
 pub fn parse_theme(theme_css: &str) -> Theme {
-    let css = strip_comments(theme_css);
+    let css = scan::strip_comments(theme_css);
     let mut found = BTreeSet::new();
     let mut rest = css.as_str();
     while let Some(i) = rest.find("--color-") {
@@ -140,19 +141,6 @@ fn valid_color_name(name: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
-fn strip_comments(css: &str) -> String {
-    let mut out = String::with_capacity(css.len());
-    let mut rest = css;
-    while let Some(i) = rest.find("/*") {
-        out.push_str(&rest[..i]);
-        rest = rest[i + 2..]
-            .find("*/")
-            .map_or("", |j| &rest[i + 2 + j + 2..]);
-    }
-    out.push_str(rest);
-    out
-}
-
 /// Output order: dark, breakpoint, pseudo-variants, table rule, name, value, opacity.
 type Key = (bool, usize, u8, usize, usize, usize, usize);
 
@@ -190,11 +178,10 @@ fn parse(class: &str, colors: &[String]) -> Option<Option<Util>> {
     }
     let m = match_util(util, colors)?;
 
+    let pseudos: Vec<&str> = PSEUDOS.iter().enumerate().filter(|(i, _)| mask & (1 << i) != 0).map(|(_, (_, pseudo))| *pseudo).collect();
     let mut selector = format!(".{}", escape(class));
-    for (i, (_, pseudo)) in PSEUDOS.iter().enumerate() {
-        if mask & (1 << i) != 0 {
-            selector.push_str(pseudo);
-        }
+    for pseudo in &pseudos {
+        selector.push_str(pseudo);
     }
     if dark {
         selector.push_str(DARK_SEL);
@@ -207,7 +194,7 @@ fn parse(class: &str, colors: &[String]) -> Option<Option<Util>> {
         media.push(format!("(width >= {})", BREAKPOINTS[bp - 1].1));
     }
     // As in Tailwind v4: hover only on devices with real hover (no sticky hover on touch).
-    if mask & 0b11 != 0 {
+    if pseudos.iter().any(|pseudo| pseudo.contains(":hover")) {
         media.push("(hover: hover)".to_string());
     }
 

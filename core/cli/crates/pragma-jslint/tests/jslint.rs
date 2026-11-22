@@ -1,20 +1,19 @@
-use pragma_jslint::{
-    LintContext, exported_actions, exported_names, lint, minify, minify_with_imports,
-};
+use pragma_jslint::{Imported, exported_names, imported_bindings, lint, minify_with_imports};
 use std::path::Path;
 
-const APP: LintContext = LintContext { is_core: false };
-const CORE: LintContext = LintContext { is_core: true };
+fn minify(src: &str) -> Result<String, String> {
+    minify_with_imports(src, |_| None)
+}
 
-fn diags(path: &str, src: &str, ctx: &LintContext) -> Vec<(u32, u32, &'static str)> {
-    lint(Path::new(path), src, ctx)
+fn diags(path: &str, src: &str) -> Vec<(u32, u32, &'static str)> {
+    lint(Path::new(path), src)
         .into_iter()
         .map(|d| (d.line, d.column, d.rule))
         .collect()
 }
 
 fn app(src: &str) -> Vec<(u32, u32, &'static str)> {
-    diags("routes/index.js", src, &APP)
+    diags("routes/index.js", src)
 }
 
 fn rules(src: &str) -> Vec<&'static str> {
@@ -76,21 +75,11 @@ fn string_and_template_with_markup() {
 }
 
 #[test]
-fn create_element_only_in_core() {
+fn create_element_is_html_in_js() {
     let src = "const item = document.createElement('li')\nitem.append(document.createTextNode(x))";
     assert_eq!(
         app(src),
         vec![(1, 23, "js/html-in-js"), (2, 22, "js/html-in-js")]
-    );
-    assert_eq!(diags("core/runtime/directives.js", src, &CORE), vec![]);
-}
-
-#[test]
-fn core_still_forbids_the_rest() {
-    let src = "el.innerHTML = ''\nconsole.log(1)";
-    assert_eq!(
-        diags("core/runtime/boot.js", src, &CORE),
-        vec![(1, 4, "js/html-in-js"), (2, 1, "js/console")]
     );
 }
 
@@ -166,7 +155,6 @@ fn allowed_imports() {
     let src = "import a from './a.js'\nimport b from '../b.js'\nimport { c } from '/core/state.js'\n\
                export { d } from './d.js'\nexport * from '../e.js'\nimport('./f.js')";
     assert_eq!(app(src), vec![]);
-    assert_eq!(diags("core/runtime/router.js", "import(url)", &CORE), vec![]);
 }
 
 #[test]
@@ -174,7 +162,7 @@ fn computed_dynamic_import() {
     assert_eq!(app("const pkg = 'date-fns'\nawait import(pkg)"), vec![(2, 14, "js/import")]);
     assert_eq!(app("await import(`${name}`)"), vec![(1, 14, "js/import")]);
     assert_eq!(app("await import(`./locales/${lang}.js`)"), vec![(1, 14, "js/import")]);
-    assert_eq!(diags("routes/shop/[id].server.js", "await import(driver)", &APP), vec![(1, 14, "js/import")]);
+    assert_eq!(diags("routes/shop/[id].server.js", "await import(driver)"), vec![(1, 14, "js/import")]);
 }
 
 #[test]
@@ -221,19 +209,15 @@ fn node_builtins_detected() {
 #[test]
 fn node_only_on_server() {
     let src = "import { readFile } from 'node:fs/promises'";
-    assert_eq!(diags("routes/shop/[id].server.js", src, &APP), vec![]);
-    assert_eq!(diags("app/core/server/node.mjs", src, &APP), vec![]);
-    assert_eq!(diags("core/runtime/server/node.mjs", src, &CORE), vec![]);
+    assert_eq!(diags("routes/shop/[id].server.js", src), vec![]);
+    assert_eq!(diags("app/core/server/node.mjs", src), vec![]);
+    assert_eq!(diags(".pragma/server/node.mjs", src), vec![]);
     assert_eq!(
-        diags("core/runtime/router.js", src, &CORE),
+        diags("routes/shop/[id].js", src),
         vec![(1, 26, "app/package")]
     );
     assert_eq!(
-        diags("routes/shop/[id].js", src, &APP),
-        vec![(1, 26, "app/package")]
-    );
-    assert_eq!(
-        diags("routes/shop/[id].server.js", "import postgres from 'pg'", &APP),
+        diags("routes/shop/[id].server.js", "import postgres from 'pg'"),
         vec![]
     );
 }
@@ -241,9 +225,9 @@ fn node_only_on_server() {
 #[test]
 fn workers_modules_only_on_server() {
     let src = "import { env } from 'cloudflare:workers'";
-    assert_eq!(diags("routes/app/[id].server.js", src, &APP), vec![]);
-    assert_eq!(diags("routes/app/[id].server.js", "import { connect } from 'cloudflare:sockets'", &APP), vec![]);
-    assert_eq!(diags("routes/app/[id].js", src, &APP), vec![(1, 21, "app/package")]);
+    assert_eq!(diags("routes/app/[id].server.js", src), vec![]);
+    assert_eq!(diags("routes/app/[id].server.js", "import { connect } from 'cloudflare:sockets'"), vec![]);
+    assert_eq!(diags("routes/app/[id].js", src), vec![(1, 21, "app/package")]);
     assert!(pragma_jslint::workers_module_message("cloudflare:workers").contains("Cloudflare Workers module"));
 }
 
@@ -257,37 +241,11 @@ fn column_counts_chars_not_bytes() {
 
 #[test]
 fn diagnostic_has_file_and_message() {
-    let d = lint(Path::new("routes/x.js"), "console.log(1)", &APP);
+    let d = lint(Path::new("routes/x.js"), "console.log(1)");
     assert_eq!(d.len(), 1);
     assert_eq!(d[0].file, Path::new("routes/x.js"));
     assert_eq!(d[0].severity, pragma_diag::Severity::Error);
     assert!(d[0].message.contains("console"));
-}
-
-#[test]
-fn exported_actions_in_many_shapes() {
-    let src = "export const actions = {\n  toggle(ctx) {},\n  async save(ctx) {},\n  clear: (ctx) => {},\n  \
-               'with-hyphen': function () {},\n  shorthand,\n  ...others,\n  [dynamic]: 1,\n  get g() { return 1 },\n}";
-    assert_eq!(
-        exported_actions(src),
-        vec!["toggle", "save", "clear", "with-hyphen", "shorthand", "g"]
-    );
-
-    let indirect = "const mine = { a() {}, b: 1 }\nexport { mine as actions }";
-    assert_eq!(exported_actions(indirect), vec!["a", "b"]);
-
-    let separate = "const actions = { x() {} }\nexport { actions }";
-    assert_eq!(exported_actions(separate), vec!["x"]);
-
-    assert_eq!(
-        exported_actions("export const state = () => ({})"),
-        Vec::<String>::new()
-    );
-    assert_eq!(
-        exported_actions("export const actions = create()"),
-        Vec::<String>::new()
-    );
-    assert_eq!(exported_actions("let x: number"), Vec::<String>::new());
 }
 
 #[test]
@@ -325,9 +283,8 @@ fn minify_keeps_exports_and_imports() {
         assert!(out.contains(spec), "missing {spec}: {out}");
     }
     assert_eq!(exported_names(&out), exported_names(src), "{out}");
-    assert_eq!(exported_actions(&out), vec!["toggle", "save"]);
     assert!(!out.contains("ticker"), "should rename locals: {out}");
-    let diagnostics: Vec<_> = lint(Path::new("x.js"), &out, &APP)
+    let diagnostics: Vec<_> = lint(Path::new("x.js"), &out)
         .into_iter()
         .filter(|d| d.rule != pragma_jslint::RULE_NAME)
         .collect();
@@ -386,6 +343,18 @@ fn server_context_short_names_are_allowed() {
 #[test]
 fn server_strings_may_hold_markup() {
     let src = "export const corpo = `<p>Olá ${nome}</p>`\nexport const prompt = '<contexto_turno>'";
-    assert_eq!(diags("routes/_servidor/email.server.js", src, &APP), vec![]);
-    assert_eq!(diags("routes/x.server.js", "el.innerHTML = corpo", &APP), vec![(1, 4, "js/html-in-js")]);
+    assert_eq!(diags("routes/_servidor/email.server.js", src), vec![]);
+    assert_eq!(diags("routes/x.server.js", "el.innerHTML = corpo"), vec![(1, 4, "js/html-in-js")]);
+}
+
+#[test]
+fn template_import_without_expressions_is_followed_like_a_string() {
+    let src = "export const load = () => import(`./lazy.js`)\nexport const quoted = () => import('./quoted.js')";
+    assert_eq!(app(src), vec![]);
+    assert_eq!(
+        imported_bindings(src),
+        vec![("./lazy.js".to_string(), Imported::All), ("./quoted.js".to_string(), Imported::All)]
+    );
+    let out = minify_with_imports(src, |s| Some(s.replace(".js", "-h1.js"))).unwrap();
+    assert!(out.contains("./lazy-h1.js") && out.contains("./quoted-h1.js"), "{out}");
 }

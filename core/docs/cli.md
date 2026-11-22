@@ -9,7 +9,7 @@
 | `pragma build [--allow-outdated-core]` | Builds `dist/` and prints the JS gzip size of each page (information only, no limits). Stops with `app/core-outdated` if `.pragma/` is older than the CLI (`--allow-outdated-core` overrides this). |
 | `pragma serve [--port 3000] [--host 127.0.0.1]` | Serves `dist/` as in production. |
 | `pragma upgrade` | Syncs `.pragma/` (runtime, docs, `base.css`, `version`) with the installed CLI version. Prints updated, added, or removed files. Never edits files outside `.pragma/`. |
-| `pragma self-update [version]` | Downloads the latest or specified `pragma` binary from GitHub Releases, verifies `SHA256SUMS.txt`, and replaces the executable. |
+| `pragma self-update [version]` | Downloads the latest or specified `pragma` binary from GitHub Releases, verifies it with `SHA256SUMS.txt`, and replaces the executable. If the checksum is missing or wrong, it stops and does not change the binary. |
 
 Run `pragma check --strict` before you finish. Fix all errors and warnings.
 Output format: `file:line:column error|warning [rule] message`.
@@ -58,6 +58,7 @@ Fix the root cause; do not work around a rule.
 | `html/script`, `html/style-inline`, `html/on-inline` | Put at most one `<script>` (optional `type="module"`) and one `<style>` at the top level of a page or component `.html`. Replace `style="..."` with classes, or with `:--name="path"` and `var(--name)` in CSS (`css.md`). Put JSON-LD `<script type="application/ld+json">` only at the top level of a page (`routes.md`). |
 | `html/json-ld` | Fix invalid JSON or unclosed `{` in JSON-LD strings. Use `{` for a literal brace. |
 | `css/unknown-class`, `css/arbitrary-value` | Use classes from `classes.md` or custom classes per `css.md`. |
+| `css/utility-name` | In `lib/theme.css`, do not write a rule whose selector is only a utility name (`.flex`, `.hidden:hover`). Rename the class (`css.md`). |
 | `css/unmatched-selector` (warning) | A page or component selector matches no element its owner writes (slot content, child component markup). Wrap the outside part in `:global(…)` or move the style to the writer (`css.md`). |
 | `app/structure`, `app/route-conflict` | Follow structure and route rules (`structure.md`, `routes.md`). |
 | `app/endpoint`, `app/middleware` | An endpoint exports only `GET`/`POST`/`PUT`/`PATCH`/`DELETE`; the middleware exports `handle` (`data.md`). |
@@ -65,6 +66,7 @@ Fix the root cause; do not work around a rule.
 | `app/package` | Follow package rules (`packages.md`). |
 | `app/pragma-json` | Fix `pragma.json` (`structure.md`). |
 | `app/core-outdated` (warning; error in `pragma build`) | `.pragma/` differs from the CLI version. Run `pragma upgrade`. Do not edit `.pragma/` by hand. |
+| `internal` (`pragma dev`) | The compiler stopped with a bug. Report it with the file you changed last. |
 
 ## Accessibility (`a11y/*`, warnings; errors with `--strict`)
 

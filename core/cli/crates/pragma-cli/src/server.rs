@@ -17,7 +17,7 @@ use tokio::sync::broadcast;
 
 pub type Body = BoxBody<Bytes, std::io::Error>;
 
-pub const DEV_SCRIPT: &str = "<script type=\"module\" src=\"/_pragma/dev.js\"></script>";
+const DEV_SCRIPT: &str = "<script type=\"module\" src=\"/_pragma/dev.js\"></script>";
 const DEV_JS: &str = include_str!("dev.js");
 const IMMUTABLE: &str = "public, max-age=31536000, immutable";
 
@@ -29,7 +29,7 @@ pub enum Mode {
 
 #[derive(Clone, Debug)]
 pub enum Event {
-    Css(String),
+    Css,
     Reload,
     Error(String),
 }
@@ -391,7 +391,7 @@ fn is_server_path(path: &str) -> bool {
     path == "/_otel" || path.starts_with("/_data/") || path == "/_data" || path.starts_with("/_action/")
 }
 
-pub fn inject_dev(html: &[u8]) -> Bytes {
+fn inject_dev(html: &[u8]) -> Bytes {
     let text = String::from_utf8_lossy(html);
     if text.contains("/_pragma/dev.js") {
         return Bytes::copy_from_slice(html);
@@ -451,7 +451,7 @@ fn load_routing(root: &Path) -> Routing {
     routing
 }
 
-pub fn mime(path: &str) -> &'static str {
+fn mime(path: &str) -> &'static str {
     let ext = path.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase()).unwrap_or_default();
     match ext.as_str() {
         "html" | "htm" => "text/html; charset=utf-8",
@@ -575,7 +575,7 @@ fn reload_message(kind: &str, data: &str) -> String {
 
 fn event_message(event: &Event) -> String {
     match event {
-        Event::Css(href) => reload_message("css", href),
+        Event::Css => reload_message("css", ""),
         Event::Reload => reload_message("reload", ""),
         Event::Error(json) => reload_message("error", json),
     }

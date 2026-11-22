@@ -2081,6 +2081,7 @@ dependencies = [
  "pragma-compiler",
  "pragma-css",
  "pragma-diag",
+ "pragma-jslint",
  "serde_json",
  "tempfile",
  "tokio",

@@ -1,8 +1,21 @@
 //! Scoped `<style>` / `.css` of components and pages: each style rule applies only inside its owner.
 
+use crate::scan::{at_name, block_end, block_end_with, compounds, find_top, split_top, top_level};
+
 /// At-rules whose block holds style rules (scoped recursively); any other block is copied as is
 /// (`@keyframes`, `@font-face`, `@property`, `@page`…).
 pub(crate) const NESTING: &[&str] = &["media", "supports", "layer", "container", "starting-style", "document"];
+
+/// The selector of the elements a page or component wrote: the build writes `data-s="<token>"` on
+/// them.
+pub fn owner_selector(token: &str) -> String {
+    format!("[data-s~=\"{token}\"]")
+}
+
+/// What [`scope`] puts in a selector's own-element compound, up to the token (`OWNED` + `"s1"` +
+/// [`OWNED_END`]).
+pub const OWNED: &str = ":where([data-s~=";
+pub(crate) const OWNED_END: &str = "])";
 
 /// Pseudo-elements written with one colon (CSS 2): the scope goes before them.
 const OLD_PSEUDO_ELEMENTS: &[&str] = &[":before", ":after", ":first-line", ":first-letter"];
@@ -35,8 +48,7 @@ pub fn scope(css: &str, scope: &str, spellings: &[String]) -> String {
         }
         let close = block_end(rest, open);
         let block = &rest[open + 1..close];
-        if let Some(at) = prelude.trim_start().strip_prefix('@') {
-            let name = at.split(|c: char| c.is_whitespace() || c == '{' || c == '(').next().unwrap_or("").to_ascii_lowercase();
+        if let Some(name) = at_name(prelude) {
             out.push_str(prelude);
             out.push('{');
             if NESTING.contains(&name.as_str()) {
@@ -87,136 +99,15 @@ fn unwrap_global(s: &str) -> String {
     out
 }
 
-/// Byte ranges of the compound selectors (split at the top-level combinators), in order.
-pub(crate) fn compounds(s: &str) -> Vec<(usize, usize)> {
-    let b = s.as_bytes();
-    let (mut depth, mut i, mut quote, mut start) = (0i32, 0, 0u8, None::<usize>);
-    let mut out = Vec::new();
-    while i < b.len() {
-        let c = b[i];
-        if quote != 0 {
-            if c == b'\\' {
-                i += 1;
-            } else if c == quote {
-                quote = 0;
-            }
-        } else if depth == 0 && matches!(c, b' ' | b'\t' | b'\n' | b'>' | b'+' | b'~') {
-            if let Some(from) = start.take() {
-                out.push((from, i));
-            }
-            i += 1;
-            continue;
-        } else {
-            match c {
-                b'"' | b'\'' => quote = c,
-                b'(' | b'[' => depth += 1,
-                b')' | b']' => depth -= 1,
-                _ => {}
-            }
-        }
-        start.get_or_insert(i);
-        i += 1;
-    }
-    if let Some(from) = start {
-        out.push((from, b.len()));
-    }
-    out
-}
-
 /// Offset of the pseudo-element (`::x` or an old one-colon form) in a compound selector.
 fn pseudo_element(compound: &str) -> Option<usize> {
-    let b = compound.as_bytes();
-    let mut depth = 0i32;
-    for i in 0..b.len() {
-        match b[i] {
-            b'(' | b'[' => depth += 1,
-            b')' | b']' => depth -= 1,
-            b':' if depth == 0 => {
-                if b.get(i + 1) == Some(&b':') {
-                    return Some(i);
-                }
-                let tail = compound[i..].to_ascii_lowercase();
-                if OLD_PSEUDO_ELEMENTS.iter().any(|p| tail.starts_with(p) && !tail[p.len()..].starts_with(|c: char| c.is_ascii_alphanumeric() || c == '-')) {
-                    return Some(i);
-                }
-            }
-            _ => {}
+    top_level(compound).find(|&(i, c)| {
+        if c != b':' {
+            return false;
         }
-    }
-    None
-}
-
-/// First of `chars` at depth 0, outside strings and comments.
-pub(crate) fn find_top(s: &str, chars: &[char]) -> Option<usize> {
-    let b = s.as_bytes();
-    let (mut depth, mut i, mut quote) = (0i32, 0, 0u8);
-    while i < b.len() {
-        let c = b[i];
-        if quote != 0 {
-            if c == b'\\' {
-                i += 1;
-            } else if c == quote {
-                quote = 0;
-            }
-        } else if c == b'/' && b.get(i + 1) == Some(&b'*') {
-            i = s[i + 2..].find("*/").map_or(b.len(), |k| i + 2 + k + 1);
-        } else {
-            match c {
-                b'"' | b'\'' => quote = c,
-                b'(' | b'[' => depth += 1,
-                b')' | b']' => depth -= 1,
-                _ if depth == 0 && chars.contains(&(c as char)) => return Some(i),
-                _ => {}
-            }
-        }
-        i += 1;
-    }
-    None
-}
-
-/// Index of the `}` closing the `{` at `open` (or the end).
-pub(crate) fn block_end(s: &str, open: usize) -> usize {
-    open + 1 + block_end_with(&s[open + 1..], '{', '}')
-}
-
-/// Index of the `close` matching an already opened `open`, in `s` (or `s.len()`).
-pub(crate) fn block_end_with(s: &str, open: char, close: char) -> usize {
-    let b = s.as_bytes();
-    let (mut depth, mut i, mut quote) = (0i32, 0, 0u8);
-    while i < b.len() {
-        let c = b[i];
-        if quote != 0 {
-            if c == b'\\' {
-                i += 1;
-            } else if c == quote {
-                quote = 0;
-            }
-        } else if c == b'/' && b.get(i + 1) == Some(&b'*') {
-            i = s[i + 2..].find("*/").map_or(b.len(), |k| i + 2 + k + 1);
-        } else if c == b'"' || c == b'\'' {
-            quote = c;
-        } else if c as char == open {
-            depth += 1;
-        } else if c as char == close {
-            if depth == 0 {
-                return i;
-            }
-            depth -= 1;
-        }
-        i += 1;
-    }
-    b.len()
-}
-
-pub(crate) fn split_top(s: &str, sep: char) -> Vec<&str> {
-    let mut parts = Vec::new();
-    let mut rest = s;
-    while let Some(i) = find_top(rest, &[sep]) {
-        parts.push(&rest[..i]);
-        rest = &rest[i + 1..];
-    }
-    parts.push(rest);
-    parts
+        let tail = compound[i..].to_ascii_lowercase();
+        tail.starts_with("::") || OLD_PSEUDO_ELEMENTS.iter().any(|p| tail.starts_with(p) && !tail[p.len()..].starts_with(|c: char| c.is_ascii_alphanumeric() || c == '-'))
+    }).map(|(i, _)| i)
 }
 
 #[cfg(test)]
@@ -225,10 +116,21 @@ mod tests {
 
     fn card(css: &str) -> String {
         let s = "[data-c=\"card\"]";
-        scope(css, "[data-s~=\"s1\"]", &[s.to_string(), "[data-c='card']".into(), "[data-c=card]".into()])
+        scope(css, &super::owner_selector("s1"), &[s.to_string(), "[data-c='card']".into(), "[data-c=card]".into()])
     }
 
     const W: &str = ":where([data-s~=\"s1\"])";
+
+    #[test]
+    fn the_scope_of_an_owner_is_its_marker() {
+        let scoped = super::scope(".a{x:1}", &super::owner_selector("s1"), &[]);
+        assert_eq!(scoped, format!(".a{}\"s1\"{}{{x:1}}", super::OWNED, super::OWNED_END));
+    }
+
+    #[test]
+    fn a_quoted_bracket_does_not_hide_the_pseudo_element() {
+        assert_eq!(card("a[title=\")\"]::before{x:1}"), format!("a[title=\")\"]{W}::before{{x:1}}"));
+    }
 
     #[test]
     fn subjects_get_the_scope() {
@@ -260,6 +162,14 @@ mod tests {
         let css = "@media (min-width: 40rem) { .a { x: 1 } @supports (x: y) { b { y: 2 } } } @keyframes spin { from { rotate: 0deg } to { rotate: 1turn } } @import url(\"x.css\"); @font-face { font-family: X; }";
         let want = format!("@media (min-width: 40rem) {{ .a{W} {{ x: 1 }} @supports (x: y) {{ b{W} {{ y: 2 }} }} }} @keyframes spin {{ from {{ rotate: 0deg }} to {{ rotate: 1turn }} }} @import url(\"x.css\"); @font-face {{ font-family: X; }}");
         assert_eq!(card(css), want);
+    }
+
+    #[test]
+    fn brackets_parentheses_and_escapes_in_selectors() {
+        assert_eq!(card(".md\\:p-0 > a[href$=\")\"]{x:1}"), format!(".md\\:p-0 > a[href$=\")\"]{W}{{x:1}}"));
+        assert_eq!(card("li:not(.a, [b=\"c d\"]) + p:nth-of-type(2n){x:1}"), format!("li:not(.a, [b=\"c d\"]) + p:nth-of-type(2n){W}{{x:1}}"));
+        assert_eq!(card("a[title=\"x::y\"]::after{x:1}"), format!("a[title=\"x::y\"]{W}::after{{x:1}}"));
+        assert_eq!(card(":is(.a,.b)::before,\n.c:BEFORE{x:1}"), format!(":is(.a,.b){W}::before,\n.c{W}:BEFORE{{x:1}}"));
     }
 
     #[test]

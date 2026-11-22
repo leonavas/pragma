@@ -225,8 +225,8 @@ async fn websocket_emits_reload_events() {
     let mut stream = ws_connect(addr).await;
     assert_eq!(ws_message(&mut stream).await["type"], "hello");
 
-    site.send(Event::Css("/assets/app-new.css".into()));
-    assert_eq!(ws_message(&mut stream).await, serde_json::json!({ "type": "css", "data": "/assets/app-new.css" }));
+    site.send(Event::Css);
+    assert_eq!(ws_message(&mut stream).await["type"], "css");
     site.send(Event::Reload);
     assert_eq!(ws_message(&mut stream).await["type"], "reload");
     let errors = r#"[{"file":"routes/index.html","line":1}]"#;

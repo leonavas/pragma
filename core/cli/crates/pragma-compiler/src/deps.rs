@@ -24,8 +24,7 @@ const UI_LIBS: &[&str] = &[
     "hyperapp",
 ];
 
-pub const RULE_IMPORT: &str = "js/import";
-pub const RULE_PACKAGE: &str = "app/package";
+pub use pragma_jslint::{RULE_IMPORT, RULE_PACKAGE};
 
 pub struct Deps {
     root: PathBuf,

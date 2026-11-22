@@ -1,4 +1,6 @@
+use crate::layout::{DEV_OUT, SKIPPED_NAMES};
 use crate::new::{core_files, write};
+use pragma_jslint::legacy;
 use pragma_diag::Diagnostic;
 use std::collections::HashSet;
 use std::path::Path;
@@ -14,6 +16,10 @@ pub struct CoreDiff {
 impl CoreDiff {
     pub fn is_empty(&self) -> bool {
         self.added.is_empty() && self.updated.is_empty() && self.removed.is_empty()
+    }
+
+    pub fn removes_legacy_files(&self) -> bool {
+        self.removed.iter().any(|rel| !rel.starts_with(".pragma/"))
     }
 
     pub fn len(&self) -> usize {
@@ -38,15 +44,23 @@ pub fn diff(root: &Path) -> CoreDiff {
     let known: HashSet<&str> = files.iter().map(|(rel, _)| rel.as_str()).collect();
     let mut present = Vec::new();
     collect(&root.join(".pragma"), ".pragma", &mut present);
-    if root.join("core/boot.js").is_file() || root.join("core/base.css").is_file() {
-        collect(&root.join("core"), "core", &mut present);
-    }
+    present.retain(|rel| !known.contains(rel.as_str()));
+    present.extend(legacy_files(root));
     present.sort();
-    out.removed = present.into_iter().filter(|rel| !known.contains(rel.as_str())).collect();
+    out.removed = present;
     out
 }
 
-/// Makes `.pragma/` equal to the embedded version (and removes legacy `core/`).
+/// The files an app in the old `core/` layout still has from that layout; its own files in `core/`
+/// are not listed.
+fn legacy_files(root: &Path) -> Vec<String> {
+    if !legacy::MARKERS.iter().any(|marker| root.join(marker).is_file()) {
+        return Vec::new();
+    }
+    legacy::FILES.iter().filter(|rel| root.join(rel).is_file()).map(|rel| rel.to_string()).collect()
+}
+
+/// Makes `.pragma/` equal to the embedded version and removes the files of the old `core/` layout.
 pub fn upgrade(root: &Path) -> Result<CoreDiff, String> {
     let changes = diff(root);
     for (rel, content) in core_files() {
@@ -57,10 +71,10 @@ pub fn upgrade(root: &Path) -> Result<CoreDiff, String> {
     for rel in &changes.removed {
         let path = root.join(rel);
         std::fs::remove_file(&path).map_err(|e| format!("cannot remove '{}': {e}", path.display()))?;
-        let base = if rel.starts_with("core/") { root.join("core") } else { root.join(".pragma") };
+        let base = root.join(if rel.starts_with(".pragma/") { ".pragma" } else { "core" });
         remove_empty_dirs(&base, &path);
-        if rel.starts_with("core/") {
-            let _ = std::fs::remove_dir(&base);
+        if !rel.starts_with(".pragma/") && is_empty_dir(&base) {
+            std::fs::remove_dir(&base).map_err(|e| format!("cannot remove '{}': {e}", base.display()))?;
         }
     }
     Ok(changes)
@@ -112,10 +126,10 @@ fn collect(dir: &Path, rel: &str, files: &mut Vec<String>) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
-        if matches!(name.as_str(), "node_modules" | ".git" | ".DS_Store") || (rel == ".pragma" && name == "dev") {
+        let child = format!("{rel}/{name}");
+        if SKIPPED_NAMES.contains(&name.as_str()) || child == DEV_OUT {
             continue;
         }
-        let child = format!("{rel}/{name}");
         if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
             collect(&entry.path(), &child, files);
         } else {
@@ -132,4 +146,8 @@ fn remove_empty_dirs(core: &Path, file: &Path) {
         }
         dir = current.parent();
     }
+}
+
+fn is_empty_dir(dir: &Path) -> bool {
+    std::fs::read_dir(dir).is_ok_and(|mut entries| entries.next().is_none())
 }

@@ -1,5 +1,6 @@
+use crate::layout::DEV_OUT;
 use crate::node::Node;
-use crate::report::{diagnostics_json, dim, print_diagnostics, red};
+use crate::report::{self, diagnostics_json, print_diagnostics};
 use crate::server::{self, Event, Mode, Site};
 use notify::{EventKind, RecursiveMode, Watcher};
 use pragma_compiler::{BuildOptions, BuildReport};
@@ -13,25 +14,21 @@ use tokio::sync::mpsc;
 const DEBOUNCE: Duration = Duration::from_millis(30);
 const IGNORED_DIRS: [&str; 5] = [".pragma", "dist", "node_modules", ".git", ".wrangler"];
 
-pub async fn run(root: PathBuf, host: &str, port: u16) -> i32 {
-    run_with(root, host, port, None).await
-}
-
 /// `cf_config`: `pragma dev --cf`, Cloudflare bindings from that wrangler config.
-pub async fn run_with(root: PathBuf, host: &str, port: u16, cf_config: Option<PathBuf>) -> i32 {
-    let out = root.join(".pragma/dev");
+pub async fn run(root: PathBuf, host: &str, port: u16, cf_config: Option<PathBuf>) -> i32 {
+    let out = root.join(DEV_OUT);
     let site = Site::new(out.join("client"), Mode::Dev);
     let mut failed = !rebuild(&root, &out, &site).await;
     let listener = match TcpListener::bind((host, port)).await {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("{} cannot listen on {host}:{port}: {e}", red("error"));
+            eprintln!("{} cannot listen on {host}:{port}: {e}", report::err().red("error"));
             return 1;
         }
     };
     let mut node = Node::new(out.join("server/node.mjs"), root.clone(), true);
     if let Some(config) = cf_config {
-        println!("{}", dim(&format!("Cloudflare bindings from {}", config.file_name().unwrap_or_default().to_string_lossy())));
+        println!("{}", report::out().dim(&format!("Cloudflare bindings from {}", config.file_name().unwrap_or_default().to_string_lossy())));
         node = node.with_cloudflare(config);
     }
     node.sync(&site).await;
@@ -44,7 +41,7 @@ pub async fn run_with(root: PathBuf, host: &str, port: u16, cf_config: Option<Pa
     let _watcher = match watch(&root, tx) {
         Ok(w) => w,
         Err(e) => {
-            eprintln!("{} cannot watch '{}': {e}", red("error"), root.display());
+            eprintln!("{} cannot watch '{}': {e}", report::err().red("error"), root.display());
             node.stop().await;
             return 1;
         }
@@ -55,7 +52,7 @@ pub async fn run_with(root: PathBuf, host: &str, port: u16, cf_config: Option<Pa
                 let Some(batch) = batch else { break };
                 let css_only = batch.iter().all(|p| p.extension().is_some_and(|e| e == "css"));
                 let names: Vec<_> = batch.iter().map(|p| p.strip_prefix(&root).unwrap_or(p).display().to_string()).collect();
-                println!("{}", dim(&format!("changed: {}", names.join(", "))));
+                println!("{}", report::out().dim(&format!("changed: {}", names.join(", "))));
                 let ok = rebuild(&root, &out, &site).await;
                 // the build writes its outputs even with errors elsewhere: node must serve the same
                 // build as the client files, or a new page's `load` answers 404 (BUG-S-8)
@@ -66,7 +63,7 @@ pub async fn run_with(root: PathBuf, host: &str, port: u16, cf_config: Option<Pa
                 }
                 // after an error the page may be stale beyond the CSS
                 if css_only && !failed {
-                    site.send(Event::Css(newest_css(&out.join("client/assets"))));
+                    site.send(Event::Css);
                 } else {
                     site.send(Event::Reload);
                 }
@@ -96,7 +93,7 @@ async fn rebuild(root: &Path, out: &Path, site: &Site) -> bool {
     match result {
         Ok(report) => {
             print_diagnostics(root, &report.warnings);
-            println!("{}", dim(&format!("compiled in {} ms", started.elapsed().as_millis())));
+            println!("{}", report::out().dim(&format!("compiled in {} ms", started.elapsed().as_millis())));
             true
         }
         Err(diagnostics) => {
@@ -106,18 +103,6 @@ async fn rebuild(root: &Path, out: &Path, site: &Site) -> bool {
             false
         }
     }
-}
-
-fn newest_css(assets: &Path) -> String {
-    std::fs::read_dir(assets)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .filter(|e| e.path().extension().is_some_and(|x| x == "css"))
-        .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.file_name())))
-        .max()
-        .map(|(_, name)| format!("/assets/{}", name.to_string_lossy()))
-        .unwrap_or_default()
 }
 
 fn watch(root: &Path, tx: mpsc::UnboundedSender<Vec<PathBuf>>) -> notify::Result<notify::RecommendedWatcher> {
@@ -156,8 +141,11 @@ fn ignored(root: &Path, path: &Path) -> bool {
     if rel.components().next().is_some_and(|c| IGNORED_DIRS.iter().any(|d| c.as_os_str() == *d)) {
         return true;
     }
-    let name = rel.file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
-    // editor temp files
+    is_editor_temp_file(&rel.file_name().map(|n| n.to_string_lossy()).unwrap_or_default())
+}
+
+/// Backups (`x~`), vim swap files and the file vim writes to probe a folder (`4913`), emacs locks.
+fn is_editor_temp_file(name: &str) -> bool {
     name.ends_with('~') || name.ends_with(".swp") || name.ends_with(".swx") || name.starts_with(".#") || name == "4913"
 }
 

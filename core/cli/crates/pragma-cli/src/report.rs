@@ -3,16 +3,40 @@ use pragma_diag::{Diagnostic, Severity};
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 
-pub fn paint(code: &str, text: &str) -> String {
-    if std::io::stderr().is_terminal() { format!("\x1b[{code}m{text}\x1b[0m") } else { text.to_owned() }
+/// Colors for one output stream: ANSI codes only when that stream is a terminal.
+#[derive(Clone, Copy)]
+pub struct Paint {
+    color: bool,
 }
 
-pub fn red(text: &str) -> String {
-    paint("31", text)
+pub fn out() -> Paint {
+    Paint { color: std::io::stdout().is_terminal() }
 }
 
-pub fn dim(text: &str) -> String {
-    paint("2", text)
+pub fn err() -> Paint {
+    Paint { color: std::io::stderr().is_terminal() }
+}
+
+impl Paint {
+    fn paint(self, code: &str, text: &str) -> String {
+        if self.color { format!("\x1b[{code}m{text}\x1b[0m") } else { text.to_owned() }
+    }
+
+    pub fn red(self, text: &str) -> String {
+        self.paint("31", text)
+    }
+
+    pub fn yellow(self, text: &str) -> String {
+        self.paint("33", text)
+    }
+
+    pub fn cyan(self, text: &str) -> String {
+        self.paint("36", text)
+    }
+
+    pub fn dim(self, text: &str) -> String {
+        self.paint("2", text)
+    }
 }
 
 fn relative(root: &Path, file: &Path) -> PathBuf {
@@ -20,13 +44,14 @@ fn relative(root: &Path, file: &Path) -> PathBuf {
 }
 
 pub fn print_diagnostics(root: &Path, diagnostics: &[Diagnostic]) {
+    let paint = err();
     for d in diagnostics {
         let level = match d.severity {
-            Severity::Error => red("error"),
-            Severity::Warning => paint("33", "warning"),
+            Severity::Error => paint.red("error"),
+            Severity::Warning => paint.yellow("warning"),
         };
         let rel = relative(root, &d.file);
-        eprintln!("{}:{}:{} {level} {} {}", rel.display(), d.line, d.column, dim(&format!("[{}]", d.rule)), d.message);
+        eprintln!("{}:{}:{} {level} {} {}", rel.display(), d.line, d.column, paint.dim(&format!("[{}]", d.rule)), d.message);
         let source = std::fs::read_to_string(root.join(&rel)).ok();
         if let Some(line) = source.as_deref().and_then(|s| s.lines().nth(d.line.saturating_sub(1) as usize))
             && d.line > 0
@@ -34,8 +59,8 @@ pub fn print_diagnostics(root: &Path, diagnostics: &[Diagnostic]) {
             let number = d.line.to_string();
             let pad = " ".repeat(number.len());
             let caret = " ".repeat(line.chars().take(d.column.saturating_sub(1) as usize).map(|c| if c == '\t' { 4 } else { 1 }).sum());
-            eprintln!("{}", dim(&format!(" {number} | {}", line.replace('\t', "    "))));
-            eprintln!("{}", dim(&format!(" {pad} | {caret}^")));
+            eprintln!("{}", paint.dim(&format!(" {number} | {}", line.replace('\t', "    "))));
+            eprintln!("{}", paint.dim(&format!(" {pad} | {caret}^")));
         }
     }
     let errors = diagnostics.iter().filter(|d| d.severity == Severity::Error).count();

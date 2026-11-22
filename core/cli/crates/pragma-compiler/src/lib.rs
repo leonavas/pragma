@@ -18,6 +18,7 @@ pub use compile::{SSR_SELF_CALLS, SSR_SELF_DEPTH};
 
 use pragma_diag::{Diagnostic, Severity};
 use pragma_jslint::script::{self, ScriptInfo, ScriptKind};
+use pragma_css::scope::{OWNED, owner_selector};
 use project::{Page, Project, rel_str};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
@@ -142,13 +143,6 @@ pub(crate) fn css_owner(kind: &str, name: &str) -> String {
     h.write(b":");
     h.write(name.as_bytes());
     format!("s{}", &short_hash(h.finish())[..6])
-}
-
-/// What scoping adds to a selector's own-element compound (see [`owner_selector`]).
-const OWNED: &str = ":where([data-s~=";
-
-fn owner_selector(token: &str) -> String {
-    format!("[data-s~=\"{token}\"]")
 }
 
 /// A component's CSS applies only to the markup it wrote: every selector that does not already name
@@ -578,7 +572,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         if let Some(s) = p.read(f) {
             let app = ["routes/", "lib/", "utils/"].iter().any(|d| rel_str(f).starts_with(d));
             if app {
-                diags.extend(pragma_jslint::lint(f, &s, &pragma_jslint::LintContext { is_core: false }));
+                diags.extend(pragma_jslint::lint(f, &s));
             }
             sources.insert(f.clone(), s);
         }
@@ -586,7 +580,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     // a <script> in an .html is linted like a file (diagnostics move to the .html at the end)
     for (path, (code, _)) in &p.embedded {
         if rel_str(path).ends_with(".js") {
-            diags.extend(pragma_jslint::lint(path, code, &pragma_jslint::LintContext { is_core: false }));
+            diags.extend(pragma_jslint::lint(path, code));
             sources.insert(path.clone(), code.clone());
         }
     }
