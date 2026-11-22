@@ -55,7 +55,8 @@ pub struct Project {
     pub sources: Vec<String>,
     pub trees: Vec<Vec<Node>>,
     pub config: Config,
-    pub layout: Option<u32>,
+    /// `routes/_layout.html`; a bare `<main data-page><slot></slot></main>` when it is missing (an error).
+    pub layout: u32,
     pub nested_layouts: HashMap<PathBuf, u32>,
     pub not_found: Option<Page>,
     pub pages: Vec<Page>,
@@ -228,7 +229,7 @@ impl Project {
             sources: Vec::new(),
             trees: Vec::new(),
             config: Config { webmcp: true, ..Config::default() },
-            layout: None,
+            layout: 0,
             nested_layouts: HashMap::new(),
             not_found: None,
             pages: Vec::new(),
@@ -361,6 +362,7 @@ impl Project {
 
     fn discover_routes(&mut self, all: &[PathBuf]) {
         let mut seen: BTreeMap<String, PathBuf> = BTreeMap::new();
+        let mut layout = None;
         for f in all {
             let s = rel_str(f);
             if !s.starts_with("routes/") {
@@ -369,7 +371,7 @@ impl Project {
             let in_private = f.components().skip(1).any(|c| c.as_os_str().to_string_lossy().starts_with('_'));
             let file_name = f.file_name().unwrap().to_string_lossy().to_string();
             if s == "routes/_layout.html" {
-                self.layout = Some(self.add_html(f.clone()));
+                layout = Some(self.add_html(f.clone()));
                 continue;
             }
             if s == "routes/_404.html" {
@@ -436,9 +438,15 @@ impl Project {
             let out_name = rel_str(&rel.with_extension(""));
             self.pages.push(Page { html: id, pattern, out_name, dir: f.parent().unwrap().to_path_buf(), module, css, server });
         }
-        if self.layout.is_none() && self.root.join("routes").is_dir() {
-            self.err("routes/_layout.html", 1, 1, "app/structure", "missing routes/_layout.html with <main data-page><slot></slot></main>");
-        }
+        self.layout = layout.unwrap_or_else(|| {
+            if self.root.join("routes").is_dir() {
+                self.err("routes/_layout.html", 1, 1, "app/structure", "missing routes/_layout.html with <main data-page><slot></slot></main>");
+            }
+            self.files.push(PathBuf::from("routes/_layout.html"));
+            self.sources.push(String::new());
+            self.trees.push(html::parse("<main data-page><slot></slot></main>", self.files.len() as u32 - 1).0);
+            self.files.len() as u32 - 1
+        });
         self.pages.sort_by(|a, b| route_order(&a.pattern, &b.pattern));
         self.endpoints.sort_by(|a, b| route_order(&a.pattern, &b.pattern));
     }

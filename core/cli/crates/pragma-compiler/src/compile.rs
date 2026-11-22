@@ -105,11 +105,15 @@ pub fn write_element(e: &Element, out: &mut String, compact: bool) {
     out.push('>');
 }
 
-/// Moves every block body out of `nodes`: the block stays as an empty anchor whose `data-tid` is a
-/// short id (`<prefix><base36>`, equal bodies share one); `<main data-page>` gets its own `t` ids.
-/// Returns one `<template data-tpl="<tid>">` per body and the `<template data-def>` of self calls,
-/// which leave the page for its template module.
-pub fn hoist(nodes: &mut Vec<Node>, prefix: char) -> Vec<Element> {
+/// Moves every block body out of the page: the block stays as an empty anchor whose `data-tid` is a
+/// short id (`<prefix><base36>`, equal bodies share one): `l` in the layout, `t` inside `<main
+/// data-page>`. Returns one `<template data-tpl="<tid>">` per body and the `<template data-def>` of
+/// self calls, which leave the page for its template module.
+pub fn hoist(body: &mut Vec<Node>) -> Vec<Element> {
+    hoist_with(body, 'l')
+}
+
+fn hoist_with(nodes: &mut Vec<Node>, prefix: char) -> Vec<Element> {
     let mut h = Hoisted { prefix, ids: HashMap::new(), out: Vec::new() };
     hoist_nodes(nodes, &mut h, false);
     let mut out = h.out;
@@ -161,7 +165,7 @@ fn hoist_nodes(nodes: &mut [Node], h: &mut Hoisted, foreign: bool) {
     for n in nodes {
         let Node::Element(e) = n else { continue };
         if e.is("main") && e.has("data-page") {
-            let page = hoist(&mut e.children, 't');
+            let page = hoist_with(&mut e.children, 't');
             h.out.extend(page);
             continue;
         }
@@ -231,6 +235,21 @@ pub fn template_module(bodies: &[Element], compact: bool) -> String {
         out.push_str(&format!("export const d = {}\n", js_object(&defs)));
     }
     out
+}
+
+/// The children of `<main data-page>`: what SSR renders.
+pub fn page_content(nodes: &[Node]) -> &[Node] {
+    for n in nodes {
+        let Node::Element(e) = n else { continue };
+        if e.is("main") && e.has("data-page") {
+            return &e.children;
+        }
+        let inner = page_content(&e.children);
+        if !inner.is_empty() {
+            return inner;
+        }
+    }
+    &[]
 }
 
 /// Roots the server can render; `shared` is left to the client. `state` gets ops too: the server
@@ -514,7 +533,7 @@ mod tests {
     fn compiles_ops() {
         let src = r#"<ul class="a" data-class-on="data.on"><template data-for="x in data.xs" data-key="x.id" data-tid="t1"><li data-text="{x.name}"></li></template><template data-empty data-tid="t2"><li>empty</li></template></ul><p data-show="!state.ok" data-attr-title="data.t" title="y">z</p>"#;
         let (mut nodes, _) = parse(src, 0);
-        let bodies = hoist(&mut nodes, 't');
+        let bodies = hoist_with(&mut nodes, 't');
         let v = ops(&nodes, &BTreeSet::new(), &bodies);
         let expected = json!([
             ["html", "<ul data-class-on=\"data.on\""],
@@ -570,7 +589,7 @@ mod tests {
     fn self_calls_render_on_the_server_up_to_a_depth() {
         let src = r#"<ul data-c="tree"><template data-for="c in state.node.kids" data-key="c.id" data-tid="t1"><ul data-c="tree" data-self="c-tree" data-with-node="c"></ul></template></ul><template data-def="tree"><ul data-c="tree"><template data-for="c in state.node.kids" data-key="c.id" data-tid="t1"><ul data-c="tree" data-self="c-tree" data-with-node="c"></ul></template></ul></template>"#;
         let (mut nodes, _) = parse(src, 0);
-        let bodies = hoist(&mut nodes, 't');
+        let bodies = hoist_with(&mut nodes, 't');
         let v = ops(&nodes, &BTreeSet::from(["tree".to_string()]), &bodies).to_string();
         assert_eq!(v.matches(r#"["comp","tree""#).count(), 1 + SSR_SELF_DEPTH, "{v}");
         assert_eq!(v.matches(r#"["for","t0""#).count(), 1 + SSR_SELF_DEPTH, "{v}");
@@ -581,7 +600,7 @@ mod tests {
     fn script_component_root_and_slot_content() {
         let src = r#"<section data-c="box" data-prop-step="2" data-with-items="data.items" data-text="{state.n}"></section><div data-c="plain"><p data-slot="1" data-text="{state.title}"></p></div><div data-c="box"><b data-slot="1" data-text="{state.open}"></b><template data-slot="1" data-if="state.open" data-tid="t9"><i>on</i></template></div>"#;
         let (mut nodes, _) = parse(src, 0);
-        let bodies = hoist(&mut nodes, 't');
+        let bodies = hoist_with(&mut nodes, 't');
         let v = ops(&nodes, &BTreeSet::from(["box".to_string()]), &bodies);
         let expected = json!([
             ["comp", "box", [["step", "text", "2"], ["items", "path", "data.items"]], [
@@ -616,7 +635,7 @@ mod tests {
     fn hoists_block_bodies_once() {
         let src = r#"<main data-page><ul><template data-for="x in data.xs" data-key="x.id" data-tid="a"><li><template data-if="x.on" data-tid="b"><b>on</b></template></li></template></ul><template data-if="data.on" data-tid="c"><b>on</b></template></main><svg><template data-if="data.on" data-tid="d"><b>on</b></template></svg><template data-if="data.on" data-tid="e"><b>on</b></template><template data-def="x"><i data-c="x"></i></template>"#;
         let (mut nodes, _) = parse(src, 0);
-        let bodies = hoist(&mut nodes, 'l');
+        let bodies = hoist(&mut nodes);
         let mut out = String::new();
         write_nodes(&nodes, &mut out, true);
         assert_eq!(out, "<main data-page><ul><!--p:for t1 x data.xs x.id--></ul><!--p:if t0 data.on--></main><svg><!--p:if l0 data.on--></svg><!--p:if l1 data.on-->");

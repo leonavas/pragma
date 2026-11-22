@@ -648,7 +648,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let comp_ids: HashSet<u32> = p.all_components().map(|c| c.html).collect();
     let nested_layout_ids: HashSet<u32> = p.nested_layouts.values().copied().collect();
     for id in 0..p.files.len() as u32 {
-        let kind = if Some(id) == p.layout {
+        let kind = if id == p.layout {
             validate::Kind::Layout
         } else if nested_layout_ids.contains(&id) {
             validate::Kind::NestedLayout
@@ -673,15 +673,13 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         diags.extend(d);
         if !is_404 && !page.pattern.contains(':') {
             mark_current(&mut exp.body, &page.pattern, false);
-            mark_current(&mut exp.page, &page.pattern, true);
         }
-        diags.extend(a11y::check(&p.files, if p.layout.is_some() { &exp.body } else { &exp.page }));
+        diags.extend(a11y::check(&p.files, &exp.body));
         if p.config.webmcp {
-            diags.extend(webmcp::check(&p.files, if p.layout.is_some() { &exp.body } else { &exp.page }));
+            diags.extend(webmcp::check(&p.files, &exp.body));
         }
         webmcp::strip_notool(&mut exp.body);
-        webmcp::strip_notool(&mut exp.page);
-        let overlays = any_element(if p.layout.is_some() { &exp.body } else { &exp.page }, &|e| e.is("dialog") || e.has("popover"));
+        let overlays = any_element(&exp.body, &|e| e.is("dialog") || e.has("popover"));
         let (loader, ssr) = match page.server.as_ref().and_then(|s| sources.get(s)) {
             Some(src) => {
                 let names = pragma_jslint::exported_names(src);
@@ -707,11 +705,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
                 .collect(),
         };
         let mut sc = expand::Scoped { p: &p, ctx: &ctx, diags: Vec::new(), stores: BTreeSet::new(), shared_classes: BTreeSet::new(), page_classes: BTreeSet::new(), outer: Vec::new() };
-        if p.layout.is_some() {
-            sc.run(&exp.body, false);
-        } else {
-            sc.run(&exp.page, true);
-        }
+        sc.run(&exp.body);
         sc.head(&exp.head);
         // stores used from scripts, and the stores those stores use
         let mut queue: Vec<String> = page
@@ -741,12 +735,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         } else {
             sc.page_classes
         };
-        let bodies = if p.layout.is_some() {
-            compile::hoist(&mut exp.page, 't');
-            compile::hoist(&mut exp.body, 'l')
-        } else {
-            compile::hoist(&mut exp.page, 'l')
-        };
+        let bodies = compile::hoist(&mut exp.body);
         outs.push(PageOut { page, exp, loader, ssr, stores: sc.stores, page_classes, is_404, overlays, bodies });
     }
 
@@ -894,7 +883,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         let mut route_css_src: Option<String> = None;
         let mut route_css_gz: u64 = 0;
         let mut markup = pragma_css::prune::Markup::default();
-        owners::markup_of(if p.layout.is_some() { &o.exp.body } else { &o.exp.page }, &mut markup);
+        owners::markup_of(&o.exp.body, &mut markup);
         for b in &o.bodies {
             owners::markup_of(&b.children, &mut markup);
         }
@@ -1059,7 +1048,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         }
         doc.push_str("</head>\n<body>\n");
         let mut body = String::new();
-        compile::write_nodes(if p.layout.is_some() { &o.exp.body } else { &o.exp.page }, &mut body, prod);
+        compile::write_nodes(&o.exp.body, &mut body, prod);
         doc.push_str(body.trim());
         doc.push_str("\n</body>\n</html>\n");
         let html_url = format!("/{}.html", o.page.out_name);
@@ -1076,7 +1065,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             let mut ssr_scripts = SsrScripts::default();
             let (template, shell) = if o.ssr {
                 let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
-                let ops = compile::ops(&o.exp.page, &scripted, &o.bodies);
+                let ops = compile::ops(compile::page_content(&o.exp.body), &scripted, &o.bodies);
                 // the server runs a script only when everything it imports is app code (no npm
                 // package, no browser runtime from core/); the others stay client-rendered
                 let runs_on_server = |m: &PathBuf| {

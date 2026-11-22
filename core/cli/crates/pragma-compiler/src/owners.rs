@@ -69,27 +69,11 @@ pub fn unmatched(css: &str, marker: &str, tree: &[Node], root: &dyn Fn(&str) -> 
         .collect()
 }
 
-/// `body` is the whole document (empty without a layout) and `page` the content of its
-/// `<main data-page>`: both keep a token only where one of its owner's selectors can match.
-pub fn trim(body: &mut [Node], page: &mut [Node], owned: &Owned) {
+/// Keeps a `data-s` token only where one of its owner's selectors can match.
+pub fn trim(body: &mut [Node], owned: &Owned) {
     let mut markup = Markup::default();
-    markup_of(if body.is_empty() { page } else { body }, &mut markup);
-    let outer = if body.is_empty() { Vec::new() } else { above_page(body, &mut Vec::new()).unwrap_or_else(|| vec![Ancestor::Unknown]) };
+    markup_of(body, &mut markup);
     walk(body, &mut Vec::new(), owned, &markup);
-    walk(page, &mut outer.clone(), owned, &markup);
-}
-
-fn above_page(nodes: &[Node], stack: &mut Vec<Ancestor>) -> Option<Vec<Ancestor>> {
-    for n in nodes {
-        let Node::Element(e) = n else { continue };
-        let pushed = push(e, stack);
-        let found = if e.has("data-page") { Some(stack.clone()) } else { above_page(&e.children, stack) };
-        stack.truncate(stack.len() - pushed);
-        if found.is_some() {
-            return found;
-        }
-    }
-    None
 }
 
 fn push(e: &Element, stack: &mut Vec<Ancestor>) -> usize {

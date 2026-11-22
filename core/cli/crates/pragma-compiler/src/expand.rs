@@ -11,9 +11,8 @@ use std::path::{Path, PathBuf};
 pub struct Expanded {
     /// Layout `<head>` merged with the page's top-level `<title>`, `<meta>` and `<link>`.
     pub head: Vec<Node>,
+    /// The layout with the page in its `<main data-page>`.
     pub body: Vec<Node>,
-    /// Content of `<main data-page>` (base of the SSR ops).
-    pub page: Vec<Node>,
     /// By `data-c` id (`Component::id`).
     pub components: BTreeMap<String, Component>,
 }
@@ -134,31 +133,27 @@ impl<'p> Expander<'p> {
         }
         page_nodes.extend(self.take_defs());
         let mut head = Vec::new();
-        let mut body = Vec::new();
-        if let Some(l) = p.layout {
-            let ltree = &p.trees[l as usize];
-            let mut rest: Vec<Node> = Vec::new();
-            let mut seen_content = false;
-            for n in ltree {
-                match n {
-                    Node::Element(e) if e.is("head") && !seen_content => head = e.children.iter().filter(|n| !matches!(n, Node::Comment)).cloned().collect(),
-                    n => {
-                        seen_content |= !is_blank(n);
-                        rest.push(n.clone());
-                    }
+        let mut rest: Vec<Node> = Vec::new();
+        let mut seen_content = false;
+        for n in &p.trees[p.layout as usize] {
+            match n {
+                Node::Element(e) if e.is("head") && !seen_content => head = e.children.iter().filter(|n| !matches!(n, Node::Comment)).cloned().collect(),
+                n => {
+                    seen_content |= !is_blank(n);
+                    rest.push(n.clone());
                 }
             }
-            let slots: Slots = HashMap::from([(String::new(), page_nodes.clone())]);
-            let lsc = Scope { from: Path::new("routes"), props: None, bound_props: HashMap::new(), script: true, slots: Some(&slots), css: None };
-            body = self.expand_nodes(&rest, &lsc);
-            body.extend(self.take_defs());
-            if page.css.is_some() {
-                name_page_main(&mut body, &page.out_name);
-            }
+        }
+        let slots: Slots = HashMap::from([(String::new(), page_nodes)]);
+        let lsc = Scope { from: Path::new("routes"), props: None, bound_props: HashMap::new(), script: true, slots: Some(&slots), css: None };
+        let mut body = self.expand_nodes(&rest, &lsc);
+        body.extend(self.take_defs());
+        if page.css.is_some() {
+            name_page_main(&mut body, &page.out_name);
         }
         merge_head(&mut head, own_head);
-        crate::owners::trim(&mut body, &mut page_nodes, self.owned);
-        (Expanded { head, body, page: page_nodes, components: self.used }, self.diags)
+        crate::owners::trim(&mut body, self.owned);
+        (Expanded { head, body, components: self.used }, self.diags)
     }
 
     /// `<template data-def="id">` of each component that rendered itself, for the runtime to clone.
@@ -815,8 +810,8 @@ impl Scoped<'_> {
         self.diags.push(diag(&self.p.files, pos, rule, msg));
     }
 
-    pub fn run(&mut self, body: &[Node], in_page: bool) {
-        self.walk(body, &mut Vec::new(), Owner::None, in_page);
+    pub fn run(&mut self, body: &[Node]) {
+        self.walk(body, &mut Vec::new(), Owner::None, false);
     }
 
     /// Bindings in the page's head tags are rendered by the server, so they need `ssr`.
