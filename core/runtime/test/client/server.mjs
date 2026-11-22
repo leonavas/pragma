@@ -64,7 +64,7 @@ export function start() {
         if (name === 'chat' || name === 'slow') return ndjson(res, name, req.headers.accept)
         return send(res, 200, { name: name, route: path.slice(8, path.lastIndexOf('/')) || '/', input: JSON.parse(body) })
       }
-      if (path === '/private.html') {
+      if (path === '/private' || path === '/private.html') {
         res.writeHead(303, { location: '/b', 'cache-control': 'no-store' })
         return res.end()
       }

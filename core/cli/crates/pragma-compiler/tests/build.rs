@@ -191,6 +191,12 @@ fn prod_bundles_one_chunk_per_route() {
     let mut files = Vec::new();
     all_files(&client.join("assets/routes"), &mut files);
     assert_eq!(files.iter().filter(|f| f.extension().is_some_and(|e| e == "js")).count(), 5, "one chunk per route with JS: {files:?}");
+    let mut assets = Vec::new();
+    all_files(&client.join("assets"), &mut assets);
+    assert!(assets.iter().any(|f| f.to_string_lossy().contains("assets/css/shop/_id_-")), "{assets:?}");
+    assert!(!assets.iter().any(|f| f.strip_prefix(&client).unwrap().to_string_lossy().contains(['[', ']'])), "asset names are URL-safe: {assets:?}");
+    let product = fs::read_to_string(client.join("shop/[id].html")).unwrap();
+    assert!(!urls(&product, "href").iter().chain(&urls(&product, "src")).any(|u| u.contains(['[', ']'])), "{product}");
 }
 
 #[test]

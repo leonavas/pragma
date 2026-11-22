@@ -390,19 +390,20 @@ test('router: static beats param and loader on navigation', async () => {
 test('router: prefetch on hover and by viewport', async () => {
   const p = await open('/a')
   await p.evaluate(() => document.querySelector('#p1').dispatchEvent(new PointerEvent('pointerenter')))
-  await p.waitForFunction(() => performance.getEntriesByType('resource').some(e => e.name.includes('/product/%5Bid%5D.html') || e.name.includes('/product/[id].html')))
+  await p.waitForFunction(() => performance.getEntriesByType('resource').some(e => e.name.endsWith('/product/%5Bid%5D')))
   const b = await open('/b')
   await b.waitForFunction(() => performance.getEntriesByType('resource').some(e => e.name.endsWith('/assets/ssr.js')))
-  await b.waitForFunction(() => performance.getEntriesByType('resource').some(e => e.name.endsWith('/directives.html')))
+  await b.waitForFunction(() => performance.getEntriesByType('resource').some(e => e.name.endsWith('/directives')))
   // a link in view downloads the route module but does not run it until navigation
   assert.equal(await b.evaluate(() => !!document.querySelector('link[rel=modulepreload][href$="/assets/ssr.js"]')), true)
   assert.equal(await b.evaluate(() => self.__ssrModuleRan), undefined)
   assert.equal(b.requests.includes('/ssr'), false)
   assert.equal(b.requests.includes('/back'), false)
-  const before = b.requests.filter(r => r === '/directives.html').length
+  assert.equal(b.requests.some(r => r.endsWith('.html')), false)
+  const before = b.requests.filter(r => r === '/directives').length
   await b.evaluate(() => document.querySelector('#d').click())
   await b.waitForSelector('#list li')
-  assert.equal(b.requests.filter(r => r === '/directives.html').length, before)
+  assert.equal(b.requests.filter(r => r === '/directives').length, before)
   await b.goBack()
   await b.waitForFunction(() => document.title === 'Page B')
   await b.evaluate(() => document.querySelector('#s').click())

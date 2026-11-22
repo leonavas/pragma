@@ -96,6 +96,10 @@ fn hash8(bytes: &[u8]) -> String {
     short_hash(h.finish())[..8].to_string()
 }
 
+fn url_safe(path: &str) -> String {
+    rolldown_utils::sanitize_filename::default_sanitize_relative_file_name(path).into_owned()
+}
+
 fn gzip_len(bytes: &[u8]) -> u64 {
     miniz_oxide::deflate::compress_to_vec(bytes, 6).len() as u64 + 18
 }
@@ -721,7 +725,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         .collect();
     let mut urls: HashMap<PathBuf, String> = HashMap::new();
     for path in mods.keys() {
-        let rel = deps::asset_path(&rel_str(path));
+        let rel = url_safe(&deps::asset_path(&rel_str(path)));
         let url = if prod {
             let mut deps = closure(&mods, std::slice::from_ref(path), true);
             deps.sort();
@@ -859,10 +863,11 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
                     }
                 }
             }
+            let css_name = url_safe(&o.page.out_name);
             let url = if prod {
-                format!("/assets/css/{}-{}.css", o.page.out_name, hash8(rcss.as_bytes()))
+                format!("/assets/css/{css_name}-{}.css", hash8(rcss.as_bytes()))
             } else {
-                format!("/assets/css/{}.css", o.page.out_name)
+                format!("/assets/css/{css_name}.css")
             };
             w.write_client(&format!("client{url}"), rcss.as_bytes(), prod);
             route_css_gz = gzip_len(rcss.as_bytes());
