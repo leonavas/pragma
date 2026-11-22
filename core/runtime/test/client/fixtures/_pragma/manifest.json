@@ -2,6 +2,7 @@
   { "pattern": "/a", "html": "/a.html", "modules": ["/assets/a.js", "/assets/cart.js"], "loader": false, "ssr": false },
   { "pattern": "/b", "html": "/b.html", "modules": ["/assets/cart.js"], "loader": false, "ssr": false },
   { "pattern": "/directives", "html": "/directives.html", "modules": ["/assets/directives.js", "/assets/counter.js", "/assets/cart.js"], "loader": false, "ssr": false },
+  { "pattern": "/frame", "html": "/frame.html", "modules": ["/assets/frame.js", "/assets/flag.js", "/assets/cart.js"], "loader": false, "ssr": false },
   { "pattern": "/fast", "html": "/fast.html", "modules": ["/assets/fast.js", "/assets/cart.js"], "loader": false, "ssr": false },
   { "pattern": "/list", "html": "/list.html", "modules": ["/assets/list.js", "/assets/cart.js"], "loader": false, "ssr": false },
   { "pattern": "/product/new", "html": "/product/new.html", "modules": ["/assets/cart.js"], "loader": false, "ssr": false },

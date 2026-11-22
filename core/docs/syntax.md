@@ -11,7 +11,7 @@ Pragma HTML uses a closed set of directives and block tags. Any other syntax is 
 | Syntax | Target | Effect |
 |---|---|---|
 | `{path}` | Text, attribute string | Inserts escaped text (`<p>Hi {$name}</p>`, `alt="Photo of {p.name}"`, `href="/shop/{p.id}"`). |
-| `:<attr>="v"` | Element | Sets attribute (`:href`, `:disabled`, `:aria-current`). `false`/`null`/`undefined` removes it; `true` sets empty. `:checked` and `:selected` also set the DOM property. Never `:class`, `:style`, `:on*`. |
+| `:<attr>="v"` | Element | Sets attribute (`:href`, `:disabled`, `:aria-current`). `false`/`null`/`undefined` removes it; `true` sets empty. `:checked` and `:selected` also set the DOM property. `v` is a path or a literal (see Values). Never `:class`, `:style`, `:on*`. |
 | `:--<name>="v"` | Element, component tag | Sets the CSS variable `--name` (`:--left="bar.left"`). Numbers stay numbers; `false`/`null`/`undefined`/`""` removes it. Use it in CSS: `left: calc(var(--left) * 1%)` (`css.md`). |
 | `.<class>="[!]v"` | Element | Toggles the class. |
 | `:show="[!]v"` | Element | Sets `hidden` when falsy. |
@@ -91,6 +91,14 @@ Block roots animate with CSS only. The runtime sets two attributes on the root e
 
 Use `root.a.b` paths only. Do not use expressions, calls, indexes, or operators. Use `!` only in `<if>`, `<else-if>`, `:show`, and `.class`.
 
+`:attr`, `:--name`, and component props (`:prop`) also take a literal: `true`, `false`, `null`, a number (`2`, `-0.5`), or a quoted string (`'text'`). The build writes it as a fixed value; a prop keeps its type (`:holiday="false"` gives `false`, not the text `"false"`).
+
+```html
+<p-hours :holiday="false" :step="15" :label="'Opening hours'"></p-hours>
+<input aria-label="Name" :disabled="true" :maxlength="40">
+<div class="bar" :--left="0"></div>
+```
+
 | Root | Value |
 |---|---|
 | `$x` | Owner state (`let`), prop (`export let`), constant, or function. |
@@ -135,7 +143,7 @@ Compute every derived value in a script or store function (`const total = () => 
 - Write strict HTML and close every non-void tag. Do not use `<html>`, `<body>`, or `<template>`. Put at most one `<script>` and one `<style>` per file (`state.md`, `css.md`).
 - `@submit` calls `preventDefault()` automatically. Every `<form>` is an agent tool (`webmcp.md`); read values with `new FormData(event.target)`.
 - Pass `<for>` items as arguments (`@click="remove(task)"`). Without parentheses, the handler receives `event` (`@input="search"`). With parentheses, it receives only listed arguments (`@click="reset()"` receives none). Use `el` instead of `event.currentTarget` (events are delegated).
-- Omit `$` in event names (`@click="increase"`). `:attr` takes a bare path (`:disabled="$atMinimum"`); use `title="Count {$count}"` without `:` for interpolated strings.
+- Omit `$` in event names (`@click="increase"`). `:attr` takes a bare path (`:disabled="$atMinimum"`) or a literal (`:maxlength="40"`); use `title="Count {$count}"` without `:` for interpolated strings.
 - Pass one bare path to block tags (`<if $hasTasks>` with `const hasTasks = () => tasks.length > 0`).
 - Return `'true'` or `'false'` strings for `aria-*` states (`aria-pressed`, `aria-expanded`), because boolean `false` removes the attribute.
 - `:show` hides an element in the DOM; `<if>` adds or removes it. `autofocus` inside a newly inserted block receives focus.

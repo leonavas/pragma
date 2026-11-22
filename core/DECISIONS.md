@@ -47,6 +47,13 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   reduces agent variance. Settles "how JS finds nodes" and "component syntax".
 - **[firm]** Reuse components. `<c-name>` is expanded at build (macro), with literal props and
   slots; the component `.js` loads only on pages using it (SPEC §3).
+- **[firm]** (2026-11-21) Literal values: `:attr`, `:--name` and props (`:prop`) take `true`,
+  `false`, `null`, a number (`-?\d+(\.\d+)?`) or a quoted string besides a path. The build
+  resolves them: a static attribute or `style="--x:…"` on elements, a build-time prop for
+  components without a script, and a JSON value in `data-with-*` (typed in the browser and in
+  SSR) for components with a script. *Why:* `:comferiado="false"` was read as the path `false`
+  (undefined) and the component got its default; `comferiado="false"` (text) only worked because
+  the default was a boolean. `<if>`, `:show`, `.class` and `:model` stay path-only.
 - **[firm]** User data and dynamic lists come from blocks; updates diff by key.
 - **[firm]** Blocks are source tags: `<if p>`, `<else-if p>`, `<else>`,
   `<for x in p key=x.id>`, `<empty>`, path unquoted. The build emits `<template data-*>`.
@@ -280,7 +287,7 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   resolves to its cleanup. *Why:* the three reviewers hit each trap and `check` passed; an
   agent fixes what `check` names.
 - **[firm]** Services come from the virtual module `pragma`: `shared`, `data`, `params`, `query`,
-  `page`, `log`, `call`, `navigate`, `open`, `close`, `confirm`. They are live (`data` is the
+  `page`, `log`, `call`, `stream`, `navigate`, `open`, `close`, `confirm`, `frame`. They are live (`data` is the
   current page's once the loader is done). Only page, component and store scripts import it.
 - **[firm]** Stores follow the same rule (`lib/state/x.js`): top-level `let` = state, functions =
   actions or derived, all reached as `shared.x.*`; `export const persist = ['items']` keeps those
@@ -314,6 +321,21 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   (hero scroll, timeline drag, 520 ms send) walked the whole page every frame. Trade-off (same as
   Svelte): a derived function that reads non-state values (`Date.now()`) refreshes only on a full
   render or when state it reads changes.
+- **[firm]** (2026-11-21) Updates stay microtask-batched; no automatic rAF deferral. *Why:* code
+  that waits with `queueMicrotask` and then measures expects the new DOM (escalei
+  `depoisDoRender`, the client tests), and a change made inside a `requestAnimationFrame`
+  callback would land one frame late. Changes in one task already make one DOM pass, and a patch
+  costs ~0.1 ms (60 `:--x` frames, 1000 rows). The real per-frame cost is read/write
+  interleaving: each rAF callback writes when it returns, so the next one's
+  `getBoundingClientRect` forces layout. Instead, `frame(fn)` from `'pragma'` runs all frame
+  callbacks of the page in one rAF and writes their changes once at the end. Measured (10
+  callbacks that read layout and set `:--x`, 1000 rows): rAF 42–50 ms/frame and 10 style writes,
+  `frame` 4.3 ms and 1 write.
+- **[firm]** (2026-11-21) Per-frame `var()` in layout properties is documented (`css.md`, "Values
+  that change every frame"), not a `check` warning. *Why:* knowing that a value changes every
+  frame needs data flow from `frame`/rAF/scroll handlers to the bound `let`, through derived
+  functions and object fields; the escalei hero sets layout variables once per resize inside the
+  same per-frame object, so a static rule would warn on correct code and miss the moving ones.
 - **[firm]** Budgets removed (2026-11-21): they broke builds on every runtime growth; size is
   reported, not enforced. `pragma build` prints the JS gzip size per page. A `budgets` key in an
   older `pragma.json` is accepted and ignored.

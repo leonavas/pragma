@@ -216,7 +216,7 @@ export function serverServices({ data, params, query, page }, log) {
   return {
     data: readonly(data), params: readonly(params), query: readonly(query), page: readonly(page), log,
     shared: new Proxy({}, { get: browserOnly('shared') }),
-    call: browserOnly('call'), stream: browserOnly('stream'), navigate: browserOnly('navigate'), open: browserOnly('open'), close: browserOnly('close'), confirm: browserOnly('confirm'),
+    call: browserOnly('call'), stream: browserOnly('stream'), frame: browserOnly('frame'), navigate: browserOnly('navigate'), open: browserOnly('open'), close: browserOnly('close'), confirm: browserOnly('confirm'),
   }
 }
 

@@ -549,6 +549,69 @@ test('binding-only changes patch the same DOM a full render would', async () => 
   assert.deepEqual(p.errors, [])
 })
 
+test('literal props: false, numbers and strings reach the instance typed', async () => {
+  const p = await open('/frame')
+  assert.equal(await text(p, '#flag span'), 'false|-2.5|a b|Ana')
+  await p.evaluate(() => { __ctx.$.who = 'Bia' })
+  await tick(p)
+  assert.equal(await text(p, '#flag span'), 'false|-2.5|a b|Bia')
+  assert.deepEqual(p.errors, [])
+})
+
+test('performance: 10 layout reads and state changes per frame on a 1000-item page, requestAnimationFrame vs frame()', async () => {
+  const p = await open('/frame')
+  const run = schedule => p.evaluate(async schedule => {
+    const box = document.querySelector('#box'), frames = 30, writers = 10, times = []
+    let writes = 0
+    const mo = new MutationObserver(rs => { writes += rs.length })
+    mo.observe(box, { attributes: true, attributeFilter: ['style'] })
+    const later = schedule === 'frame' ? __ctx.frame : requestAnimationFrame
+    for (let f = 0; f < frames; f++) {
+      await new Promise(done => {
+        let start = 0, left = writers
+        for (let w = 0; w < writers; w++) later(() => {
+          start ||= performance.now()
+          box.offsetHeight
+          __ctx.$.x = ((f * writers + w) % 40) + 1
+          if (--left) return
+          queueMicrotask(() => {
+            box.offsetHeight
+            times.push(performance.now() - start)
+            done()
+          })
+        })
+      })
+    }
+    await new Promise(r => setTimeout(r))
+    mo.disconnect()
+    times.sort((a, b) => a - b)
+    return { median: times[frames >> 1], writes: writes / frames }
+  }, schedule)
+  const raf = await run('raf'), batched = await run('frame')
+  console.log(`performance (ms per frame, 10 read+write callbacks, 1000 items): requestAnimationFrame = ${raf.median.toFixed(2)} (${raf.writes} style writes), frame() = ${batched.median.toFixed(2)} (${batched.writes} style write)`)
+  assert.equal(raf.writes, 10)
+  assert.equal(batched.writes, 1)
+  assert.ok(batched.median < raf.median, `${batched.median} < ${raf.median}`)
+  assert.equal(await p.$eval('#box', el => el.style.getPropertyValue('--x')), String(((29 * 10 + 9) % 40) + 1))
+  assert.deepEqual(p.errors, [])
+})
+
+test('frame(): callbacks share one animation frame, run in order, and can be cancelled', async () => {
+  const p = await open('/frame')
+  const r = await p.evaluate(() => new Promise(done => {
+    const seen = []
+    __ctx.frame(now => seen.push(['a', typeof now]))
+    const cancel = __ctx.frame(() => seen.push(['b']))
+    __ctx.frame(() => {
+      seen.push(['c'])
+      __ctx.frame(() => done(seen.concat([['next']])))
+    })
+    cancel()
+  }))
+  assert.deepEqual(r, [['a', 'number'], ['c'], ['next']])
+  assert.deepEqual(p.errors, [])
+})
+
 test('{} text: element templates, comment markers, attribute templates and derived functions', async () => {
   const p = await open('/template')
   assert.equal(await text(p, '#hello'), 'Hello Ana, you have 2 items {literal} & more')

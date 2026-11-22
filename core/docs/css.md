@@ -85,8 +85,30 @@ Use `:--name="path"` when a value comes from state or data (position, width, col
 - Pass numbers without units (`42`) and add the unit in CSS (`* 1%`, `* 1px`). Compute the number in a script function (`const start = shift => (shift.from - dayStart) / dayLength * 100`).
 - `false`, `null`, `undefined`, and `""` remove the variable; use a fallback (`var(--tone, …)`).
 - On a component tag, `:--name` goes to the component root.
-- Values set every frame (scroll, drag, progress) update only their bindings, not the page (`state.md`, "Per-frame updates").
+- Values set every frame (scroll, drag, progress) update only their bindings, not the page (`state.md`, "Per-frame updates"). Use them only in `transform` and `opacity` ("Values that change every frame").
 - The server writes `style="--start:42"` in SSR pages. Do not write `style="..."` yourself (`html/style-inline`).
+
+### Values that change every frame
+
+A variable set every frame (scroll, drag, progress) must drive `transform`, `translate`, `scale`, `rotate`, or `opacity`. Do not use it in layout properties (`top`, `left`, `right`, `bottom`, `inset*`, `width`, `height`, `margin*`, `padding*`, `font-size`, `grid-*`): each frame then computes layout for the element and the elements around it. A transform changes only the composited image.
+
+Layout every frame (avoid):
+
+```css
+.thumb { top: calc(var(--y) * 1px); height: calc(var(--h) * 1px); }
+.card { width: calc(var(--w) * 1px); height: calc(var(--h) * 1px); }
+```
+
+Compositor only (fixed size, then move and scale):
+
+```css
+.thumb { height: 100px; translate: 0 calc(var(--y) * 1px); scale: 1 calc(var(--h) / 100); transform-origin: top; }
+.card { width: 640px; height: 360px; translate: calc(var(--x) * 1px) calc(var(--y) * 1px); scale: calc(var(--w) / 640); transform-origin: 0 0; }
+```
+
+- Give the element its final (or largest) size once, and scale from it. Use `clip-path: inset(…)` to reveal a part without changing the size (paint, no layout).
+- Layout properties are fine for values that change on resize or on a click (column count, a measured height).
+- Set a per-frame variable on the element that uses it. Set on a parent with many children, every child computes its style again each frame.
 
 ## Custom classes
 

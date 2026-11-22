@@ -16,7 +16,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - A function defines an action (`@click="add"`) or a derived value (`{$total}` in HTML, `total()` in JS).
 - `export let step = 1` declares a prop.
 - `function mount(el) { …; return cleanup }` runs after mount.
-- Import services from `'pragma'`: `import { shared, data, params, query, page, call, stream, navigate, open, close, confirm, log } from 'pragma'`.
+- Import services from `'pragma'`: `import { shared, data, params, query, page, call, stream, navigate, open, close, confirm, frame, log } from 'pragma'`.
 - `<style>` scopes to its component or page (`:global(…)` opts out only its argument).
 - `{path}` inserts escaped text in text and attribute strings (`<p>Hi {$name}</p>`, `href="/shop/{p.id}"`).
 - `:` binds a value (`:href`, `:disabled`). `.` toggles a class. `@` binds an event.

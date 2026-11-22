@@ -241,6 +241,10 @@ fn component_ops(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
             let value = a.value.clone().unwrap_or_default();
             if let Some(k) = name.strip_prefix("data-prop-") {
                 Some(json!([k, "text", value]))
+            } else if let Some(k) = name.strip_prefix("data-with-")
+                && let Ok(literal) = serde_json::from_str::<Value>(&value)
+            {
+                Some(json!([k, "text", literal]))
             } else {
                 name.strip_prefix("data-with-").map(|k| json!([k, "path", value]))
             }
@@ -423,5 +427,12 @@ mod tests {
             ]]
         ]);
         assert_eq!(v, expected);
+    }
+
+    #[test]
+    fn literal_props_are_typed_values() {
+        let (nodes, _) = parse(r#"<p data-c="box" data-with-open="false" data-with-n="-2.5" data-with-label='"a b"' data-with-items="data.items"></p>"#, 0);
+        let v = ops(&nodes, &BTreeSet::from(["box".to_string()]));
+        assert_eq!(v[0][2], json!([["open", "text", false], ["n", "text", -2.5], ["label", "text", "a b"], ["items", "path", "data.items"]]));
     }
 }

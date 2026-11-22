@@ -420,10 +420,11 @@ impl FileCheck<'_> {
                 } else if n == "class" {
                     self.err(pos, "html/class", ":class is not allowed: write static classes in class=\"…\" and toggle each one with .name=\"path\" (e.g. .text-warning-700=\"$warn\")");
                 }
-                for p in values(d, v) {
+                for p in values(d, v).into_iter().filter(|_| directive::literal(v).is_none()) {
                     self.path(pos, &p, false, true);
                 }
             }
+            Dir::Var(_) if directive::literal(v).is_some() => {}
             Dir::Var(_) => self.path(pos, v, false, true),
             Dir::Model => {
                 if !matches!(name, "input" | "select" | "textarea") {
@@ -478,7 +479,9 @@ impl FileCheck<'_> {
                 } else if !directive::is_ident(alias) || directive::ROOTS.contains(&alias) {
                     self.err(pos, "html/component", format!("invalid alias \"{alias}\""));
                 }
-                self.path(pos, v, false, false);
+                if directive::literal(v).is_none() {
+                    self.path(pos, v, false, false);
+                }
             }
             Dir::Open => {
                 if v.is_empty() {
