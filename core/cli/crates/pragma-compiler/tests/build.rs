@@ -1074,6 +1074,7 @@ fn preload_only_what_first_paint_uses() {
     assert!(!index.contains("lazy.js"), "dynamic import() is not modulepreloaded");
     assert!(!index.contains("overlay.js"), "page without overlay does not preload overlay.js");
     assert!(about.contains("<link rel=\"modulepreload\" href=\"/assets/core/overlay.js\">"), "{about}");
+    assert!(about.contains("\"overlays\":true") && !index.contains("\"overlays\""), "the route says when the page has overlays");
 }
 
 #[test]

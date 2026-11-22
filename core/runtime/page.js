@@ -1,12 +1,11 @@
-import { render, patch, hooks, scopeOf, input, eventCall, useBodies, hasOverlay, DEV, PAGE } from './directives.js'
+import { render, patch, hooks, scopeOf, input, eventCall, useBodies, DEV, PAGE } from './directives.js'
 import { log } from './log.js'
 import { reactive, readers, onChange, persist, persistStores } from './state.js'
-import { coerce, instantiate, isPlain, readonlyViews } from './binding.js'
 import { fetchData, load, loadResult, call, stream } from './loader.js'
 import { navigate, redirect } from './router.js'
-import { DATA_ID, MAIN, PERSIST_SUFFIX, matchPattern } from './contract.js'
+import { DATA_ID, MAIN, PERSIST_SUFFIX, matchPattern, coerce, instantiate, isPlain, readonlyViews } from './contract.js'
 
-// The build modulepreloads overlay.js only on pages with a dialog or popover.
+// The build sets `overlays` in the route and modulepreloads overlay.js only on pages with a dialog or popover.
 let overlayModule = null, overlayLoad = null
 const overlays = () => (overlayLoad ??= import('./overlay.js').then(m => (m.initOverlays(), (overlayModule = m))))
 const open = (...a) => overlays().then(m => m.open(...a))
@@ -186,7 +185,7 @@ export function enter(route, mods, url, doc, pending) {
   useBodies(mods.bodies, !cur)
   Object.assign(comps, mods.comps)
   for (const [name, mod] of Object.entries(mods.stores)) shared[name] ??= store(name, mod)
-  if (hasOverlay(document)) overlays()
+  if (route.overlays) overlays()
   const p = (cur = { route, url, params: matchPattern(route.pattern, url.pathname) ?? {}, query: Object.fromEntries(url.searchParams), page: { loading: false, error: null } })
   const done = loadData(p, doc, pending)
   p.o = instance(document.querySelector(MAIN), mods.page ?? {}, null)

@@ -1,5 +1,4 @@
-import { STORE_KEY, THEME_KEY } from './contract.js'
-import { isPlain } from './binding.js'
+import { STORE_KEY, THEME_KEY, isPlain } from './contract.js'
 
 const proxies = new WeakMap(), raws = new WeakMap(), persisted = []
 let notify = () => {}

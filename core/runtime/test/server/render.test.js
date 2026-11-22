@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { render, renderHead, renderPage, serverServices } from '../../server/render.js'
-import { template } from '../../binding.js'
+import { template } from '../../contract.js'
 
 const TPL = '<ul><!--p:for t1 item data.items item.id-->'
 const EMPTY = '<!--p:empty t1-->'

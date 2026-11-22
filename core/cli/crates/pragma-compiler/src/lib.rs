@@ -1010,6 +1010,9 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
         if let Some(u) = &tpl_url {
             route["tpl"] = json!(u);
         }
+        if o.overlays {
+            route["overlays"] = json!(true);
+        }
         let mut doc = String::with_capacity(4096);
         doc.push_str(&format!("<!doctype html>\n<html lang=\"{}\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n", html::escape_attr(&p.config.lang)));
         match o.exp.head.iter().find_map(|n| match n {
