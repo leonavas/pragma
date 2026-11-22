@@ -28,7 +28,7 @@ pub const RULE_DERIVED_CALL: &str = "js/derived-call";
 pub const RULE_DOLLAR: &str = "js/dollar-in-script";
 
 /// Names the virtual module `pragma` exports.
-pub const PRAGMA_EXPORTS: &[&str] = &["shared", "data", "params", "query", "page", "log", "call", "stream", "navigate", "open", "close", "confirm"];
+pub const PRAGMA_EXPORTS: &[&str] = &["shared", "data", "params", "query", "page", "log", "call", "stream", "navigate", "open", "close", "confirm", "frame"];
 const MUTATORS: &[&str] = &["push", "pop", "shift", "unshift", "splice", "sort", "reverse", "fill", "copyWithin", "set", "add", "delete", "clear"];
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

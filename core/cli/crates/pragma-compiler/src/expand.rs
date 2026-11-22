@@ -361,7 +361,9 @@ impl<'p> Expander<'p> {
                 }
                 _ => {}
             }
+            let literal = matches!(d, Dir::Attr(_) | Dir::Var(_)).then(|| directive::literal(v)).flatten();
             let res = match d {
+                _ if literal.is_some() => Res::Prop(literal.as_ref().and_then(directive::Literal::attr)),
                 Dir::Show | Dir::Attr(_) | Dir::Var(_) | Dir::Class(_) | Dir::If | Dir::ElseIf | Dir::Model => self.resolve(v, sc),
                 Dir::For => {
                     if let Some((var, path)) = directive::parse_for(v) {
@@ -482,7 +484,16 @@ impl<'p> Expander<'p> {
                 };
                 self.err(a.pos, "html/unknown-prop", format!("<{tag}> has no prop `{prop}` ({has}); {fix}"));
             }
-            if let Some(alias) = lname.strip_prefix("data-with-") {
+            if let Some(alias) = lname.strip_prefix("data-with-")
+                && let Some(literal) = directive::literal(a.value.as_deref().unwrap_or(""))
+            {
+                if script.is_some() {
+                    forward.push(Attr { name: lname.clone(), value: Some(literal.json().to_string()), pos: a.pos });
+                }
+                if let Some(value) = literal.attr() {
+                    props.insert(alias.to_string(), value);
+                }
+            } else if let Some(alias) = lname.strip_prefix("data-with-") {
                 match self.resolve(a.value.as_deref().unwrap_or(""), sc) {
                     Res::Path(p) if script.is_some() => {
                         bound_props.insert(alias.to_string(), p.clone());

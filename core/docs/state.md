@@ -134,25 +134,48 @@ Keep the original `item` reference (`row.item`) when mutating it. Spreading `{ .
 
 ## Per-frame updates
 
-Assign state from `requestAnimationFrame` (scroll, drag, a progress animation) and bind it with `:--name`, `{}`, `:attr`, `:class`, or `:show`. When a change is read only by such bindings (directly or through derived functions), the runtime updates only those bindings, not the page. A value read by `<if>`, `<for>`, `:model`, or a component prop renders the whole page.
+Assign state from `frame` (scroll, drag, a progress animation) and bind it with `:--name`, `{}`, `:attr`, `:class`, or `:show`. When a change is read only by such bindings (directly or through derived functions), the runtime updates only those bindings, not the page. A value read by `<if>`, `<for>`, `:model`, or a component prop renders the whole page.
+
+`frame(fn)` is `requestAnimationFrame` for all components together: every `frame` callback of the page runs in one animation frame, then the runtime writes all their state changes to the DOM in one pass. It returns a function that cancels the callback.
 
 ```js
+import { frame } from 'pragma'
+
 let progress = 0
 
 function mount() {
   const start = performance.now()
-  let frame = 0
-  const step = now => {
+  let cancel = frame(function step(now) {
     progress = Math.min(1, (now - start) / 520)
-    if (progress < 1) frame = requestAnimationFrame(step)
-  }
-  frame = requestAnimationFrame(step)
-  return () => cancelAnimationFrame(frame)
+    if (progress < 1) cancel = frame(step)
+  })
+  return () => cancel()
 }
 ```
 ```html
 <div class="send" :--progress="$progress"></div>
 ```
+
+Scroll and pointer handlers: read nothing in the event, ask for a frame, then read layout and assign state in the callback.
+
+```js
+function mount(el) {
+  let cancel = null
+  const update = () => {
+    cancel = null
+    const box = el.getBoundingClientRect()
+    progress = Math.min(1, Math.max(0, -box.top / box.height))
+  }
+  const onScroll = () => { cancel ??= frame(update) }
+  addEventListener('scroll', onScroll, { passive: true })
+  return () => { removeEventListener('scroll', onScroll); cancel?.() }
+}
+```
+
+- Read layout (`getBoundingClientRect`, `offsetHeight`, `scrollHeight`) before you assign state in a `frame` callback. Assigning state does not touch the DOM until all callbacks of the frame finish, so the reads of the next callbacks stay fast.
+- With `requestAnimationFrame`, each callback writes its changes when it returns; a later callback that reads layout forces the browser to compute layout again (about 10x slower with 10 callbacks on a 1000-row page).
+- Outside `frame`, the DOM updates in the next microtask after a change (code that waits with `queueMicrotask` sees the new DOM).
+- Animate `transform` and `opacity` with the variable, not layout properties (`css.md`, "Values that change every frame").
 
 Derived functions recompute only when state they read changes. Keep values from outside state (`Date.now()`, module variables) in a `let` you assign (`now = Date.now()`).
 
@@ -167,6 +190,7 @@ Derived functions recompute only when state they read changes. Keep values from 
 | `stream(name, input, { signal })` | Calls a server action that streams NDJSON; `for await` each line (`data.md`). |
 | `navigate(url, { replace })` | Navigates via the router; `replace: true` replaces the history entry. |
 | `open(id)`, `close(id)`, `confirm(id)` | Controls overlays (`overlays.md`). |
+| `frame(fn)` | Runs `fn(now)` in the next animation frame with the other `frame` callbacks, then updates the DOM once; returns a cancel function ("Per-frame updates"). |
 | `log` | Emits logs (`logs.md`). |
 
 ## Stores

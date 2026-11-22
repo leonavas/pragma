@@ -230,7 +230,14 @@ fn attrs(element: &mut Element, errors: &mut Vec<SugarError>) {
             continue;
         };
         if let Some(value) = &attr.value {
-            attr.value = Some(if internal.starts_with("data-on-") { expand_call(value, attr.pos, errors) } else { expand_dollar(value, attr.pos, errors) });
+            let takes_literal = ["data-attr-", "data-var-", "data-with-"].iter().any(|p| internal.starts_with(p));
+            attr.value = Some(if internal.starts_with("data-on-") {
+                expand_call(value, attr.pos, errors)
+            } else if takes_literal && directive::literal(value).is_some() {
+                value.trim().to_string()
+            } else {
+                expand_dollar(value, attr.pos, errors)
+            });
         }
         attr.name = internal;
         out.push(attr);
@@ -385,6 +392,13 @@ mod tests {
     fn event_calls_expand_dollar() {
         assert_eq!(sugar("<button @click=\"set($item, 'x', event)\">x</button>").0, "<button data-on-click=\"set($.item, 'x', event)\">x</button>");
         assert_eq!(sugar("<input @change=\"toggle(task)\">").0, "<input data-on-change=\"toggle(task)\">");
+    }
+
+    #[test]
+    fn literal_values_stay_as_written() {
+        let (out, errors) = sugar("<p :title=\"'$5 off'\" :--x=\"-2.5\" :aria-busy=\"false\">x</p><c-day :holiday=\"false\" :label=\"'a b'\"></c-day>");
+        assert!(errors.is_empty(), "{errors:?}");
+        assert_eq!(out, "<p data-attr-title=\"'$5 off'\" data-var-x=\"-2.5\" data-attr-aria-busy=\"false\">x</p><c-day data-with-holiday=\"false\" data-with-label=\"'a b'\"></c-day>");
     }
 
     #[test]

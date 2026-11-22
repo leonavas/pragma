@@ -61,6 +61,24 @@ function cleanup(o, off) {
   }, reportError)
 }
 
+let frameCallbacks = [], frameRequest = 0
+
+function runFrame(now) {
+  frameRequest = 0
+  const callbacks = frameCallbacks
+  frameCallbacks = []
+  for (const fn of callbacks) try { fn(now) } catch (e) { reportError(e) }
+}
+
+export function frame(fn) {
+  frameCallbacks.push(fn)
+  frameRequest ||= requestAnimationFrame(runFrame)
+  return () => {
+    const i = frameCallbacks.indexOf(fn)
+    if (i >= 0) frameCallbacks.splice(i, 1)
+  }
+}
+
 // Dev: a prop object is read-only all the way down (writing to it would change the caller's data).
 const views = new WeakMap()
 function readonly(v, name) {
@@ -82,7 +100,7 @@ function readonly(v, name) {
 // What `import { … } from 'pragma'` gives a script (the build rewrites `data` to `$pragma.data`): live
 // values, so `data` is the current page's once the loader is done.
 const services = {
-  shared, log, navigate, open, close, confirm,
+  shared, log, navigate, open, close, confirm, frame,
   get data() { return reactive(cur?.data) },
   get params() { return cur?.params },
   get query() { return cur?.query },

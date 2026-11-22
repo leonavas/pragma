@@ -310,6 +310,29 @@ fn optional_prop_of_script_component() {
 }
 
 #[test]
+fn literal_values_in_bindings_and_props() {
+    let t = app_with(&[
+        ("lib/components/hours/hours.html", Some("<p><if $holiday><b>holiday</b></if><span>{$label} {$count}</span></p>")),
+        ("lib/components/hours/hours.js", Some("export let holiday = true\nexport let label = ''\nexport let count = 0\n")),
+        ("lib/components/plain/plain.html", Some("<p><if $holiday><b>holiday</b></if><i :title=\"$label\">x</i></p>")),
+        (
+            "routes/hours.html",
+            Some("<title>Hours</title>\n<c-hours :holiday=\"false\" :label=\"'a b'\" :count=\"-2.5\"></c-hours>\n<c-plain :holiday=\"false\" :label=\"'$5 off'\"></c-plain>\n<input aria-label=\"Name\" :disabled=\"true\" :aria-busy=\"false\" :maxlength=\"20\" :placeholder=\"'Your name'\">\n<div :--left=\"0.5\" :--tone=\"'red'\" :--gone=\"null\"></div>"),
+        ),
+    ]);
+    let app = t.0.join("app");
+    let d = check(&app);
+    assert!(d.is_empty(), "{d:#?}");
+    let out = t.0.join("dev");
+    build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let html = fs::read_to_string(out.join("client/hours.html")).unwrap();
+    assert!(html.contains("data-with-holiday=\"false\"") && html.contains("data-with-label=\"&quot;a b&quot;\"") && html.contains("data-with-count=\"-2.5\""), "{html}");
+    assert!(html.contains("<p data-c=\"plain\"><i title=\"$5 off\">x</i></p>"), "{html}");
+    assert!(html.contains("<input aria-label=\"Name\" disabled maxlength=\"20\" placeholder=\"Your name\">"), "{html}");
+    assert!(html.contains("style=\"--left:0.5;--tone:red\"") && !html.contains("data-var-"), "{html}");
+}
+
+#[test]
 fn script_rules_report_at_the_html_line_in_one_pass() {
     // page with an embedded script: script rules, HTML name checks and const-state in one run
     let src = "<title>X</title>\n<script>\n  import { data } from 'pragma'\n  let items = data.items\n  let count = 0\n  let doubled = count * 2\n  const picked = []\n  function pick() { picked.push(1); if (empty) return }\n  const empty = () => count === 0\n  function bump() { $count += 1 }\n</script>\n<p @click=\"pick\">{$doubled} {$picked.length} {$cuont}</p>\n";

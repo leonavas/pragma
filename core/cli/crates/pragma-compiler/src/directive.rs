@@ -274,6 +274,55 @@ pub fn css_value(v: &str) -> Option<&str> {
     (!v.contains([';', '{', '}', '<'])).then_some(v.trim())
 }
 
+/// A JS literal written as the value of `:attr`, `:--name` or a prop: `true`, `false`, `null`,
+/// a number (`-2.5`) or a quoted string (`'x'`, `"x"`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Literal {
+    Bool(bool),
+    Null,
+    Number(String),
+    Text(String),
+}
+
+impl Literal {
+    /// As a static attribute: `None` leaves it out, `Some(None)` writes it empty.
+    pub fn attr(&self) -> Option<Option<String>> {
+        match self {
+            Literal::Bool(false) | Literal::Null => None,
+            Literal::Bool(true) => Some(None),
+            Literal::Number(n) => Some(Some(n.clone())),
+            Literal::Text(t) => Some(Some(t.clone())),
+        }
+    }
+
+    pub fn json(&self) -> serde_json::Value {
+        match self {
+            Literal::Bool(b) => serde_json::Value::Bool(*b),
+            Literal::Null => serde_json::Value::Null,
+            Literal::Number(n) => serde_json::from_str(n).unwrap_or(serde_json::Value::Null),
+            Literal::Text(t) => serde_json::Value::String(t.clone()),
+        }
+    }
+}
+
+pub fn literal(v: &str) -> Option<Literal> {
+    let v = v.trim();
+    match v {
+        "true" => return Some(Literal::Bool(true)),
+        "false" => return Some(Literal::Bool(false)),
+        "null" => return Some(Literal::Null),
+        _ => {}
+    }
+    if let Some(q @ ('\'' | '"')) = v.chars().next() {
+        let inner = v[1..].strip_suffix(q)?;
+        return (!inner.contains(q)).then(|| Literal::Text(inner.to_string()));
+    }
+    let digits = v.strip_prefix('-').unwrap_or(v);
+    let (int, frac) = digits.split_once('.').unwrap_or((digits, "0"));
+    let all_digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    (all_digits(int) && all_digits(frac)).then(|| Literal::Number(v.to_string()))
+}
+
 pub fn is_ident(s: &str) -> bool {
     s.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_' || c == '$')
         && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
@@ -449,6 +498,26 @@ mod tests {
         assert_eq!(parse("data-prop-step"), Some(Some(Dir::Generated)));
         assert_eq!(parse("data-self"), Some(Some(Dir::Generated)));
         assert_eq!(parse("data-def"), Some(Some(Dir::Generated)));
+    }
+
+    #[test]
+    fn literal_values() {
+        assert_eq!(literal("false"), Some(Literal::Bool(false)));
+        assert_eq!(literal(" true "), Some(Literal::Bool(true)));
+        assert_eq!(literal("null"), Some(Literal::Null));
+        assert_eq!(literal("-2.5"), Some(Literal::Number("-2.5".into())));
+        assert_eq!(literal("42"), Some(Literal::Number("42".into())));
+        assert_eq!(literal("'a b'"), Some(Literal::Text("a b".into())));
+        assert_eq!(literal("\"it's\""), Some(Literal::Text("it's".into())));
+        assert_eq!(literal("''"), Some(Literal::Text(String::new())));
+        for path in ["$.x", "task.done", "falsey", "1.", ".5", "1e3", "'a'b'", "'a", "-", "NaN"] {
+            assert_eq!(literal(path), None, "{path}");
+        }
+        assert_eq!(Literal::Bool(false).attr(), None);
+        assert_eq!(Literal::Bool(true).attr(), Some(None));
+        assert_eq!(Literal::Number("3".into()).attr(), Some(Some("3".into())));
+        assert_eq!(Literal::Number("-2.5".into()).json(), serde_json::json!(-2.5));
+        assert_eq!(Literal::Text("x".into()).json(), serde_json::json!("x"));
     }
 
     #[test]

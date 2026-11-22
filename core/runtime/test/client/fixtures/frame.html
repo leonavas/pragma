@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Frame</title>
+  <style>#box li{padding-left:calc(var(--x, 0) * 1px)}</style>
+  <script>self.__pragmaDev=true</script>
+  <script type="application/json" id="pragma-route">{"pattern":"/frame","page":"/assets/frame.js","components":{"flag":"/assets/flag.js"},"stores":{"cart":"/assets/cart.js"},"loader":false,"ssr":false}</script>
+  <script type="module" src="/core/boot.js"></script>
+</head>
+<body>
+  <header><span id="qty" data-text="{shared.cart.items.length}"></span></header>
+  <main data-page>
+    <p id="flag" data-c="flag" data-with-on="false" data-with-n="-2.5" data-with-label='"a b"' data-with-who="state.who"><span data-text="{state.on}|{state.n}|{state.label}|{state.who}"></span></p>
+    <div id="box" data-var-x="state.x"><ul><template data-for="item in state.items" data-key="item.id" data-tid="r1"><li data-text="{item.name}"></li></template></ul></div>
+  </main>
+</body>
+</html>
