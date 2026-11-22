@@ -364,6 +364,7 @@ fn module_graph(
                         ok = Some(t);
                     }
                 }
+                None if is_rel => diags.push(Diagnostic::error(&path, pos.line, pos.col, deps::RULE_IMPORT, format!("import \"{}\" points outside the app folder; remove the extra `../`", imp.spec))),
                 _ if is_rel => diags.push(Diagnostic::error(&path, pos.line, pos.col, deps::RULE_IMPORT, format!("import \"{}\" not found", imp.spec))),
                 _ => {}
             }
@@ -776,6 +777,8 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
     let deps = deps::Deps::new(&opts.root, diags);
     let mut requests = BTreeMap::new();
     let mut mods = module_graph(p, &all_entries, true, sources, &deps, &mut requests, diags);
+    let unused_components: Vec<PathBuf> = p.all_components().filter_map(|c| c.module.clone()).filter(|m| !mods.contains_key(m)).collect();
+    module_graph(p, &unused_components, true, sources, &deps, &mut BTreeMap::new(), diags);
     let out_abs = std::path::absolute(&opts.out_dir).unwrap_or_else(|_| opts.out_dir.clone());
     if let Some(b) = bundle::bundle(&opts.root, &out_abs.join(".cache/npm"), prod, &requests, diags) {
         link_packages(&mut mods, &b, diags);
@@ -1227,13 +1230,9 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
         w.write("server/package.json", b"{ \"type\": \"module\" }\n");
         if report.has_server {
             let options = format!("{{ root: new URL('../client/', import.meta.url), port: process.env.PORT ?? 3000, service: {} }}", json!(p.config.name));
-            // a static import graph is loaded before any code runs: the .wasm loader must be
-            // registered before worker.js is imported
-            let node = if wasm.is_empty() {
-                format!("import h from './worker.js'\nimport {{ serve }} from './{node_adapter}'\n\nserve(h, {options})\n")
-            } else {
-                format!("import {{ serve, registerWasm }} from './{node_adapter}'\n\nregisterWasm()\nconst {{ default: h }} = await import('./worker.js')\nserve(h, {options})\n")
-            };
+            // a static import graph is loaded before any code runs: the .wasm and cloudflare:*
+            // hooks must be registered before worker.js is imported
+            let node = format!("import {{ serve, registerNodeHooks }} from './{node_adapter}'\n\nregisterNodeHooks()\nconst {{ default: h }} = await import('./worker.js')\nserve(h, {options})\n");
             w.write(layout::NODE_ENTRY, node.as_bytes());
         }
         let mut wrangler = json!({

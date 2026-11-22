@@ -1,5 +1,6 @@
 import { createServer } from 'node:http'
 import nodeModule from 'node:module'
+import { readFileSync } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import { extname, join, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
@@ -170,14 +171,55 @@ async function send(res, response, method) {
 
 const wasmSource = (url) => `import { readFileSync } from 'node:fs'\nexport default new WebAssembly.Module(readFileSync(new URL(${JSON.stringify(url)})))`
 
-function loadWasm(url, context, nextLoad) {
+function cloudflareStubSource(url, readFileSync) {
+  const [specifier, parent] = url.slice('pragma-cloudflare:'.length).split('?')
+  const parentUrl = decodeURIComponent(parent ?? '')
+  const importer = parentUrl.startsWith('file:') ? readFileSync(new URL(parentUrl), 'utf8') : ''
+  const names = new Set()
+  for (const [, clause] of importer.matchAll(new RegExp(`import\\s*([^'"]*?)\\s*from\\s*['"]${specifier}['"]`, 'g'))) {
+    const named = clause.match(/\{([^}]*)\}/)
+    for (const part of named ? named[1].split(',') : []) names.add(part.trim().split(/\s+as\s+/)[0])
+  }
+  names.delete('')
+  names.delete('default')
+  const message = `${specifier} exists only on Cloudflare Workers, not on Node: read bindings from the env that load and actions receive (pragma dev --cf gives them in dev)`
+  const lines = [
+    `const message = ${JSON.stringify(message)}`,
+    'const fail = () => { throw new Error(message) }',
+    "const unavailable = () => new Proxy(function () {}, { get: (target, key) => (key === 'prototype' ? target.prototype : fail()), apply: fail, construct: fail })",
+    'export default unavailable()',
+  ]
+  for (const name of names) {
+    if (specifier === 'cloudflare:workers' && name === 'env') {
+      lines.push("export const env = new Proxy({}, { get: (target, key) => (globalThis[Symbol.for('pragma.env')] ?? process.env)[key], has: (target, key) => key in (globalThis[Symbol.for('pragma.env')] ?? process.env) })")
+    } else {
+      lines.push(`export const ${name} = unavailable()`)
+    }
+  }
+  return lines.join('\n')
+}
+
+function resolveCloudflare(specifier, context, nextResolve) {
+  if (!specifier.startsWith('cloudflare:')) return nextResolve(specifier, context)
+  return { url: 'pragma-cloudflare:' + specifier + '?' + encodeURIComponent(context.parentURL ?? ''), shortCircuit: true }
+}
+
+function loadNodeModule(url, context, nextLoad) {
+  if (url.startsWith('pragma-cloudflare:')) return { format: 'module', source: cloudflareStubSource(url, readFileSync), shortCircuit: true }
   if (!url.startsWith('file:') || !url.endsWith('.wasm')) return nextLoad(url, context)
   return { format: 'module', source: wasmSource(url), shortCircuit: true }
 }
 
-export function registerWasm() {
-  if (nodeModule.registerHooks) return nodeModule.registerHooks({ load: loadWasm })
-  nodeModule.register('data:text/javascript,' + encodeURIComponent(`const wasmSource = ${wasmSource}\nexport const load = ${loadWasm}`))
+export function registerNodeHooks() {
+  if (nodeModule.registerHooks) return nodeModule.registerHooks({ resolve: resolveCloudflare, load: loadNodeModule })
+  const hooks = [
+    "import { readFileSync } from 'node:fs'",
+    `const wasmSource = ${wasmSource}`,
+    `${cloudflareStubSource}`,
+    `export ${resolveCloudflare}`,
+    `export ${loadNodeModule}`,
+  ]
+  nodeModule.register('data:text/javascript,' + encodeURIComponent(hooks.join('\n')))
 }
 
 async function cloudflarePlatform(configPath) {
@@ -196,6 +238,7 @@ export function serve(handler, { root, port = 3000, service } = {}) {
   const log = createLogger({ resource: resourceFrom(process.env, service), min: minSeverity(process.env), sink: writeLine })
   const assets = createStatic(root)
   const env = { ...process.env, ASSETS: assets }
+  globalThis[Symbol.for('pragma.env')] = env
   let ctx = { waitUntil: (p) => Promise.resolve(p).catch((err) => log.error('waitUntil failed', err)) }
   const cfConfig = process.env.PRAGMA_CF_CONFIG
   const ready = cfConfig

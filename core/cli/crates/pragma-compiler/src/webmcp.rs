@@ -206,7 +206,8 @@ impl Tools<'_> {
         let labelled = in_label || e.value("id").is_some_and(|id| self.label_for.contains(id)) || e.has("data-attr-id");
         if kind != "hidden" && !labelled && !has(e, "toolparamdescription") && !has(e, "aria-description") {
             let param = e.value("name").map_or(String::new(), |n| format!(" name=\"{n}\""));
-            self.warn(e.pos, "webmcp/param-description", format!("<{name}{param}> has no description for agents: add toolparamdescription=\"…\", a <label> or aria-description"));
+            let aria_label = if has(e, "aria-label") { " (agents do not read aria-label)" } else { "" };
+            self.warn(e.pos, "webmcp/param-description", format!("<{name}{param}> has no description for agents{aria_label}: add toolparamdescription=\"…\", a <label> or aria-description"));
         }
     }
 }

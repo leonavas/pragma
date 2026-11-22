@@ -2099,7 +2099,7 @@ fn server_wasm_is_copied_with_a_compiled_wasm_rule() {
     assert_eq!(wrangler["rules"][0]["type"], "CompiledWasm");
     assert_eq!(wrangler["rules"][0]["globs"][0], "**/*.wasm");
     let node = fs::read_to_string(out.join("server/node.mjs")).unwrap();
-    assert!(node.contains("registerWasm()\nconst { default: h } = await import('./worker.js')"), "{node}");
+    assert!(node.contains("registerNodeHooks()\nconst { default: h } = await import('./worker.js')"), "{node}");
 }
 
 #[test]

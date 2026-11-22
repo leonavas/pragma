@@ -533,6 +533,9 @@ impl<'p> Expander<'p> {
             }
         }
         let Some(root) = tree.iter().find(|n| matches!(n, Node::Element(_))) else { return Vec::new() };
+        if matches!(root, Node::Element(r) if component_tag(&r.name.to_ascii_lowercase()).is_some()) {
+            return Vec::new();
+        }
         let css = comp.css.as_ref().map(|_| crate::hash::css_owner("component", &comp.id));
         let inner = Scope { from: &comp.scope, props: Some(&props), bound_props, script: comp.module.is_some(), slots: Some(&slots), css };
         let mut nodes = match root {
