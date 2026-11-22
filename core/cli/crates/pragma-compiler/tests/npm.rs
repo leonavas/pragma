@@ -441,8 +441,7 @@ fn reexports_from_app_modules() {
         assert!(code.contains(m), "{m} missing: {code}");
     }
     assert!(out.npm_preloads("index").contains(&url));
-    assert!(out.code("utils/everything").contains(&url));
-    assert!(out.code("utils/renamed").contains(&url));
+    assert!(out.code("routes/index").contains(&url), "utils/ modules used by one page join its route chunk");
     let dev = app.dev();
     let renamed = dev.code("utils/renamed");
     assert!(renamed.contains("used as richUsed") && renamed.contains("/assets/npm/rich.js"), "{renamed}");
@@ -490,7 +489,6 @@ fn same_package_from_pages_and_components_is_one_entry() {
     assert_eq!(out.npm_preloads("index"), vec![url.clone()]);
     assert_eq!(out.npm_preloads("shop/index"), vec![url.clone()]);
     assert!(out.npm_preloads("blog/[slug]").is_empty());
-    assert!(out.code("lib/components/card/card").contains(&url));
     assert!(out.code("routes/shop/index").contains(&url));
 }
 

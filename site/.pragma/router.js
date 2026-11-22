@@ -4,7 +4,7 @@ import { fetchData } from './loader.js'
 
 const pages = new Map(), seen = new Set(), positions = new Map()
 const noop = () => {}
-let manifest, here, key, seq = 0, io, hops = 0
+let manifest, here, key, seq = 0, io, mo, hops = 0
 
 const where = u => u.pathname + u.search
 const newKey = () => Math.random().toString(36).slice(2)
@@ -116,13 +116,32 @@ function mark() {
   }
 }
 
+const watch = el => {
+  const a = link(el)
+  if (a) io.observe(a)
+}
+
+function watchAdded(records) {
+  for (const r of records) {
+    if (r.type === 'attributes') watch(r.target)
+    else for (const n of r.addedNodes) if (n.nodeType === 1) {
+      if (n.localName === 'a') watch(n)
+      for (const a of n.querySelectorAll('a[href]')) watch(a)
+    }
+  }
+}
+
 function observe() {
   ;(self.requestIdleCallback ?? setTimeout)(() => {
     io?.disconnect()
     io = new IntersectionObserver(es => {
       for (const x of es) if (x.isIntersecting) io.unobserve(x.target), prefetch(x.target.href)
     })
-    for (const a of document.querySelectorAll('a[href]')) if (link(a)) io.observe(a)
+    for (const a of document.querySelectorAll('a[href]')) watch(a)
+    if (!mo) {
+      mo = new MutationObserver(watchAdded)
+      mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['href'] })
+    }
   })
 }
 
