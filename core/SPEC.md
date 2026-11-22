@@ -475,6 +475,9 @@ Usage:
   any layer: theme classes < utilities < scoped styles.
 - Utilities are generated even when project CSS uses the same class name. A `lib/theme.css` rule
   whose whole selector is a utility name (`.flex`, `.hidden:hover`) is `css/utility-name`.
+- A scoped selector whose subject (name, classes, `.x` toggles, `:is()`) matches no element its
+  owner writes is a `css/unmatched-selector` warning; a child component root that gets the
+  owner's `class` counts.
 - WebMCP pseudo-classes `:tool-form-active` and `:tool-submit-active` are valid in any project
   CSS (§3.1).
 - Output (lightningcss, minified, hashed): one shared file (base + layout utilities) and one file

@@ -17,6 +17,49 @@ pub fn classes(el: &Element) -> Vec<String> {
     out
 }
 
+/// An element an owner writes: its name and every class it can have, or `None` when unknown.
+pub type Written = Option<(String, Vec<String>)>;
+
+/// The root of a component body as its caller sees it, `None` when it is not a plain element.
+pub fn root_of(tree: &[Node]) -> Written {
+    let e = tree.iter().find_map(|n| if let Node::Element(e) = n { Some(e) } else { None })?;
+    let plain = !crate::project::is_component_tag(&e.name) && !e.is("slot") && !e.is("template");
+    plain.then(|| (e.name.to_ascii_lowercase(), classes(e)))
+}
+
+fn written(nodes: &[Node], root: &dyn Fn(&str) -> Written, out: &mut Vec<Written>) {
+    for n in nodes {
+        let Node::Element(e) = n else { continue };
+        if crate::project::is_component_tag(&e.name) {
+            if e.has("class") {
+                out.push(root(&e.name).map(|(tag, mut cls)| {
+                    cls.extend(classes(e));
+                    (tag, cls)
+                }));
+            }
+        } else if !e.is("slot") && !(e.is("template") && BLOCKS.iter().any(|b| e.has(b))) {
+            out.push(Some((e.name.to_ascii_lowercase(), classes(e))));
+        }
+        written(&e.children, root, out);
+    }
+}
+
+/// Scoped selectors of one owner whose subject matches no element the owner writes, as
+/// `(offset in css, selector, the same with its subject in :global)`. Slot content and child
+/// component markup belong to their writer, so a component selector for them never matches.
+/// `root` gives the root of a child component tag (it also belongs to a caller that gives it a
+/// `class`).
+pub fn unmatched(css: &str, marker: &str, tree: &[Node], root: &dyn Fn(&str) -> Written) -> Vec<(usize, String, String)> {
+    let mut own = Vec::new();
+    written(tree, root, &mut own);
+    pragma_css::prune::scoped_subjects(css, marker)
+        .into_iter()
+        .filter(|s| !s.own.tag.as_deref().is_some_and(|t| ["html", "body", "head"].contains(&t)))
+        .filter(|s| !own.iter().any(|w| w.as_ref().is_none_or(|(tag, cls)| s.own.matches(tag, &|c| cls.iter().any(|x| x == c)))))
+        .map(|s| (s.offset, s.selector, s.global))
+        .collect()
+}
+
 /// `body` is the whole document (empty without a layout) and `page` the content of its
 /// `<main data-page>`: both keep a token only where one of its owner's selectors can match.
 pub fn trim(body: &mut [Node], page: &mut [Node], owned: &Owned) {

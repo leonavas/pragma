@@ -1322,6 +1322,8 @@ Scoping works as in Svelte. The build appends `:where([data-s~="<token>"])` to t
 
 A component's root element also belongs to the caller when the caller gives it a `class` (`<c-card class="wide">` + `.wide { … }` in the page).
 
+A selector whose last part matches no element its owner writes is a `css/unmatched-selector` warning (`.tabs a` in a component whose links come from a slot: write `.tabs :global(a)`).
+
 Write plain selectors (`button`, `.row:hover`, `li::marker`). Use `:global(…)` only for parts outside the owner's markup:
 
 | Written | Compiled | Matches |
@@ -1948,6 +1950,7 @@ Fix the root cause; do not work around a rule.
 | `html/script`, `html/style-inline`, `html/on-inline` | Put at most one `<script>` (optional `type="module"`) and one `<style>` at the top level of a page or component `.html`. Replace `style="..."` with classes, or with `:--name="path"` and `var(--name)` in CSS (`css.md`). Put JSON-LD `<script type="application/ld+json">` only at the top level of a page (`routes.md`). |
 | `html/json-ld` | Fix invalid JSON or unclosed `{` in JSON-LD strings. Use `{` for a literal brace. |
 | `css/unknown-class`, `css/arbitrary-value` | Use classes from `classes.md` or custom classes per `css.md`. |
+| `css/unmatched-selector` (warning) | A page or component selector matches no element its owner writes (slot content, child component markup). Wrap the outside part in `:global(…)` or move the style to the writer (`css.md`). |
 | `app/structure`, `app/route-conflict` | Follow structure and route rules (`structure.md`, `routes.md`). |
 | `app/endpoint`, `app/middleware` | An endpoint exports only `GET`/`POST`/`PUT`/`PATCH`/`DELETE`; the middleware exports `handle` (`data.md`). |
 | `app/endpoint-json` (warning) | An endpoint answers JSON. Use `load` and actions for page data (`data.md`). |

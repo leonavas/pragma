@@ -353,6 +353,43 @@ pub fn own_selectors(css: &str, marker: &str) -> BTreeSet<OwnSelector> {
     out
 }
 
+/// The own-element compound of each scoped selector in `css`, with the selector as written (the
+/// scope `marker` taken out, its subject in `:global(…)` as the fix) and its offset in `css`.
+/// Selectors with nesting (`&`) or a namespace (`|`) are left out: they can match any element.
+pub fn scoped_subjects(css: &str, marker: &str) -> Vec<ScopedSubject> {
+    let mut out = Vec::new();
+    each_rule(css, &mut |prelude, _| {
+        for sel in split_top(prelude, ',') {
+            let sel = sel.trim();
+            if sel.contains('&') || sel.contains('|') {
+                continue;
+            }
+            let parts = compounds(sel);
+            let Some(&(start, end)) = parts.iter().find(|(start, end)| sel[*start..*end].contains(marker)) else { continue };
+            let compound = &sel[start..end];
+            let at = compound.find(marker).unwrap();
+            let close = at + compound[at..].find("])").map_or(compound.len() - at, |i| i + 2);
+            let bare = format!("{}{}", &compound[..at], &compound[close..]);
+            out.push(ScopedSubject {
+                own: own_compound(&bare),
+                selector: format!("{}{bare}{}", &sel[..start], &sel[end..]),
+                global: format!("{}:global({bare}){}", &sel[..start], &sel[end..]),
+                offset: sel.as_ptr() as usize - css.as_ptr() as usize,
+            });
+        }
+    });
+    out
+}
+
+/// A scoped selector seen from its subject: see [`scoped_subjects`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScopedSubject {
+    pub own: OwnCompound,
+    pub selector: String,
+    pub global: String,
+    pub offset: usize,
+}
+
 fn own_compound(compound: &str) -> OwnCompound {
     let b = compound.as_bytes();
     let tag_len = compound.find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_')).unwrap_or(b.len());

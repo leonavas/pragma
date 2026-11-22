@@ -592,6 +592,27 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         .filter_map(|c| comp_css.get(&c.dir).map(|css| (css_owner("component", &c.id), pragma_css::prune::own_selectors(css, OWNED))))
         .chain(p.pages.iter().chain(p.not_found.iter()).filter_map(|pg| pg.css.as_ref().and_then(|f| page_css.get(f)).map(|css| (css_owner("page", &pg.out_name), pragma_css::prune::own_selectors(css, OWNED)))))
         .collect();
+    let scoped_owners = p
+        .all_components()
+        .filter_map(|c| Some(("component", c.css.as_ref()?, comp_css.get(&c.dir)?, c.html)))
+        .chain(p.pages.iter().chain(p.not_found.iter()).filter_map(|pg| Some(("page", pg.css.as_ref()?, page_css.get(pg.css.as_ref()?)?, pg.html))));
+    for (kind, file, css, html) in scoped_owners {
+        let from = &p.files[html as usize];
+        let root = |tag: &str| {
+            let (local, name) = project::component_tag(&tag.to_ascii_lowercase()).map(|(l, n)| (l, n.to_string()))?;
+            owners::root_of(&p.trees[p.find_component(from, local, &name)?.html as usize])
+        };
+        for (offset, selector, global) in owners::unmatched(css, OWNED, &p.trees[html as usize], &root) {
+            let (line, col) = line_col(css, offset);
+            diags.push(Diagnostic::warning(
+                file,
+                line,
+                col,
+                "css/unmatched-selector",
+                format!("`{selector}` matches no element this {kind} writes; slot content and child components belong to their writer: style them there, or write `{global}`"),
+            ));
+        }
+    }
     let mut classes = validate::ClassCheck::new(project_classes, theme);
 
     let comp_ids: HashSet<u32> = p.all_components().map(|c| c.html).collect();

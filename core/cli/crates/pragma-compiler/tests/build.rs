@@ -1,5 +1,5 @@
 use pragma_compiler::{BuildOptions, Mode, build, check};
-use pragma_diag::Diagnostic;
+use pragma_diag::{Diagnostic, Severity};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -725,6 +725,18 @@ fn theme_class_named_like_a_utility_is_an_error() {
     expect(&d, "css/utility-name", "lib/theme.css", 5);
     assert_eq!(d.iter().filter(|x| x.rule == "css/utility-name").count(), 1, "{d:#?}");
     assert!(message(&d, "css/utility-name").contains(".hidden"), "{d:#?}");
+}
+
+#[test]
+fn scoped_selector_for_slot_content_is_unmatched() {
+    let switch = "<script>\n  export let open = false\n</script>\n<div class=\"switch-row\">\n  <nav class=\"switch\" .is-on=\"$open\"><slot></slot></nav>\n  <if $open><span class=\"hint\">open</span></if>\n  <c-pill class=\"pill\"></c-pill>\n  <slot name=\"note\"></slot>\n</div>\n<style>\n  .switch a { padding: 0 1rem }\n  .switch a[aria-current=\"page\"], .switch-row p { color: red }\n  .switch > :global(a) { display: flex }\n  [data-c=\"switch\"] p { margin: 0 }\n  .switch-row .hint, .pill, .switch.is-on, :is(nav, em).switch, :root { color: blue }\n</style>\n";
+    let page = "<title>Switch</title>\n<c-switch>\n  <a href=\"/\" aria-current=\"page\">Human</a>\n  <a href=\"/agents\">Agent</a>\n  <p slot=\"note\">Note</p>\n</c-switch>\n<style>\n  a, p { color: green }\n  .ghost { color: red }\n</style>\n";
+    let d = check_with(&[("lib/components/switch/switch.html", Some(switch)), ("lib/components/pill/pill.html", Some("<b>pill</b>")), ("routes/switcher.html", Some(page))]);
+    let unmatched: Vec<(String, u32)> = d.iter().filter(|x| x.rule == "css/unmatched-selector").map(|x| (x.file.to_string_lossy().into_owned(), x.line)).collect();
+    let comp = "lib/components/switch/switch.html".to_string();
+    assert_eq!(unmatched, [(comp.clone(), 11), (comp.clone(), 12), (comp, 12), ("routes/switcher.html".into(), 9)], "{d:#?}");
+    let first = d.iter().find(|x| x.rule == "css/unmatched-selector").unwrap();
+    assert!(first.severity == Severity::Warning && first.message.contains("`.switch a`") && first.message.contains("`.switch :global(a)`"), "{}", first.message);
 }
 
 #[test]
