@@ -1,6 +1,5 @@
-use crate::directive::{self, Dir, INTERP, Part};
+use crate::directive::{self, Dir, INTERP, Part, is_component_tag};
 use crate::html::{Attr, Element, Node, Pos};
-use crate::project::is_component_tag;
 
 pub type SugarError = (Pos, &'static str, String);
 

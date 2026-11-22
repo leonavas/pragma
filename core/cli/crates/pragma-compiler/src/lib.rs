@@ -6,8 +6,10 @@ mod compile;
 mod deps;
 mod directive;
 mod expand;
+mod hash;
 mod html;
 mod js;
+pub mod layout;
 mod owners;
 mod project;
 mod sugar;
@@ -16,7 +18,8 @@ mod webmcp;
 
 use pragma_diag::{Diagnostic, Severity};
 use pragma_jslint::script::{self, ScriptInfo, ScriptKind};
-use pragma_css::scope::{OWNED, owner_selector};
+use pragma_css::scope::owner_selector;
+use hash::{Fnv, css_owner, hash8, short_hash};
 use project::{Page, Project, rel_str};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
@@ -67,35 +70,6 @@ pub fn check(root: &Path) -> Vec<Diagnostic> {
     diags
 }
 
-pub(crate) struct Fnv(u64);
-
-impl Fnv {
-    pub fn new() -> Self {
-        Fnv(0xcbf29ce484222325)
-    }
-
-    pub fn write(&mut self, bytes: &[u8]) {
-        for b in bytes {
-            self.0 ^= *b as u64;
-            self.0 = self.0.wrapping_mul(0x100000001b3);
-        }
-    }
-
-    pub fn finish(&self) -> u64 {
-        self.0
-    }
-}
-
-pub(crate) fn short_hash(h: u64) -> String {
-    format!("{h:016x}")
-}
-
-fn hash8(bytes: &[u8]) -> String {
-    let mut h = Fnv::new();
-    h.write(bytes);
-    short_hash(h.finish())[..8].to_string()
-}
-
 fn url_safe(path: &str) -> String {
     rolldown_utils::sanitize_filename::default_sanitize_relative_file_name(path).into_owned()
 }
@@ -130,16 +104,6 @@ fn gzip_compress(bytes: &[u8]) -> Option<Vec<u8>> {
 
 fn spellings(attr: &str, value: &str) -> Vec<String> {
     vec![format!("[{attr}=\"{value}\"]"), format!("[{attr}='{value}']"), format!("[{attr}={value}]")]
-}
-
-/// `data-s` token of a page's or component's CSS: the build writes it on every element that owner
-/// wrote (not on child components' markup, and slot content keeps its writer's token).
-pub(crate) fn css_owner(kind: &str, name: &str) -> String {
-    let mut h = Fnv::new();
-    h.write(kind.as_bytes());
-    h.write(b":");
-    h.write(name.as_bytes());
-    format!("s{}", &short_hash(h.finish())[..6])
 }
 
 /// A component's CSS applies only to the markup it wrote: every selector that does not already name
@@ -544,7 +508,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let a = analyze(&p, &mut diags);
     let client = emit_client(&p, &a, opts, &mut w, &mut report, &mut diags);
     emit_server(&p, &a, &client, opts, &mut w, &mut report, &mut diags);
-    for d in ["client", "server"] {
+    for d in [layout::CLIENT, layout::SERVER] {
         w.prune(&opts.out_dir.join(d));
     }
     for d in &mut diags {
@@ -636,8 +600,8 @@ fn analyze<'p>(p: &'p Project, diags: &mut Vec<Diagnostic>) -> Analysis<'p> {
     }
     let owned: owners::Owned = p
         .all_components()
-        .filter_map(|c| comp_css.get(&c.dir).map(|css| (css_owner("component", &c.id), pragma_css::prune::own_selectors(css, OWNED))))
-        .chain(p.pages.iter().chain(p.not_found.iter()).filter_map(|pg| pg.css.as_ref().and_then(|f| page_css.get(f)).map(|css| (css_owner("page", &pg.out_name), pragma_css::prune::own_selectors(css, OWNED)))))
+        .filter_map(|c| comp_css.get(&c.dir).map(|css| (css_owner("component", &c.id), pragma_css::prune::own_selectors(css))))
+        .chain(p.pages.iter().chain(p.not_found.iter()).filter_map(|pg| pg.css.as_ref().and_then(|f| page_css.get(f)).map(|css| (css_owner("page", &pg.out_name), pragma_css::prune::own_selectors(css)))))
         .collect();
     let scoped_owners = p
         .all_components()
@@ -646,10 +610,10 @@ fn analyze<'p>(p: &'p Project, diags: &mut Vec<Diagnostic>) -> Analysis<'p> {
     for (kind, file, css, html) in scoped_owners {
         let from = &p.files[html as usize];
         let root = |tag: &str| {
-            let (local, name) = project::component_tag(&tag.to_ascii_lowercase()).map(|(l, n)| (l, n.to_string()))?;
+            let (local, name) = directive::component_tag(&tag.to_ascii_lowercase()).map(|(l, n)| (l, n.to_string()))?;
             owners::root_of(&p.trees[p.find_component(from, local, &name)?.html as usize])
         };
-        for (offset, selector, global) in owners::unmatched(css, OWNED, &p.trees[html as usize], &root) {
+        for (offset, selector, global) in owners::unmatched(css, &p.trees[html as usize], &root) {
             let (line, col) = html::line_col(css, offset);
             diags.push(Diagnostic::warning(
                 file,
@@ -916,13 +880,13 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
             if seen_dirs.insert(&c.dir)
                 && let Some(s) = comp_css.get(&c.dir)
             {
-                scoped.push_str(&format!("/* {} */\n{}\n", rel_str(p.origin(c.css.as_ref().unwrap())), pragma_css::prune::prune_scoped(s, &markup, OWNED).trim()));
+                scoped.push_str(&format!("/* {} */\n{}\n", rel_str(p.origin(c.css.as_ref().unwrap())), pragma_css::prune::prune_scoped(s, &markup).trim()));
             }
         }
         if let Some(f) = &o.page.css
             && let Some(s) = page_css.get(f)
         {
-            scoped.push_str(&format!("/* {} */\n{}\n", rel_str(p.origin(f)), pragma_css::prune::prune_scoped(s, &markup, OWNED).trim()));
+            scoped.push_str(&format!("/* {} */\n{}\n", rel_str(p.origin(f)), pragma_css::prune::prune_scoped(s, &markup).trim()));
         }
         let route_names: Vec<String> = o.page_classes.iter().filter(|c| !shared_classes.contains(*c)).cloned().collect();
         scoped.push_str(&pragma_css::generate(&route_names, &classes.theme).css);
@@ -1089,7 +1053,7 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
         }
         docs.push(doc);
     }
-    w.write_client("client/_pragma/manifest.json", serde_json::to_string_pretty(&Value::Array(manifest)).unwrap().as_bytes(), prod);
+    w.write_client(&format!("{}/{}", layout::CLIENT, layout::MANIFEST), serde_json::to_string_pretty(&Value::Array(manifest)).unwrap().as_bytes(), prod);
 
     for f in &p.public_files {
         let rel = rel_str(f.strip_prefix("public").unwrap());
@@ -1125,7 +1089,7 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
                 let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
                 let ops = compile::ops(compile::page_content(&o.exp.body), &scripted, &o.bodies);
                 // the server runs a script only when everything it imports is app code (no npm
-                // package, no browser runtime from core/); the others stay client-rendered
+                // package, no browser runtime of the framework); the others stay client-rendered
                 let runs_on_server = |m: &PathBuf| {
                     closure(mods, std::slice::from_ref(m), true).iter().all(|f| is_app_code(f))
                 };
@@ -1232,7 +1196,7 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
         w.write("server/worker.js", worker.as_bytes());
         if report.has_server {
             let routing = json!({ "middleware": p.middleware.is_some(), "endpoints": p.endpoints.iter().map(|e| e.pattern.clone()).collect::<Vec<_>>() });
-            w.write("server/routes.json", serde_json::to_string_pretty(&routing).unwrap().as_bytes());
+            w.write(layout::SERVER_ROUTES, serde_json::to_string_pretty(&routing).unwrap().as_bytes());
         }
         w.write("server/package.json", b"{ \"type\": \"module\" }\n");
         if report.has_server {
@@ -1244,7 +1208,7 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
             } else {
                 format!("import {{ serve, registerWasm }} from './{node_adapter}'\n\nregisterWasm()\nconst {{ default: h }} = await import('./worker.js')\nserve(h, {options})\n")
             };
-            w.write("server/node.mjs", node.as_bytes());
+            w.write(layout::NODE_ENTRY, node.as_bytes());
         }
         let mut wrangler = json!({
             "name": p.config.name,

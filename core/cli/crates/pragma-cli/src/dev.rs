@@ -10,14 +10,15 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
+use pragma_compiler::layout::{CLIENT, DIST, NODE_ENTRY};
 
 const DEBOUNCE: Duration = Duration::from_millis(30);
-const IGNORED_DIRS: [&str; 5] = [".pragma", "dist", "node_modules", ".git", ".wrangler"];
+const IGNORED_DIRS: [&str; 5] = [".pragma", DIST, "node_modules", ".git", ".wrangler"];
 
 /// `cf_config`: `pragma dev --cf`, Cloudflare bindings from that wrangler config.
 pub async fn run(root: PathBuf, host: &str, port: u16, cf_config: Option<PathBuf>) -> i32 {
     let out = root.join(DEV_OUT);
-    let site = Site::new(out.join("client"), Mode::Dev);
+    let site = Site::new(out.join(CLIENT), Mode::Dev);
     let mut failed = !rebuild(&root, &out, &site).await;
     let listener = match TcpListener::bind((host, port)).await {
         Ok(l) => l,
@@ -26,7 +27,7 @@ pub async fn run(root: PathBuf, host: &str, port: u16, cf_config: Option<PathBuf
             return 1;
         }
     };
-    let mut node = Node::new(out.join("server/node.mjs"), root.clone(), true);
+    let mut node = Node::new(out.join(NODE_ENTRY), root.clone(), true);
     if let Some(config) = cf_config {
         println!("{}", report::out().dim(&format!("Cloudflare bindings from {}", config.file_name().unwrap_or_default().to_string_lossy())));
         node = node.with_cloudflare(config);

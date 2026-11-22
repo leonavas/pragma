@@ -130,7 +130,7 @@ fn mtime(path: &Path) -> String {
 }
 
 fn cache_key(root: &Path, prod: bool, entries: &[(String, String)], requests: &BTreeMap<String, Request>) -> String {
-    let mut h = crate::Fnv::new();
+    let mut h = crate::hash::Fnv::new();
     h.write(env!("CARGO_PKG_VERSION").as_bytes());
     h.write(if prod { b"prod" } else { b"dev" });
     for (name, src) in entries {
@@ -144,7 +144,7 @@ fn cache_key(root: &Path, prod: bool, entries: &[(String, String)], requests: &B
     for p in pkgs {
         h.write(mtime(&root.join("node_modules").join(p).join("package.json")).as_bytes());
     }
-    crate::short_hash(h.finish())
+    crate::hash::short_hash(h.finish())
 }
 
 fn load_cache(dir: &Path, key: &str) -> Option<Bundle> {

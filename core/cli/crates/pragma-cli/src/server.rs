@@ -14,6 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
+use pragma_compiler::layout::{MANIFEST, SERVER_ROUTES};
 
 pub type Body = BoxBody<Bytes, std::io::Error>;
 
@@ -433,7 +434,7 @@ fn read_json(path: &Path) -> Option<serde_json::Value> {
 /// Pages from the client manifest; endpoints and middleware from `../server/routes.json`.
 fn load_routing(root: &Path) -> Routing {
     let mut routing = Routing::default();
-    if let Some(serde_json::Value::Array(items)) = read_json(&root.join("_pragma/manifest.json")) {
+    if let Some(serde_json::Value::Array(items)) = read_json(&root.join(MANIFEST)) {
         routing.routes.extend(items.iter().filter_map(|item| {
             Some(Route {
                 segments: segments(item.get("pattern")?.as_str()?),
@@ -443,7 +444,7 @@ fn load_routing(root: &Path) -> Routing {
             })
         }));
     }
-    if let Some(server) = root.parent().and_then(|dir| read_json(&dir.join("server/routes.json"))) {
+    if let Some(server) = root.parent().and_then(|dir| read_json(&dir.join(SERVER_ROUTES))) {
         routing.middleware = server.get("middleware").and_then(|v| v.as_bool()).unwrap_or(false);
         let endpoints = server.get("endpoints").and_then(|v| v.as_array()).into_iter().flatten();
         routing.routes.extend(endpoints.filter_map(|p| p.as_str()).map(|p| Route { segments: segments(p), html: String::new(), ssr: false, endpoint: true }));

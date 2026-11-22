@@ -1,7 +1,7 @@
 //! Route-level CSS trimming: theme rules that cannot match a route's markup, and the fonts it uses.
 
 use crate::scan::{at_name, block_end, block_end_with, compounds, find_top, split_top, strip_comments, top_level, var_names};
-use crate::scope::{NESTING, OWNED_END};
+use crate::scope::{NESTING, OWNED, OWNED_END};
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 /// Element names and classes a route's markup can have (static classes and `.x` toggles).
@@ -231,15 +231,15 @@ pub fn prune_theme(theme_css: &str, markup: &Markup, route_css: &str) -> String 
 }
 
 /// Scoped page or component CSS without the rules whose own-element compound (the one with
-/// `marker`, e.g. `:where([data-s~=`) needs an element name or class the route's markup lacks.
+/// [`OWNED`]) needs an element name or class the route's markup lacks.
 /// Other compounds may be outside the owner (`:global(…)`, ancestors), so they never drop a rule.
-pub fn prune_scoped(css: &str, markup: &Markup, marker: &str) -> String {
+pub fn prune_scoped(css: &str, markup: &Markup) -> String {
     let css = strip_comments(css);
     filter(&css, &mut |prelude, _| {
         at_name(prelude).is_some()
             || split_top(prelude, ',').iter().any(|sel| {
                 let sel = sel.trim();
-                compounds(sel).into_iter().find(|(start, end)| sel[*start..*end].contains(marker)).is_none_or(|(start, end)| compound_may_match(&sel[start..end], markup))
+                compounds(sel).into_iter().find(|(start, end)| sel[*start..*end].contains(OWNED)).is_none_or(|(start, end)| compound_may_match(&sel[start..end], markup))
             })
     })
 }
@@ -313,15 +313,15 @@ impl OwnSelector {
     }
 }
 
-/// The own-element selectors (those holding `marker`) of every style rule in scoped CSS. A selector
+/// The own-element selectors (those holding [`OWNED`]) of every style rule in scoped CSS. A selector
 /// with nesting (`&`) or a namespace (`|`) can match any element.
-pub fn own_selectors(css: &str, marker: &str) -> BTreeSet<OwnSelector> {
+pub fn own_selectors(css: &str) -> BTreeSet<OwnSelector> {
     let mut out = BTreeSet::new();
     each_rule(&strip_comments(css), &mut |prelude, _| {
         for sel in split_top(prelude, ',') {
             let sel = sel.trim();
             let parts = compounds(sel);
-            let Some(at) = parts.iter().position(|(start, end)| sel[*start..*end].contains(marker)) else { continue };
+            let Some(at) = parts.iter().position(|(start, end)| sel[*start..*end].contains(OWNED)) else { continue };
             if matches_any_element(sel) {
                 out.insert(OwnSelector { own: own_compound(""), ancestors: Vec::new() });
                 continue;
@@ -334,9 +334,9 @@ pub fn own_selectors(css: &str, marker: &str) -> BTreeSet<OwnSelector> {
 }
 
 /// The own-element compound of each scoped selector in `css`, with the selector as written (the
-/// scope `marker` taken out, its subject in `:global(…)` as the fix) and its offset in `css`.
+/// scope [`OWNED`] taken out, its subject in `:global(…)` as the fix) and its offset in `css`.
 /// Selectors with nesting (`&`) or a namespace (`|`) are left out: they can match any element.
-pub fn scoped_subjects(css: &str, marker: &str) -> Vec<ScopedSubject> {
+pub fn scoped_subjects(css: &str) -> Vec<ScopedSubject> {
     let mut out = Vec::new();
     each_rule(css, &mut |prelude, _| {
         for sel in split_top(prelude, ',') {
@@ -345,9 +345,9 @@ pub fn scoped_subjects(css: &str, marker: &str) -> Vec<ScopedSubject> {
                 continue;
             }
             let parts = compounds(sel);
-            let Some(&(start, end)) = parts.iter().find(|(start, end)| sel[*start..*end].contains(marker)) else { continue };
+            let Some(&(start, end)) = parts.iter().find(|(start, end)| sel[*start..*end].contains(OWNED)) else { continue };
             let compound = &sel[start..end];
-            let at = compound.find(marker).unwrap();
+            let at = compound.find(OWNED).unwrap();
             let close = at + compound[at..].find(OWNED_END).map_or(compound.len() - at, |i| i + OWNED_END.len());
             let bare = format!("{}{}", &compound[..at], &compound[close..]);
             out.push(ScopedSubject {
@@ -612,7 +612,7 @@ mod tests {
     #[test]
     fn scoped_rules_need_their_own_element() {
         let css = ".a:where([data-s~=\"s1\"]) { x: 1 }\n.b:where([data-s~=\"s1\"]) { x: 2 }\n.b:where([data-s~=\"s1\"]) .hit, .gone .a:where([data-s~=\"s1\"]) { x: 3 }\n.list:where([data-s~=\"s1\"]) .widget { x: 4 }\n[data-c=\"x\"] .nope { x: 5 }\n@keyframes k { to { x: 6 } }";
-        let out = prune_scoped(css, &markup(&[], &["a", "list"]), ":where([data-s~=");
+        let out = prune_scoped(css, &markup(&[], &["a", "list"]));
         for kept in ["x: 1", "x: 3", "x: 4", "x: 5", "x: 6"] {
             assert!(out.contains(kept), "{kept} missing in {out}");
         }
@@ -628,7 +628,7 @@ mod tests {
     }
 
     fn owns(css: &str) -> Vec<OwnSelector> {
-        own_selectors(css, ":where([data-s~=").into_iter().collect()
+        own_selectors(css).into_iter().collect()
     }
 
     #[test]

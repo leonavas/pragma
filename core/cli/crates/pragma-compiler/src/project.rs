@@ -1,4 +1,6 @@
 //! App discovery (SPEC §2): routes, layout, 404, components, modules, stores and config.
+use crate::directive;
+use pragma_jslint::legacy;
 use crate::html::{self, Node, Pos};
 use pragma_diag::Diagnostic;
 use std::collections::{BTreeMap, HashMap};
@@ -100,21 +102,9 @@ fn walk(root: &Path, rel: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-pub fn component_tag(tag: &str) -> Option<(bool, &str)> {
-    tag.strip_prefix("c-").map(|n| (false, n)).or_else(|| tag.strip_prefix("p-").map(|n| (true, n)))
-}
-
-pub fn is_component_tag(tag: &str) -> bool {
-    component_tag(&tag.to_ascii_lowercase()).is_some()
-}
-
 pub fn comment_positions(src: &str, open: &str) -> Vec<(u32, u32)> {
     let lines = html::LineIndex::new(src);
     src.match_indices(open).map(|(i, _)| lines.pos(src, i, 0)).map(|p| (p.line, p.col)).collect()
-}
-
-pub fn is_component_name(s: &str) -> bool {
-    s.starts_with(|c: char| c.is_ascii_lowercase()) && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 fn is_ident(s: &str) -> bool {
@@ -151,8 +141,8 @@ impl Project {
         let (mut scripts, mut styles, mut kept) = (Vec::new(), Vec::new(), Vec::new());
         for n in std::mem::take(&mut self.trees[id as usize]) {
             match n {
-                Node::Element(e) if crate::directive::is_json_ld(&e) && page => kept.push(Node::Element(e)),
-                Node::Element(e) if crate::directive::is_json_ld(&e) => {
+                Node::Element(e) if directive::is_json_ld(&e) && page => kept.push(Node::Element(e)),
+                Node::Element(e) if directive::is_json_ld(&e) => {
                     self.err_at(e.pos, "html/script", "JSON-LD <script type=\"application/ld+json\"> goes at the top level of a page, not in a component");
                 }
                 Node::Element(e) if e.is("script") => scripts.push(e),
@@ -240,12 +230,12 @@ impl Project {
             js_files: Vec::new(),
             embedded: HashMap::new(),
             public_files: Vec::new(),
-            framework: PathBuf::from(if !root.join(".pragma/boot.js").is_file() && root.join("core/boot.js").is_file() { "core" } else { ".pragma" }),
+            framework: PathBuf::from(if !root.join(".pragma/boot.js").is_file() && root.join(legacy::DIR).join("boot.js").is_file() { legacy::DIR } else { ".pragma" }),
             diags: Vec::new(),
         };
         p.load_config();
         let mut all = Vec::new();
-        for dir in ["routes", "lib", "utils", ".pragma", "core"] {
+        for dir in ["routes", "lib", "utils", ".pragma", legacy::DIR] {
             walk(root, Path::new(dir), &mut all);
         }
         walk(root, Path::new("public"), &mut p.public_files);
@@ -254,8 +244,7 @@ impl Project {
         }
         for f in &all {
             let s = rel_str(f);
-            let skip = s.starts_with("core/docs/") || s.starts_with("core/test/") || s.contains("/node_modules/");
-            if !skip && (s.ends_with(".js") || s.ends_with(".mjs")) {
+            if !s.contains("/node_modules/") && (s.ends_with(".js") || s.ends_with(".mjs")) {
                 p.js_files.push(f.clone());
             }
         }
@@ -330,7 +319,7 @@ impl Project {
             dirs.entry(base.join(&name)).or_insert((base.to_path_buf(), name));
         }
         for (dir, (base, name)) in dirs {
-            if !is_component_name(&name) {
+            if !directive::is_component_name(&name) {
                 self.err(&dir, 1, 1, "app/structure", format!("invalid component name \"{name}\": use lowercase letters, digits and hyphens"));
                 continue;
             }
@@ -349,9 +338,9 @@ impl Project {
             let cid = if global {
                 name.clone()
             } else {
-                let mut h = crate::Fnv::new();
+                let mut h = crate::hash::Fnv::new();
                 h.write(rel_str(&dir).as_bytes());
-                format!("{name}-{}", &crate::short_hash(h.finish())[..6])
+                format!("{name}-{}", &crate::hash::short_hash(h.finish())[..6])
             };
             let c = Component { name: name.clone(), id: cid, html: id, dir: dir.clone(), module, css, scope };
             self.components.entry(base).or_default().insert(name, c);

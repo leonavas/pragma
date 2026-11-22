@@ -1,6 +1,9 @@
 //! The app layout before `.pragma/`: framework files lived in `core/`. Apps in that layout still
 //! lint and build, and `pragma upgrade` moves them to `.pragma/`.
 
+/// Folder of the framework files in the old layout.
+pub const DIR: &str = "core";
+
 /// Files that only an app in the old layout has.
 pub const MARKERS: &[&str] = &["core/boot.js", "core/base.css"];
 

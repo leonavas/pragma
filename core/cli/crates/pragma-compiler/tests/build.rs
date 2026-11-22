@@ -1465,6 +1465,7 @@ fn scratch(files: &[(&str, &str)]) -> Tmp {
     let t = tmp();
     let app = t.0.join("app");
     copy_dir(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../runtime"), &app.join("core"));
+    fs::remove_dir_all(app.join("core/test")).unwrap();
     let base = [("pragma.json", "{ \"name\": \"tpl\" }"), ("routes/_layout.html", "<main data-page><slot></slot></main>")];
     for (f, c) in base.iter().chain(files) {
         let path = app.join(f);

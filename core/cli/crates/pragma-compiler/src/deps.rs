@@ -45,7 +45,7 @@ impl Deps {
                         listed.extend(deps.keys().cloned());
                     }
                 }
-                Err(e) => diags.push(Diagnostic::error("package.json", e.line() as u32, e.column() as u32, "app/package", format!("invalid package.json: {e}"))),
+                Err(e) => diags.push(Diagnostic::error("package.json", e.line() as u32, e.column() as u32, RULE_PACKAGE, format!("invalid package.json: {e}"))),
             }
         }
         let resolver = Resolver::new(ResolveOptions {

@@ -358,15 +358,6 @@ pub fn push_attr(out: &mut String, a: &Attr) {
     }
 }
 
-/// Text outside an element, `{path}` included.
-pub fn stray_text(nodes: &[Node]) -> Option<Pos> {
-    nodes.iter().find_map(|n| match n {
-        Node::Text(t, p) if !t.trim().is_empty() => Some(*p),
-        Node::Element(e) if e.name == crate::directive::INTERP => Some(e.pos),
-        _ => None,
-    })
-}
-
 pub fn is_blank(n: &Node) -> bool {
     match n {
         Node::Text(t, _) => t.trim().is_empty(),
