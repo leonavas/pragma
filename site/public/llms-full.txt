@@ -181,7 +181,7 @@ The folder structure is fixed. Do not create other top-level folders. Do not edi
     state/<name>.js        stores (access through `shared`, never import)
     theme.css              tokens and global custom classes
   utils/                   pure functions
-  public/                  static files (images, fonts, robots.txt, <page>.md for agents)
+  public/                  static files (images, fonts, robots.txt, <page>.md for agents); files that CSS names with url(/…) also get a hashed /assets/ copy
   .pragma/                 framework (runtime, docs, base.css, version); do not edit
 ```
 
@@ -1358,6 +1358,11 @@ Markup that pragma does not render (HTML from an npm widget) gets no theme rule 
 
 Fonts: the build adds `<link rel="preload" as="font" crossorigin>` for each `@font-face` family that the page's CSS uses (directly or through `var(--font-…)`): the upright `.woff2` face that covers Latin letters (weight 400 when there are several). Remove manual font preloads from `_layout.html`: they load fonts on pages that do not use them.
 
+Files in CSS `url()`: put fonts and CSS images in `public/` and write the path from the site root (`url('/fonts/inter.woff2')`). `pragma build` copies each `public/` file that any CSS names to `/assets/<folder>/<name>-<hash>.<ext>` (`/assets/fonts/inter-1a2b3c4d.woff2`) and writes that URL in the CSS and in the font preload. The browser caches it as `immutable`, so a returning visit uses the font with no request and the text does not change font after the first paint. The file also stays at its `public/` URL. `pragma dev` keeps the `public/` URL.
+
+- Write `/path` from the site root. A relative path (`url(fonts/x.woff2)`) stays as written and resolves against the page or stylesheet URL.
+- `data:`, `http(s)://`, `//host` and `#id` URLs stay as written. A path with no file in `public/` stays as written too.
+
 ## Tokens and dark mode
 
 The starter includes theme-aware tokens (`bg-surface`, `text-ink`, `text-muted`, `border-line`) and classes (`.card`, `.btn`, `.btn-primary`, `.btn-danger`, `.dialog`).
@@ -1774,7 +1779,7 @@ Source: https://pragma.leonavas.com/docs/performance.md
 
 # Performance
 
-Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<head>`, per-route CSS with only the theme rules the page can match (inlined in production when <= 14 kB gzip, so small pages have no render-blocking stylesheet), per-page font preload, per-route JS chunks, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets, and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
+Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<head>`, per-route CSS with only the theme rules the page can match (inlined in production when <= 14 kB gzip, so small pages have no render-blocking stylesheet), per-page font preload, per-route JS chunks, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets (JS, CSS, and the `public/` files that CSS names with `url()`, such as fonts), and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
 
 ## JS chunks
 
@@ -1830,7 +1835,7 @@ export function exportXlsx(rows, name) {
 - Navigate with `<a href>`. A `<button>` that calls `navigate()` gets no prefetch.
 - Match skeleton shapes to the final content.
 - Set `width` and `height` on every `<img>`. Add `loading="lazy"` below the fold. Store AVIF or WebP images in `public/`.
-- Set `font-display: swap` on custom fonts and declare them with `@font-face` in `lib/theme.css`. The build preloads the fonts each page uses (`css.md`). Do not write `<link rel="preload" as="font">` in `_layout.html`.
+- Set `font-display: swap` on custom fonts and declare them with `@font-face` in `lib/theme.css`, with the file in `public/` and a root path (`url('/fonts/x.woff2')`). The build serves the font from a hashed, immutable `/assets/` URL and preloads the fonts each page uses (`css.md`). Do not write `<link rel="preload" as="font">` in `_layout.html`.
 - Give `<for>` a stable `key`.
 - Drive per-frame animations (scroll, drag, progress) with `frame` from `'pragma'`: read layout first, then assign state (`state.md`, "Per-frame updates").
 - Use per-frame `:--name` values only in `transform` and `opacity`, never in `top`/`left`/`width`/`height`/`margin`/`padding`/`inset` (`css.md`, "Values that change every frame").
@@ -1984,7 +1989,7 @@ Every `<form>` is an agent tool (`webmcp.md`).
 | Path | Use |
 |---|---|
 | `client/` | HTML per route and assets. |
-| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest and serves `_404.html` with 404). Emitted when the app has a `*.server.js` or a `public/**/*.md`. `run_worker_first` sends every request, also prebuilt pages, through the worker, so middleware runs for them. `html_handling: "drop-trailing-slash"` serves `/a/index.html` at `/a` (200, no redirect to `/a/`). |
+| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest, serves `_404.html` with 404, and serves `/assets/*` as `immutable`). Emitted when the app has a `*.server.js` or a `public/**/*.md`. `run_worker_first` sends every request, also prebuilt pages, through the worker, so middleware runs for them. `html_handling: "drop-trailing-slash"` serves `/a/index.html` at `/a` (200, no redirect to `/a/`). |
 | `server/node.mjs` | Run `node dist/server/node.mjs` (reads `PORT`, default 3000). Emitted when the app has a `*.server.js`. |
 
 Every server (`dev`, `serve`, Workers, Node) returns the matching `.md` from `public/` when `Accept` prefers `text/markdown` (`webmcp.md`).

@@ -5,6 +5,7 @@ mod doc;
 pub mod prune;
 pub mod scope;
 mod table;
+pub mod urls;
 #[cfg(test)]
 mod tests;
 

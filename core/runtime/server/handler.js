@@ -5,6 +5,7 @@ import { createCookies } from './cookies.js'
 import { HttpError, Redirect } from './http.js'
 
 const OTEL_MAX_BYTES = 256 * 1024
+const IMMUTABLE = 'public, max-age=31536000, immutable'
 
 const split = (path) => path.split('/').filter(Boolean)
 
@@ -63,6 +64,13 @@ function withVary(res) {
   return out
 }
 
+function immutable(res) {
+  if (res.headers.get('cache-control') === IMMUTABLE) return res
+  const out = new Response(res.body, res)
+  out.headers.set('cache-control', IMMUTABLE)
+  return out
+}
+
 function asMarkdown(res) {
   if (res.status !== 200) return res
   const out = new Response(res.body, res)
@@ -108,6 +116,7 @@ export function createHandler({ routes, middleware, service }) {
 
   async function asset(request, env) {
     const res = await env.ASSETS.fetch(request)
+    if ((res.ok || res.status === 304) && new URL(request.url).pathname.startsWith('/assets/')) return immutable(res)
     if (res.status !== 404 || (request.method !== 'GET' && request.method !== 'HEAD')) return res
     // Assets use html_handling "drop-trailing-slash": /a/index.html and /a.html are served at /a.
     // A dynamic page file (/shop/[id].html) is fetched encoded: a raw [ ] path gets a redirect, not the file.

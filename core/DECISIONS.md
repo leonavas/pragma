@@ -298,6 +298,19 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   (weight 400 when there are several). Manual preloads in `_layout.html` should be removed
   (not repeated when present). *Why:* the layout preloaded 130 kB of fonts the landing did not
   use. Metric overrides (`size-adjust`) for fallbacks are not generated.
+- **[firm]** (2026-11-22) CSS `url()` files are hashed assets. In production, each `url(/path)` in
+  the emitted CSS (shared and route, inline and external) that names a file in `public/` points to
+  a copy at `/assets/<folder>/<name>-<hash8>.<ext>` (URL-safe, same content hash and compression
+  policy as other assets: `.br`/`.gz` only for text types, so not `.woff2`); the font preloads
+  follow, and the file stays at its `public/` URL. `data:`, `http(s):`, `//`, `#`, relative paths
+  and paths with no file in `public/` stay as written, with no diagnostic (a path can be an
+  endpoint). `pragma dev` keeps the `public/` URL. The Workers handler now sets
+  `public, max-age=31536000, immutable` on `/assets/*` (Workers static assets answer
+  `max-age=0, must-revalidate`; `serve` and Node already did). *Why:* escalei served fonts from
+  `/fonts/` with `max-age=0, must-revalidate`; every visit revalidated them (304) before use, and
+  since pragma paints early (inline CSS) the hero showed the fallback font and swapped on every
+  visit. SvelteKit/Vite hashes `url()` files the same way. Relative `url()` is not resolved: it
+  means a different file inline (page URL) and external (stylesheet URL).
 - **[firm]** (2026-11-21) Computed values (bar position, width, `--cols`, `--i/--n`) go through CSS
   custom properties: `:--name="path"` sets `--name` (Svelte `style:--name`); the CSS reads
   `var(--name)`. `false`/`null`/`undefined`/`""` remove it; a value with `;`, `{`, `}` or `<` is

@@ -52,6 +52,11 @@ Markup that pragma does not render (HTML from an npm widget) gets no theme rule 
 
 Fonts: the build adds `<link rel="preload" as="font" crossorigin>` for each `@font-face` family that the page's CSS uses (directly or through `var(--font-…)`): the upright `.woff2` face that covers Latin letters (weight 400 when there are several). Remove manual font preloads from `_layout.html`: they load fonts on pages that do not use them.
 
+Files in CSS `url()`: put fonts and CSS images in `public/` and write the path from the site root (`url('/fonts/inter.woff2')`). `pragma build` copies each `public/` file that any CSS names to `/assets/<folder>/<name>-<hash>.<ext>` (`/assets/fonts/inter-1a2b3c4d.woff2`) and writes that URL in the CSS and in the font preload. The browser caches it as `immutable`, so a returning visit uses the font with no request and the text does not change font after the first paint. The file also stays at its `public/` URL. `pragma dev` keeps the `public/` URL.
+
+- Write `/path` from the site root. A relative path (`url(fonts/x.woff2)`) stays as written and resolves against the page or stylesheet URL.
+- `data:`, `http(s)://`, `//host` and `#id` URLs stay as written. A path with no file in `public/` stays as written too.
+
 ## Tokens and dark mode
 
 The starter includes theme-aware tokens (`bg-surface`, `text-ink`, `text-muted`, `border-line`) and classes (`.card`, `.btn`, `.btn-primary`, `.btn-danger`, `.dialog`).

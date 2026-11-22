@@ -94,7 +94,7 @@ Every `<form>` is an agent tool (`webmcp.md`).
 | Path | Use |
 |---|---|
 | `client/` | HTML per route and assets. |
-| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest and serves `_404.html` with 404). Emitted when the app has a `*.server.js` or a `public/**/*.md`. `run_worker_first` sends every request, also prebuilt pages, through the worker, so middleware runs for them. `html_handling: "drop-trailing-slash"` serves `/a/index.html` at `/a` (200, no redirect to `/a/`). |
+| `server/worker.js` + `wrangler.jsonc` | Cloudflare Workers (resolves param pages via manifest, serves `_404.html` with 404, and serves `/assets/*` as `immutable`). Emitted when the app has a `*.server.js` or a `public/**/*.md`. `run_worker_first` sends every request, also prebuilt pages, through the worker, so middleware runs for them. `html_handling: "drop-trailing-slash"` serves `/a/index.html` at `/a` (200, no redirect to `/a/`). |
 | `server/node.mjs` | Run `node dist/server/node.mjs` (reads `PORT`, default 3000). Emitted when the app has a `*.server.js`. |
 
 Every server (`dev`, `serve`, Workers, Node) returns the matching `.md` from `public/` when `Accept` prefers `text/markdown` (`webmcp.md`).

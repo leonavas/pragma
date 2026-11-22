@@ -247,6 +247,64 @@ impl Writer {
     }
 }
 
+/// Files in `public/` that production CSS names with `url(/path)`: each one gets a hashed copy under
+/// `/assets/` (immutable cache) and the CSS points to it. `data:`, external, relative and unknown
+/// URLs stay as written; the file stays in `public/` too.
+struct PublicAssets {
+    dir: PathBuf,
+    files: HashSet<String>,
+    hashed: HashMap<String, Option<String>>,
+}
+
+impl PublicAssets {
+    fn new(root: &Path, files: &[PathBuf]) -> Self {
+        let files = files.iter().filter_map(|f| f.strip_prefix("public").ok()).map(rel_str).collect();
+        PublicAssets { dir: root.join("public"), files, hashed: HashMap::new() }
+    }
+
+    fn rewrite(&mut self, css: &str, w: &mut Writer) -> String {
+        pragma_css::urls::map(css, |url| self.url(url, w))
+    }
+
+    fn url(&mut self, url: &str, w: &mut Writer) -> Option<String> {
+        let path = url.strip_prefix('/').filter(|p| !p.starts_with('/'))?;
+        let (path, suffix) = path.split_at(path.find(['?', '#']).unwrap_or(path.len()));
+        let rel = percent_decode(path);
+        if !self.hashed.contains_key(&rel) {
+            let copy = self.files.contains(&rel).then(|| fs::read(self.dir.join(&rel)).ok()).flatten().map(|bytes| {
+                let file = Path::new(&rel);
+                let stem = file.with_extension("");
+                let ext = file.extension().map(|e| format!(".{}", e.to_string_lossy())).unwrap_or_default();
+                let url = format!("/assets/{}-{}{ext}", url_safe(&rel_str(&stem)), hash8(&bytes));
+                w.write_client(&format!("client{url}"), &bytes, true);
+                url
+            });
+            self.hashed.insert(rel.clone(), copy);
+        }
+        self.hashed[&rel].as_ref().map(|u| format!("{u}{suffix}"))
+    }
+}
+
+fn percent_decode(path: &str) -> String {
+    let bytes = path.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let hex = (bytes[i] == b'%').then(|| path.get(i + 1..i + 3).and_then(|h| u8::from_str_radix(h, 16).ok())).flatten();
+        match hex {
+            Some(b) => {
+                out.push(b);
+                i += 3;
+            }
+            None => {
+                out.push(bytes[i]);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8(out).unwrap_or_else(|_| path.to_string())
+}
+
 fn normalize(base: &Path, spec: &str) -> Option<PathBuf> {
     let joined = if let Some(abs) = spec.strip_prefix('/') { PathBuf::from(abs) } else { base.join(spec) };
     let mut out = PathBuf::new();
@@ -818,11 +876,13 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     };
     css.push('\n');
     css.push_str(&generated.css);
+    let mut public_assets = PublicAssets::new(&opts.root, &p.public_files);
     if prod {
         match pragma_css::minify(&css) {
             Ok(m) => css = m,
             Err(e) => diags.push(Diagnostic::error("lib/theme.css", 1, 1, "css/syntax", e)),
         }
+        css = public_assets.rewrite(&css, &mut w);
     }
     let css_url = if prod { format!("/assets/app-{}.css", hash8(css.as_bytes())) } else { "/assets/app.css".to_string() };
     w.write_client(&format!("client{css_url}"), css.as_bytes(), prod);
@@ -864,6 +924,9 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         scoped.push_str(&pragma_css::generate(&route_names, &classes.theme).css);
         let route_theme = pragma_css::prune::prune_theme(&theme_src, &markup, &scoped);
         let mut rcss = if route_theme.trim().is_empty() { scoped } else { format!("/* lib/theme.css */\n{}\n{scoped}", route_theme.trim()) };
+        if prod {
+            rcss = public_assets.rewrite(&rcss, &mut w);
+        }
         let fonts = pragma_css::prune::font_preloads(&format!("{css}\n{rcss}"), &markup);
         if !rcss.trim().is_empty() {
             if prod {

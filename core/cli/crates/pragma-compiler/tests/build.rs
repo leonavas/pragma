@@ -752,6 +752,77 @@ fn route_css_keeps_only_matching_theme_rules_and_preloads_used_fonts() {
     assert!(plain.contains(".note{") && !plain.contains(".hero{"), "{plain}");
 }
 
+fn css_url_app() -> Tmp {
+    let theme = "@font-face { font-family: 'Body'; src: url('/fonts/body.woff2') format('woff2'); }\n@font-face { font-family: 'Cdn'; src: url(https://cdn.example/cdn.woff2) format('woff2'); }\n@layer tokens {\n  :root { --font-sans: 'Body', 'Cdn', sans-serif; }\n}\n@layer components {\n  .hero { background: url(\"/img/bg.svg#top\"), url(/missing.png), url(//cdn.example/a.png), url(img/rel.png); }\n  .mask { mask: url(\"data:image/svg+xml,%3Csvg/%3E\"); fill: url(#grad); }\n}\n";
+    let mut seed: u64 = 1;
+    let noise: String = (0..1500)
+        .map(|i| {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            format!("--n{i}: \"{seed:016x}\"; ")
+        })
+        .collect();
+    let big = format!("<title>Big</title><p class=\"hero\">Big</p>\n<style>\n  p {{ background-image: url('/img/bg.svg'); {noise}}}\n</style>\n");
+    let svg = format!("<svg xmlns=\"http://www.w3.org/2000/svg\">{}</svg>", "<rect width=\"1\" height=\"1\"/>".repeat(40));
+    let t = scratch(&[
+        ("lib/theme.css", theme),
+        ("routes/index.html", "<title>Home</title><h1 class=\"hero mask\">Hi</h1>"),
+        ("routes/big.html", &big),
+        ("public/img/bg.svg", &svg),
+        ("public/img/rel.png", "png"),
+    ]);
+    fs::create_dir_all(t.0.join("app/public/fonts")).unwrap();
+    fs::write(t.0.join("app/public/fonts/body.woff2"), b"wOF2 body").unwrap();
+    t
+}
+
+fn hashed_url(text: &str, prefix: &str, ext: &str) -> String {
+    let start = text.find(prefix).unwrap_or_else(|| panic!("no {prefix} in {text}"));
+    let rest = &text[start..];
+    let url = &rest[..rest.find(ext).unwrap() + ext.len()];
+    let hash = url[prefix.len()..url.len() - ext.len()].trim_start_matches('-');
+    assert!(hash.len() == 8 && hash.chars().all(|c| c.is_ascii_hexdigit()), "{url} has no hash");
+    url.to_string()
+}
+
+#[test]
+fn css_urls_to_public_files_become_hashed_assets() {
+    let t = css_url_app();
+    let app = t.0.join("app");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: app.clone(), out_dir: out.clone(), mode: Mode::Prod }).unwrap();
+    let client = out.join("client");
+    let index = fs::read_to_string(client.join("index.html")).unwrap();
+    assert!(!index.contains("rel=\"stylesheet\""), "inline CSS: {index}");
+    let font = hashed_url(&index, "/assets/fonts/body", ".woff2");
+    let svg = hashed_url(&index, "/assets/img/bg", ".svg");
+    assert_eq!(fs::read(client.join(&font[1..])).unwrap(), b"wOF2 body");
+    assert_eq!(fs::read(client.join(&svg[1..])).unwrap(), fs::read(app.join("public/img/bg.svg")).unwrap());
+    assert!(client.join(format!("{}.br", &svg[1..])).is_file() && client.join(format!("{}.gz", &svg[1..])).is_file(), "SVG is precompressed like other assets");
+    assert!(!client.join(format!("{}.br", &font[1..])).exists(), "woff2 is not precompressed");
+    assert!(client.join("fonts/body.woff2").is_file() && client.join("img/bg.svg").is_file(), "public/ files are still copied");
+    assert!(index.contains(&format!("src:url({font})")) || index.contains(&format!("src:url(\"{font}\")")), "{index}");
+    assert!(index.contains(&format!("{svg}#top")), "the fragment is kept: {index}");
+    assert!(index.contains(&format!("<link rel=\"preload\" href=\"{font}\" as=\"font\" type=\"font/woff2\" crossorigin>")), "{index}");
+    assert!(!index.contains("href=\"/fonts/body.woff2\"") && !index.contains("url(/fonts/") && !index.contains("url(\"/fonts/"), "{index}");
+    assert!(index.contains("https://cdn.example/cdn.woff2") && index.contains("//cdn.example/a.png"), "external URLs stay: {index}");
+    assert!(index.contains("/missing.png") && index.contains("img/rel.png") && index.contains("data:image/svg+xml") && index.contains("url(#grad)"), "missing, relative, data and fragment URLs stay: {index}");
+    assert!(!index.contains("/assets/img/rel"), "{index}");
+
+    let big = fs::read_to_string(client.join("big.html")).unwrap();
+    let route_css = urls(&big, "href").into_iter().find(|u| u.starts_with("/assets/css/big-")).unwrap_or_else(|| panic!("external route CSS: {big}"));
+    assert!(big.contains(&format!("<link rel=\"preload\" href=\"{font}\" as=\"font\"")), "{big}");
+    let css = fs::read_to_string(client.join(&route_css[1..])).unwrap();
+    assert!(css.contains(&font) && css.contains(&svg), "{css}");
+    assert!(!css.contains("url(/img/bg.svg") && !css.contains("url(\"/img/bg.svg") && !css.contains("url('/img/bg.svg"), "{css}");
+
+    let dev = t.0.join("dev");
+    build(&BuildOptions { root: app, out_dir: dev.clone(), mode: Mode::Dev }).unwrap();
+    let index = fs::read_to_string(dev.join("client/index.html")).unwrap();
+    let css = fs::read_to_string(dev.join("client/assets/css/index.css")).unwrap();
+    assert!(css.contains("url('/fonts/body.woff2')") && index.contains("href=\"/fonts/body.woff2\""), "dev keeps public URLs: {css}");
+    assert!(!dev.join("client/assets/fonts").exists());
+}
+
 #[test]
 fn data_slot_is_generated() {
     expect(&page("<p data-slot=\"1\">x</p>"), "html/data-attribute", PAGE, 1);

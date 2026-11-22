@@ -177,6 +177,26 @@ test('everything else goes to env.ASSETS', async (t) => {
   assert.equal((await get('/anything')).status, 404)
 })
 
+test('hashed assets from env.ASSETS are immutable; other files keep their cache-control', async (t) => {
+  capture(t)
+  const revalidate = 'public, max-age=0, must-revalidate'
+  const env = {
+    ASSETS: {
+      fetch: async (req) => {
+        const path = new URL(req.url).pathname
+        if (path.endsWith('missing.woff2')) return new Response('no', { status: 404 })
+        if (req.headers.get('if-none-match')) return new Response(null, { status: 304, headers: { 'cache-control': revalidate } })
+        return new Response('file', { headers: { 'cache-control': revalidate } })
+      },
+    },
+  }
+  const cache = async (path, init) => (await handler.fetch(new Request('http://x' + path, init), env)).headers.get('cache-control')
+  assert.equal(await cache('/assets/fonts/a-1234abcd.woff2'), 'public, max-age=31536000, immutable')
+  assert.equal(await cache('/assets/app-1234abcd.css', { headers: { 'if-none-match': 'W/"1"' } }), 'public, max-age=31536000, immutable')
+  assert.equal(await cache('/fonts/a.woff2'), revalidate)
+  assert.notEqual(await cache('/assets/fonts/missing.woff2'), 'public, max-age=31536000, immutable')
+})
+
 test('per-request span continues the incoming traceparent', async (t) => {
   const lines = capture(t)
   const traceId = '4bf92f3577b34da6a3ce929d0e0e4736'

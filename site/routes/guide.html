@@ -254,7 +254,7 @@ CSS       3.9 KB
             <li>The bodies of <code>&lt;if&gt;</code> and <code>&lt;for&gt;</code> blocks go to one preloaded template module per page; the HTML keeps a short comment where each block renders.</li>
             <li>The CSS contains only the classes the app uses.</li>
             <li>Links prefetch on hover, focus or when visible; navigations use view transitions.</li>
-            <li>HTML is served <code>no-cache</code>, <code>/assets/</code> as <code>immutable</code>, both brotli or gzip compressed.</li>
+            <li>HTML is served <code>no-cache</code>, <code>/assets/</code> as <code>immutable</code>, both brotli or gzip compressed. A file in <code>public/</code> that the CSS names with <code>url(/…)</code> (a font, a background image) gets a hashed copy in <code>/assets/</code>, so a returning visit uses it from cache with no request.</li>
             <li>Code needed only after a click goes behind <code>await import()</code> in the action: not preloaded, not in the page size. See <a href="/examples/packages#lazy-import">lazy packages</a>.</li>
           </ul>
         </div>
@@ -289,7 +289,7 @@ dist/server/routes/orders/index.server.js</code></pre>
         </c-terminal>
         <div class="prose">
           <ul>
-            <li><code>dist/client/</code>: one HTML file per route (a param route keeps its name, <code>blog/[slug].html</code>), <code>_404.html</code>, hashed <code>assets/</code> (with <code>assets/tpl/</code>, the block bodies of each page), the files from <code>public/</code> and <code>_pragma/manifest.json</code>.</li>
+            <li><code>dist/client/</code>: one HTML file per route (a param route keeps its name, <code>blog/[slug].html</code>), <code>_404.html</code>, hashed <code>assets/</code> (with <code>assets/tpl/</code>, the block bodies of each page, and hashed copies of the <code>public/</code> files the CSS names, like <code>assets/fonts/inter-&lt;hash&gt;.woff2</code>), the files from <code>public/</code> and <code>_pragma/manifest.json</code>.</li>
             <li><code>dist/server/</code>: <code>worker.js</code> (a fetch handler with the route table), <code>node.mjs</code> (a Node adapter around it), <code>wrangler.jsonc</code>, and your <code>.server.js</code> files copied unbundled with their relative imports.</li>
             <li><code>dist/templates/&lt;route&gt;.json</code>: only for routes with <code>ssr = true</code>.</li>
           </ul>
