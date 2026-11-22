@@ -12,6 +12,44 @@ Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<hea
 - `await import()` stays a separate chunk. npm packages stay in `/assets/npm/` (`packages.md`).
 - The page `modulepreload`s every chunk it runs. The router prefetches the HTML and chunks of a link on hover, focus, and when the link enters the viewport, also for links rendered after the page loads (`/app/:id` links included).
 
+## Lazy-load heavy code
+
+Code that runs only after a click (export to XLSX or PDF, a parser, a chart in a closed modal) does not need to be in the route chunk. Put it in a `utils/` module and load that module with `await import()` inside the action.
+
+`utils/export-xlsx.js`:
+
+```js
+import { utils, writeFile } from 'xlsx'
+
+export function exportXlsx(rows, name) {
+  const book = utils.book_new()
+  utils.book_append_sheet(book, utils.json_to_sheet(rows), 'Data')
+  writeFile(book, name)
+}
+```
+
+`routes/report.html`:
+
+```html
+<script>
+  let rows = []
+
+  async function download() {
+    const { exportXlsx } = await import('../utils/export-xlsx.js')
+    exportXlsx(rows, 'report.xlsx')
+  }
+</script>
+
+<button type="button" @click="download">Export XLSX</button>
+```
+
+- `pragma build` puts the module in `/assets/chunks/<name>-<hash>.js` and the packages it imports in `/assets/npm/`. The page does not `modulepreload` them; the browser fetches them on the first click. `pragma dev` does the same per file.
+- Import named exports in the `utils/` module, not `import('pkg')` in the page: the build tree-shakes the package only through named imports.
+- Use `import()` only. A static `import` of the same module anywhere in the route (page, component, store) puts it back in the route chunk.
+- It works the same in a component `<script>` (for example the action of a modal). The markup of the component stays in the route; only the imported code is lazy.
+- The page JS size that `pragma build` prints does not count lazy chunks.
+- Show a pending state if the first load can be slow (`let exporting = true` before the `await`).
+
 ## Rules
 
 - Navigate with `<a href>`. A `<button>` that calls `navigate()` gets no prefetch.
@@ -22,7 +60,7 @@ Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<hea
 - Drive per-frame animations (scroll, drag, progress) with `frame` from `'pragma'`: read layout first, then assign state (`state.md`, "Per-frame updates").
 - Use per-frame `:--name` values only in `transform` and `opacity`, never in `top`/`left`/`width`/`height`/`margin`/`padding`/`inset` (`css.md`, "Values that change every frame").
 - Omit `.js` on pages without interaction.
-- Keep heavy single-page code on that page. Load interaction-only code with `await import()` inside the action.
+- Keep heavy single-page code on that page. Load interaction-only code with `await import()` inside the action ("Lazy-load heavy code").
 - Return only displayed fields from `load`. Run independent requests with `Promise.all`.
 - Keep page JS small. Read the size table of `pragma build` after you add a package or a large module.
 - Do not import large modules in `lib/state/`. Do not fetch data in `mount`. Do not enable `ssr` by default.
