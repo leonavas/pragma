@@ -14,7 +14,6 @@ pub fn is_tool_attr(name: &str) -> bool {
     TOOL_ATTRS.contains(&name)
 }
 
-/// Tool attributes written with WebMCP off (`webmcp/disabled`).
 pub fn disabled(files: &[PathBuf], trees: &[Vec<Node>]) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     for tree in trees {

@@ -16,13 +16,12 @@ pub struct Config {
 pub struct Page {
     pub html: u32,
     pub pattern: String,
-    /// SSR template and output HTML name, without extension: `index`, `shop/[id]`.
+    /// Output name, without extension: `index`, `shop/[id]`.
     pub out_name: String,
     /// Folder (relative to the root) where component resolution starts.
     pub dir: PathBuf,
     /// `x.js` or the `<script>` of `x.html` (see `Project::embedded`).
     pub module: Option<PathBuf>,
-    /// The `<style>` of `x.html`.
     pub css: Option<PathBuf>,
     pub server: Option<PathBuf>,
 }
@@ -67,7 +66,7 @@ pub struct Project {
     pub components: HashMap<PathBuf, BTreeMap<String, Component>>,
     pub stores: BTreeMap<String, PathBuf>,
     pub theme_css: Option<String>,
-    /// All app .js/.mjs files (including core/), relative.
+    /// All .js/.mjs files, the framework's included, relative.
     pub js_files: Vec<PathBuf>,
     /// `<script>` / `<style>` of a page or component `.html`, under the path the separate file would
     /// have (`routes/x.js`, `lib/components/x/x.css`) -> (code padded with blank lines so lines and
@@ -317,7 +316,6 @@ impl Project {
     }
 
     fn discover_components(&mut self, all: &[PathBuf]) {
-        // Folders directly inside a components directory.
         let mut dirs: BTreeMap<PathBuf, (PathBuf, String)> = BTreeMap::new();
         for f in all {
             let comps: Vec<_> = f.ancestors().filter(|a| a.file_name().is_some_and(|n| n == "_components") || *a == Path::new("lib/components")).collect();

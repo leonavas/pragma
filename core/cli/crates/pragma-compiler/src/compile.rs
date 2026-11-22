@@ -10,7 +10,6 @@ pub const SSR_SELF_DEPTH: usize = 12;
 /// Self calls the server renders per page at most (a component that calls itself twice doubles per level).
 pub const SSR_SELF_CALLS: usize = 64;
 
-/// Serializes nodes; a block `<template>` is written as its anchor comment. `compact` collapses whitespace between tags.
 pub fn write_nodes(nodes: &[Node], out: &mut String, compact: bool) {
     for n in nodes {
         match n {
@@ -237,7 +236,6 @@ pub fn template_module(bodies: &[Element], compact: bool) -> String {
     out
 }
 
-/// The children of `<main data-page>`: what SSR renders.
 pub fn page_content(nodes: &[Node]) -> &[Node] {
     for n in nodes {
         let Node::Element(e) = n else { continue };
@@ -252,17 +250,13 @@ pub fn page_content(nodes: &[Node]) -> &[Node] {
     &[]
 }
 
-/// Roots the server can render; `shared` is left to the client. `state` gets ops too: the server
-/// renders them when it runs the page or component script (`comp` op), else leaves them.
 fn server_path(p: &str, vars: &[String]) -> bool {
     let r = directive::root(p);
     directive::SSR_ROOTS.contains(&r) || vars.iter().any(|v| v == r)
 }
 
 struct Ctx<'s> {
-    /// `data-c` ids of components with a script.
     scripted: &'s BTreeSet<String>,
-    /// Root of each `<template data-def>`: the body a `data-self` call renders.
     defs: BTreeMap<String, Element>,
     tpls: HashMap<String, Element>,
     depth: Cell<usize>,
@@ -270,7 +264,6 @@ struct Ctx<'s> {
 }
 
 impl Ctx<'_> {
-    /// A `data-self` call the server renders: the call's root with the component's body.
     fn self_call(&self, e: &Element) -> Option<Element> {
         if !e.has("data-self") || !e.children.is_empty() || self.depth.get() >= SSR_SELF_DEPTH || self.calls.get() >= SSR_SELF_CALLS {
             return None;
@@ -334,7 +327,6 @@ fn block(e: &Element, vars: &mut Vec<String>, ctx: &Ctx) -> Value {
     Value::Array(o.ops)
 }
 
-/// `data-slot="n"`: slot content evaluated in the scope n components up (`slot` op).
 fn slot_of(e: &Element) -> Option<u32> {
     e.value("data-slot").and_then(|v| v.parse().ok())
 }

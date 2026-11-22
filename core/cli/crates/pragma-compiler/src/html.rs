@@ -139,7 +139,6 @@ impl Parser<'_> {
     }
 
     fn run(&mut self) -> Vec<Node> {
-        // stack of (element, opening tag offset)
         let mut stack: Vec<(Element, usize)> = Vec::new();
         let mut root: Vec<Node> = Vec::new();
         macro_rules! push {

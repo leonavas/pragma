@@ -128,7 +128,6 @@ fn gzip_compress(bytes: &[u8]) -> Option<Vec<u8>> {
     enc.finish().ok()
 }
 
-/// The three ways to write `[attr="value"]` in CSS.
 fn spellings(attr: &str, value: &str) -> Vec<String> {
     vec![format!("[{attr}=\"{value}\"]"), format!("[{attr}='{value}']"), format!("[{attr}={value}]")]
 }
@@ -153,7 +152,6 @@ fn scope_component_css(css: &str, name: &str, id: &str) -> String {
     pragma_css::scope::scope(&css, &owner_selector(&css_owner("component", id)), &spellings("data-c", id))
 }
 
-/// A page's CSS applies only to the markup its `.html` wrote.
 fn scope_page_css(css: &str, page: &str) -> String {
     pragma_css::scope::scope(css, &owner_selector(&css_owner("page", page)), &spellings("data-page", page))
 }
@@ -164,7 +162,6 @@ fn sort_diags(mut d: Vec<Diagnostic>) -> Vec<Diagnostic> {
     d
 }
 
-/// Writes only what changed and remembers what was written, to delete the rest at the end.
 struct Writer {
     root: PathBuf,
     written: HashSet<PathBuf>,
@@ -397,7 +394,6 @@ fn module_graph(
 
 const METHODS: [&str; 7] = ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"];
 
-/// Endpoints export only method handlers; the middleware exports `handle`.
 fn check_endpoints(p: &Project, sources: &HashMap<PathBuf, String>) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     for e in &p.endpoints {
@@ -428,7 +424,6 @@ fn check_endpoints(p: &Project, sources: &HashMap<PathBuf, String>) -> Vec<Diagn
     out
 }
 
-/// The app's own code (not the framework, not packages).
 fn is_app_code(path: &Path) -> bool {
     ["routes/", "lib/", "utils/"].iter().any(|d| rel_str(path).starts_with(d))
 }
@@ -437,7 +432,6 @@ fn is_wasm(path: &Path) -> bool {
     path.extension().is_some_and(|e| e == "wasm")
 }
 
-/// Import specifier from the module at `from` to the file at `to` (both relative to the same folder).
 fn relative_spec(from: &str, to: &str) -> String {
     let depth = from.matches('/').count();
     if depth == 0 { format!("./{to}") } else { format!("{}{to}", "../".repeat(depth)) }
@@ -478,7 +472,6 @@ fn link_packages(mods: &mut BTreeMap<PathBuf, Module>, b: &bundle::Bundle, diags
     }
 }
 
-/// Reachable modules; `dynamic` also follows `import()`.
 fn closure(mods: &BTreeMap<PathBuf, Module>, entries: &[PathBuf], dynamic: bool) -> Vec<PathBuf> {
     let mut seen = HashSet::new();
     let mut order = Vec::new();
@@ -498,7 +491,6 @@ fn closure(mods: &BTreeMap<PathBuf, Module>, entries: &[PathBuf], dynamic: bool)
     order
 }
 
-/// Scripts the SSR of a route runs: the page's and its components' (`data-c` id -> module).
 #[derive(Default)]
 struct SsrScripts {
     page: Option<PathBuf>,
@@ -561,7 +553,6 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     (sort_diags(diags), report)
 }
 
-/// Everything the build knows before it writes a file: checked sources, scoped CSS, expanded pages.
 struct Analysis<'p> {
     sources: HashMap<PathBuf, String>,
     theme_src: String,
@@ -589,7 +580,6 @@ fn analyze<'p>(p: &'p Project, diags: &mut Vec<Diagnostic>) -> Analysis<'p> {
             sources.insert(path.clone(), code.clone());
         }
     }
-    // page, component and store scripts become per-instance factories (SPEC §4)
     let mut scripts: HashMap<PathBuf, ScriptInfo> = HashMap::new();
     let script_kinds: Vec<(PathBuf, ScriptKind)> = p
         .pages
@@ -734,7 +724,6 @@ fn analyze<'p>(p: &'p Project, diags: &mut Vec<Diagnostic>) -> Analysis<'p> {
         let mut sc = expand::Scoped { p, ctx: &ctx, diags: Vec::new(), stores: BTreeSet::new(), shared_classes: BTreeSet::new(), page_classes: BTreeSet::new(), outer: Vec::new() };
         sc.run(&exp.body);
         sc.head(&exp.head);
-        // stores used from scripts, and the stores those stores use
         let mut queue: Vec<String> = page
             .module
             .iter()
@@ -768,7 +757,6 @@ fn analyze<'p>(p: &'p Project, diags: &mut Vec<Diagnostic>) -> Analysis<'p> {
     Analysis { sources, theme_src, comp_css, page_css, classes, outs, shared_classes }
 }
 
-/// What the server part needs from the client build: the module graph and each page's HTML.
 struct Client {
     mods: BTreeMap<PathBuf, Module>,
     deps: deps::Deps,
@@ -779,7 +767,6 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
     let prod = opts.mode == Mode::Prod;
     let Analysis { sources, theme_src, comp_css, page_css, classes, outs, shared_classes } = a;
     let mut docs = Vec::with_capacity(outs.len());
-    // client JS
     let boot = p.framework.join("boot.js");
     let overlay = p.framework.join("overlay.js");
     if !opts.root.join(&boot).is_file() {
@@ -874,7 +861,6 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
     }
     let npm_paths: HashMap<&str, &PathBuf> = urls.iter().filter(|(k, _)| k.starts_with("node_modules")).map(|(k, u)| (u.as_str(), k)).collect();
 
-    // Shared CSS (base + layout/_404 utilities); the theme, components and pages go per route
     let shared_names: Vec<String> = shared_classes.iter().cloned().collect();
     let generated = pragma_css::generate(&shared_names, &classes.theme);
     let mut css = if prod {
@@ -909,7 +895,6 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
     let shared_css_gz = gzip_len(css.as_bytes());
     report.css_gzip_bytes = shared_css_gz;
 
-    // pages
     let theme_js = mods.contains_key(&p.framework.join("theme.js"));
     let mut manifest = Vec::new();
     let boot_url = match &chunked {
@@ -1159,7 +1144,6 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
     // no *.server.js: static-only app, no node in dev/serve (BUG-S-1); still emit Cloudflare worker
     // when public/**/*.md exists so Accept: text/markdown negotiation works on Cloudflare Workers.
     if emit_worker && opts.root.join(&handler).is_file() {
-        // page and component scripts the SSR renders with (each imported once)
         let mut script_ids: BTreeMap<PathBuf, usize> = BTreeMap::new();
         for r in &server_routes {
             for m in r.scripts.page.iter().chain(r.scripts.components.iter().map(|(_, m)| m)) {
@@ -1275,7 +1259,7 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
 
 }
 
-/// Stores read from JS as `ctx.shared.<name>` (or a destructured `shared.<name>`).
+/// Store names after `shared.` in JS source (a text scan: strings and comments count too).
 fn shared_refs(src: &str) -> impl Iterator<Item = &str> {
     src.match_indices("shared.").filter_map(|(i, m)| {
         let boundary = src[..i].chars().next_back().is_none_or(|c| !(c.is_ascii_alphanumeric() || c == '_' || c == '$'));

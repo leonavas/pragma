@@ -16,7 +16,6 @@ pub fn classes(el: &Element) -> Vec<String> {
     out
 }
 
-/// Element names and classes of a route's markup.
 pub fn markup_of(nodes: &[Node], out: &mut Markup) {
     for n in nodes {
         let Node::Element(e) = n else { continue };
@@ -69,7 +68,6 @@ pub fn unmatched(css: &str, marker: &str, tree: &[Node], root: &dyn Fn(&str) -> 
         .collect()
 }
 
-/// Keeps a `data-s` token only where one of its owner's selectors can match.
 pub fn trim(body: &mut [Node], owned: &Owned) {
     let mut markup = Markup::default();
     markup_of(body, &mut markup);

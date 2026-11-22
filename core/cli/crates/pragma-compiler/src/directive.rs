@@ -66,7 +66,6 @@ pub fn template(v: &str) -> Result<Vec<Part>, usize> {
     Ok(parts)
 }
 
-/// Whether text or an attribute value has `{` (an interpolation or a `\{` escape).
 pub fn has_braces(v: &str) -> bool {
     v.contains('{')
 }
@@ -87,18 +86,15 @@ pub fn join_template(parts: &[Part]) -> String {
     out
 }
 
-/// Paths of a compiled template (`data-text`, `data-attr-*` with `{`).
 pub fn template_paths(v: &str) -> Vec<String> {
     template(v).map(|parts| parts.into_iter().filter_map(|p| if let Part::Path(p) = p { Some(p) } else { None }).collect()).unwrap_or_default()
 }
 
-/// Argument of an event call.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Arg<'a> {
     Path(&'a str),
     /// `'text'`, `"text"`, number, `true`, `false`, `null`: written as is.
     Literal(&'a str),
-    /// The DOM event.
     Event,
     /// The element with the `@event` directive.
     El,
@@ -376,7 +372,6 @@ pub fn is_ident(s: &str) -> bool {
         && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
 }
 
-/// Path `root.a.b`, with optional `!` when `neg_ok`.
 pub fn check_path(v: &str, neg_ok: bool) -> Result<(), String> {
     let p = v.strip_prefix('!').unwrap_or(v);
     if p.len() != v.len() && !neg_ok {

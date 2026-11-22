@@ -156,7 +156,6 @@ impl<'p> Expander<'p> {
         (Expanded { head, body, components: self.used }, self.diags)
     }
 
-    /// `<template data-def="id">` of each component that rendered itself, for the runtime to clone.
     fn take_defs(&mut self) -> Vec<Node> {
         std::mem::take(&mut self.defs).into_values().flatten().flat_map(|t| [Node::Text("\n".into(), t.pos), Node::Element(t)]).collect()
     }
@@ -631,7 +630,6 @@ impl<'p> Expander<'p> {
     }
 }
 
-/// `{}` templates and event calls (@sfc-template).
 impl Expander<'_> {
     /// Resolves the paths of a `{}` template. Ok: the template still has runtime paths.
     /// Err: only static props were used; the literal text (HTML-escaped when `text`).
@@ -774,7 +772,6 @@ pub struct OwnerScript<'a> {
     pub info: &'a ScriptInfo,
 }
 
-/// Page data for scoped validation.
 pub struct PageCtx<'a> {
     pub loader: bool,
     pub ssr: bool,
@@ -1002,13 +999,11 @@ impl Scoped<'_> {
         self.err(pos, "html/unknown-name", format!("\"{f}\" is not a function of the store {store} (lib/state/{store}.js).{hint}"));
     }
 
-    /// Every name the owner's script declares (state, props, constants, functions).
     fn script_names(&self, owner: &Owner) -> Vec<String> {
         let Some((_, s)) = self.owner_script(owner) else { return Vec::new() };
         [&s.info.lets, &s.info.props, &s.info.consts, &s.info.functions].into_iter().flatten().cloned().collect()
     }
 
-    /// `:model` writes: only a top-level `let`.
     fn model_target(&mut self, pos: Pos, v: &str, owner: &Owner) {
         let name = v.split('.').nth(1).unwrap_or("");
         let Some((_, script)) = self.owner_script(owner) else { return };
