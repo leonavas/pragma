@@ -1,4 +1,4 @@
-import { render, patch, hooks, scopeOf, input, eventCall } from './directives.js'
+import { render, patch, hooks, scopeOf, input, eventCall, useBodies } from './directives.js'
 import { log } from './log.js'
 import { reactive, readers, onChange, persist, persistStores } from './state.js'
 import { coerce } from './props.js'
@@ -181,8 +181,8 @@ const importPart = async u => {
 
 export async function importRoute(r) {
   const all = o => Promise.all(Object.entries(o ?? {}).map(async ([k, u]) => [k, await importPart(u)]))
-  const [page, c, s] = await Promise.all([r.page && importPart(r.page), all(r.components), all(r.stores)])
-  return { page, comps: Object.fromEntries(c), stores: Object.fromEntries(s) }
+  const [page, c, s, bodies] = await Promise.all([r.page && importPart(r.page), all(r.components), all(r.stores), r.tpl && import(r.tpl)])
+  return { page, comps: Object.fromEntries(c), stores: Object.fromEntries(s), bodies }
 }
 
 export function leave() {
@@ -191,6 +191,7 @@ export function leave() {
 }
 
 export function enter(route, mods, url, params, doc, pending) {
+  useBodies(mods.bodies, !cur)
   Object.assign(comps, mods.comps)
   for (const [name, mod] of Object.entries(mods.stores)) shared[name] ??= store(name, mod)
   if (document.querySelector('dialog,[popover]')) overlays()

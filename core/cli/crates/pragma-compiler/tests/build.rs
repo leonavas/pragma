@@ -709,7 +709,7 @@ fn scoped_token_only_where_ancestors_allow_a_match() {
     let app = t.0.join("app");
     let out = t.0.join("dist");
     build(&BuildOptions { root: app.clone(), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let html = page_html(&out, "index.html");
     let page = token_after(&html, "<td");
     for kept in ["<td data-s", "<span data-s=\"PAGE\">block", "<em data-s=\"PAGE\">slot", "<p data-s=\"PAGE\">dark"] {
         assert!(html.contains(&kept.replace("PAGE", &page)), "{kept}: {html}");
