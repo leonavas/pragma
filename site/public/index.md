@@ -67,85 +67,51 @@ Some know a bit more and pick SvelteKit, Astro or htmx. Good tools, made for peo
 
 ## One file: markup, script and style
 
-A component is one .html file. A top-level `let` is state, a function is an action or a derived value, and `{path}` puts a value in the text. Check a task, add one, hide the done ones: each action assigns a variable and the runtime reapplies the bindings. No hooks, no virtual DOM. The form is also a WebMCP tool: an agent in the browser can call `add_task`.
+A component is one .html file. A top-level `let` is state, a function is an action, and `{path}` puts a value in the text. Add a task: the action changes `tasks` and the runtime updates the list. No hooks, no virtual DOM. The form is also a WebMCP tool: an agent in the browser can call `add_task`.
 
 This is the whole component, read from disk when the page renders: the source you see is the source that runs.
 
 ```html
 <script>
   let draft = ''
-  let pendingOnly = false
-  let nextId = 4
   let tasks = [
-    { id: 1, title: 'Write the page in one .html file', done: true },
-    { id: 2, title: 'Show values with {path}', done: false },
-    { id: 3, title: 'Run pragma check --strict', done: false },
+    { id: 1, title: 'Write the page' },
+    { id: 2, title: 'Run pragma check' },
   ]
 
-  const visible = () => (pendingOnly ? tasks.filter(task => !task.done) : tasks)
-  const pending = () => tasks.filter(task => !task.done).length
-  const total = () => tasks.length
-  const filterText = () => (pendingOnly ? 'Show all' : 'Hide done')
-  const filterPressed = () => (pendingOnly ? 'true' : 'false')
-
   function add(event) {
-    const title = String(new FormData(event.target).get('title')).trim()
-    if (!title) return
-    tasks.push({ id: nextId, title, done: false })
-    nextId += 1
+    const form = new FormData(event.target)
+    const id = tasks.length + 1
+    tasks.push({ id, title: form.get('title') })
     draft = ''
-    if (event.agentInvoked) event.respondWith(Promise.resolve('Added "' + title + '". ' + pending() + ' of ' + total() + ' tasks pending.'))
-  }
-
-  function toggle(task) {
-    task.done = !task.done
-  }
-
-  function toggleFilter() {
-    pendingOnly = !pendingOnly
   }
 </script>
 
-<div class="grid w-full max-w-sm gap-3.5">
-  <div class="flex items-center justify-between gap-4 font-mono text-xs">
-    <p class="text-faint tabular-nums" role="status">{$pending} of {$total} pending</p>
-    <button type="button" class="tasks-filter cursor-pointer py-1.5 underline hover:text-ink" @click="toggleFilter" :aria-pressed="$filterPressed">{$filterText}</button>
-  </div>
-  <form class="flex gap-2" toolname="add_task" tooldescription="Add a task to the demo to-do list on the pragma landing page" @submit="add">
-    <input class="h-8 min-w-0 flex-1 border border-line-strong bg-sunken px-3 text-sm text-ink focus-visible:border-accent" type="text" name="title" required maxlength="48" placeholder="Add a task" aria-label="New task" toolparamdescription="Title of the task, up to 48 characters" :model="$draft">
-    <button type="submit" class="btn btn-small">Add</button>
-  </form>
-  <ul class="border-t border-line">
-    <for task in $visible key=task.id>
-      <li class="flex min-h-11 items-center gap-3 border-b border-line" .done="task.done">
-        <input type="checkbox" class="tasks-check size-4 shrink-0 cursor-pointer" :checked="task.done" :aria-label="task.title" @change="toggle(task)">
-        <span class="tasks-title min-w-0">{task.title}</span>
-      </li>
+<div class="grid w-full max-w-xs gap-3">
+  <p>{$tasks.length} tasks</p>
+  <ul class="tasks">
+    <for task in $tasks key=task.id>
+      <li>{task.title}</li>
     </for>
-    <empty>
-      <li class="border-b border-line py-3.5 text-sm text-muted">Nothing pending. Ship it.</li>
-    </empty>
   </ul>
+  <form class="flex gap-2" @submit="add"
+    toolname="add_task"
+    tooldescription="Add a task to the demo list">
+    <input class="flex-1 border border-line px-2"
+      name="title" required aria-label="New task"
+      toolparamdescription="Title of the task"
+      :model="$draft">
+    <button class="btn">Add</button>
+  </form>
 </div>
 
 <style>
-  .tasks-filter { color: var(--color-muted); text-decoration-color: var(--color-line-strong); text-underline-offset: 0.3em; }
-  .tasks-filter[aria-pressed="true"] { color: var(--color-accent-text); text-decoration-color: currentColor; }
-  .tasks-check { accent-color: var(--color-accent); }
-  .tasks-title {
-    overflow-wrap: anywhere;
-    background: linear-gradient(currentColor, currentColor) 0 55% / 0 1px no-repeat;
-    transition: background-size 0.28s var(--ease-out), color 0.2s var(--ease-out);
-  }
-  .done .tasks-title { color: var(--color-faint); background-size: 100% 1px; }
-  @media (prefers-reduced-motion: reduce) {
-    .tasks-title { transition: none; }
-  }
+  .tasks { list-style: disc inside; }
 </style>
 ```
 
-- `add_task`: Add a task to the demo to-do list on the pragma landing page
-  - `title`: Title of the task, up to 48 characters
+- `add_task`: Add a task to the demo list
+  - `title`: Title of the task
 
 ## Four constraints, enforced by the compiler
 

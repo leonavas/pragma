@@ -67,7 +67,7 @@ Some know a bit more and pick SvelteKit, Astro or htmx. Good tools, made for peo
 
 ## One file: markup, script and style
 
-A component is one .html file. A top-level `let` is state, a function is an action or a derived value, and `{path}` puts a value in the text. Check a task, add one, hide the done ones: each action assigns a variable and the runtime reapplies the bindings. No hooks, no virtual DOM. The form is also a WebMCP tool: an agent in the browser can call `add_task`.
+A component is one .html file. A top-level `let` is state, a function is an action, and `{path}` puts a value in the text. Add a task: the action changes `tasks` and the runtime updates the list. No hooks, no virtual DOM. The form is also a WebMCP tool: an agent in the browser can call `add_task`.
 
 This is the whole component, read from disk when the page renders: the source you see is the source that runs.
 

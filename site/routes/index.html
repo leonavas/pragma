@@ -104,7 +104,7 @@ pragma 0.1.0</code></pre>
   <div class="grid gap-8 border-t border-line py-16 lg:py-24">
     <div class="max-w-2xl">
       <h2 id="live-title" class="section-title">One file: markup, script and style</h2>
-      <p class="mt-4 text-muted">A component is one .html file. A top-level <code class="text-ink">let</code> is state, a function is an action or a derived value, and <code class="text-ink">{path}</code> puts a value in the text. Check a task, add one, hide the done ones: each action assigns a variable and the runtime reapplies the bindings. No hooks, no virtual DOM. The form is also a WebMCP tool: an agent in the browser can call <code class="text-ink">add_task</code>.</p>
+      <p class="mt-4 text-muted">A component is one .html file. A top-level <code class="text-ink">let</code> is state, a function is an action, and <code class="text-ink">{path}</code> puts a value in the text. Add a task: the action changes <code class="text-ink">tasks</code> and the runtime updates the list. No hooks, no virtual DOM. The form is also a WebMCP tool: an agent in the browser can call <code class="text-ink">add_task</code>.</p>
     </div>
     <c-showcase :source="data.examples.tasks" caption="This is the whole component, read from disk when the page renders: the source you see is the source that runs.">
       <p-task-list></p-task-list>

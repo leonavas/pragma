@@ -6,12 +6,16 @@
 
   let sections = []
   let currentId = ''
+  let asideRoom = 9999
+  let tocRoom = 9999
 
   const rows = () => sections.map(section => ({
     ...section,
     href: '#' + section.id,
     current: section.id === currentId && 'true',
   }))
+
+  const tocCollapsed = () => tocRoom < 96
 
   const currentTitle = () => sections.find(section => section.id === currentId)?.title ?? ''
 
@@ -22,13 +26,22 @@
     return passed.at(-1)?.id ?? headings[0]?.id ?? ''
   }
 
-  function revealLink(aside, id) {
-    const link = aside.querySelector('a[href="#' + id + '"]')
+  function revealLink(root, id) {
+    const list = root.querySelector('.doc-toc')
+    const link = list?.querySelector('a[href="#' + id + '"]')
     if (!link) return
-    const box = aside.getBoundingClientRect()
+    const box = list.getBoundingClientRect()
     const linkBox = link.getBoundingClientRect()
-    if (linkBox.bottom > box.bottom) aside.scrollTop += linkBox.bottom - box.bottom + 24
-    if (linkBox.top < box.top) aside.scrollTop -= box.top - linkBox.top + 24
+    if (linkBox.bottom > box.bottom) list.scrollTop += linkBox.bottom - box.bottom
+    if (linkBox.top < box.top) list.scrollTop -= box.top - linkBox.top
+  }
+
+  const bottomGap = 16
+
+  function roomFor(aside, root) {
+    const limit = Math.min(innerHeight - bottomGap, root.getBoundingClientRect().bottom)
+    const stickyTop = parseFloat(getComputedStyle(aside).top)
+    return Math.round(limit - Math.max(aside.getBoundingClientRect().top, stickyTop))
   }
 
   function mount(el) {
@@ -40,7 +53,10 @@
       pending ??= frame(() => {
         pending = null
         currentId = findCurrent(headings)
-        revealLink(aside, currentId)
+        asideRoom = roomFor(aside, el)
+        const toc = aside.querySelector('.doc-toc-nav')
+        tocRoom = toc ? asideRoom - toc.offsetTop : 9999
+        revealLink(el, currentId)
       })
     }
     follow()
@@ -63,13 +79,15 @@
     </details>
     <span class="doc-current min-w-0 truncate text-muted">{$currentTitle}</span>
   </div>
-  <aside class="hidden self-start lg:sticky lg:top-24 lg:block">
+  <aside class="hidden self-start lg:sticky lg:top-24 lg:flex lg:flex-col"
+    :--room="$asideRoom">
     <a href="/examples" class="label nav-link">All examples</a>
     <c-section-nav class="compact mt-4" label="Example sections"></c-section-nav>
     <if $sections.length>
-      <nav class="mt-8 border-t border-line pt-6" aria-label="On this page">
+      <nav class="doc-toc-nav mt-8 flex min-h-0 flex-col border-t border-line pt-6"
+        aria-label="On this page" .collapsed="$tocCollapsed">
         <p class="label">On this page</p>
-        <ul class="mt-3 grid gap-0.5">
+        <ul class="doc-toc mt-3 grid min-h-0 gap-0.5 overflow-y-auto">
           <for row in $rows key=row.id>
             <li><a class="doc-toc-link nav-link" :href="row.href" :aria-current="row.current">{row.title}</a></li>
           </for>
@@ -93,12 +111,15 @@
   [data-c="doc"] .doc-sections summary::-webkit-details-marker { display: none; }
   [data-c="doc"] .doc-sections[open] .doc-sections-chevron { rotate: 180deg; }
   [data-c="doc"] .doc-sections-panel { left: var(--gutter); width: min(18rem, calc(100vw - 2 * var(--gutter))); max-height: min(70vh, 26rem); padding: 0.5rem 0.875rem; overflow-y: auto; }
-  [data-c="doc"] aside { max-height: calc(100vh - 7rem); overflow-y: auto; scrollbar-width: thin; }
+  [data-c="doc"] aside { max-height: min(calc(100vh - 7rem), calc(var(--room) * 1px)); overflow: clip; overflow-clip-margin: 4px; }
+  [data-c="doc"] .doc-toc { scrollbar-width: thin; }
+  [data-c="doc"] .doc-toc-nav.collapsed { visibility: hidden; }
   [data-c="doc"] .doc-toc-link { display: block; padding: 0.3rem 0 0.3rem 0.75rem; border-left: 1px solid var(--color-line); font-size: 0.75rem; line-height: 1.35; }
   [data-c="doc"] .doc-toc-link[aria-current="true"] { border-left-color: var(--color-accent-text); }
   [data-c="doc"] .doc-current:not(:empty)::before { content: "/ "; color: var(--color-faint); }
   [data-c="doc"] .doc-title { font-size: clamp(1.875rem, 5vw, 3.25rem); }
   @media (min-width: 64rem) {
-    [data-c="doc"] { display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: 4rem; padding-top: 4rem; }
+    [data-c="doc"] { display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: 4rem; padding-top: 4rem; margin-bottom: -6rem; }
+    [data-c="doc"] > article { padding-bottom: 6rem; }
   }
 </style>
