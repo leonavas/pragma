@@ -9,5 +9,7 @@ const pending = route.loader && !route.ssr ? self.__pd ?? fetchData(url) : undef
 self.__pd = null
 
 initClientLog({ endpoint: '/_otel', service: location.hostname })
-enter(route, await importRoute(route), url, match(route.pattern, url.pathname) ?? {}, document, pending)
-startRouter()
+importRoute(route).then(mods => {
+  enter(route, mods, url, match(route.pattern, url.pathname) ?? {}, document, pending)
+  startRouter()
+})

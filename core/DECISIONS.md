@@ -300,8 +300,19 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 
 - **[firm]** The app must be very fast. Each page serves the minimum: per-page and
   per-component modules, all `modulepreload`ed (SPEC §9).
-- **[firm v0]** No bundler: each module minified (oxc) and hashed; `immutable` assets;
+- **[superseded]** No bundler: each module minified (oxc) and hashed; `immutable` assets;
   uncached HTML.
+- **[firm]** (2026-11-21) Route chunks in `pragma build` (rolldown, already used for npm): the
+  core runtime is one chunk; each route is one chunk (page, components, stores, single-route
+  code); code used by 2+ routes is grouped by the exact set of routes, and a group under 4 kB
+  joins the closest group of a wider set (no page loads a chunk it would not load anyway).
+  `import()` stays separate; npm files stay in `assets/npm/` as externals. The route JSON points
+  to `chunk.js#p` / `#c<i>` / `#s<i>` (named re-exports, no namespace helper). `boot.js` has no
+  top-level await (rolldown turns off chunk merging with TLA). `pragma dev` keeps one file per
+  module. Measured on escalei (prod, gzip JS): `/` 20 files 23.4 kB → 5 files 20.3 kB, `/entrar`
+  14 / 16.7 → 6 / 14.7, `/app/[id]` 99 / 186.0 → 10 / 153.2. *Why:* ~0.6 kB modules cost one
+  request each (115 requests on `/app/[id]`). The router also watches links added after load
+  (MutationObserver) for viewport prefetch, so client-rendered `/app/<id>` lists get prefetched.
 - **[superseded]** Budgets in `pragma.json` (`initialJsKb`, `routeJsKb`, `cssKb`, per-route
   `budgets.routes`), checked by build and check.
 - **[firm]** (2026-11-21) Binding-only updates: the full render records which bindings read each
@@ -318,7 +329,8 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   reported, not enforced. `pragma build` prints the JS gzip size per page. A `budgets` key in an
   older `pragma.json` is accepted and ignored.
 - **[superseded]** Per-route chunks with a bundler and chunk manifest: v0 uses loose modules
-  and the `/_pragma/manifest.json` manifest.
+  and the `/_pragma/manifest.json` manifest. (Route chunks came back on 2026-11-21, above; the
+  manifest stays.)
 
 ## npm dependencies
 
@@ -491,8 +503,6 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - [ ] `db`, `kv` and `files` interfaces over `env`.
 - [ ] Publishing: release pipeline (cargo-dist), per-platform npm packages,
       provenance/attestations and signed checksums (see "Tool (Rust CLI)").
-- [ ] Bundler for app modules after v0 (`rolldown` already bundles npm packages), and whether
-      it beats one file per module with `modulepreload`.
 - [ ] Per-route CSS and inline critical CSS.
 - [ ] Brotli or gzip; precompress at build.
 - [ ] 103 Early Hints on Cloudflare.

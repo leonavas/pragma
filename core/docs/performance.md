@@ -1,10 +1,20 @@
 # Performance
 
-Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<head>`, per-route CSS (inlined in production when <= 14 kB gzip), per-page JS, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets, and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
+Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<head>`, per-route CSS (inlined in production when <= 14 kB gzip), per-route JS chunks, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets, and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
+
+## JS chunks
+
+`pragma build` bundles the client JS (`pragma dev` keeps one file per module):
+
+- The core runtime is one file (`/assets/core/boot-<hash>.js`).
+- Each route gets one chunk with its page, components, stores and the code only it uses (`/assets/routes/<route>-<hash>.js`).
+- Code used by 2+ routes goes to `/assets/chunks/shared<n>-<hash>.js`, one chunk per set of routes. A set under 4 kB joins a chunk that a wider set of routes uses.
+- `await import()` stays a separate chunk. npm packages stay in `/assets/npm/` (`packages.md`).
+- The page `modulepreload`s every chunk it runs. The router prefetches the HTML and chunks of a link on hover, focus, and when the link enters the viewport, also for links rendered after the page loads (`/app/:id` links included).
 
 ## Rules
 
-- Navigate with `<a href>`.
+- Navigate with `<a href>`. A `<button>` that calls `navigate()` gets no prefetch.
 - Match skeleton shapes to the final content.
 - Set `width` and `height` on every `<img>`. Add `loading="lazy"` below the fold. Store AVIF or WebP images in `public/`.
 - Set `font-display: swap` on custom fonts. Avoid `<link rel="preload" as="font">` unless proven faster on slow 4G.

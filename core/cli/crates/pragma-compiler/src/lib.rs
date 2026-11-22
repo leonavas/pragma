@@ -1,6 +1,7 @@
 //! Build, analysis and directives. Contract: core/SPEC.md §2, §3, §5, §9, §10.
 mod a11y;
 mod bundle;
+mod chunks;
 mod compile;
 mod deps;
 mod directive;
@@ -688,9 +689,27 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         urls.insert(path.clone(), url);
     }
 
+    let routes: Vec<chunks::Route> = outs
+        .iter()
+        .map(|o| chunks::Route {
+            name: format!("routes/{}", o.page.out_name),
+            page: o.page.module.clone(),
+            components: o.exp.components.values().filter_map(|c| c.module.clone().map(|m| (c.id.clone(), m))).collect(),
+            stores: o.stores.iter().filter_map(|s| p.stores.get(s).map(|f| (s.clone(), f.clone()))).collect(),
+        })
+        .collect();
+    let chunked = if prod && !diags.iter().any(|d| d.severity == Severity::Error) {
+        chunks::bundle(&out_abs.join(".cache/app"), &mods, &urls, &boot, &routes, &mut diags)
+    } else {
+        None
+    };
+
     let mut w = Writer { root: opts.out_dir.clone(), written: HashSet::new() };
-    let mut gz: HashMap<PathBuf, u64> = HashMap::new();
+    let mut gz: HashMap<String, u64> = HashMap::new();
     for (path, m) in &mods {
+        if chunked.is_some() && !path.starts_with("node_modules") {
+            continue;
+        }
         let map: HashMap<&str, &str> = m.imports.iter().filter_map(|(imp, t)| t.as_ref().map(|t| (imp.spec.as_str(), urls[t].as_str()))).collect();
         let code = if prod && !path.starts_with("node_modules") {
             match pragma_jslint::minify_with_imports(&m.src, |s| map.get(s).map(|u| u.to_string())) {
@@ -703,10 +722,15 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         } else {
             js::rewrite(&m.src, &m.imports.iter().map(|(i, _)| i.clone()).collect::<Vec<_>>(), |i| map.get(i.spec.as_str()).map(|u| u.to_string()))
         };
-        gz.insert(path.clone(), gzip_len(code.as_bytes()));
+        gz.insert(urls[path].clone(), gzip_len(code.as_bytes()));
         let code = if !prod && urls[path] == "/assets/core/log.js" { with_ignore_map(code) } else { code };
         w.write_client(&format!("client{}", urls[path]), code.as_bytes(), prod);
     }
+    for (file, code) in chunked.iter().flat_map(|c| &c.files) {
+        gz.insert(format!("/assets/{file}"), gzip_len(code.as_bytes()));
+        w.write_client(&format!("client/assets/{file}"), code.as_bytes(), prod);
+    }
+    let npm_paths: HashMap<&str, &PathBuf> = urls.iter().filter(|(k, _)| k.starts_with("node_modules")).map(|(k, u)| (u.as_str(), k)).collect();
 
     // Shared CSS (base + theme + layout/_404 components and utilities)
     let shared_names: Vec<String> = shared_classes.iter().filter(|c| !classes.project.contains(*c)).cloned().collect();
@@ -762,8 +786,11 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let theme_js = mods.contains_key(&PathBuf::from(format!("{core_dir}/theme.js")));
     let mut manifest = Vec::new();
     let mut server_routes = Vec::new();
-    let boot_url = urls.get(&boot).cloned().unwrap_or_else(|| "/assets/core/boot.js".into());
-    for o in &outs {
+    let boot_url = match &chunked {
+        Some(c) => c.boot.clone(),
+        None => urls.get(&boot).cloned().unwrap_or_else(|| "/assets/core/boot.js".into()),
+    };
+    for (i, o) in outs.iter().enumerate() {
         let mut route_css_url: Option<String> = None;
         let mut route_css_src: Option<String> = None;
         let mut route_css_gz: u64 = 0;
@@ -812,15 +839,46 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
                 route_css_src = Some(rcss);
             }
         }
-        let entries = page_entries(o);
-        let modules = closure(&mods, &entries, false);
-        let module_urls: Vec<&str> = modules.iter().filter(|m| **m != boot).map(|m| urls[m].as_str()).collect();
-        let url_of = |f: &Option<PathBuf>| f.as_ref().and_then(|f| urls.get(f)).map(|u| Value::String(u.clone())).unwrap_or(Value::Null);
-        let comps: serde_json::Map<String, Value> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| (c.id.clone(), url_of(&c.module))).collect();
-        let stores: serde_json::Map<String, Value> = p.stores.iter().filter(|(name, f)| o.stores.contains(*name) || modules.contains(f)).map(|(name, f)| (name.clone(), url_of(&Some(f.clone())))).collect();
+        let (module_urls, page_js, comps, stores): (Vec<String>, Value, serde_json::Map<String, Value>, serde_json::Map<String, Value>) = match &chunked {
+            Some(ch) => {
+                let entry = ch.routes[i].as_deref();
+                let mut starts = vec![ch.boot.as_str()];
+                starts.extend(entry);
+                if o.overlays && let Some(u) = ch.of_module.get(&overlay) {
+                    starts.push(u);
+                }
+                let mut list: Vec<String> = Vec::new();
+                for u in ch.closure(&starts) {
+                    match npm_paths.get(u.as_str()) {
+                        Some(npm) => list.extend(closure(&mods, &[(*npm).clone()], false).iter().map(|m| urls[m].clone())),
+                        None => list.push(u),
+                    }
+                }
+                let mut seen = HashSet::new();
+                list.retain(|u| *u != ch.boot && seen.insert(u.clone()));
+                let export = |name: String| entry.map_or(Value::Null, |e| Value::String(format!("{e}#{name}")));
+                let r = &routes[i];
+                (
+                    list,
+                    if r.page.is_some() { export(chunks::page_export()) } else { Value::Null },
+                    r.components.iter().enumerate().map(|(k, (id, _))| (id.clone(), export(chunks::component_export(k)))).collect(),
+                    r.stores.iter().enumerate().map(|(k, (name, _))| (name.clone(), export(chunks::store_export(k)))).collect(),
+                )
+            }
+            None => {
+                let modules = closure(&mods, &page_entries(o), false);
+                let url_of = |f: &Option<PathBuf>| f.as_ref().and_then(|f| urls.get(f)).map(|u| Value::String(u.clone())).unwrap_or(Value::Null);
+                (
+                    modules.iter().filter(|m| **m != boot).map(|m| urls[m].clone()).collect(),
+                    url_of(&o.page.module),
+                    o.exp.components.values().filter(|c| c.module.is_some()).map(|c| (c.id.clone(), url_of(&c.module))).collect(),
+                    p.stores.iter().filter(|(name, f)| o.stores.contains(*name) || modules.contains(f)).map(|(name, f)| (name.clone(), url_of(&Some(f.clone())))).collect(),
+                )
+            }
+        };
         let route = json!({
             "pattern": o.page.pattern,
-            "page": url_of(&o.page.module),
+            "page": page_js,
             "components": comps,
             "stores": stores,
             "loader": o.loader,
@@ -890,7 +948,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         let html_url = format!("/{}.html", o.page.out_name);
         w.write_client(&format!("client{html_url}"), doc.as_bytes(), prod);
 
-        let initial: u64 = modules.iter().map(|m| gz.get(m).copied().unwrap_or(0)).sum();
+        let initial: u64 = module_urls.iter().chain(std::iter::once(&boot_url)).map(|u| gz.get(u).copied().unwrap_or(0)).sum();
         let total_css_gz = shared_css_gz + route_css_gz;
         report.css_gzip_bytes = report.css_gzip_bytes.max(total_css_gz);
         if !o.is_404 {

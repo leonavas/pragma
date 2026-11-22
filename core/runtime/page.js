@@ -155,9 +155,15 @@ function onEvent(e) {
 
 onChange(schedule)
 
+const importPart = async u => {
+  const [file, name] = u.split('#')
+  const m = await import(file)
+  return name ? { default: m[name], persist: m[`${name}$persist`] } : m
+}
+
 export async function importRoute(r) {
-  const all = o => Promise.all(Object.entries(o ?? {}).map(async ([k, u]) => [k, await import(u)]))
-  const [page, c, s] = await Promise.all([r.page && import(r.page), all(r.components), all(r.stores)])
+  const all = o => Promise.all(Object.entries(o ?? {}).map(async ([k, u]) => [k, await importPart(u)]))
+  const [page, c, s] = await Promise.all([r.page && importPart(r.page), all(r.components), all(r.stores)])
   return { page, comps: Object.fromEntries(c), stores: Object.fromEntries(s) }
 }
 

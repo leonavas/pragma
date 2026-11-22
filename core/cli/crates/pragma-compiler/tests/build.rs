@@ -158,17 +158,39 @@ fn prod_hashes_and_rewrites() {
     all_files(&client.join("assets"), &mut files);
     for f in files.iter().filter(|f| f.extension().is_some_and(|e| e == "js")) {
         let src = fs::read_to_string(f).unwrap();
-        assert!(!src.contains("'./") && !src.contains("\"./") && !src.contains("../"), "unrewritten import in {f:?}: {src}");
         assert!(!src.contains("\n  "), "not minified: {f:?}");
         for spec in src.split("/assets/").skip(1) {
             let end = spec.find(['"', '\'', '`']).unwrap();
             assert!(client.join("assets").join(&spec[..end]).is_file(), "broken import {spec} in {f:?}");
+        }
+        for quote in ['"', '\'', '`'] {
+            for spec in src.split(&format!("{quote}.")).skip(1) {
+                let spec = format!(".{}", &spec[..spec.find(quote).unwrap()]);
+                assert!(spec.ends_with(".js") && f.parent().unwrap().join(&spec).is_file(), "broken chunk import {spec} in {f:?}");
+            }
         }
     }
     let worker = fs::read_to_string(out.join("server/worker.js")).unwrap();
     assert!(worker.contains("service: \"test-shop\""));
     assert!(worker.contains("ssr: true, template: [[\"html\""));
     assert!(out.join("templates/blog/[slug].json").is_file());
+}
+
+#[test]
+fn prod_bundles_one_chunk_per_route() {
+    let t = tmp();
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: fixture(), out_dir: out.clone(), mode: Mode::Prod }).unwrap();
+    let client = out.join("client");
+    let index = fs::read_to_string(client.join("index.html")).unwrap();
+    let preloads: Vec<String> = urls(&index, "href").into_iter().filter(|u| u.ends_with(".js")).collect();
+    let route = preloads.iter().find(|u| u.starts_with("/assets/routes/index-")).expect("route chunk");
+    assert!(index.contains(&format!("\"page\":\"{route}#p\"")) && index.contains(&format!("\"cart\":\"{route}#s0\"")), "{index}");
+    assert!(preloads.iter().any(|u| u.starts_with("/assets/chunks/shared")), "the cart store, used by every route, is a shared chunk: {preloads:?}");
+    assert!(!preloads.iter().any(|u| u.contains("lazy")), "import() stays a separate chunk, not preloaded: {preloads:?}");
+    let mut files = Vec::new();
+    all_files(&client.join("assets/routes"), &mut files);
+    assert_eq!(files.iter().filter(|f| f.extension().is_some_and(|e| e == "js")).count(), 5, "one chunk per route with JS: {files:?}");
 }
 
 #[test]
@@ -190,8 +212,8 @@ fn hash_follows_dependencies() {
     let (na, nb) = (names(&a), names(&b));
     let changed: Vec<&String> = nb.iter().filter(|n| !na.contains(n)).collect();
     let prefix = |s: &str| changed.iter().any(|n| n.starts_with(s));
-    assert!(prefix("fmt-") && prefix("index-"), "fmt and its importers change: {changed:?}");
-    assert!(!prefix("boot-") && !prefix("cart-"), "the rest does not change: {changed:?}");
+    assert!(prefix("index-"), "the route chunk holding fmt changes: {changed:?}");
+    assert!(!prefix("boot-") && !prefix("shared") && !prefix("_id_-"), "the rest does not change: {changed:?}");
 }
 
 #[test]
