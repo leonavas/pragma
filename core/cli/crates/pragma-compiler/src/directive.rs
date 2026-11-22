@@ -464,6 +464,18 @@ pub fn json_ld_check(text: &str) -> Result<(), (usize, String)> {
     })
 }
 
+pub fn component_tag(tag: &str) -> Option<(bool, &str)> {
+    tag.strip_prefix("c-").map(|n| (false, n)).or_else(|| tag.strip_prefix("p-").map(|n| (true, n)))
+}
+
+pub fn is_component_tag(tag: &str) -> bool {
+    component_tag(&tag.to_ascii_lowercase()).is_some()
+}
+
+pub fn is_component_name(s: &str) -> bool {
+    s.starts_with(|c: char| c.is_ascii_lowercase()) && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

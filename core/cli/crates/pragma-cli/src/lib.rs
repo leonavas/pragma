@@ -11,6 +11,7 @@ use report::{print_diagnostics, print_summary};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+use pragma_compiler::layout::{CLIENT, DIST, NODE_ENTRY};
 
 const HELP: &str = "pragma — HTML, CSS and JS without a framework
 
@@ -161,7 +162,7 @@ fn cmd_build(allow_outdated_core: bool) -> Result<i32, String> {
         }
     }
     let started = Instant::now();
-    let opts = pragma_compiler::BuildOptions { root: root.clone(), out_dir: root.join("dist"), mode: pragma_compiler::Mode::Prod };
+    let opts = pragma_compiler::BuildOptions { root: root.clone(), out_dir: root.join(DIST), mode: pragma_compiler::Mode::Prod };
     match pragma_compiler::build(&opts) {
         Ok(report) => {
             print_diagnostics(&root, &report.warnings);
@@ -248,6 +249,38 @@ pub async fn shutdown() {
     let _ = tokio::signal::ctrl_c().await;
 }
 
+fn cmd_serve(args: &[String]) -> Result<i32, String> {
+    let args = parse(args, &["port", "host"], &[])?;
+    no_positional(&args)?;
+    let port = args.port(3000)?;
+    let host = args.host();
+    let root = std::env::current_dir().map_err(|e| format!("cannot access current directory: {e}"))?;
+    let client = root.join(DIST).join(CLIENT);
+    if !client.is_dir() {
+        return Err(format!("{DIST}/{CLIENT} does not exist; run `pragma build` first"));
+    }
+    runtime()?.block_on(async move {
+        let started = Instant::now();
+        let site = tokio::task::spawn_blocking(move || server::Site::new(client, server::Mode::Serve)).await.map_err(|e| e.to_string())?;
+        println!("{}", report::out().dim(&format!("files compressed in {} ms", started.elapsed().as_millis())));
+        let listener = tokio::net::TcpListener::bind((host.as_str(), port)).await.map_err(|e| format!("cannot listen on {host}:{port}: {e}"))?;
+        let mut node = node::Node::new(root.join(DIST).join(NODE_ENTRY), root.clone(), false);
+        node.sync(&site).await;
+        tokio::spawn(server::serve(listener, site));
+        println!("pragma serve at http://{}:{port}", dev::display_host(&host));
+        shutdown().await;
+        node.stop().await;
+        Ok(0)
+    })
+}
+
+fn no_positional(args: &Args) -> Result<(), String> {
+    match args.positional.first() {
+        Some(extra) => Err(format!("unexpected argument '{extra}'")),
+        None => Ok(()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{check_status, parse};
@@ -270,37 +303,5 @@ mod tests {
         assert_eq!(check_status(&mut d, false), 0);
         assert_eq!(check_status(&mut d, true), 1);
         assert_eq!(check_status(&mut [], true), 0);
-    }
-}
-
-fn cmd_serve(args: &[String]) -> Result<i32, String> {
-    let args = parse(args, &["port", "host"], &[])?;
-    no_positional(&args)?;
-    let port = args.port(3000)?;
-    let host = args.host();
-    let root = std::env::current_dir().map_err(|e| format!("cannot access current directory: {e}"))?;
-    let client = root.join("dist/client");
-    if !client.is_dir() {
-        return Err("dist/client does not exist; run `pragma build` first".into());
-    }
-    runtime()?.block_on(async move {
-        let started = Instant::now();
-        let site = tokio::task::spawn_blocking(move || server::Site::new(client, server::Mode::Serve)).await.map_err(|e| e.to_string())?;
-        println!("{}", report::out().dim(&format!("files compressed in {} ms", started.elapsed().as_millis())));
-        let listener = tokio::net::TcpListener::bind((host.as_str(), port)).await.map_err(|e| format!("cannot listen on {host}:{port}: {e}"))?;
-        let mut node = node::Node::new(root.join("dist/server/node.mjs"), root.clone(), false);
-        node.sync(&site).await;
-        tokio::spawn(server::serve(listener, site));
-        println!("pragma serve at http://{}:{port}", dev::display_host(&host));
-        shutdown().await;
-        node.stop().await;
-        Ok(0)
-    })
-}
-
-fn no_positional(args: &Args) -> Result<(), String> {
-    match args.positional.first() {
-        Some(extra) => Err(format!("unexpected argument '{extra}'")),
-        None => Ok(()),
     }
 }

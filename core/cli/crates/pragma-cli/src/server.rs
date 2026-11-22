@@ -14,6 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
+use pragma_compiler::layout::{MANIFEST, SERVER_ROUTES};
 
 pub type Body = BoxBody<Bytes, std::io::Error>;
 
@@ -106,15 +107,17 @@ impl Site {
         *self.backend.read().unwrap()
     }
 
-    fn match_route(&self, path: &str) -> Option<Route> {
-        let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    /// `raw` is the path as requested: split first, then each segment decoded (contract.js), so
+    /// `/shop/a%2Fb` is one segment `a/b`.
+    fn match_route(&self, raw: &str) -> Option<Route> {
+        let parts: Vec<String> = raw.split('/').filter(|s| !s.is_empty()).map(percent_decode).collect::<Option<_>>()?;
         let routing = self.routing.read().unwrap().clone();
         routing
             .routes
             .iter()
             .filter(|r| {
                 r.segments.len() == parts.len()
-                    && r.segments.iter().zip(&parts).all(|(s, p)| s.as_deref().is_none_or(|s| s == *p))
+                    && r.segments.iter().zip(&parts).all(|(s, p)| s.as_deref().is_none_or(|s| s == p))
             })
             // static beats param, segment by segment
             .min_by_key(|r| r.segments.iter().map(Option::is_none).collect::<Vec<_>>())
@@ -194,7 +197,7 @@ async fn handle(site: Arc<Site>, req: Request<Incoming>) -> Result<Response<Body
         vary_accept(&mut res);
         return Ok(res);
     }
-    let route = site.match_route(&path);
+    let route = site.match_route(&raw);
     if let Some(port) = site.backend()
         && (is_server_path(&path) || route.as_ref().is_some_and(|r| r.endpoint || r.ssr && !path.ends_with(".html")))
     {
@@ -208,7 +211,7 @@ async fn handle(site: Arc<Site>, req: Request<Incoming>) -> Result<Response<Body
         if let Ok(body) = req.into_body().collect().await
             && site.mode == Mode::Dev
         {
-            crate::node::print_client_logs(&body.to_bytes());
+            crate::report::print_client_logs(&body.to_bytes());
         }
         let mut res = Response::new(empty());
         *res.status_mut() = StatusCode::NO_CONTENT;
@@ -404,6 +407,12 @@ fn inject_dev(html: &[u8]) -> Bytes {
 }
 
 fn decode_path(path: &str) -> Option<String> {
+    let path = percent_decode(path)?;
+    let bad = path.contains('\0') || path.contains('\\') || path.split('/').any(|s| s == ".." || s == ".");
+    (!bad).then_some(path)
+}
+
+fn percent_decode(path: &str) -> Option<String> {
     let bytes = path.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
@@ -417,9 +426,7 @@ fn decode_path(path: &str) -> Option<String> {
             i += 1;
         }
     }
-    let path = String::from_utf8(out).ok()?;
-    let bad = path.contains('\0') || path.contains('\\') || path.split('/').any(|s| s == ".." || s == ".");
-    (!bad).then_some(path)
+    String::from_utf8(out).ok()
 }
 
 fn segments(pattern: &str) -> Vec<Option<String>> {
@@ -433,7 +440,7 @@ fn read_json(path: &Path) -> Option<serde_json::Value> {
 /// Pages from the client manifest; endpoints and middleware from `../server/routes.json`.
 fn load_routing(root: &Path) -> Routing {
     let mut routing = Routing::default();
-    if let Some(serde_json::Value::Array(items)) = read_json(&root.join("_pragma/manifest.json")) {
+    if let Some(serde_json::Value::Array(items)) = read_json(&root.join(MANIFEST)) {
         routing.routes.extend(items.iter().filter_map(|item| {
             Some(Route {
                 segments: segments(item.get("pattern")?.as_str()?),
@@ -443,7 +450,7 @@ fn load_routing(root: &Path) -> Routing {
             })
         }));
     }
-    if let Some(server) = root.parent().and_then(|dir| read_json(&dir.join("server/routes.json"))) {
+    if let Some(server) = root.parent().and_then(|dir| read_json(&dir.join(SERVER_ROUTES))) {
         routing.middleware = server.get("middleware").and_then(|v| v.as_bool()).unwrap_or(false);
         let endpoints = server.get("endpoints").and_then(|v| v.as_array()).into_iter().flatten();
         routing.routes.extend(endpoints.filter_map(|p| p.as_str()).map(|p| Route { segments: segments(p), html: String::new(), ssr: false, endpoint: true }));

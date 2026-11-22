@@ -1,7 +1,6 @@
 //! Per-file validation (SPEC §3, §10): what does not depend on scope or expansion.
-use crate::directive::{self, Dir};
-use crate::html::{Element, Node, Pos, is_blank, stray_text};
-use crate::project::{component_tag, is_component_name, is_component_tag};
+use crate::directive::{self, Dir, component_tag, is_component_name, is_component_tag};
+use crate::html::{Element, Node, Pos, is_blank};
 use pragma_diag::Diagnostic;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -559,6 +558,15 @@ fn find_slots<'a>(nodes: &'a [Node], out: &mut Vec<&'a Element>) {
             find_slots(&e.children, out);
         }
     }
+}
+
+/// Text outside an element, `{path}` included.
+fn stray_text(nodes: &[Node]) -> Option<Pos> {
+    nodes.iter().find_map(|n| match n {
+        Node::Text(t, p) if !t.trim().is_empty() => Some(*p),
+        Node::Element(e) if e.name == directive::INTERP => Some(e.pos),
+        _ => None,
+    })
 }
 
 #[cfg(test)]

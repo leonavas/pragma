@@ -164,6 +164,16 @@ test('SSR: a query param missing from the URL renders empty, not a 500', async (
   assert.ok((await res.text()).includes('<main data-page class="p-4"><p>q=</p></main>'))
 })
 
+test('SSR: null in the middle of a path renders empty, not a 500', async (t) => {
+  capture(t)
+  const account = createHandler({
+    routes: [{ pattern: '/account', server: { load: () => ({ user: null }) }, ssr: true, template: [['html', '<p>'], ['text', 'hi {data.user.name}'], ['html', '</p>']], shell: SHELL }],
+  })
+  const res = await account.fetch(new Request('http://x/account'), {})
+  assert.equal(res.status, 200)
+  assert.ok((await res.text()).includes('<main data-page class="p-4"><p>hi </p></main>'))
+})
+
 test('SSR with load error: 500, shell intact and pragma-data with error', async (t) => {
   const lines = capture(t)
   const res = await get('/blog/error')

@@ -65,6 +65,7 @@ Fix the root cause; do not work around a rule.
 | `app/endpoint-json` (warning) | An endpoint answers JSON. Use `load` and actions for page data (`data.md`). |
 | `app/package` | Follow package rules (`packages.md`). |
 | `app/pragma-json` | Fix `pragma.json` (`structure.md`). |
+| `app/output` | The build cannot write its output (`dist/`, `.pragma/dev/`). Check the folder permissions and the free disk space. |
 | `app/core-outdated` (warning; error in `pragma build`) | `.pragma/` differs from the CLI version. Run `pragma upgrade`. Do not edit `.pragma/` by hand. |
 | `internal` (`pragma dev`) | The compiler stopped with a bug. Report it with the file you changed last. |
 

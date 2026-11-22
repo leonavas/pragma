@@ -6,8 +6,10 @@ mod compile;
 mod deps;
 mod directive;
 mod expand;
+mod hash;
 mod html;
 mod js;
+pub mod layout;
 mod owners;
 mod project;
 mod sugar;
@@ -16,7 +18,8 @@ mod webmcp;
 
 use pragma_diag::{Diagnostic, Severity};
 use pragma_jslint::script::{self, ScriptInfo, ScriptKind};
-use pragma_css::scope::{OWNED, owner_selector};
+use pragma_css::scope::owner_selector;
+use hash::{Fnv, css_owner, hash8, short_hash};
 use project::{Page, Project, rel_str};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
@@ -67,35 +70,6 @@ pub fn check(root: &Path) -> Vec<Diagnostic> {
     diags
 }
 
-pub(crate) struct Fnv(u64);
-
-impl Fnv {
-    pub fn new() -> Self {
-        Fnv(0xcbf29ce484222325)
-    }
-
-    pub fn write(&mut self, bytes: &[u8]) {
-        for b in bytes {
-            self.0 ^= *b as u64;
-            self.0 = self.0.wrapping_mul(0x100000001b3);
-        }
-    }
-
-    pub fn finish(&self) -> u64 {
-        self.0
-    }
-}
-
-pub(crate) fn short_hash(h: u64) -> String {
-    format!("{h:016x}")
-}
-
-fn hash8(bytes: &[u8]) -> String {
-    let mut h = Fnv::new();
-    h.write(bytes);
-    short_hash(h.finish())[..8].to_string()
-}
-
 fn url_safe(path: &str) -> String {
     rolldown_utils::sanitize_filename::default_sanitize_relative_file_name(path).into_owned()
 }
@@ -132,16 +106,6 @@ fn spellings(attr: &str, value: &str) -> Vec<String> {
     vec![format!("[{attr}=\"{value}\"]"), format!("[{attr}='{value}']"), format!("[{attr}={value}]")]
 }
 
-/// `data-s` token of a page's or component's CSS: the build writes it on every element that owner
-/// wrote (not on child components' markup, and slot content keeps its writer's token).
-pub(crate) fn css_owner(kind: &str, name: &str) -> String {
-    let mut h = Fnv::new();
-    h.write(kind.as_bytes());
-    h.write(b":");
-    h.write(name.as_bytes());
-    format!("s{}", &short_hash(h.finish())[..6])
-}
-
 /// A component's CSS applies only to the markup it wrote: every selector that does not already name
 /// `[data-c="<name>"]` is scoped to its `data-s` token (`:global(…)` opts out). A
 /// `routes/**/_components` one gets a per-folder id (`Component::id`), so its own selector is
@@ -165,6 +129,7 @@ fn sort_diags(mut d: Vec<Diagnostic>) -> Vec<Diagnostic> {
 struct Writer {
     root: PathBuf,
     written: HashSet<PathBuf>,
+    failed: Vec<Diagnostic>,
 }
 
 impl Writer {
@@ -174,10 +139,10 @@ impl Writer {
             self.written.insert(path);
             return;
         }
-        if let Some(dir) = path.parent() {
-            let _ = fs::create_dir_all(dir);
+        let written = path.parent().map_or(Ok(()), fs::create_dir_all).and_then(|()| fs::write(&path, bytes));
+        if let Err(e) = written {
+            self.failed.push(Diagnostic::error(&path, 0, 0, "app/output", format!("cannot write: {e}")));
         }
-        let _ = fs::write(&path, bytes);
         self.written.insert(path);
     }
 
@@ -304,12 +269,29 @@ fn module_graph(
 ) -> BTreeMap<PathBuf, Module> {
     let root = p.root.as_path();
     let mut mods = BTreeMap::new();
+    let mut unreadable = HashSet::new();
     let mut queue: VecDeque<PathBuf> = entries.iter().cloned().collect();
     while let Some(path) = queue.pop_front() {
         if mods.contains_key(&path) {
             continue;
         }
-        let Some(src) = sources.get(&path).cloned().or_else(|| fs::read_to_string(root.join(&path)).ok()) else { continue };
+        let src = match sources.get(&path) {
+            Some(src) => src.clone(),
+            None => match fs::read(root.join(&path)).map(String::from_utf8) {
+                Ok(Ok(src)) => src,
+                Ok(Err(e)) => {
+                    let valid = String::from_utf8_lossy(&e.as_bytes()[..e.utf8_error().valid_up_to()]).into_owned();
+                    let (line, col) = html::line_col(&valid, valid.len());
+                    diags.push(Diagnostic::error(&path, line, col, "js/syntax", "the file is not UTF-8 text; save it as UTF-8"));
+                    unreadable.insert(path);
+                    continue;
+                }
+                Err(_) => {
+                    unreadable.insert(path);
+                    continue;
+                }
+            },
+        };
         let lines = html::LineIndex::new(&src);
         let mut bindings: Option<Vec<(String, pragma_jslint::Imported)>> = None;
         let mut imports = Vec::new();
@@ -388,6 +370,13 @@ fn module_graph(
             imports.push((imp, ok));
         }
         mods.insert(path, Module { src, imports });
+    }
+    for m in mods.values_mut() {
+        for (_, target) in &mut m.imports {
+            if target.as_ref().is_some_and(|t| unreadable.contains(t)) {
+                *target = None;
+            }
+        }
     }
     mods
 }
@@ -540,13 +529,14 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let mut p = Project::load(&opts.root);
     let mut diags = std::mem::take(&mut p.diags);
     let mut report = BuildReport::default();
-    let mut w = Writer { root: opts.out_dir.clone(), written: HashSet::new() };
+    let mut w = Writer { root: opts.out_dir.clone(), written: HashSet::new(), failed: Vec::new() };
     let a = analyze(&p, &mut diags);
     let client = emit_client(&p, &a, opts, &mut w, &mut report, &mut diags);
     emit_server(&p, &a, &client, opts, &mut w, &mut report, &mut diags);
-    for d in ["client", "server"] {
+    for d in [layout::CLIENT, layout::SERVER] {
         w.prune(&opts.out_dir.join(d));
     }
+    diags.append(&mut w.failed);
     for d in &mut diags {
         d.file = p.origin(&d.file).to_path_buf();
     }
@@ -636,8 +626,8 @@ fn analyze<'p>(p: &'p Project, diags: &mut Vec<Diagnostic>) -> Analysis<'p> {
     }
     let owned: owners::Owned = p
         .all_components()
-        .filter_map(|c| comp_css.get(&c.dir).map(|css| (css_owner("component", &c.id), pragma_css::prune::own_selectors(css, OWNED))))
-        .chain(p.pages.iter().chain(p.not_found.iter()).filter_map(|pg| pg.css.as_ref().and_then(|f| page_css.get(f)).map(|css| (css_owner("page", &pg.out_name), pragma_css::prune::own_selectors(css, OWNED)))))
+        .filter_map(|c| comp_css.get(&c.dir).map(|css| (css_owner("component", &c.id), pragma_css::prune::own_selectors(css))))
+        .chain(p.pages.iter().chain(p.not_found.iter()).filter_map(|pg| pg.css.as_ref().and_then(|f| page_css.get(f)).map(|css| (css_owner("page", &pg.out_name), pragma_css::prune::own_selectors(css)))))
         .collect();
     let scoped_owners = p
         .all_components()
@@ -646,10 +636,10 @@ fn analyze<'p>(p: &'p Project, diags: &mut Vec<Diagnostic>) -> Analysis<'p> {
     for (kind, file, css, html) in scoped_owners {
         let from = &p.files[html as usize];
         let root = |tag: &str| {
-            let (local, name) = project::component_tag(&tag.to_ascii_lowercase()).map(|(l, n)| (l, n.to_string()))?;
+            let (local, name) = directive::component_tag(&tag.to_ascii_lowercase()).map(|(l, n)| (l, n.to_string()))?;
             owners::root_of(&p.trees[p.find_component(from, local, &name)?.html as usize])
         };
-        for (offset, selector, global) in owners::unmatched(css, OWNED, &p.trees[html as usize], &root) {
+        for (offset, selector, global) in owners::unmatched(css, &p.trees[html as usize], &root) {
             let (line, col) = html::line_col(css, offset);
             diags.push(Diagnostic::warning(
                 file,
@@ -916,13 +906,13 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
             if seen_dirs.insert(&c.dir)
                 && let Some(s) = comp_css.get(&c.dir)
             {
-                scoped.push_str(&format!("/* {} */\n{}\n", rel_str(p.origin(c.css.as_ref().unwrap())), pragma_css::prune::prune_scoped(s, &markup, OWNED).trim()));
+                scoped.push_str(&format!("/* {} */\n{}\n", rel_str(p.origin(c.css.as_ref().unwrap())), pragma_css::prune::prune_scoped(s, &markup).trim()));
             }
         }
         if let Some(f) = &o.page.css
             && let Some(s) = page_css.get(f)
         {
-            scoped.push_str(&format!("/* {} */\n{}\n", rel_str(p.origin(f)), pragma_css::prune::prune_scoped(s, &markup, OWNED).trim()));
+            scoped.push_str(&format!("/* {} */\n{}\n", rel_str(p.origin(f)), pragma_css::prune::prune_scoped(s, &markup).trim()));
         }
         let route_names: Vec<String> = o.page_classes.iter().filter(|c| !shared_classes.contains(*c)).cloned().collect();
         scoped.push_str(&pragma_css::generate(&route_names, &classes.theme).css);
@@ -1010,6 +1000,9 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
         if let Some(u) = &tpl_url {
             route["tpl"] = json!(u);
         }
+        if o.overlays {
+            route["overlays"] = json!(true);
+        }
         let mut doc = String::with_capacity(4096);
         doc.push_str(&format!("<!doctype html>\n<html lang=\"{}\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n", html::escape_attr(&p.config.lang)));
         match o.exp.head.iter().find_map(|n| match n {
@@ -1086,7 +1079,7 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
         }
         docs.push(doc);
     }
-    w.write_client("client/_pragma/manifest.json", serde_json::to_string_pretty(&Value::Array(manifest)).unwrap().as_bytes(), prod);
+    w.write_client(&format!("{}/{}", layout::CLIENT, layout::MANIFEST), serde_json::to_string_pretty(&Value::Array(manifest)).unwrap().as_bytes(), prod);
 
     for f in &p.public_files {
         let rel = rel_str(f.strip_prefix("public").unwrap());
@@ -1122,7 +1115,7 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
                 let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
                 let ops = compile::ops(compile::page_content(&o.exp.body), &scripted, &o.bodies);
                 // the server runs a script only when everything it imports is app code (no npm
-                // package, no browser runtime from core/); the others stay client-rendered
+                // package, no browser runtime of the framework); the others stay client-rendered
                 let runs_on_server = |m: &PathBuf| {
                     closure(mods, std::slice::from_ref(m), true).iter().all(|f| is_app_code(f))
                 };
@@ -1229,7 +1222,7 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
         w.write("server/worker.js", worker.as_bytes());
         if report.has_server {
             let routing = json!({ "middleware": p.middleware.is_some(), "endpoints": p.endpoints.iter().map(|e| e.pattern.clone()).collect::<Vec<_>>() });
-            w.write("server/routes.json", serde_json::to_string_pretty(&routing).unwrap().as_bytes());
+            w.write(layout::SERVER_ROUTES, serde_json::to_string_pretty(&routing).unwrap().as_bytes());
         }
         w.write("server/package.json", b"{ \"type\": \"module\" }\n");
         if report.has_server {
@@ -1241,7 +1234,7 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
             } else {
                 format!("import {{ serve, registerWasm }} from './{node_adapter}'\n\nregisterWasm()\nconst {{ default: h }} = await import('./worker.js')\nserve(h, {options})\n")
             };
-            w.write("server/node.mjs", node.as_bytes());
+            w.write(layout::NODE_ENTRY, node.as_bytes());
         }
         let mut wrangler = json!({
             "name": p.config.name,

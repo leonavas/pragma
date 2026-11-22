@@ -3,7 +3,7 @@ import { createLogger, flush, fromClient, minSeverity, newSpanId, newTraceId, pa
 import { createPlatform } from './platform.js'
 import { createCookies } from './cookies.js'
 import { HttpError, Redirect } from './http.js'
-import { ASSETS, DATA_ID, IMMUTABLE, MANIFEST, OTEL, apiTarget, matchRoute, pageUrl, sortRoutes } from '../contract.js'
+import { ASSETS, DATA_ID, IMMUTABLE, MANIFEST, OTEL, PRAGMA, apiTarget, matchRoute, pageUrl, sortRoutes } from '../contract.js'
 
 const OTEL_MAX_BYTES = 256 * 1024
 const MARKDOWN_CACHE_SIZE = 1000
@@ -124,7 +124,7 @@ export function createHandler({ routes, middleware, service }) {
       else if (!kind && (request.method === 'GET' || request.method === 'HEAD')) kind = 'page'
       const md = kind === 'page' && env.ASSETS && !/\.[^/]*$/.test(path) ? await markdownFor(path, request, env) : null
       if (kind === 'page' && (path.endsWith('.html') || !m?.route.ssr)) kind = null
-      const guarded = Boolean(middleware) && !path.startsWith(ASSETS) && !path.startsWith('/_pragma/')
+      const guarded = Boolean(middleware) && !path.startsWith(ASSETS) && !path.startsWith(PRAGMA)
       if (!kind && !guarded) return dispatch()
 
       const isApi = api !== null

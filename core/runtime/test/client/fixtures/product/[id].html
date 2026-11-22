@@ -6,7 +6,7 @@
   <title>Product</title>
   <style>#tall{height:3000px}</style>
   <script>self.__pragmaDev=true</script>
-  <script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}})</script>
+  <script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}});self.__pd.catch(()=>{})</script>
   <script type="application/json" id="pragma-route">{"pattern":"/product/:id","page":null,"components":{},"stores":{"cart":"/assets/cart.js"},"loader":true,"ssr":false,"tpl":"/assets/tpl/product/_id_.js"}</script>
   <script type="module" src="/core/boot.js"></script>
 </head>

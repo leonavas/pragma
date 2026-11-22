@@ -204,7 +204,7 @@ fn server(ctx: &Ctx) -> bool {
     let dir = ctx.core.join("runtime/test/server");
     let mut files: Vec<PathBuf> = std::fs::read_dir(&dir)
         .map(|it| it.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.to_string_lossy().ends_with(".test.js")).collect())
-        .unwrap_or_default();
+        .unwrap_or_else(|e| panic!("cannot read {}: {e}", dir.display()));
     files.sort();
     run("server runtime (node --test)", Command::new("node").arg("--test").args(&files))
 }

@@ -171,7 +171,7 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - **[firm]** SSR is per-page opt-in with `export const ssr = true`; the client binds directives
   without rebuilding the DOM.
 - **[firm]** Never HTML in JS, not even in SSR: the server renders from the same `.html`,
-  compiled to ops (`templates/<route>.json`).
+  compiled to ops (embedded in `server/worker.js`).
 - **[firm v0]** With `ssr`, the server runs page and component scripts (BUG-S-17, 2026-11-19):
   the compiled factory runs once per request with read-only `data`/`params`/`query`/`page`
   (stores and browser services throw), so initial `let`s, props and derived values are in the

@@ -31,14 +31,14 @@ pub type Written = Option<(String, Vec<String>)>;
 /// The root of a component body as its caller sees it, `None` when it is not a plain element.
 pub fn root_of(tree: &[Node]) -> Written {
     let e = tree.iter().find_map(|n| if let Node::Element(e) = n { Some(e) } else { None })?;
-    let plain = !crate::project::is_component_tag(&e.name) && !e.is("slot") && !e.is("template");
+    let plain = !crate::directive::is_component_tag(&e.name) && !e.is("slot") && !e.is("template");
     plain.then(|| (e.name.to_ascii_lowercase(), classes(e)))
 }
 
 fn written(nodes: &[Node], root: &dyn Fn(&str) -> Written, out: &mut Vec<Written>) {
     for n in nodes {
         let Node::Element(e) = n else { continue };
-        if crate::project::is_component_tag(&e.name) {
+        if crate::directive::is_component_tag(&e.name) {
             if e.has("class") {
                 out.push(root(&e.name).map(|(tag, mut cls)| {
                     cls.extend(classes(e));
@@ -57,10 +57,10 @@ fn written(nodes: &[Node], root: &dyn Fn(&str) -> Written, out: &mut Vec<Written
 /// component markup belong to their writer, so a component selector for them never matches.
 /// `root` gives the root of a child component tag (it also belongs to a caller that gives it a
 /// `class`).
-pub fn unmatched(css: &str, marker: &str, tree: &[Node], root: &dyn Fn(&str) -> Written) -> Vec<(usize, String, String)> {
+pub fn unmatched(css: &str, tree: &[Node], root: &dyn Fn(&str) -> Written) -> Vec<(usize, String, String)> {
     let mut own = Vec::new();
     written(tree, root, &mut own);
-    pragma_css::prune::scoped_subjects(css, marker)
+    pragma_css::prune::scoped_subjects(css)
         .into_iter()
         .filter(|s| !s.own.tag.as_deref().is_some_and(|t| ["html", "body", "head"].contains(&t)))
         .filter(|s| !own.iter().any(|w| w.as_ref().is_none_or(|(tag, cls)| s.own.matches(tag, &|c| cls.iter().any(|x| x == c)))))

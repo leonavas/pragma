@@ -19,7 +19,7 @@ impl CoreDiff {
     }
 
     pub fn removes_legacy_files(&self) -> bool {
-        self.removed.iter().any(|rel| !rel.starts_with(".pragma/"))
+        self.removed.iter().any(|rel| is_legacy(rel))
     }
 
     pub fn len(&self) -> usize {
@@ -60,7 +60,8 @@ fn legacy_files(root: &Path) -> Vec<String> {
     legacy::FILES.iter().filter(|rel| root.join(rel).is_file()).map(|rel| rel.to_string()).collect()
 }
 
-/// Makes `.pragma/` equal to the embedded version and removes the files of the old `core/` layout.
+/// Makes `.pragma/` equal to the embedded version and removes the files of the old `core/` layout,
+/// its markers last: a run that stops halfway still finds the layout the next time.
 pub fn upgrade(root: &Path) -> Result<CoreDiff, String> {
     let changes = diff(root);
     for (rel, content) in core_files() {
@@ -68,12 +69,13 @@ pub fn upgrade(root: &Path) -> Result<CoreDiff, String> {
             write(&root.join(&rel), content)?;
         }
     }
-    for rel in &changes.removed {
+    let (markers, rest): (Vec<&String>, Vec<&String>) = changes.removed.iter().partition(|rel| legacy::MARKERS.contains(&rel.as_str()));
+    for rel in rest.into_iter().chain(markers) {
         let path = root.join(rel);
         std::fs::remove_file(&path).map_err(|e| format!("cannot remove '{}': {e}", path.display()))?;
-        let base = root.join(if rel.starts_with(".pragma/") { ".pragma" } else { "core" });
+        let base = root.join(if is_legacy(rel) { legacy::DIR } else { ".pragma" });
         remove_empty_dirs(&base, &path);
-        if !rel.starts_with(".pragma/") && is_empty_dir(&base) {
+        if is_legacy(rel) && is_empty_dir(&base) {
             std::fs::remove_dir(&base).map_err(|e| format!("cannot remove '{}': {e}", base.display()))?;
         }
     }
@@ -120,6 +122,10 @@ pub fn build_gate(root: &Path, allow: bool) -> Result<Option<Diagnostic>, (Diagn
             Err((error, ".pragma/ is older than this pragma: run `pragma upgrade` first (or `pragma build --allow-outdated-core` to build with it anyway)".into()))
         }
     }
+}
+
+fn is_legacy(rel: &str) -> bool {
+    Path::new(rel).starts_with(legacy::DIR)
 }
 
 fn collect(dir: &Path, rel: &str, files: &mut Vec<String>) {

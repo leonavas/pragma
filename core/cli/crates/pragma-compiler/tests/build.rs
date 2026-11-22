@@ -1074,6 +1074,7 @@ fn preload_only_what_first_paint_uses() {
     assert!(!index.contains("lazy.js"), "dynamic import() is not modulepreloaded");
     assert!(!index.contains("overlay.js"), "page without overlay does not preload overlay.js");
     assert!(about.contains("<link rel=\"modulepreload\" href=\"/assets/core/overlay.js\">"), "{about}");
+    assert!(about.contains("\"overlays\":true") && !index.contains("\"overlays\""), "the route says when the page has overlays");
 }
 
 #[test]
@@ -1464,6 +1465,7 @@ fn scratch(files: &[(&str, &str)]) -> Tmp {
     let t = tmp();
     let app = t.0.join("app");
     copy_dir(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../runtime"), &app.join("core"));
+    fs::remove_dir_all(app.join("core/test")).unwrap();
     let base = [("pragma.json", "{ \"name\": \"tpl\" }"), ("routes/_layout.html", "<main data-page><slot></slot></main>")];
     for (f, c) in base.iter().chain(files) {
         let path = app.join(f);
@@ -2159,4 +2161,16 @@ fn attributes_the_build_writes_are_errors_in_source() {
         expect(&d, "html/data-attribute", PAGE, 1);
         assert!(message(&d, "html/data-attribute").contains("is internal"), "{attr}: {d:#?}");
     }
+}
+
+#[test]
+fn an_imported_module_that_is_not_utf8_is_an_error() {
+    let t = app_with(&[]);
+    let app = t.0.join("app");
+    fs::write(app.join("utils/fmt.js"), b"export const format = (value) => \"\xe7\" + value\n").unwrap();
+    let d = check(&app);
+    expect(&d, "js/syntax", "utils/fmt.js", 1);
+    let out = t.0.join("out");
+    let errors = build(&BuildOptions { root: app, out_dir: out, mode: Mode::Dev }).unwrap_err();
+    expect(&errors, "js/syntax", "utils/fmt.js", 1);
 }

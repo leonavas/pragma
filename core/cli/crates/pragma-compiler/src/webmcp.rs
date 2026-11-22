@@ -1,6 +1,6 @@
 use crate::a11y::{collect_labels, has};
 use crate::html::{Element, Node, Pos};
-use crate::project::is_component_tag;
+use crate::directive::is_component_tag;
 use pragma_diag::Diagnostic;
 use std::collections::HashSet;
 use std::path::PathBuf;

@@ -1,7 +1,8 @@
 //! Component expansion (macro, SPEC §3) and scoped validation on the expanded page.
 use crate::directive::{self, Dir, Part};
 use crate::html::{Attr, Element, Node, Pos, escape_text, is_blank};
-use crate::project::{Component, Page, Project, component_tag, is_component_tag, rel_str};
+use crate::directive::{component_tag, is_component_tag};
+use crate::project::{Component, Page, Project, rel_str};
 use crate::validate::diag;
 use pragma_diag::Diagnostic;
 use pragma_jslint::script::ScriptInfo;
@@ -116,7 +117,7 @@ impl<'p> Expander<'p> {
                 _ => content.push(n.clone()),
             }
         }
-        let css = page.css.as_ref().map(|_| crate::css_owner("page", &page.out_name));
+        let css = page.css.as_ref().map(|_| crate::hash::css_owner("page", &page.out_name));
         let sc = Scope { from: &page.dir, props: None, bound_props: HashMap::new(), script: true, slots: None, css };
         let mut page_nodes = self.expand_nodes(&content, &sc);
         if page.out_name != "_404" {
@@ -184,11 +185,11 @@ impl<'p> Expander<'p> {
             }
             return Res::Prop(props.get(&name.to_ascii_lowercase()).cloned());
         }
-        if r == "props" {
-            if let Some(props) = sc.props {
-                let name = p.split('.').nth(1).unwrap_or("");
-                return Res::Prop(props.get(&name.to_ascii_lowercase()).cloned());
-            }
+        if r == "props"
+            && let Some(props) = sc.props
+        {
+            let name = p.split('.').nth(1).unwrap_or("");
+            return Res::Prop(props.get(&name.to_ascii_lowercase()).cloned());
         }
         Res::Path(v.to_string())
     }
@@ -218,9 +219,11 @@ impl<'p> Expander<'p> {
                         out.push(self.interp(e, sc));
                     } else if is_component_tag(&lname) {
                         out.extend(self.component(e, sc));
-                    } else if lname == "slot" && sc.slots.is_some() {
+                    } else if lname == "slot"
+                        && let Some(slots) = sc.slots
+                    {
                         let name = e.value("name").unwrap_or("");
-                        match sc.slots.unwrap().get(name) {
+                        match slots.get(name) {
                             Some(v) if v.iter().any(|n| !is_blank(n)) => out.extend(v.iter().cloned()),
                             _ => out.extend(self.expand_nodes(&e.children, sc)),
                         }
@@ -352,11 +355,11 @@ impl<'p> Expander<'p> {
                 _ if literal.is_some() => Res::Prop(literal.as_ref().and_then(directive::Literal::attr)),
                 Dir::Show | Dir::Attr(_) | Dir::Var(_) | Dir::Class(_) | Dir::If | Dir::ElseIf | Dir::Model => self.resolve(v, sc),
                 Dir::For => {
-                    if let Some((var, path)) = directive::parse_for(v) {
-                        if let Res::Path(p) = self.resolve(path, sc) {
-                            el.attrs.push(Attr { value: Some(format!("{var} in {p}")), ..a.clone() });
-                            continue;
-                        }
+                    if let Some((var, path)) = directive::parse_for(v)
+                        && let Res::Path(p) = self.resolve(path, sc)
+                    {
+                        el.attrs.push(Attr { value: Some(format!("{var} in {p}")), ..a.clone() });
+                        continue;
                     }
                     Res::Path(v.to_string())
                 }
@@ -530,7 +533,7 @@ impl<'p> Expander<'p> {
             }
         }
         let Some(root) = tree.iter().find(|n| matches!(n, Node::Element(_))) else { return Vec::new() };
-        let css = comp.css.as_ref().map(|_| crate::css_owner("component", &comp.id));
+        let css = comp.css.as_ref().map(|_| crate::hash::css_owner("component", &comp.id));
         let inner = Scope { from: &comp.scope, props: Some(&props), bound_props, script: comp.module.is_some(), slots: Some(&slots), css };
         let mut nodes = match root {
             Node::Element(r) if recursive => self.expand_nodes(&[Node::Element(Element { children: Vec::new(), ..r.clone() })], &inner),
@@ -613,7 +616,7 @@ impl<'p> Expander<'p> {
         self.defs.insert(comp.id.clone(), None);
         let Some(root) = self.p.trees[comp.html as usize].iter().find(|n| matches!(n, Node::Element(_))) else { return };
         let (props, slots) = (Props::new(), Slots::new());
-        let css = comp.css.as_ref().map(|_| crate::css_owner("component", &comp.id));
+        let css = comp.css.as_ref().map(|_| crate::hash::css_owner("component", &comp.id));
         let inner = Scope { from: &comp.scope, props: Some(&props), bound_props: HashMap::new(), script: true, slots: Some(&slots), css };
         let reported = self.diags.len();
         self.stack.push(&comp.dir);

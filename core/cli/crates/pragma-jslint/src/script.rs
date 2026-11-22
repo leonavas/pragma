@@ -19,13 +19,13 @@ use pragma_diag::Diagnostic;
 use std::collections::HashMap;
 use std::path::Path;
 
-pub const RULE_LEGACY: &str = "js/legacy-api";
-pub const RULE_PROP_WRITE: &str = "js/prop-write";
-pub const RULE_SCRIPT: &str = "js/component-script";
-pub const RULE_TOP_LEVEL_DATA: &str = "js/top-level-data";
-pub const RULE_STALE: &str = "js/stale-derived";
-pub const RULE_DERIVED_CALL: &str = "js/derived-call";
-pub const RULE_DOLLAR: &str = "js/dollar-in-script";
+const RULE_LEGACY: &str = "js/legacy-api";
+const RULE_PROP_WRITE: &str = "js/prop-write";
+const RULE_SCRIPT: &str = "js/component-script";
+const RULE_TOP_LEVEL_DATA: &str = "js/top-level-data";
+const RULE_STALE: &str = "js/stale-derived";
+const RULE_DERIVED_CALL: &str = "js/derived-call";
+const RULE_DOLLAR: &str = "js/dollar-in-script";
 
 /// Names the virtual module `pragma` exports.
 pub const PRAGMA_EXPORTS: &[&str] = &["shared", "data", "params", "query", "page", "log", "call", "stream", "navigate", "open", "close", "confirm", "frame"];
@@ -663,19 +663,19 @@ impl<'a> Visit<'a> for Refs<'_, '_, '_> {
     }
 
     fn visit_assignment_expression(&mut self, it: &AssignmentExpression<'a>) {
-        if let Some(m) = it.left.as_member_expression() {
-            if let Some(root) = member_root(m.object()) {
-                self.mutated_root(root);
-            }
+        if let Some(m) = it.left.as_member_expression()
+            && let Some(root) = member_root(m.object())
+        {
+            self.mutated_root(root);
         }
         walk::walk_assignment_expression(self, it);
     }
 
     fn visit_update_expression(&mut self, it: &UpdateExpression<'a>) {
-        if let Some(m) = it.argument.as_member_expression() {
-            if let Some(root) = member_root(m.object()) {
-                self.mutated_root(root);
-            }
+        if let Some(m) = it.argument.as_member_expression()
+            && let Some(root) = member_root(m.object())
+        {
+            self.mutated_root(root);
         }
         walk::walk_update_expression(self, it);
     }

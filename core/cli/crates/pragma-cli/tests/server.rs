@@ -90,6 +90,9 @@ async fn routes_by_manifest() {
     assert_eq!((res.status, res.text()), (200, fixture("shop/[id].html")));
     let res = get(addr, "/shop/caf%C3%A9").await;
     assert_eq!((res.status, res.text()), (200, fixture("shop/[id].html")));
+    // the path is split before its segments are decoded, as in contract.js
+    let res = get(addr, "/shop/a%2Fb").await;
+    assert_eq!((res.status, res.text()), (200, fixture("shop/[id].html")));
     // static beats param, even when listed later in the manifest
     assert_eq!(get(addr, "/shop/new").await.text(), fixture("shop/new.html"));
     assert_eq!(get(addr, "/shop").await.text(), fixture("shop/index.html"));

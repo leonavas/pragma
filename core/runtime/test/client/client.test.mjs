@@ -311,6 +311,13 @@ test('unknown path throws in dev', async () => {
   assert.match(p.errors.join(), /unknown path "state.name"/)
 })
 
+test('null in the middle of a path renders empty in dev, as on the server', async () => {
+  const p = await open('/directives')
+  await p.evaluate(() => __ctx.update(s => { s.person = null }))
+  await p.waitForFunction(() => document.querySelector('#w').textContent === '')
+  assert.deepEqual(p.errors, [])
+})
+
 test('loader: skeleton, data, reused __pd and params', async () => {
   const p = await open('/product/7')
   assert.equal(await p.locator('#sk').count(), 1)
@@ -923,6 +930,13 @@ test('a store named theme keeps its own key: the theme value is not read as stor
   assert.equal(await text(old, '#mode'), 'wide')
   assert.deepEqual(await old.evaluate(() => [localStorage.getItem('pragma:theme'), localStorage.getItem('pragma:store:theme')]), [null, '{"mode":"wide"}'])
   assert.deepEqual([...themed.errors, ...old.errors], [])
+})
+
+test('a loop variable named like an Object.prototype member is passed to the handler', async () => {
+  const p = await open('/prefs')
+  await p.click('#picks button')
+  assert.equal(await text(p, '#got'), 'lid')
+  assert.deepEqual(p.errors, [])
 })
 
 test('event arguments accept the number literals the compiler accepts', async () => {

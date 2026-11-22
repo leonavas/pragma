@@ -11,13 +11,13 @@ use oxc_span::{GetSpan, Span};
 use pragma_diag::Diagnostic;
 use std::path::{Component, Path};
 
-pub const RULE_SYNTAX: &str = "js/syntax";
-pub const RULE_HTML: &str = "js/html-in-js";
-pub const RULE_CONSOLE: &str = "js/console";
-pub const RULE_JSDOC: &str = "js/jsdoc-types";
+const RULE_SYNTAX: &str = "js/syntax";
+const RULE_HTML: &str = "js/html-in-js";
+const RULE_CONSOLE: &str = "js/console";
+const RULE_JSDOC: &str = "js/jsdoc-types";
 pub const RULE_IMPORT: &str = "js/import";
 pub const RULE_PACKAGE: &str = "app/package";
-pub const RULE_COMMENT: &str = "js/comment";
+const RULE_COMMENT: &str = "js/comment";
 pub const RULE_NAME: &str = "js/vague-name";
 
 pub const SHORT_OK: &[&str] = &["$", "i", "j", "k", "id", "ok", "el", "ctx", "url", "log", "db", "kv"];

@@ -127,15 +127,15 @@ function fallback(records, error) {
   for (const r of records) writeLine(r)
 }
 
-const LIMIT = { records: 500, body: 8192, attrs: 64, value: 4096 }
+const LIMIT = { records: 500, body: 8192, attrs: 64, key: 128, value: 4096, resource: 256, severity: 16 }
 const isHex = (v, n) => typeof v === 'string' && v.length === n && /^[0-9a-f]+$/.test(v) && nonZero(v)
 
 function cleanAttributes(attrs) {
   const out = {}
   if (!attrs || typeof attrs !== 'object') return out
   for (const [k, v] of Object.entries(attrs).slice(0, LIMIT.attrs)) {
-    if (typeof v === 'string') out[k.slice(0, 128)] = v.slice(0, LIMIT.value)
-    else if (typeof v === 'boolean' || Number.isFinite(v)) out[k.slice(0, 128)] = v
+    if (typeof v === 'string') out[k.slice(0, LIMIT.key)] = v.slice(0, LIMIT.value)
+    else if (typeof v === 'boolean' || Number.isFinite(v)) out[k.slice(0, LIMIT.key)] = v
   }
   return out
 }
@@ -143,7 +143,7 @@ function cleanAttributes(attrs) {
 export function fromClient(payload) {
   if (!payload || !Array.isArray(payload.logs)) throw new Error('invalid log batch')
   const resource = {}
-  for (const [k, v] of Object.entries(payload.resource ?? {})) if (typeof v === 'string') resource[k.slice(0, 128)] = v.slice(0, 256)
+  for (const [k, v] of Object.entries(payload.resource ?? {})) if (typeof v === 'string') resource[k.slice(0, LIMIT.key)] = v.slice(0, LIMIT.resource)
   resource['service.name'] ??= 'pragma-client'
   const observed = nowUnixNano()
   return payload.logs.slice(0, LIMIT.records).filter((r) => r && typeof r === 'object').map((r) => {
@@ -153,7 +153,7 @@ export function fromClient(payload) {
       timeUnixNano: typeof r.timeUnixNano === 'string' && /^\d{1,20}$/.test(r.timeUnixNano) ? r.timeUnixNano : observed,
       observedTimeUnixNano: observed,
       severityNumber,
-      severityText: typeof r.severityText === 'string' ? r.severityText.slice(0, 16) : Object.keys(SEVERITY).findLast((k) => SEVERITY[k] <= severityNumber) ?? 'TRACE',
+      severityText: typeof r.severityText === 'string' ? r.severityText.slice(0, LIMIT.severity) : Object.keys(SEVERITY).findLast((k) => SEVERITY[k] <= severityNumber) ?? 'TRACE',
       body: String(r.body ?? '').slice(0, LIMIT.body),
       attributes: cleanAttributes(r.attributes),
     }
