@@ -168,7 +168,7 @@ Then deploy with `npx wrangler@4 deploy` (no `--config`).
 2. Create the root `wrangler.jsonc` (above).
 3. Run `pragma dev --cf`.
 
-Without `--cf`, `pragma dev` is unchanged. A change to `wrangler.jsonc` or `.dev.vars` restarts the node server. `cloudflare:workers` imports still do not work on Node (`packages.md`).
+Without `--cf`, `pragma dev` is unchanged. A change to `wrangler.jsonc` or `.dev.vars` restarts the node server. On Node, only `env` from `cloudflare:workers` works; other `cloudflare:*` exports throw when used (`packages.md`).
 
 ### Workers runtime limits
 

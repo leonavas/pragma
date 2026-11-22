@@ -14,7 +14,7 @@ WebMCP is on by default (`"webmcp": true` in `pragma.json`; omitted means `true`
 |---|---|---|
 | `toolname` | `<form>` | Required with `tooldescription`. Lowercase `snake_case` `verb_object` (`search_products`, `add_task`, `create_order`), unique per page. |
 | `tooldescription` | `<form>` | Required with `toolname`. One sentence of 4+ words describing action and purpose. |
-| `toolparamdescription` | input, select, textarea | Describes the expected input. Without it, agents fall back to `<label>` text, then `aria-description`. |
+| `toolparamdescription` | input, select, textarea | Describes the expected input. Without it, agents fall back to `<label>` text, then `aria-description`. `aria-label` is not read. |
 | `toolautosubmit` | `<form>` | Submits without user click. Use only on safe, reversible forms (search, filter, add). Never on delete, pay, buy, cancel, send, or transfer. |
 | `notool` | `<form>` | Excludes the form (login, password, payment). Removed at build time. |
 
