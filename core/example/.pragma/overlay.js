@@ -1,7 +1,8 @@
 import { afterMotion } from './directives.js'
+import { log } from './log.js'
 
 let stack = []
-let log, opener
+let opener
 let backs = 0
 let pushes = 0
 let anchors = 0
@@ -11,8 +12,6 @@ const anchored = CSS.supports('position-try-fallbacks', 'flip-block')
 const get = id => typeof id == 'string' ? document.getElementById(id) : id
 const entry = el => stack.find(e => e.el == el)
 
-// A dialog leaves like a block: `data-leaving` + inert until its CSS animations end, then close().
-// It leaves the stack at once (history, scroll lock, confirm()); focus returns once it is closed.
 function hide(el) {
   if (el.popover) return el.hidePopover()
   if (el[LEAVE]) return
@@ -71,7 +70,6 @@ function refocus(el, o) {
 
 // data-placement="bottom-start" (default) | "bottom-end" | "top-start" | "top-end": side of the
 // trigger, then the edge both share. Flips to the other side or edge when there is no room.
-// CSS anchor positioning where supported (follows scroll and resize); otherwise measured once.
 const AREA = { bottom: 'block-end', top: 'block-start', start: 'span-inline-end', end: 'span-inline-start' }
 function place(el, o) {
   const [side, edge] = (el.dataset.placement || 'bottom-start').split('-'), s = el.style
@@ -116,8 +114,7 @@ function onClick(ev) {
   open(id, b)
 }
 
-export function initOverlays(o = {}) {
-  log = o.log
+export function initOverlays() {
   document.addEventListener('click', onClick)
   document.addEventListener('close', e => e.target.open || refocus(e.target, done(e.target)?.o), true)
   document.addEventListener('cancel', e => {
@@ -137,7 +134,7 @@ export function initOverlays(o = {}) {
 
 export function open(id, o = document.activeElement) {
   const el = get(id)
-  if (!el) return log?.error('overlay not found', { 'pragma.overlay.id': id })
+  if (!el) return log.error('overlay not found', { 'pragma.overlay.id': id })
   if (el.popover) {
     if (el.matches(':popover-open')) return
     opener = o

@@ -3,38 +3,10 @@ import { createLogger, flush, fromClient, minSeverity, newSpanId, newTraceId, pa
 import { createPlatform } from './platform.js'
 import { createCookies } from './cookies.js'
 import { HttpError, Redirect } from './http.js'
+import { ASSETS, DATA_ID, IMMUTABLE, MANIFEST, OTEL, apiTarget, matchRoute, pageUrl, sortRoutes } from '../contract.js'
 
 const OTEL_MAX_BYTES = 256 * 1024
-
-const split = (path) => path.split('/').filter(Boolean)
-
-export function compileRoutes(routes) {
-  return routes
-    .map((route) => {
-      const segs = split(route.pattern)
-      return { route, segs, rank: segs.map((s) => (s[0] === ':' ? '1' : '0')).join('') }
-    })
-    .sort((a, b) => (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : 0))
-}
-
-export function matchRoute(table, path) {
-  let parts
-  try {
-    parts = split(path).map(decodeURIComponent)
-  } catch {
-    return null
-  }
-  next: for (const { route, segs } of table) {
-    if (segs.length !== parts.length) continue
-    const params = {}
-    for (let i = 0; i < segs.length; i++) {
-      if (segs[i][0] === ':') params[segs[i].slice(1)] = parts[i]
-      else if (segs[i] !== parts[i]) continue next
-    }
-    return { route, params }
-  }
-  return null
-}
+const MARKDOWN_CACHE_SIZE = 1000
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -63,6 +35,13 @@ function withVary(res) {
   return out
 }
 
+function immutable(res) {
+  if (res.headers.get('cache-control') === IMMUTABLE) return res
+  const out = new Response(res.body, res)
+  out.headers.set('cache-control', IMMUTABLE)
+  return out
+}
+
 function asMarkdown(res) {
   if (res.status !== 200) return res
   const out = new Response(res.body, res)
@@ -84,15 +63,15 @@ function later(promise, ctx) {
 }
 
 export function createHandler({ routes, middleware, service }) {
-  const table = compileRoutes(routes)
+  const table = sortRoutes(routes)
   const markdownFiles = new Map()
-  let pages
+  let manifest
 
   function markdownFor(path, request, env) {
     const key = path.replace(/\/+$/, '')
     let found = markdownFiles.get(key)
     if (!found) {
-      if (markdownFiles.size >= 1000) markdownFiles.clear()
+      if (markdownFiles.size >= MARKDOWN_CACHE_SIZE) markdownFiles.clear()
       found = findMarkdown(key, request, env).catch(() => null)
       markdownFiles.set(key, found)
     }
@@ -106,19 +85,26 @@ export function createHandler({ routes, middleware, service }) {
     return new Response(request.method === 'HEAD' ? null : missing.body, { status: 404, headers: missing.headers })
   }
 
+  function pages(request, env) {
+    manifest ??= env.ASSETS.fetch(new Request(new URL(MANIFEST, request.url)))
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then(sortRoutes)
+      .catch(() => {
+        manifest = null
+        return []
+      })
+    return manifest
+  }
+
   async function asset(request, env) {
     const res = await env.ASSETS.fetch(request)
+    if ((res.ok || res.status === 304) && new URL(request.url).pathname.startsWith(ASSETS)) return immutable(res)
     if (res.status !== 404 || (request.method !== 'GET' && request.method !== 'HEAD')) return res
-    // Assets use html_handling "drop-trailing-slash": /a/index.html and /a.html are served at /a.
-    // A dynamic page file (/shop/[id].html) is fetched encoded: a raw [ ] path gets a redirect, not the file.
-    const at = (path) => new URL(encodeURI(path.replace(/(\/index)?\.html$/, '')) || '/', request.url)
-    pages ??= env.ASSETS.fetch(new Request(new URL('/_pragma/manifest.json', request.url)))
-      .then((r) => (r.ok ? r.json() : []))
-      .then(compileRoutes)
-      .catch(() => [])
-    const m = matchRoute(await pages, new URL(request.url).pathname)
+    // Workers assets serve /a.html and /a/index.html at /a (html_handling "drop-trailing-slash") and
+    // answer a raw /shop/[id].html with a redirect, so the page file is fetched at its encoded clean URL.
+    const m = matchRoute(await pages(request, env), new URL(request.url).pathname)
     if (m?.route.html && !m.route.ssr) {
-      const page = await env.ASSETS.fetch(new Request(at(m.route.html), request))
+      const page = await env.ASSETS.fetch(new Request(new URL(pageUrl(m.route.html), request.url), request))
       if (page.ok) return page
     }
     return (await notFoundPage(request, env)) ?? res
@@ -128,31 +114,20 @@ export function createHandler({ routes, middleware, service }) {
     async fetch(request, env = {}, ctx) {
       const url = new URL(request.url)
       const path = url.pathname
-      if (path === '/_otel') return ingest(request, env, ctx)
+      if (path === OTEL) return ingest(request, env, ctx)
 
-      let kind = null
-      let target = path
-      let actionName
-      if (path === '/_data' || path.startsWith('/_data/')) {
-        kind = 'data'
-        target = path.slice(6) || '/'
-      } else if (path.startsWith('/_action/')) {
-        kind = 'action'
-        const rest = path.slice(8)
-        const i = rest.lastIndexOf('/')
-        target = rest.slice(0, i) || '/'
-        actionName = rest.slice(i + 1)
-      }
+      const api = apiTarget(path)
+      let kind = api?.kind ?? null
+      const target = api?.target ?? path
       const m = matchRoute(table, target)
       if (!kind && m?.route.endpoint) kind = 'endpoint'
       else if (!kind && (request.method === 'GET' || request.method === 'HEAD')) kind = 'page'
       const md = kind === 'page' && env.ASSETS && !/\.[^/]*$/.test(path) ? await markdownFor(path, request, env) : null
-      // The router fetches prebuilt HTML (/shop/index.html): that is a file, not an SSR page.
-      if (kind === 'page' && (path.endsWith('.html') || !(m?.route.ssr && m.route.template && m.route.shell))) kind = null
-      const guarded = Boolean(middleware) && !path.startsWith('/assets/') && !path.startsWith('/_pragma/')
+      if (kind === 'page' && (path.endsWith('.html') || !m?.route.ssr)) kind = null
+      const guarded = Boolean(middleware) && !path.startsWith(ASSETS) && !path.startsWith('/_pragma/')
       if (!kind && !guarded) return dispatch()
 
-      const api = kind === 'data' || kind === 'action'
+      const isApi = api !== null
       const start = performance.now()
       const parent = parseTraceparent(request.headers.get('traceparent'))
       const log = createLogger({
@@ -161,12 +136,12 @@ export function createHandler({ routes, middleware, service }) {
         spanId: newSpanId(),
         min: minSeverity(env),
       })
-      const pageUrl = new URL(url.origin + target + url.search)
-      const { cookies, setCookieLines } = createCookies(request, pageUrl)
+      const targetUrl = new URL(url.origin + target + url.search)
+      const { cookies, setCookieLines } = createCookies(request, targetUrl)
       const headers = new Map()
       const event = {
         request,
-        url: pageUrl,
+        url: targetUrl,
         params: m?.params ?? {},
         query: Object.fromEntries(url.searchParams),
         env,
@@ -201,7 +176,7 @@ export function createHandler({ routes, middleware, service }) {
           return withVary(asMarkdown(await env.ASSETS.fetch(new Request(new URL(md, request.url), request))))
         }
         if (kind === 'data') return data(m, event)
-        if (kind === 'action') return action(m, actionName, event)
+        if (kind === 'action') return action(m, api.action, event)
         if (kind === 'endpoint') return endpoint(m, event)
         if (kind === 'page') {
           const res = await page(m, event)
@@ -212,11 +187,11 @@ export function createHandler({ routes, middleware, service }) {
 
       async function failure(err) {
         if (err instanceof Redirect) {
-          if (api) return json({ redirect: { status: err.status, location: err.location } })
+          if (isApi) return json({ redirect: { status: err.status, location: err.location } })
           return new Response(null, { status: err.status, headers: { location: err.location } })
         }
         if (err instanceof HttpError) {
-          if (api || kind === 'endpoint') return json({ error: err.body }, err.status)
+          if (isApi || kind === 'endpoint') return json({ error: err.body }, err.status)
           if (err.status === 404) {
             const missing = await notFoundPage(request, env)
             if (missing) return missing
@@ -225,7 +200,7 @@ export function createHandler({ routes, middleware, service }) {
         }
         const message = err instanceof Error ? err.message : String(err)
         log.error(message, err)
-        if (api || kind === 'endpoint') return fail(message, 500)
+        if (isApi || kind === 'endpoint') return fail(message, 500)
         return new Response('Internal error', { status: 500, headers: { 'content-type': 'text/plain; charset=utf-8' } })
       }
 
@@ -242,7 +217,7 @@ export function createHandler({ routes, middleware, service }) {
       } else {
         res = await resolve()
       }
-      res = finish(res, { api, headers, cookies: setCookieLines() })
+      res = finish(res, { api: isApi, headers, cookies: setCookieLines() })
 
       const status = res.status
       if (kind) {
@@ -385,23 +360,22 @@ async function page(m, event) {
   }
   const html = shellWith(route.shell, body, payload, scope)
   const headers = new Headers({ 'content-type': 'text/html; charset=utf-8', 'cache-control': 'private, no-cache' })
-  if (status === 200 && !headers.has('link')) {
+  if (status === 200) {
     const link = earlyHints(html)
     if (link) headers.set('link', link)
   }
   return new Response(request.method === 'HEAD' ? null : html, { status, headers })
 }
 
-export function shellWith(shell, body, payload, scope) {
-  let html = shell.replace(/<script>self\.__pd=[^<]*<\/script>\s*/, '')
-  if (scope) html = renderHead(html, scope)
+function shellWith(shell, body, payload, scope) {
+  let html = renderHead(shell, scope)
   if (body !== undefined) {
     const open = /<main\b[^>]*\bdata-page\b[^>]*>/.exec(html)
     const end = open ? html.indexOf('</main>', open.index) : -1
     if (end < 0) throw new Error('shell has no <main data-page>…</main>')
     html = html.slice(0, open.index + open[0].length) + body + html.slice(end)
   }
-  const script = `<script type="application/json" id="pragma-data">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>`
+  const script = `<script type="application/json" id="${DATA_ID}">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>`
   const i = html.lastIndexOf('</body>')
   return i < 0 ? html + script : html.slice(0, i) + script + html.slice(i)
 }

@@ -1,14 +1,15 @@
+import { OTEL } from './contract.js'
+
 const SEV = { debug: 5, info: 9, warn: 13, error: 17 }
+const BATCH = 50, FLUSH_MS = 2000
 const hex = (n) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => (b + 256).toString(16).slice(1)).join('')
 const exc = (e) => ({ 'exception.type': e?.name, 'exception.message': e?.message ?? String(e), 'exception.stacktrace': e?.stack })
 
 let queue = []
-let endpoint = '/_otel'
+let endpoint = OTEL
 let resource = { 'service.name': 'pragma-client' }
-let min = SEV.info
 let traceId = hex(16)
 let timer
-let started
 
 export const newTrace = () => {
   traceId = hex(16)
@@ -18,7 +19,7 @@ export const traceHeaders = () => ({ traceparent: `00-${traceId}-${hex(8)}-01` }
 
 function emit(level, body, attributes) {
   if (globalThis.__pragmaDev) console[level](body, ...(attributes ? [attributes] : []))
-  if (SEV[level] < min || !endpoint) return
+  if (SEV[level] < SEV.info || !endpoint) return
   queue.push({
     timeUnixNano: Date.now() + '000000',
     severityNumber: SEV[level],
@@ -27,8 +28,8 @@ function emit(level, body, attributes) {
     attributes: { 'url.path': location.pathname, ...attributes },
     traceId,
   })
-  if (queue.length > 49) flush()
-  else timer ||= setTimeout(flush, 2000)
+  if (queue.length >= BATCH) flush()
+  else timer ||= setTimeout(flush, FLUSH_MS)
 }
 
 export const log = {
@@ -51,12 +52,8 @@ export function flush(beacon) {
     .catch(() => {})
 }
 
-export function initClientLog(opts = {}) {
-  endpoint = opts.endpoint ?? endpoint
-  resource = { 'service.name': opts.service ?? resource['service.name'] }
-  min = SEV[opts.level] ?? min
-  if (started) return
-  started = 1
+export function initClientLog(service) {
+  resource = { 'service.name': service }
   addEventListener('error', (e) => emit('error', e.message, exc(e.error ?? e)))
   addEventListener('unhandledrejection', (e) => emit('error', e.reason?.message ?? String(e.reason), exc(e.reason)))
   addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush(true))

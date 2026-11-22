@@ -1,35 +1,25 @@
 import { log, traceHeaders, newTrace } from './log.js'
-import { enter, leave, importRoute, overlay } from './page.js'
 import { fetchData } from './loader.js'
+import { MAIN, MANIFEST, ROUTE_CSS, ROUTE_ID, SHARED_CSS, matchRoute, pageUrl, sortRoutes } from './contract.js'
 
+const MAX_HOPS = 20
 const pages = new Map(), seen = new Set(), positions = new Map()
 const noop = () => {}
-let manifest, here, key, seq = 0, io, mo, hops = 0
+let page, manifest, here, key, seq = 0, io, mo, hops = 0
 
 const where = u => u.pathname + u.search
 const newKey = () => Math.random().toString(36).slice(2)
 
-export function match(pattern, path) {
-  const a = pattern.split('/'), b = path.replace(/(.)\/$/, '$1').split('/'), params = {}
-  if (a.length !== b.length) return null
-  for (let i = 0; i < a.length; i++) {
-    if (a[i][0] === ':') params[a[i].slice(1)] = decodeURIComponent(b[i])
-    else if (a[i] !== b[i]) return null
-  }
-  return params
-}
-
 function entry(url) {
-  manifest ??= fetch('/_pragma/manifest.json', { headers: traceHeaders() })
+  manifest ??= fetch(MANIFEST, { headers: traceHeaders() })
     .then(r => r.json())
-    .then(m => m.sort((x, y) => x.pattern.split(':').length - y.pattern.split(':').length))
+    .then(sortRoutes)
     .catch(e => { manifest = null; throw e })
-  return manifest.then(m => m.find(e => match(e.pattern, url.pathname)))
+  return manifest.then(table => matchRoute(table, url.pathname)?.route)
 }
 
-// Decoded: the assets binding redirects a raw /a/[id].html to the encoded /a/%5Bid%5D, the same page.
+// The assets binding redirects a raw /a/[id].html to the encoded /a/%5Bid%5D: decoded, both are the same page.
 const pagePath = u => decodeURI(new URL(u, location.href).pathname).replace(/(\/index)?\.html$/, '').replace(/\/$/, '')
-const pageUrl = file => encodeURI(pagePath(file)) || '/'
 
 function html(u, anyStatus = false) {
   return fetch(u, { headers: traceHeaders() }).then(r => {
@@ -55,19 +45,19 @@ function syncHead(doc) {
   const h = document.head
   const old = [...h.children].filter(own), next = [...doc.head.children].filter(own)
   if (old.length === next.length && old.every((el, i) => el.isEqualNode(next[i]))) return
-  const at = h.querySelector('link[rel=stylesheet], [data-pragma-shared-css], [data-pragma-route-css]')
+  const at = h.querySelector(`link[rel=stylesheet], [${SHARED_CSS}], [${ROUTE_CSS}]`)
   for (const el of old) el.remove()
   for (const el of next) h.insertBefore(document.importNode(el, true), at)
 }
 
 function loadRouteCss(href) {
   const h = document.head, target = new URL(href, location.href).href
-  const existing = [...h.querySelectorAll('link[data-pragma-route-css]')].find(el => el.href === target)
+  const existing = [...h.querySelectorAll(`link[${ROUTE_CSS}]`)].find(el => el.href === target)
   if (existing) return { el: existing, created: false, ready: Promise.resolve() }
   const el = document.createElement('link')
   el.rel = 'stylesheet'
   el.href = href
-  el.setAttribute('data-pragma-route-css', '')
+  el.setAttribute(ROUTE_CSS, '')
   const ready = new Promise(resolve => { el.onload = el.onerror = resolve })
   const sheets = h.querySelectorAll('link[rel=stylesheet]')
   sheets.length ? sheets[sheets.length - 1].after(el) : h.append(el)
@@ -76,10 +66,10 @@ function loadRouteCss(href) {
 
 function syncRouteCss(keep, nextStyle) {
   const h = document.head
-  for (const el of h.querySelectorAll('[data-pragma-route-css]')) if (el !== keep) el.remove()
+  for (const el of h.querySelectorAll(`[${ROUTE_CSS}]`)) if (el !== keep) el.remove()
   if (nextStyle) {
     const style = document.importNode(nextStyle, true)
-    const anchor = h.querySelector('[data-pragma-shared-css], link[rel=stylesheet]')
+    const anchor = h.querySelector(`[${SHARED_CSS}], link[rel=stylesheet]`)
     anchor ? anchor.after(style) : h.append(style)
   }
 }
@@ -89,7 +79,7 @@ const link = el => {
   return a && !a.target && !a.hasAttribute('download') && !a.hasAttribute('data-reload') && a.origin === location.origin ? a : null
 }
 
-// modulepreload downloads and compiles without running: a route module runs only on navigation
+// modulepreload downloads and compiles without running: a route module runs only on navigation.
 function preload(m) {
   const href = new URL(m, location.href).href
   if ([...document.querySelectorAll('link[rel=modulepreload]')].some(el => el.href === href)) return
@@ -154,7 +144,7 @@ export function navigate(to, { replace = false } = {}) {
 
 export function redirect(to, replace = false) {
   const url = new URL(to, location.href)
-  if (url.origin === location.origin && ++hops <= 20) return go(url, false, replace)
+  if (url.origin === location.origin && ++hops <= MAX_HOPS) return go(url, false, replace)
   location[replace ? 'replace' : 'assign'](url)
 }
 
@@ -169,10 +159,10 @@ async function go(to, pop, replace) {
       pending?.catch(noop)
       for (const m of e.modules ?? []) import(m).catch(noop)
       doc = new DOMParser().parseFromString(await (e.ssr ? html(url, true) : text(pageUrl(e.html))), 'text/html')
-      route = JSON.parse(doc.getElementById('pragma-route').textContent)
-      const nextCss = doc.head.querySelector('link[rel=stylesheet][data-pragma-route-css]')?.getAttribute('href')
+      route = JSON.parse(doc.getElementById(ROUTE_ID).textContent)
+      const nextCss = doc.head.querySelector(`link[rel=stylesheet][${ROUTE_CSS}]`)?.getAttribute('href')
       if (nextCss) css = loadRouteCss(nextCss)
-      mods = await importRoute(route)
+      mods = await page.importRoute(route)
       if (css) await css.ready
     }
   } catch (err) {
@@ -180,30 +170,27 @@ async function go(to, pop, replace) {
     else log.error('navigation failed', { 'url.path': url.pathname, 'error.message': err.message })
     e = null
   }
-  if (n !== seq) {
+  if (n !== seq || !e) {
     if (css?.created) css.el.remove()
-    return
-  }
-  if (!e) {
-    if (css?.created) css.el.remove()
+    if (n !== seq) return
     if (moved) return redirect(moved, pop || replace)
     return pop ? location.reload() : location[replace ? 'replace' : 'assign'](url)
   }
 
   positions.set(key, scrollY)
-  const stacked = overlay?.closeAll() ?? 0
+  const stacked = page.closeOverlays()
   if (pop) key = history.state?.k
   else history[stacked || replace ? 'replaceState' : 'pushState']({ k: (key = newKey()) }, '', url)
   here = where(url)
 
   const swap = () => {
-    leave()
-    const main = document.querySelector('main[data-page]'), next = doc.querySelector('main[data-page]')
+    page.leave()
+    const main = document.querySelector(MAIN), next = doc.querySelector(MAIN)
     main.replaceChildren(...next.childNodes)
     main.dataset.page = next.dataset.page
     syncHead(doc)
-    syncRouteCss(css?.el ?? null, doc.head.querySelector('style[data-pragma-route-css]'))
-    const done = enter(route, mods, url, match(route.pattern, url.pathname) ?? {}, doc, pending)
+    syncRouteCss(css?.el ?? null, doc.head.querySelector(`style[${ROUTE_CSS}]`))
+    const done = page.enter(route, mods, url, doc, pending)
     const y = pop ? positions.get(key) ?? 0 : 0
     if (!pop && url.hash) document.getElementById(decodeURIComponent(url.hash.slice(1)))?.scrollIntoView()
     else scrollTo(0, y)
@@ -218,7 +205,8 @@ async function go(to, pop, replace) {
   observe()
 }
 
-export function startRouter() {
+export function startRouter(pageApi) {
+  page = pageApi
   history.scrollRestoration = 'manual'
   key = history.state?.k ?? newKey()
   history.replaceState({ ...history.state, k: key }, '')
@@ -232,8 +220,8 @@ export function startRouter() {
     ev.preventDefault()
     navigate(a.href)
   })
-  addEventListener('popstate', ev => {
-    if (overlay?.handlePopState(ev) || where(location) === here) return
+  addEventListener('popstate', () => {
+    if (page.popOverlay() || where(location) === here) return
     go(location.href, true)
   })
   const hover = ev => {

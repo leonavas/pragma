@@ -26,7 +26,7 @@ The folder structure is fixed. Do not create other top-level folders. Do not edi
     state/<name>.js        stores (access through `shared`, never import)
     theme.css              tokens and global custom classes
   utils/                   pure functions
-  public/                  static files (images, fonts, robots.txt, <page>.md for agents)
+  public/                  static files (images, fonts, robots.txt, <page>.md for agents); files that CSS names with url(/…) also get a hashed /assets/ copy
   .pragma/                 framework (runtime, docs, base.css, version); do not edit
 ```
 

@@ -1,4 +1,4 @@
-export function createDb(binding) {
+function createDb(binding) {
   if (!binding) return undefined
   if (typeof binding.get === 'function' && typeof binding.all === 'function' && typeof binding.run === 'function') {
     return binding
@@ -23,7 +23,7 @@ export function createDb(binding) {
   }
 }
 
-export function createKv(binding) {
+function createKv(binding) {
   if (!binding) return undefined
   if (typeof binding.get === 'function' && typeof binding.put === 'function' && typeof binding.delete === 'function') {
     return binding
@@ -38,7 +38,7 @@ export function createKv(binding) {
   return undefined
 }
 
-export function createFiles(binding) {
+function createFiles(binding) {
   if (!binding) return undefined
   if (typeof binding.get === 'function' && typeof binding.put === 'function' && typeof binding.delete === 'function') {
     return binding
