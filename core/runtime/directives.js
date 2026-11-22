@@ -77,7 +77,7 @@ function call(v) {
     a === 'event' ? EVENT
     : a === 'el' ? EL
     : a[0] === "'" || a[0] === '"' ? { v: a.slice(1, -1) }
-    : a in LITERAL ? { v: LITERAL[a] }
+    : Object.hasOwn(LITERAL, a) ? { v: LITERAL[a] }
     : NUMBER.test(a) && isFinite(a) ? { v: +a }
     : { p: path(a) })
   return { f: m[1], args }

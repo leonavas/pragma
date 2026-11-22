@@ -925,6 +925,13 @@ test('a store named theme keeps its own key: the theme value is not read as stor
   assert.deepEqual([...themed.errors, ...old.errors], [])
 })
 
+test('a loop variable named like an Object.prototype member is passed to the handler', async () => {
+  const p = await open('/prefs')
+  await p.click('#picks button')
+  assert.equal(await text(p, '#got'), 'lid')
+  assert.deepEqual(p.errors, [])
+})
+
 test('event arguments accept the number literals the compiler accepts', async () => {
   const p = await open('/prefs')
   await p.click('#nums')
