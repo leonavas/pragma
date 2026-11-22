@@ -18,7 +18,7 @@ pragma build && pragma serve  # production build; run from this folder (see "Sou
 ```
 routes/
   _layout.html                 header, footer and the site-wide <head> defaults (SEO/OGP)
-  index.html                   landing: <p-audience>, <p-hero>, why, showcase, <p-principles>, install, sections
+  index.html                   landing: <p-audience>, <p-hero>, speed, install, callout, why, showcase, principles, sections
   agents.html                  /agents: the prompt, install, files for agents, the WebMCP tools
   _components/hero|principles|prompt/   landing-only pieces (<p-...>); prompt is the hero box with the agent prompt and its Copy button (same text as /agents)
   _components/audience/        Human / Agent switch (real links) + the "agents: read /llms-full.txt" note

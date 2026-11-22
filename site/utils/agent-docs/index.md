@@ -2,7 +2,7 @@
 
 Agents: the full docs are one file at {{origin}}/llms-full.txt (index: {{origin}}/llms.txt). This page in HTML: {{origin}}/. For agents: {{origin}}/agents.md.
 
-Paste this into your coding agent. It reads the docs, builds the app and checks every line.
+Fast as plain HTML, structured to scale. Paste this into your coding agent. It reads the docs, builds the app and checks every line.
 
 ```
 Read {{origin}}/llms-full.txt and create a pragma app that [describe your app]. Install pragma if missing, or validate the version with pragma -V and .pragma/version and run pragma self-update and pragma upgrade if outdated. Follow the AGENTS.md that pragma new writes into the app, and finish with pragma check --strict at zero errors and zero warnings.
@@ -10,6 +10,12 @@ Read {{origin}}/llms-full.txt and create a pragma app that [describe your app]. 
 
 - [Install the CLI yourself](#install)
 - [Read the guide]({{origin}}/guide)
+
+## The speed of one HTML file, built to scale
+
+No framework beats plain HTML, CSS and JS in one file. It just doesn't scale.
+
+pragma gives that code a structure that grows: routes, components, stores, one way to do each thing. The build keeps the speed: prebuilt HTML, no virtual DOM, one JS chunk per route and only the CSS each page can match.
 
 ## Install
 
