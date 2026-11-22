@@ -1,3 +1,4 @@
+use crate::scan::var_names;
 use crate::table::{PALETTE, TONES};
 use std::collections::HashSet;
 use std::fmt::Write;
@@ -194,21 +195,7 @@ fn decl_var(line: &str) -> Option<(&str, &str)> {
 }
 
 fn collect_var_refs(css: &str, out: &mut HashSet<String>) {
-    let mut rest = css;
-    while let Some(i) = rest.find("var(") {
-        let after = rest[i + 4..].trim_start();
-        if after.starts_with("--") {
-            let len = after
-                .find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
-                .unwrap_or(after.len());
-            if len > 2 {
-                out.insert(after[..len].to_string());
-            }
-            rest = &after[len..];
-        } else {
-            rest = after;
-        }
-    }
+    out.extend(var_names(css).filter(|name| name.starts_with("--") && name.len() > 2).map(str::to_string));
 }
 
 fn render(filter: Option<(&HashSet<String>, &str)>) -> String {

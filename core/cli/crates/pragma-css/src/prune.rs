@@ -1,6 +1,7 @@
 //! Route-level CSS trimming: theme rules that cannot match a route's markup, and the fonts it uses.
 
-use crate::scope::{NESTING, block_end, block_end_with, compounds, find_top, split_top};
+use crate::scan::{at_name, block_end, block_end_with, compounds, find_top, split_top, strip_comments, top_level, var_names};
+use crate::scope::{NESTING, OWNED_END};
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 /// Element names and classes a route's markup can have (static classes and `.x` toggles).
@@ -42,11 +43,6 @@ fn items(css: &str) -> Vec<Item<'_>> {
         rest = &rest[(close + 1).min(rest.len())..];
     }
     out
-}
-
-fn at_name(prelude: &str) -> Option<String> {
-    let at = prelude.trim_start().strip_prefix('@')?;
-    Some(at.split(|c: char| c.is_whitespace() || c == '{' || c == '(').next().unwrap_or("").to_ascii_lowercase())
 }
 
 fn at_param(prelude: &str) -> &str {
@@ -121,12 +117,17 @@ fn push_decl<'a>(decl: &'a str, out: &mut Vec<(String, &'a str)>) {
     }
 }
 
+/// A selector with nesting (`&`) or a namespace (`|`) is not read: it can match any element.
+fn matches_any_element(selector: &str) -> bool {
+    selector.contains(['&', '|'])
+}
+
 /// Whether a selector (one item of a list) can match an element of `markup`: each compound outside
 /// `:is()`, `:not()`, `[…]` and the like needs its element name and all its classes in the markup.
 /// Attributes, ids and pseudo-classes never rule a selector out.
 pub fn may_match(selector: &str, markup: &Markup) -> bool {
     let s = selector.trim();
-    if s.contains('&') || s.contains('|') {
+    if matches_any_element(s) {
         return true;
     }
     compounds(s).into_iter().all(|(start, end)| compound_may_match(&s[start..end], markup))
@@ -141,39 +142,29 @@ fn compound_may_match(compound: &str, markup: &Markup) -> bool {
             return false;
         }
     }
-    let (mut depth, mut i, mut quote) = (0i32, tag_len, 0u8);
-    while i < b.len() {
-        let c = b[i];
-        if quote != 0 {
-            if c == b'\\' {
-                i += 1;
-            } else if c == quote {
-                quote = 0;
-            }
-        } else {
-            match c {
-                b'"' | b'\'' => quote = c,
-                b':' if depth == 0 && (compound[i..].starts_with(":is(") || compound[i..].starts_with(":where(")) => {
-                    let open = i + compound[i..].find('(').unwrap();
-                    let close = open + 1 + block_end_with(&compound[open + 1..], '(', ')');
-                    if !split_top(&compound[open + 1..close.min(b.len())], ',').iter().any(|s| may_match(s, markup)) {
-                        return false;
-                    }
-                    i = close;
-                }
-                b'(' | b'[' => depth += 1,
-                b')' | b']' => depth -= 1,
-                b'.' if depth == 0 => {
-                    let (class, len) = ident(&compound[i + 1..]);
-                    if !class.is_empty() && !markup.classes.contains(&class) {
-                        return false;
-                    }
-                    i += len;
-                }
-                _ => {}
-            }
+    let mut resume = tag_len;
+    for (i, c) in top_level(compound) {
+        if i < resume {
+            continue;
         }
-        i += 1;
+        match c {
+            b':' if compound[i..].starts_with(":is(") || compound[i..].starts_with(":where(") => {
+                let open = i + compound[i..].find('(').unwrap();
+                let close = open + 1 + block_end_with(&compound[open + 1..], '(', ')');
+                if !split_top(&compound[open + 1..close.min(b.len())], ',').iter().any(|s| may_match(s, markup)) {
+                    return false;
+                }
+                resume = close + 1;
+            }
+            b'.' => {
+                let (class, len) = ident(&compound[i + 1..]);
+                if !class.is_empty() && !markup.classes.contains(&class) {
+                    return false;
+                }
+                resume = i + 1 + len;
+            }
+            _ => {}
+        }
     }
     true
 }
@@ -206,17 +197,6 @@ fn ident(s: &str) -> (String, usize) {
         }
     }
     (out, s.len())
-}
-
-fn strip_comments(css: &str) -> String {
-    let mut out = String::with_capacity(css.len());
-    let mut rest = css;
-    while let Some(i) = rest.find("/*") {
-        out.push_str(&rest[..i]);
-        rest = rest[i + 2..].find("*/").map_or("", |j| &rest[i + 2 + j + 2..]);
-    }
-    out.push_str(rest);
-    out
 }
 
 fn unquote(s: &str) -> String {
@@ -342,7 +322,7 @@ pub fn own_selectors(css: &str, marker: &str) -> BTreeSet<OwnSelector> {
             let sel = sel.trim();
             let parts = compounds(sel);
             let Some(at) = parts.iter().position(|(start, end)| sel[*start..*end].contains(marker)) else { continue };
-            if sel.contains('&') || sel.contains('|') {
+            if matches_any_element(sel) {
                 out.insert(OwnSelector { own: own_compound(""), ancestors: Vec::new() });
                 continue;
             }
@@ -361,14 +341,14 @@ pub fn scoped_subjects(css: &str, marker: &str) -> Vec<ScopedSubject> {
     each_rule(css, &mut |prelude, _| {
         for sel in split_top(prelude, ',') {
             let sel = sel.trim();
-            if sel.contains('&') || sel.contains('|') {
+            if matches_any_element(sel) {
                 continue;
             }
             let parts = compounds(sel);
             let Some(&(start, end)) = parts.iter().find(|(start, end)| sel[*start..*end].contains(marker)) else { continue };
             let compound = &sel[start..end];
             let at = compound.find(marker).unwrap();
-            let close = at + compound[at..].find("])").map_or(compound.len() - at, |i| i + 2);
+            let close = at + compound[at..].find(OWNED_END).map_or(compound.len() - at, |i| i + OWNED_END.len());
             let bare = format!("{}{}", &compound[..at], &compound[close..]);
             out.push(ScopedSubject {
                 own: own_compound(&bare),
@@ -396,50 +376,40 @@ fn own_compound(compound: &str) -> OwnCompound {
     let mut tag = (tag_len > 0 && b[0].is_ascii_alphabetic()).then(|| compound[..tag_len].to_ascii_lowercase());
     let mut classes = Vec::new();
     let mut any_of = Vec::new();
-    let (mut depth, mut i, mut quote) = (0i32, tag_len, 0u8);
-    while i < b.len() {
-        let c = b[i];
-        if quote != 0 {
-            if c == b'\\' {
-                i += 1;
-            } else if c == quote {
-                quote = 0;
-            }
-        } else {
-            match c {
-                b'"' | b'\'' => quote = c,
-                b':' if depth == 0 && [":is(", ":where(", ":matches(", ":-webkit-any("].iter().any(|p| compound[i..].to_ascii_lowercase().starts_with(p)) => {
-                    let open = i + compound[i..].find('(').unwrap();
-                    let close = open + 1 + block_end_with(&compound[open + 1..], '(', ')');
-                    let alts: Vec<OwnCompound> = split_top(&compound[open + 1..close.min(b.len())], ',').into_iter().map(|alt| subject(alt.trim())).collect();
-                    if !alts.iter().any(OwnCompound::is_any) {
-                        any_of.push(alts);
-                    }
-                    i = close;
-                }
-                b':' if depth == 0 && ident(&compound[i + 1..]).0.eq_ignore_ascii_case("root") => {
-                    tag.get_or_insert_with(|| "html".into());
-                }
-                b'(' | b'[' => depth += 1,
-                b')' | b']' => depth -= 1,
-                b'.' if depth == 0 => {
-                    let (class, len) = ident(&compound[i + 1..]);
-                    if !class.is_empty() {
-                        classes.push(class);
-                    }
-                    i += len;
-                }
-                _ => {}
-            }
+    let mut resume = tag_len;
+    for (i, c) in top_level(compound) {
+        if i < resume {
+            continue;
         }
-        i += 1;
+        match c {
+            b':' if [":is(", ":where(", ":matches(", ":-webkit-any("].iter().any(|p| compound[i..].to_ascii_lowercase().starts_with(p)) => {
+                let open = i + compound[i..].find('(').unwrap();
+                let close = open + 1 + block_end_with(&compound[open + 1..], '(', ')');
+                let alts: Vec<OwnCompound> = split_top(&compound[open + 1..close.min(b.len())], ',').into_iter().map(|alt| subject(alt.trim())).collect();
+                if !alts.iter().any(OwnCompound::is_any) {
+                    any_of.push(alts);
+                }
+                resume = close + 1;
+            }
+            b':' if ident(&compound[i + 1..]).0.eq_ignore_ascii_case("root") => {
+                tag.get_or_insert_with(|| "html".into());
+            }
+            b'.' => {
+                let (class, len) = ident(&compound[i + 1..]);
+                if !class.is_empty() {
+                    classes.push(class);
+                }
+                resume = i + 1 + len;
+            }
+            _ => {}
+        }
     }
     OwnCompound { tag, classes, any_of }
 }
 
 fn subject(selector: &str) -> OwnCompound {
     match compounds(selector).last() {
-        Some(&(start, end)) if !selector.contains(['&', '|']) => own_compound(&selector[start..end]),
+        Some(&(start, end)) if !matches_any_element(selector) => own_compound(&selector[start..end]),
         _ => own_compound(""),
     }
 }
@@ -517,17 +487,13 @@ fn font_values(css: &str, markup: &Markup) -> (HashMap<String, Vec<String>>, Vec
 fn resolve(value: &str, vars: &HashMap<String, Vec<String>>, seen: &mut BTreeSet<String>, out: &mut String) {
     out.push_str(value);
     out.push(',');
-    let mut rest = value;
-    while let Some(i) = rest.find("var(") {
-        let after = rest[i + 4..].trim_start();
-        let len = after.find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_')).unwrap_or(after.len());
-        let name = after[..len].to_ascii_lowercase();
+    for name in var_names(value) {
+        let name = name.to_ascii_lowercase();
         if seen.insert(name.clone()) {
             for v in vars.get(&name).into_iter().flatten() {
                 resolve(v, vars, seen, out);
             }
         }
-        rest = &after[len..];
     }
 }
 
