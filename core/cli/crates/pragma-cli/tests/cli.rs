@@ -41,3 +41,34 @@ fn redirected_stdout_has_no_color_when_stderr_is_a_terminal() {
     assert!(stdout.contains("dist/ built in"), "{stdout}");
     assert!(!stdout.contains('\x1b'), "{stdout:?}");
 }
+
+#[cfg(unix)]
+#[test]
+fn a_build_that_cannot_write_its_output_fails() {
+    use std::os::unix::fs::PermissionsExt;
+    let tmp = tempfile::tempdir().unwrap();
+    let app = tmp.path();
+    create(app).unwrap();
+    assert_eq!(pragma(app, &["build"]).status.code(), Some(0));
+    let client = app.join("dist/client");
+    let index = client.join("index.html");
+    let mode = |m: u32| {
+        fs::set_permissions(&index, fs::Permissions::from_mode(m & 0o666)).unwrap();
+        fs::set_permissions(&client, fs::Permissions::from_mode(m)).unwrap();
+    };
+    mode(0o555);
+    if fs::write(client.join("probe"), "").is_ok() {
+        mode(0o755);
+        eprintln!("skipped: this user can write to a read-only folder");
+        return;
+    }
+    let page = fs::read_to_string(app.join("routes/index.html")).unwrap();
+    fs::write(app.join("routes/index.html"), page.replace("</h1>", " changed</h1>")).unwrap();
+    let out = pragma(app, &["build"]);
+    mode(0o755);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(out.status.code(), Some(1), "{stdout}\n{stderr}");
+    assert!(stderr.contains("dist/client/index.html") && stderr.contains("error [app/output] cannot write"), "{stderr}");
+    assert!(!stdout.contains("built in"), "{stdout}");
+}

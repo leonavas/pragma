@@ -129,6 +129,7 @@ fn sort_diags(mut d: Vec<Diagnostic>) -> Vec<Diagnostic> {
 struct Writer {
     root: PathBuf,
     written: HashSet<PathBuf>,
+    failed: Vec<Diagnostic>,
 }
 
 impl Writer {
@@ -138,10 +139,10 @@ impl Writer {
             self.written.insert(path);
             return;
         }
-        if let Some(dir) = path.parent() {
-            let _ = fs::create_dir_all(dir);
+        let written = path.parent().map_or(Ok(()), fs::create_dir_all).and_then(|()| fs::write(&path, bytes));
+        if let Err(e) = written {
+            self.failed.push(Diagnostic::error(&path, 0, 0, "app/output", format!("cannot write: {e}")));
         }
-        let _ = fs::write(&path, bytes);
         self.written.insert(path);
     }
 
@@ -528,13 +529,14 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let mut p = Project::load(&opts.root);
     let mut diags = std::mem::take(&mut p.diags);
     let mut report = BuildReport::default();
-    let mut w = Writer { root: opts.out_dir.clone(), written: HashSet::new() };
+    let mut w = Writer { root: opts.out_dir.clone(), written: HashSet::new(), failed: Vec::new() };
     let a = analyze(&p, &mut diags);
     let client = emit_client(&p, &a, opts, &mut w, &mut report, &mut diags);
     emit_server(&p, &a, &client, opts, &mut w, &mut report, &mut diags);
     for d in [layout::CLIENT, layout::SERVER] {
         w.prune(&opts.out_dir.join(d));
     }
+    diags.append(&mut w.failed);
     for d in &mut diags {
         d.file = p.origin(&d.file).to_path_buf();
     }
