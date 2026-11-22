@@ -109,7 +109,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - Read `data` inside functions only; it is undefined until `load` finishes.
 - Put stores in `lib/state/`. Access stores only through `shared`.
 - Do not write comments.
-- Use descriptive names. Do not use vague (`tmp`, `data`, `info`) or short (`t`, `e`) names, except `i`, `j`, `k`, `id`, `ok`, `el`, `url`, `log`, and parameters of one-expression arrows.
+- Use descriptive names. Do not use vague (`tmp`, `data`, `info`) or short (`t`, `e`) names, except `$`, `i`, `j`, `k`, `id`, `ok`, `el`, `ctx`, `url`, `log`, `db`, `kv`, and parameters of one-expression arrows.
 - Keep the fixed folder structure. Do not edit `.pragma/` (run `pragma upgrade` to update it).
 - Reuse existing components before creating new ones.
 - Build overlays only with `c-modal`, `c-alert`, and `c-dropdown`.
@@ -742,7 +742,7 @@ function add(title) {
 - Write `count` in JS, never `$count` (`js/dollar-in-script`).
 - Keep page-only state in the page script. Use a store for shared or persisted state, and put actions shared by 2+ pages in the store.
 - Store filters, tabs, and pagination in `query`, read by a derived function.
-- `persist` saves listed `let` names to `localStorage`; use it only for preferences, drafts, and local-only data.
+- `persist` saves listed `let` names to `localStorage` (key `pragma:<store>`; a store named `theme` uses `pragma:store:theme`, because `pragma:theme` belongs to `.pragma/theme.js`); use it only for preferences, drafts, and local-only data.
 - Declare mutated top-level state with `let`, not `const` (`js/const-state`).
 - Do not use `var`, destructuring `let`, or top-level `await`. Use `export` only for props (or `persist` in stores).
 - Access stores only through `shared`; direct store imports trigger `js/store-import`.
@@ -1906,7 +1906,7 @@ Source: https://pragma.leonavas.com/docs/cli.md
 | `pragma build [--allow-outdated-core]` | Builds `dist/` and prints the JS gzip size of each page (information only, no limits). Stops with `app/core-outdated` if `.pragma/` is older than the CLI (`--allow-outdated-core` overrides this). |
 | `pragma serve [--port 3000] [--host 127.0.0.1]` | Serves `dist/` as in production. |
 | `pragma upgrade` | Syncs `.pragma/` (runtime, docs, `base.css`, `version`) with the installed CLI version. Prints updated, added, or removed files. Never edits files outside `.pragma/`. |
-| `pragma self-update [version]` | Downloads the latest or specified `pragma` binary from GitHub Releases, verifies `SHA256SUMS.txt`, and replaces the executable. |
+| `pragma self-update [version]` | Downloads the latest or specified `pragma` binary from GitHub Releases, verifies it with `SHA256SUMS.txt`, and replaces the executable. If the checksum is missing or wrong, it stops and does not change the binary. |
 
 Run `pragma check --strict` before you finish. Fix all errors and warnings.
 Output format: `file:line:column error|warning [rule] message`.
@@ -1955,6 +1955,7 @@ Fix the root cause; do not work around a rule.
 | `html/script`, `html/style-inline`, `html/on-inline` | Put at most one `<script>` (optional `type="module"`) and one `<style>` at the top level of a page or component `.html`. Replace `style="..."` with classes, or with `:--name="path"` and `var(--name)` in CSS (`css.md`). Put JSON-LD `<script type="application/ld+json">` only at the top level of a page (`routes.md`). |
 | `html/json-ld` | Fix invalid JSON or unclosed `{` in JSON-LD strings. Use `{` for a literal brace. |
 | `css/unknown-class`, `css/arbitrary-value` | Use classes from `classes.md` or custom classes per `css.md`. |
+| `css/utility-name` | In `lib/theme.css`, do not write a rule whose selector is only a utility name (`.flex`, `.hidden:hover`). Rename the class (`css.md`). |
 | `css/unmatched-selector` (warning) | A page or component selector matches no element its owner writes (slot content, child component markup). Wrap the outside part in `:global(…)` or move the style to the writer (`css.md`). |
 | `app/structure`, `app/route-conflict` | Follow structure and route rules (`structure.md`, `routes.md`). |
 | `app/endpoint`, `app/middleware` | An endpoint exports only `GET`/`POST`/`PUT`/`PATCH`/`DELETE`; the middleware exports `handle` (`data.md`). |
@@ -1962,6 +1963,7 @@ Fix the root cause; do not work around a rule.
 | `app/package` | Follow package rules (`packages.md`). |
 | `app/pragma-json` | Fix `pragma.json` (`structure.md`). |
 | `app/core-outdated` (warning; error in `pragma build`) | `.pragma/` differs from the CLI version. Run `pragma upgrade`. Do not edit `.pragma/` by hand. |
+| `internal` (`pragma dev`) | The compiler stopped with a bug. Report it with the file you changed last. |
 
 ## Accessibility (`a11y/*`, warnings; errors with `--strict`)
 

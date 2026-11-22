@@ -217,7 +217,7 @@ function add(title) {
 - Write `count` in JS, never `$count` (`js/dollar-in-script`).
 - Keep page-only state in the page script. Use a store for shared or persisted state, and put actions shared by 2+ pages in the store.
 - Store filters, tabs, and pagination in `query`, read by a derived function.
-- `persist` saves listed `let` names to `localStorage`; use it only for preferences, drafts, and local-only data.
+- `persist` saves listed `let` names to `localStorage` (key `pragma:<store>`; a store named `theme` uses `pragma:store:theme`, because `pragma:theme` belongs to `.pragma/theme.js`); use it only for preferences, drafts, and local-only data.
 - Declare mutated top-level state with `let`, not `const` (`js/const-state`).
 - Do not use `var`, destructuring `let`, or top-level `await`. Use `export` only for props (or `persist` in stores).
 - Access stores only through `shared`; direct store imports trigger `js/store-import`.
