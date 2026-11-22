@@ -123,3 +123,30 @@ fn upgrade_removes_an_emptied_core_folder() {
     assert_eq!(upgrade(app).unwrap().removed, ["core/boot.js", "core/server/handler.js"]);
     assert!(!app.join("core").exists());
 }
+
+#[cfg(unix)]
+#[test]
+fn an_upgrade_stopped_halfway_can_run_again() {
+    use std::os::unix::fs::PermissionsExt;
+    let tmp = tempfile::tempdir().unwrap();
+    let app = tmp.path();
+    create(app).unwrap();
+    for rel in ["core/base.css", "core/boot.js", "core/server/handler.js"] {
+        fs::create_dir_all(app.join(rel).parent().unwrap()).unwrap();
+        fs::write(app.join(rel), "old").unwrap();
+    }
+    let server = app.join("core/server");
+    let mode = |m: u32| fs::set_permissions(&server, fs::Permissions::from_mode(m)).unwrap();
+    mode(0o555);
+    if fs::write(server.join("probe"), "").is_ok() {
+        mode(0o755);
+        eprintln!("skipped: this user can write to a read-only folder");
+        return;
+    }
+    let stopped = upgrade(app);
+    mode(0o755);
+    assert!(stopped.is_err(), "{stopped:?}");
+    assert!(app.join("core/server/handler.js").is_file());
+    assert!(upgrade(app).unwrap().removed.contains(&"core/server/handler.js".to_string()));
+    assert!(!app.join("core").exists(), "the second run removes what the first left");
+}

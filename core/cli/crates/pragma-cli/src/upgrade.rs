@@ -60,7 +60,8 @@ fn legacy_files(root: &Path) -> Vec<String> {
     legacy::FILES.iter().filter(|rel| root.join(rel).is_file()).map(|rel| rel.to_string()).collect()
 }
 
-/// Makes `.pragma/` equal to the embedded version and removes the files of the old `core/` layout.
+/// Makes `.pragma/` equal to the embedded version and removes the files of the old `core/` layout,
+/// its markers last: a run that stops halfway still finds the layout the next time.
 pub fn upgrade(root: &Path) -> Result<CoreDiff, String> {
     let changes = diff(root);
     for (rel, content) in core_files() {
@@ -68,7 +69,8 @@ pub fn upgrade(root: &Path) -> Result<CoreDiff, String> {
             write(&root.join(&rel), content)?;
         }
     }
-    for rel in &changes.removed {
+    let (markers, rest): (Vec<&String>, Vec<&String>) = changes.removed.iter().partition(|rel| legacy::MARKERS.contains(&rel.as_str()));
+    for rel in rest.into_iter().chain(markers) {
         let path = root.join(rel);
         std::fs::remove_file(&path).map_err(|e| format!("cannot remove '{}': {e}", path.display()))?;
         let base = root.join(if is_legacy(rel) { legacy::DIR } else { ".pragma" });
