@@ -18,5 +18,9 @@
   { "pattern": "/motion", "html": "/motion.html", "modules": ["/assets/motion.js", "/assets/cart.js"], "loader": false, "ssr": false },
   { "pattern": "/tree", "html": "/tree.html", "modules": ["/assets/tree.js", "/assets/node.js"], "loader": false, "ssr": false },
   { "pattern": "/private", "html": "/private.html", "modules": ["/assets/cart.js"], "loader": false, "ssr": false },
-  { "pattern": "/tidy", "html": "/tidy.html", "modules": ["/assets/cart.js"], "loader": false, "ssr": false }
+  { "pattern": "/tidy", "html": "/tidy.html", "modules": ["/assets/cart.js"], "loader": false, "ssr": false },
+  { "pattern": "/docs/:a/:b", "html": "/docs/[a]/[b].html", "modules": ["/assets/cart.js"], "loader": false, "ssr": false },
+  { "pattern": "/:x/y/z", "html": "/[x]/y/z.html", "modules": ["/assets/cart.js"], "loader": false, "ssr": false },
+  { "pattern": "/menu", "html": "/menu.html", "modules": ["/assets/menu.js", "/assets/cart.js"], "loader": false, "ssr": false },
+  { "pattern": "/prefs", "html": "/prefs.html", "modules": ["/assets/prefs.js", "/assets/cart.js", "/assets/theme.js"], "loader": false, "ssr": false }
 ]

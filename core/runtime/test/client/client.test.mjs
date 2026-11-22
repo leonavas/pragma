@@ -895,3 +895,50 @@ test('a component renders itself: tree from data, adopts prerendered levels, dep
   await tick(p)
   assert.match(p.errors.join(' | '), /<c-node> is nested more than 64 levels inside itself/)
 })
+
+test('router: a link picks the same route as a full load (static segment first, as on the server)', async () => {
+  const p = await open('/net')
+  await p.evaluate(() => __net.navigate('/docs/y/z'))
+  await p.waitForFunction(() => location.pathname === '/docs/y/z' && document.querySelector('#title')?.textContent !== 'Net')
+  assert.equal(await text(p, '#title'), 'Docs')
+  const full = await open('/docs/y/z')
+  assert.equal(await text(full, '#title'), 'Docs')
+  assert.deepEqual(p.errors, [])
+})
+
+test('an overlay that exists only inside a block opens', async () => {
+  const p = await open('/menu')
+  await p.click('#open-m2')
+  await p.waitForFunction(() => document.querySelector('#m2').open)
+  assert.deepEqual(p.errors, [])
+})
+
+test('a store named theme keeps its own key: the theme value is not read as store data, old store data moves', async () => {
+  const visit = async init => {
+    const ctx = await browser.newContext()
+    await ctx.addInitScript(init)
+    const page = await ctx.newPage()
+    page.errors = []
+    page.on('pageerror', e => page.errors.push(e.message))
+    await page.goto(server.url + '/prefs')
+    await page.waitForFunction(() => document.querySelector('#mode').textContent !== '')
+    return page
+  }
+  const themed = await visit(() => localStorage.getItem('pragma:theme') ?? localStorage.setItem('pragma:theme', 'dark'))
+  assert.equal(await text(themed, '#mode'), 'narrow')
+  await themed.click('#wide')
+  await themed.waitForFunction(() => localStorage.getItem('pragma:store:theme') === '{"mode":"wide"}')
+  assert.equal(await themed.evaluate(() => localStorage.getItem('pragma:theme')), 'dark')
+
+  const old = await visit(() => localStorage.getItem('pragma:store:theme') ?? localStorage.setItem('pragma:theme', '{"mode":"wide"}'))
+  assert.equal(await text(old, '#mode'), 'wide')
+  assert.deepEqual(await old.evaluate(() => [localStorage.getItem('pragma:theme'), localStorage.getItem('pragma:store:theme')]), [null, '{"mode":"wide"}'])
+  assert.deepEqual([...themed.errors, ...old.errors], [])
+})
+
+test('event arguments accept the number literals the compiler accepts', async () => {
+  const p = await open('/prefs')
+  await p.click('#nums')
+  assert.equal(await text(p, '#got'), 'number:0.5|number:1000|number:-0.0025|number:1|number:1|number:7')
+  assert.deepEqual(p.errors, [])
+})

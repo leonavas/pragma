@@ -17,10 +17,12 @@
   </style>
   <script type="module">
     import { initOverlays, open, close, confirm, closeAll, handlePopState } from '/core/overlay.js'
+    import { log } from '/core/log.js'
     const errors = []
-    initOverlays({ log: { error: (msg, attrs) => errors.push([msg, attrs]) } })
+    log.error = (msg, attrs) => errors.push([msg, attrs])
+    initOverlays()
     self.navigations = 0
-    addEventListener('popstate', e => handlePopState(e) || self.navigations++)
+    addEventListener('popstate', () => handlePopState() || self.navigations++)
     document.addEventListener('click', async e => {
       if (e.target.id == 'item-js') self.r = await confirm('delete')
     })

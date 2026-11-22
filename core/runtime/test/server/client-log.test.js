@@ -19,7 +19,7 @@ before(async () => {
   })
   globalThis.fetch = async (url, init) => (posts.push({ url, init }), new Response(null, { status: 204 }))
   mod = await import('../../log.js')
-  mod.initClientLog({ endpoint: '/_otel', service: 'shop-web' })
+  mod.initClientLog('shop-web')
 })
 
 test('client log.js is under 1.5 KB gzip', () => {

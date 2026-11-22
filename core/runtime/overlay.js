@@ -1,7 +1,8 @@
 import { afterMotion } from './directives.js'
+import { log } from './log.js'
 
 let stack = []
-let log, opener
+let opener
 let backs = 0
 let pushes = 0
 let anchors = 0
@@ -116,8 +117,7 @@ function onClick(ev) {
   open(id, b)
 }
 
-export function initOverlays(o = {}) {
-  log = o.log
+export function initOverlays() {
   document.addEventListener('click', onClick)
   document.addEventListener('close', e => e.target.open || refocus(e.target, done(e.target)?.o), true)
   document.addEventListener('cancel', e => {
@@ -137,7 +137,7 @@ export function initOverlays(o = {}) {
 
 export function open(id, o = document.activeElement) {
   const el = get(id)
-  if (!el) return log?.error('overlay not found', { 'pragma.overlay.id': id })
+  if (!el) return log.error('overlay not found', { 'pragma.overlay.id': id })
   if (el.popover) {
     if (el.matches(':popover-open')) return
     opener = o

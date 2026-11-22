@@ -2,17 +2,13 @@ import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 import { join, extname } from 'node:path'
+import { OTEL, apiTarget, matchRoute, sortRoutes } from '../../contract.js'
 
 const here = fileURLToPath(new URL('.', import.meta.url))
 const fixtures = join(here, 'fixtures')
 const runtime = join(here, '../..')
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.css': 'text/css' }
 const wait = ms => new Promise(r => setTimeout(r, ms))
-
-const match = (pattern, path) => {
-  const a = pattern.split('/'), b = path.split('/')
-  return a.length === b.length && a.every((s, i) => s[0] === ':' || s === b[i])
-}
 
 function send(res, status, body, type = 'application/json') {
   res.writeHead(status, { 'content-type': type, 'cache-control': 'no-store' })
@@ -50,19 +46,20 @@ export function start() {
     const url = new URL(req.url, 'http://x')
     const path = decodeURIComponent(url.pathname)
     try {
-      if (path === '/_otel') return send(res, 204, '')
-      if (path.startsWith('/_data/')) return send(res, ...(await data(path.slice(6))))
-      if (path.startsWith('/_action/')) {
+      const api = apiTarget(path)
+      if (path === OTEL) return send(res, 204, '')
+      if (api?.kind === 'data') return send(res, ...(await data(api.target)))
+      if (api?.kind === 'action') {
         let body = ''
         for await (const c of req) body += c
-        const name = path.slice(path.lastIndexOf('/') + 1)
+        const name = api.action
         await wait(100)
         if (name === 'fail') return send(res, 500, { error: { message: 'Failed' } })
         if (name === 'go') return send(res, 200, { redirect: { status: 303, location: '/b' } })
         if (name === 'conflict') return send(res, 409, { error: { message: 'Slot taken', field: 'day' } })
         if (name === 'plain') return send(res, 400, 'bad input', 'text/plain')
         if (name === 'chat' || name === 'slow') return ndjson(res, name, req.headers.accept)
-        return send(res, 200, { name: name, route: path.slice(8, path.lastIndexOf('/')) || '/', input: JSON.parse(body) })
+        return send(res, 200, { name, route: api.target, input: JSON.parse(body) })
       }
       if (path === '/private' || path === '/private.html') {
         res.writeHead(303, { location: '/b', 'cache-control': 'no-store' })
@@ -78,9 +75,9 @@ export function start() {
       else if (extname(path)) file = join(fixtures, path)
       else {
         const manifest = JSON.parse(await readFile(join(fixtures, '_pragma/manifest.json'), 'utf8'))
-        const e = manifest.find(e => !e.pattern.includes(':') && e.pattern === path) ?? manifest.find(e => match(e.pattern, path))
-        if (!e) return send(res, 404, 'not found', 'text/plain')
-        file = join(fixtures, e.html)
+        const m = matchRoute(sortRoutes(manifest), url.pathname)
+        if (!m) return send(res, 404, 'not found', 'text/plain')
+        file = join(fixtures, m.route.html)
       }
       send(res, 200, await readFile(file), mime[extname(file)] ?? 'application/octet-stream')
     } catch {

@@ -1,26 +1,25 @@
-import { render, patch, hooks, scopeOf, input, eventCall, useBodies } from './directives.js'
+import { render, patch, hooks, scopeOf, input, eventCall, useBodies, hasOverlay, DEV, PAGE } from './directives.js'
 import { log } from './log.js'
 import { reactive, readers, onChange, persist, persistStores } from './state.js'
-import { coerce } from './props.js'
-import { load, call, stream } from './loader.js'
+import { coerce, instantiate, readonlyViews } from './binding.js'
+import { fetchData, load, loadResult, call, stream } from './loader.js'
 import { navigate, redirect } from './router.js'
+import { DATA_ID, MAIN, PERSIST_SUFFIX, matchPattern } from './contract.js'
 
-let ov
-export let overlay
-// overlay.js is only fetched on pages with overlays; the build modulepreloads it there.
-export const overlays = () => (ov ??= import('./overlay.js').then(m => (m.initOverlays({ log }), (overlay = m))))
+let overlayModule = null, overlayLoad = null
+const overlays = () => (overlayLoad ??= import('./overlay.js').then(m => (m.initOverlays(), (overlayModule = m))))
 const open = (...a) => overlays().then(m => m.open(...a))
 const close = (...a) => overlays().then(m => m.close(...a))
 const confirm = (...a) => overlays().then(m => m.confirm(...a))
+export const closeOverlays = () => overlayModule?.closeAll() ?? 0
+export const popOverlay = () => overlayModule?.handlePopState() ?? false
 
 const C = Symbol(), O = Symbol(), mounted = new Set(), comps = {}, types = new Set()
-export const shared = {}
+const shared = {}
 let cur, queued, whole, mounts = []
 const dirty = new Set()
 
-// A state change read only by bindings (`:--x`, `{x}`, `:attr`, `:class`, `:show`) patches those
-// bindings; anything else (no key, a key read by a block, prop or component, a key never read) renders the page.
-export function schedule(target, key) {
+function schedule(target, key) {
   if (!whole) {
     const r = target && readers(target, key)
     if (r) dirty.add(r)
@@ -43,15 +42,12 @@ function flush() {
   whole = false
   render(document.body, { __proto__: null, shared, params: cur.params, query: cur.query, page: cur.page })
   persistStores()
-  // `function mount(el)`: el is the component root, or the page's `<main data-page>`
   for (const o of mounts.splice(0)) {
     if (!mounted.has(o)) continue
     try { cleanup(o, o.mount?.(o.el)) } catch (e) { reportError(e) }
   }
 }
 
-// `async function mount(el)`: the cleanup is what the promise resolves to; if the component is gone
-// by then, it runs at once.
 function cleanup(o, off) {
   if (typeof off?.then !== 'function') return void (o.off = off)
   off.then(fn => {
@@ -70,7 +66,7 @@ function runFrame(now) {
   for (const fn of callbacks) try { fn(now) } catch (e) { reportError(e) }
 }
 
-export function frame(fn) {
+function frame(fn) {
   frameCallbacks.push(fn)
   frameRequest ||= requestAnimationFrame(runFrame)
   return () => {
@@ -79,54 +75,29 @@ export function frame(fn) {
   }
 }
 
-// Dev: a prop object is read-only all the way down (writing to it would change the caller's data).
-const views = new WeakMap()
-function readonly(v, name) {
-  if (v === null || typeof v !== 'object') return v
+const plain = v => {
   const proto = Object.getPrototypeOf(v)
-  if (proto !== Object.prototype && proto !== null && !Array.isArray(v)) return v
-  let view = views.get(v)
-  if (!view) {
-    const deny = () => {
-      throw new TypeError(`pragma: "${name}" is a prop: props are read-only, also inside; copy what you change into a let (\`let rows = ${name}.map(row => ({ ...row }))\`)`)
-    }
-    const get = (t, k, r) => (typeof k === 'symbol' ? Reflect.get(t, k, r) : readonly(Reflect.get(t, k, r), name))
-    view = new Proxy(v, { get, set: deny, deleteProperty: deny, defineProperty: deny })
-    views.set(v, view)
-  }
-  return view
+  return proto === Object.prototype || proto === null || Array.isArray(v)
 }
+const readonly = readonlyViews(plain, name => `pragma: "${name}" is a prop: props are read-only, also inside; copy what you change into a let (\`let rows = ${name}.map(row => ({ ...row }))\`)`)
 
-// What `import { … } from 'pragma'` gives a script (the build rewrites `data` to `$pragma.data`): live
-// values, so `data` is the current page's once the loader is done.
 const services = {
   shared, log, navigate, open, close, confirm, frame,
   get data() { return reactive(cur?.data) },
   get params() { return cur?.params },
   get query() { return cur?.query },
   get page() { return cur?.page },
-  call: (name, data) => call(cur.url, name, data),
-  stream: (name, data, options) => stream(cur.url, name, data, options),
+  call: (name, data) => call(cur.url, name, data, navigate),
+  stream: (name, data, options) => stream(cur.url, name, data, options, navigate),
 }
 
-// A page or component instance: `scope` is what its HTML reads as `$x` (state, props, functions).
-// Props come from data-with-<name> (values from the caller's scope, `w`) or data-prop-<name> (text).
 function instance(el, mod, w) {
   const target = {}, o = { el, w, target }
   o.scope = reactive(target)
-  const prop = (name, d) => {
-    const k = name.toLowerCase()
-    Object.defineProperty(target, name, {
-      enumerable: true,
-      get: () => {
-        const v = coerce(o.w && Object.hasOwn(o.w, k) ? o.w[k] : el.getAttribute('data-prop-' + k) ?? undefined, d)
-        return self.__pragmaDev ? readonly(v, name) : v
-      },
-    })
-  }
-  const api = mod.default?.(o.scope, { __proto__: services, prop }) ?? {}
-  for (const k in api) if (k !== 'mount') target[k] = api[k]
-  o.mount = api.mount
+  o.mount = instantiate(mod, target, o.scope, services, (k, d, name) => {
+    const v = coerce(o.w && Object.hasOwn(o.w, k) ? o.w[k] : el.getAttribute('data-prop-' + k) ?? undefined, d)
+    return DEV ? readonly(v, name) : v
+  })
   mounted.add(o)
   mounts.push(o)
   return (el[C] = o)
@@ -148,7 +119,7 @@ function unmount(o) {
 hooks.on = t => types.has(t) || (types.add(t), document.addEventListener(t, onEvent, true))
 hooks.remove = n => { for (const o of mounted) if (n.contains(o.el)) unmount(o) }
 hooks.enter = (el, s, x, w = null) => {
-  if (x === 2) return { __proto__: s, data: reactive(cur.data), state: cur.o.scope, [O]: cur.o }
+  if (x === PAGE) return { __proto__: s, data: reactive(cur.data), state: cur.o.scope, [O]: cur.o }
   const mod = comps[el.dataset.c]
   if (!mod) return s
   const o = el[C] ?? instance(el, mod, w)
@@ -162,7 +133,7 @@ function onEvent(e) {
   if (!el) return
   const o = scopeOf(el)?.[O] ?? cur.o, [name, args, store] = eventCall(el, e.type, e), fn = store ?? o.target[name]
   if (typeof fn !== 'function') {
-    if (self.__pragmaDev) throw new Error(`pragma: @${e.type}="${name}" needs a function, but "${name}" holds ${fn === null ? 'null' : typeof fn} (in the ${name.includes('.') ? 'store' : 'script'}): use a function or a const holding one (\`const saveLater = debounce(save, 300)\`)`)
+    if (DEV) throw new Error(`pragma: @${e.type}="${name}" needs a function, but "${name}" holds ${fn === null ? 'null' : typeof fn} (in the ${name.includes('.') ? 'store' : 'script'}): use a function or a const holding one (\`const saveLater = debounce(save, 300)\`)`)
     return
   }
   if (e.type === 'submit') e.preventDefault()
@@ -176,7 +147,7 @@ onChange(schedule)
 const importPart = async u => {
   const [file, name] = u.split('#')
   const m = await import(file)
-  return name ? { default: m[name], persist: m[`${name}$persist`] } : m
+  return name ? { default: m[name], persist: m[name + PERSIST_SUFFIX] } : m
 }
 
 export async function importRoute(r) {
@@ -190,16 +161,37 @@ export function leave() {
   for (const o of mounted) if (cur.o.el.contains(o.el)) unmount(o)
 }
 
-export function enter(route, mods, url, params, doc, pending) {
+function settle(p, result) {
+  p.data = result.data
+  p.page.error = result.error
+  p.page.loading = false
+  if (result.error) log.error('loader failed', { 'url.path': p.url.pathname, 'error.message': result.error.message })
+}
+
+function loadData(p, doc, pending) {
+  if (!p.route.loader) return Promise.resolve()
+  const embedded = p.route.ssr && doc.getElementById(DATA_ID)
+  if (embedded) {
+    const result = loadResult(JSON.parse(embedded.textContent))
+    if (!result.redirect) settle(p, result)
+    return Promise.resolve().then(() => cur === p && result.redirect && redirect(result.redirect, true))
+  }
+  p.page.loading = true
+  return load(pending ?? fetchData(p.url)).then(result => {
+    if (!result) return cur === p && schedule()
+    if (!result.redirect) settle(p, result)
+    if (cur === p) return result.redirect ? redirect(result.redirect, true) : schedule()
+  })
+}
+
+export function enter(route, mods, url, doc, pending) {
   useBodies(mods.bodies, !cur)
   Object.assign(comps, mods.comps)
   for (const [name, mod] of Object.entries(mods.stores)) shared[name] ??= store(name, mod)
-  if (document.querySelector('dialog,[popover]')) overlays()
-  const p = (cur = { route, url, params, query: Object.fromEntries(url.searchParams), page: { loading: false, error: null } })
-  // with ssr the loader sets `data` synchronously, so the page script sees it as the server did
-  const loaded = load(p, doc, pending), waiting = p.page.loading
-  const done = loaded.then(to => cur === p && (to ? redirect(to, true) : waiting && schedule()))
-  p.o = instance(document.querySelector('main[data-page]'), mods.page ?? {}, null)
+  if (hasOverlay(document)) overlays()
+  const p = (cur = { route, url, params: matchPattern(route.pattern, url.pathname) ?? {}, query: Object.fromEntries(url.searchParams), page: { loading: false, error: null } })
+  const done = loadData(p, doc, pending)
+  p.o = instance(document.querySelector(MAIN), mods.page ?? {}, null)
   whole = true
   flush()
   return done

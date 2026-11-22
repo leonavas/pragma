@@ -1,3 +1,5 @@
+import { STORE_KEY, THEME_KEY } from './contract.js'
+
 // Reactive values: a deep Proxy over plain objects and arrays. Every change calls `notify(target, key)`,
 // which page.js turns into one render per microtask. Functions, DOM nodes and class instances are not wrapped.
 const proxies = new WeakMap(), raws = new WeakMap(), persisted = []
@@ -25,7 +27,7 @@ function read(target, key) {
 }
 
 export const onChange = fn => { notify = fn }
-export const raw = v => raws.get(v) ?? v
+const raw = v => raws.get(v) ?? v
 
 function wrappable(v) {
   if (v === null || typeof v !== 'object' || raws.has(v)) return false
@@ -67,17 +69,26 @@ export function reactive(v) {
   return p
 }
 
-// Store fields listed in `export const persist = [...]` live in localStorage['pragma:<store>'].
-const key = name => 'pragma:' + name
+const key = STORE_KEY
 const pick = (target, keys) => JSON.stringify(Object.fromEntries(keys.filter(k => k in target).map(k => [k, target[k]])))
 
 function restore(target, keys, saved) {
   if (saved && typeof saved === 'object') for (const k of keys) if (k in saved) target[k] = saved[k]
 }
 
+function saved(k) {
+  const text = localStorage.getItem(k)
+  if (text != null || k !== key('theme')) return JSON.parse(text)
+  const old = JSON.parse(localStorage.getItem(THEME_KEY))
+  if (old === null || typeof old !== 'object') return null
+  localStorage.setItem(k, JSON.stringify(old))
+  localStorage.removeItem(THEME_KEY)
+  return old
+}
+
 export function persist(target, name, keys) {
   if (!keys?.length) return
-  try { restore(target, keys, JSON.parse(localStorage.getItem(key(name)))) } catch {}
+  try { restore(target, keys, saved(key(name))) } catch {}
   persisted.push({ target, keys, k: key(name), j: pick(target, keys) })
 }
 

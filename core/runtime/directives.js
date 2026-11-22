@@ -1,14 +1,19 @@
 import { readBy, forgetReads } from './state.js'
+import { cssValue, lookup, template as parts } from './binding.js'
+import { KEY, LAYOUT_PREFIX, OF } from './contract.js'
+
+const TEXT = 0, SHOW = 1, ATTR = 2, CLASS = 3, ATTR_TEMPLATE = 4, MARKER = 5, CSS_VAR = 6
+const IF = 1, FOR = 2, ELSE = 3, ELIF = 4
+export const COMPONENT = 1, PAGE = 2
 
 const D = Symbol(), S = Symbol(), L = Symbol(), NONE = { b: [] }
-// Outer scope of each open component; slot content (data-slot="n") uses the one n levels up.
 const outer = []
-// Open `data-self` roots (a component inside itself); more than SELF_DEPTH means the data never ends.
-export const SELF_DEPTH = 64
+const SELF_DEPTH = 64
 let deep = 0
 let layoutBodies = null, pageBodies = null
-const parsed = new WeakMap()
+const parsed = new WeakMap(), overlays = new WeakMap()
 const NS = { 'http://www.w3.org/2000/svg': 'svg', 'http://www.w3.org/1998/Math/MathML': 'math' }
+export const DEV = Boolean(self.__pragmaDev)
 
 export const hooks = { on() {}, enter: (el, s) => s, remove() {} }
 export const scopeOf = el => el[S]
@@ -17,53 +22,30 @@ const fail = msg => { throw new Error('pragma: ' + msg) }
 const path = v => v.split('.')
 const cond = v => (v[0] === '!' ? [path(v.slice(1)), true] : [path(v), false])
 const JSON_LITERAL = /^(?:true|false|null|-?\d+(?:\.\d+)?|".*")$/s
+const NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?$/
 const operand = v => (JSON_LITERAL.test(v) ? { v: JSON.parse(v) } : path(v))
 
-// A function met on a path is a derived value: called with no args.
-export function get(s, p) {
-  let v = s
-  for (const k of p) {
-    const o = v
-    if (o == null || !(k in Object(o))) {
-      if (self.__pragmaDev && p[0] !== 'query') fail(`unknown path "${p.join('.')}"`)
-      return
-    }
-    v = o[k]
-    if (typeof v === 'function') v = v.call(o)
-  }
-  return v
-}
-
-// Template "a {path} b": [literal, path, literal, …]; `\{` is a literal brace.
-const TPL = /\\\{|\{([^{}]*)\}/g
-export function template(v) {
-  const t = ['']
-  let at = 0
-  for (const m of v.matchAll(TPL)) {
-    t[t.length - 1] += v.slice(at, m.index)
-    if (m[1] == null) t[t.length - 1] += '{'
-    else t.push(path(m[1]), '')
-    at = m.index + m[0].length
-  }
-  t[t.length - 1] += v.slice(at)
-  return t
-}
-
+const unknown = p => (DEV ? fail(`unknown path "${p}"`) : undefined)
+const get = (s, p) => lookup(s, p, unknown)
+const template = v => parts(v).map((x, i) => (i % 2 ? path(x) : x))
 const str = v => (v == null ? '' : String(v))
-
-// `:--name`: false, null, undefined and '' remove the property; a value that could add declarations is refused.
-function cssValue(v, name) {
-  if (v == null || v === false || v === '') return null
-  v = String(v)
-  if (!/[;{}<]/.test(v)) return v
-  if (self.__pragmaDev) fail(`:--${name} got "${v}": a CSS value cannot contain ; { } or <`)
-  return null
-}
+const css = (v, name) => cssValue(v, v => (DEV ? fail(`:--${name} got "${v}": a CSS value cannot contain ; { } or <`) : null))
 
 export function useBodies(mod, boot) {
   pageBodies = mod ?? null
   if (boot) layoutBodies = pageBodies
 }
+
+const OVERLAY = /<dialog[\s>]|\spopover[\s=>]/
+
+function bodiesHaveOverlay(mod) {
+  if (!mod) return false
+  let found = overlays.get(mod)
+  if (found === undefined) overlays.set(mod, (found = [mod.default, mod.d].some(src => src && Object.values(src).some(html => OVERLAY.test(html)))))
+  return found
+}
+
+export const hasOverlay = root => !!root.querySelector('dialog,[popover]') || bodiesHaveOverlay(pageBodies) || bodiesHaveOverlay(layoutBodies)
 
 function bodyOf(src, id, ns) {
   let m = parsed.get(src)
@@ -79,11 +61,10 @@ function bodyOf(src, id, ns) {
 }
 
 function source(id, parent) {
-  const src = (id[0] === 'l' ? layoutBodies : pageBodies)?.default
+  const src = (id.startsWith(LAYOUT_PREFIX) ? layoutBodies : pageBodies)?.default
   return src && Object.hasOwn(src, id) ? bodyOf(src, id, NS[parent.namespaceURI]) : fail(`no template body "${id}": the page's template module is missing or out of date`)
 }
 
-// A component inside itself: its root arrives empty and gets the body from the page's template module (`d`).
 function fillSelf(el, id) {
   const src = [pageBodies, layoutBodies].map(m => m?.d).find(d => d && Object.hasOwn(d, id)) ?? fail(`<${el.getAttribute('data-self')}> renders itself but the template module has no definition "${id}"`)
   el.append(...bodyOf(src, id, NS[el.namespaceURI]).cloneNode(true).childNodes)
@@ -95,8 +76,6 @@ function fill(s, t) {
   return o
 }
 
-// `fn` (gets the event), `fn(arg, …)` or `shared.store.fn(…)`; arg: path, 'text', "text", number,
-// true, false, null, event or el (the element with the directive).
 const EVENT = {}, EL = {}
 const LITERAL = { true: true, false: false, null: null }
 function call(v) {
@@ -106,13 +85,11 @@ function call(v) {
     : a === 'el' ? EL
     : a[0] === "'" || a[0] === '"' ? { v: a.slice(1, -1) }
     : a in LITERAL ? { v: LITERAL[a] }
-    : /^-?\d+(\.\d+)?$/.test(a) ? { v: +a }
+    : NUMBER.test(a) && isFinite(a) ? { v: +a }
     : { p: path(a) })
   return { f: m[1], args }
 }
 
-// Handler written in `data-on-<type>`: [function name, arguments resolved against the element's
-// scope, the function itself for a store handler (`shared.cart.add`)].
 export function eventCall(el, type, event) {
   const d = el[D] ?? parse(el), c = ((d.c ??= {})[type] ??= call(el.getAttribute('data-on-' + type))), s = el[S]
   const args = c.args.map(a => (a === EVENT ? event : a === EL ? el : 'v' in a ? a.v : s && get(s, a.p)))
@@ -128,10 +105,10 @@ function anchor(n) {
   const m = ANCHOR.exec(n.data)
   if (!m) return (n[D] = NONE)
   const [, kind, slot, s, rest] = m, a = rest ? rest.split(' ').map(decode) : [], d = { s, u: +slot }
-  if (kind === 'if' || kind === 'elif') [d.p, d.n] = cond(a[0]), (d.t = kind === 'if' ? 1 : 4)
-  else if (kind === 'for') Object.assign(d, { t: 2, v: a[0], p: path(a[1]), k: path(a[2]) })
-  else d.t = 3
-  if (d.t < 3) d.id = s
+  if (kind === 'if' || kind === 'elif') [d.p, d.n] = cond(a[0]), (d.t = kind === 'if' ? IF : ELIF)
+  else if (kind === 'for') Object.assign(d, { t: FOR, v: a[0], p: path(a[1]), k: path(a[2]) })
+  else d.t = ELSE
+  if (d.t === IF || d.t === FOR) d.id = s
   return (n[D] = d)
 }
 
@@ -141,55 +118,52 @@ function parse(el) {
     if (!name.startsWith('data-')) continue
     const n = name.slice(5), i = n.indexOf('-'), a = n.slice(i + 1)
     switch (i < 0 ? n : n.slice(0, i + 1)) {
-      case 'text': d.b.push([0, template(value)]); break
-      case 'show': d.b.push([1, ...cond(value)]); break
-      case 'attr-': d.b.push(value.includes('{') ? [4, template(value), 0, a] : [2, path(value), 0, a]); break
-      case 'var-': d.b.push([6, path(value), 0, a]); break
-      case 'class-': d.b.push([3, ...cond(value), a]); break
+      case 'text': d.b.push([TEXT, template(value)]); break
+      case 'show': d.b.push([SHOW, ...cond(value)]); break
+      case 'attr-': d.b.push(value.includes('{') ? [ATTR_TEMPLATE, template(value), 0, a] : [ATTR, path(value), 0, a]); break
+      case 'var-': d.b.push([CSS_VAR, path(value), 0, a]); break
+      case 'class-': d.b.push([CLASS, ...cond(value), a]); break
       case 'with-': (d.w ??= []).push([a, operand(value)]); break
       case 'on-': hooks.on(a); d.e = 1; break
       case 'model':
         d.m = path(value)
-        if (self.__pragmaDev && d.m[0] !== 'state' && d.m[0] !== 'shared') fail(`data-model only accepts state or shared: "${value}"`)
+        if (DEV && d.m[0] !== 'state' && d.m[0] !== 'shared') fail(`data-model only accepts state or shared: "${value}"`)
         hooks.on('input'); d.e = 1; break
-      case 'c': d.x = 1; break
-      case 'self': d.r = 1; break
-      case 'page': d.x = 2; break
+      case 'c': d.x = COMPONENT; break
+      case 'self': d.self = 1; break
+      case 'page': d.x = PAGE; break
       case 'slot': d.u = +value
     }
   }
-  if (d.r && !el.firstChild) fillSelf(el, el.getAttribute('data-c'))
-  // `{path}` beside child elements: <!--{path}-->text<!--}-->; the text node between them is bound.
-  // <!--n{path}--> is slot content: it belongs to the owner n components up.
+  if (d.self && !el.firstChild) fillSelf(el, el.getAttribute('data-c'))
   for (let n = el.firstChild, m; n; n = n.nextSibling) {
     if (n.nodeType !== 8 || !(m = /^(\d*)\{(.*)\}$/.exec(n.data))) continue
     let t = n.nextSibling
     if (t?.nodeType !== 3) n.after((t = document.createTextNode('')))
-    d.b.push([5, path(m[2]), t, +m[1]])
+    d.b.push([MARKER, path(m[2]), t, +m[1]])
   }
-  return (el[D] = d.b.length || d.w || d.e || d.x || d.u || d.r ? d : NONE)
+  return (el[D] = d.b.length || d.w || d.e || d.x || d.u || d.self ? d : NONE)
 }
 
 function bind(el, [t, p, n, a], s) {
   let v
-  if (t === 0) {
+  if (t === TEXT) {
     if (el.textContent !== (v = fill(s, p))) el.textContent = v
-  } else if (t === 4) {
+  } else if (t === ATTR_TEMPLATE) {
     if (el.getAttribute(a) !== (v = fill(s, p))) el.setAttribute(a, v)
-  } else if (t === 5) {
+  } else if (t === MARKER) {
     if (n.data !== (v = str(get(s, p)))) n.data = v
-  } else if (t === 6) {
-    v = cssValue(get(s, p), a)
+  } else if (t === CSS_VAR) {
+    v = css(get(s, p), a)
     if (el.style.getPropertyValue('--' + a) !== (v ?? '')) v == null ? el.style.removeProperty('--' + a) : el.style.setProperty('--' + a, v)
-  } else if (t === 2) {
+  } else if (t === ATTR) {
     v = get(s, p)
     v = v === false || v == null ? null : v === true ? '' : String(v)
     if (el.getAttribute(a) !== v) v == null ? el.removeAttribute(a) : el.setAttribute(a, v)
-    // Once the user touches it, the attribute no longer drives the state: set the property.
     if ((a === 'checked' || a === 'selected') && el[a] !== (v != null)) el[a] = v != null
   } else {
     v = !get(s, p) === n
-    if (t === 1) { if (el.hasAttribute('hidden') === v) el.toggleAttribute('hidden', !v) }
+    if (t === SHOW) { if (el.hasAttribute('hidden') === v) el.toggleAttribute('hidden', !v) }
     else if (el.classList.contains(a) !== v) el.classList.toggle(a, v)
   }
 }
@@ -218,18 +192,17 @@ const lexical = (s, d) => (d.u && outer.at(-d.u)) || s
 
 function visit(el, s, d = el[D] ?? parse(el)) {
   s = lexical(s, d)
-  // data-with-<name>: values from the caller's scope (props of a component with a script).
   let w = null
   if (d.w) {
     w = {}
     for (const [a, p] of d.w) w[a] = 'v' in p ? p.v : get(s, p)
     s = Object.assign({ __proto__: s }, w)
   }
-  if (d.r && ++deep > SELF_DEPTH) fail(`<${el.getAttribute('data-self')}> is nested more than ${SELF_DEPTH} levels inside itself: stop the recursion on data (a tree without cycles, <if>/<for> around the self call)`)
-  if (d.x === 1) outer.push(s)
+  if (d.self && ++deep > SELF_DEPTH) fail(`<${el.getAttribute('data-self')}> is nested more than ${SELF_DEPTH} levels inside itself: stop the recursion on data (a tree without cycles, <if>/<for> around the self call)`)
+  if (d.x === COMPONENT) outer.push(s)
   if (d.x) s = hooks.enter(el, s, d.x, w)
   for (const b of d.b) {
-    const r = [el, b, b[0] === 5 && b[3] ? (outer.at(-b[3]) ?? s) : s]
+    const r = [el, b, b[0] === MARKER && b[3] ? (outer.at(-b[3]) ?? s) : s]
     readBy(r)
     bind(...r)
   }
@@ -237,8 +210,8 @@ function visit(el, s, d = el[D] ?? parse(el)) {
   if (d.e) el[S] = s
   if (el.firstChild) walk(el, s)
   if (d.m) model(el, s, d.m)
-  if (d.x === 1) outer.pop()
-  if (d.r) deep--
+  if (d.x === COMPONENT) outer.pop()
+  if (d.self) deep--
 }
 
 function walk(parent, s) {
@@ -253,15 +226,13 @@ function walk(parent, s) {
   }
 }
 
-// Motion is CSS only: a block root inserted after the block's first render gets `data-entering`
-// until its animations end; a removed one gets `data-leaving` + inert and stays until they end.
 let leaving = [], entering = [], focusing = null
 const reduced = matchMedia('(prefers-reduced-motion: reduce)')
 
 function clone(t, d, id) {
   const n = source(d.s, t.parentNode).cloneNode(true)
-  n.setAttribute('data-of', id)
-  if (d.r && !reduced.matches) {
+  n.setAttribute(OF, id)
+  if (d.rendered && !reduced.matches) {
     n.setAttribute('data-entering', '')
     entering.push(n)
   }
@@ -333,24 +304,22 @@ const sibling = n => {
   while (n?.nodeType === 3)
   return n
 }
-const of = (n, id) => n?.nodeType === 1 && n.getAttribute('data-of') === id
+const of = (n, id) => n?.nodeType === 1 && n.getAttribute(OF) === id
 const next = n => {
   do n = sibling(n)
   while (n?.[L])
   return n
 }
 
-// else-if/else/empty have no tid of their own: instances use the tid of the if/for opening the chain (same as SSR).
-// `last`: an earlier branch of the chain is already on.
 function block(t, d, s, last, id) {
-  const r = d.t === 2 ? list(t, d, s) : branch(t, d, s, last, id)
-  d.r = 1
+  const r = d.t === FOR ? list(t, d, s) : branch(t, d, s, last, id)
+  d.rendered = 1
   return r
 }
 
 function branch(t, d, s, last, id) {
-  const chained = d.t > 2 && last
-  const on = !chained && (d.t === 3 || !get(s, d.p) === d.n)
+  const chained = (d.t === ELSE || d.t === ELIF) && last
+  const on = !chained && (d.t === ELSE || !get(s, d.p) === d.n)
   let n = sibling(t)
   if (!of(n, id)) n = null
   if (!on) {
@@ -370,21 +339,21 @@ function branch(t, d, s, last, id) {
 
 function list(t, d, s) {
   const id = d.id, old = new Map(), scopes = [], keys = []
-  for (let n = sibling(t); of(n, id); n = sibling(n)) old.set(n.getAttribute('data-key'), n)
+  for (let n = sibling(t); of(n, id); n = sibling(n)) old.set(n.getAttribute(KEY), n)
   for (const it of get(s, d.p) ?? []) {
     const c = { __proto__: s, [d.v]: it }
     scopes.push(c)
     keys.push(String(get(c, d.k)))
   }
   const keep = new Set(keys)
-  if (self.__pragmaDev && keep.size < keys.length) fail(`duplicate key in <for ${d.v} in ${d.p.join('.')}>`)
+  if (DEV && keep.size < keys.length) fail(`duplicate key in <for ${d.v} in ${d.p.join('.')}>`)
   for (const [k, n] of old) if (!keep.has(k)) drop(n)
   let ref = t
   for (let i = 0; i < keys.length; i++) {
     let n = old.get(keys[i])
     if (!n) {
       n = clone(t, d, id)
-      n.setAttribute('data-key', keys[i])
+      n.setAttribute(KEY, keys[i])
       ref.after(n)
     } else {
       if (n[L]) stay(n)
@@ -409,7 +378,6 @@ export function render(el, s) {
   target?.focus()
 }
 
-// After a change read only by bindings (state.js `readers`): runs just those, nothing else is walked.
 export function patch(groups) {
   try {
     for (const g of groups) for (const r of g) {
