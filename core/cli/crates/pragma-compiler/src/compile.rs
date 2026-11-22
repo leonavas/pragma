@@ -516,128 +516,182 @@ fn element_body(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
     o.html(&format!("</{}>", e.name));
 }
 
+/// `html` with the tid of every block anchor written as `*`.
+#[cfg(test)]
+pub(crate) fn without_ids(html: &str) -> String {
+    let mut out = String::new();
+    let mut rest = html;
+    while let Some(i) = rest.find("<!--p:") {
+        let kind_end = i + rest[i..].find(' ').unwrap();
+        out.push_str(&rest[..kind_end]);
+        out.push_str(" *");
+        let after = &rest[kind_end + 1..];
+        rest = &after[after.find([' ', '-']).unwrap_or(after.len())..];
+    }
+    out.push_str(rest);
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::html::parse;
 
-    #[test]
-    fn compiles_ops() {
-        let src = r#"<ul class="a" data-class-on="data.on"><template data-for="x in data.xs" data-key="x.id" data-tid="t1"><li data-text="{x.name}"></li></template><template data-empty data-tid="t2"><li>empty</li></template></ul><p data-show="!state.ok" data-attr-title="data.t" title="y">z</p>"#;
-        let (mut nodes, _) = parse(src, 0);
-        let bodies = hoist_with(&mut nodes, 't');
-        let v = ops(&nodes, &BTreeSet::new(), &bodies);
-        let expected = json!([
-            ["html", "<ul data-class-on=\"data.on\""],
-            ["class", "a", [["on", "data.on", false]]],
-            ["html", "><!--p:for t0 x data.xs x.id-->"],
-            ["for", "t0", "x", "data.xs", "x.id", [["html", "<li"], ["html", " data-text=\"{x.name}\">"], ["text", "{x.name}"], ["html", "</li>"]]],
-            ["html", "<!--p:empty t1-->"],
-            ["empty", "t0", [["html", "<li"], ["html", ">empty</li>"]]],
-            ["html", "</ul><p data-show=\"!state.ok\" data-attr-title=\"data.t\""],
-            ["attr", "title", "data.t"],
-            ["show", "state.ok", true],
-            ["html", ">z</p>"]
-        ]);
-        assert_eq!(v, expected);
+    /// Ops of `src` after hoist, as render.js reads them: adjacent `html` ops joined and every tid
+    /// written as `*` (anchor-to-op ids are checked in `hoisted_ids_tie_anchors_ops_and_bodies`).
+    fn ops_of(src: &str, scripted: &[&str]) -> Value {
+        let (mut nodes, errors) = parse(src, 0);
+        assert!(errors.is_empty());
+        let bodies = hoist(&mut nodes);
+        let scripted = scripted.iter().map(|s| s.to_string()).collect();
+        normalized(ops(&nodes, &scripted, &bodies))
+    }
+
+    fn normalized(v: Value) -> Value {
+        let Value::Array(items) = v else { return v };
+        let is_ops = !items.is_empty() && items.iter().all(|x| x.as_array().is_some_and(|a| a.first().is_some_and(Value::is_string)));
+        let mut out: Vec<Value> = Vec::new();
+        for item in items {
+            let mut item = normalized(item);
+            if is_ops && let Value::Array(op) = &mut item {
+                if matches!(op[0].as_str(), Some("if" | "elif" | "else" | "for" | "empty")) {
+                    op[1] = json!("*");
+                }
+                if op[0] == "html" {
+                    let text = without_ids(op[1].as_str().unwrap_or(""));
+                    if let Some(Value::Array(last)) = out.last_mut()
+                        && last[0] == "html"
+                    {
+                        last[1] = json!(format!("{}{text}", last[1].as_str().unwrap_or("")));
+                        continue;
+                    }
+                    op[1] = json!(text);
+                }
+            }
+            out.push(item);
+        }
+        Value::Array(out)
     }
 
     #[test]
-    fn templates_and_markers() {
+    fn blocks_classes_attributes_and_show_become_ops() {
+        let src = r#"<ul class="a" data-class-on="data.on"><template data-for="x in data.xs" data-key="x.id"><li data-text="{x.name}"></li></template><template data-empty><li>empty</li></template></ul><p data-show="!state.ok" data-attr-title="data.t" title="y">z</p>"#;
+        assert_eq!(
+            ops_of(src, &[]),
+            json!([
+                ["html", "<ul data-class-on=\"data.on\""],
+                ["class", "a", [["on", "data.on", false]]],
+                ["html", "><!--p:for * x data.xs x.id-->"],
+                ["for", "*", "x", "data.xs", "x.id", [["html", "<li data-text=\"{x.name}\">"], ["text", "{x.name}"], ["html", "</li>"]]],
+                ["html", "<!--p:empty *-->"],
+                ["empty", "*", [["html", "<li>empty</li>"]]],
+                ["html", "</ul><p data-show=\"!state.ok\" data-attr-title=\"data.t\""],
+                ["attr", "title", "data.t"],
+                ["show", "state.ok", true],
+                ["html", ">z</p>"]
+            ])
+        );
+    }
+
+    #[test]
+    fn shared_paths_are_left_to_the_client() {
+        let v = ops_of(r#"<div><template data-if="shared.ui.open"><b>x</b></template><template data-else><i>y</i></template><p data-text="{shared.ui.n}"></p></div>"#, &[]);
+        assert_eq!(v, json!([["html", "<div><!--p:if * shared.ui.open--><!--p:else *--><p data-text=\"{shared.ui.n}\"></p></div>"]]));
+    }
+
+    #[test]
+    fn text_markers_and_attribute_templates() {
         let mut p = Element { name: "p".into(), attrs: Vec::new(), children: Vec::new(), pos: Default::default() };
-        let interp = |v: &str| Element { name: directive::INTERP.into(), attrs: vec![crate::html::Attr { name: "data-text".into(), value: Some(v.into()), pos: Default::default() }], children: Vec::new(), pos: Default::default() };
+        let interp = |v: &str| Element { name: directive::INTERP.into(), attrs: vec![Attr { name: "data-text".into(), value: Some(v.into()), pos: Default::default() }], children: Vec::new(), pos: Default::default() };
         p.children = vec![Node::Text("Hi ".into(), Default::default()), Node::Element(interp("{data.name}")), Node::Text(", ".into(), Default::default()), Node::Element(interp("{state.n}"))];
-        p.attrs.push(crate::html::Attr { name: "data-attr-href".into(), value: Some("/p/{data.id}".into()), pos: Default::default() });
-        p.attrs.push(crate::html::Attr { name: "data-attr-title".into(), value: Some("{state.t}".into()), pos: Default::default() });
+        p.attrs.push(Attr { name: "data-attr-href".into(), value: Some("/p/{data.id}".into()), pos: Default::default() });
+        p.attrs.push(Attr { name: "data-attr-title".into(), value: Some("{state.t}".into()), pos: Default::default() });
         let mut html = String::new();
         write_element(&p, &mut html, false);
         assert_eq!(html, "<p data-attr-href=\"/p/{data.id}\" data-attr-title=\"{state.t}\">Hi <!--{data.name}--><!--}-->, <!--{state.n}--><!--}--></p>");
-        let v = ops(&[Node::Element(p)], &BTreeSet::new(), &[]);
-        let expected = json!([
-            ["html", "<p data-attr-href=\"/p/{data.id}\" data-attr-title=\"{state.t}\""],
-            ["attr", "href", "/p/{data.id}"],
-            ["attr", "title", "{state.t}"],
-            ["html", ">Hi <!--{data.name}-->"],
-            ["text", "{data.name}"],
-            ["html", "<!--}-->, <!--{state.n}-->"],
-            ["text", "{state.n}"],
-            ["html", "<!--}--></p>"]
-        ]);
-        assert_eq!(v, expected);
+        assert_eq!(
+            normalized(ops(&[Node::Element(p)], &BTreeSet::new(), &[])),
+            json!([
+                ["html", "<p data-attr-href=\"/p/{data.id}\" data-attr-title=\"{state.t}\""],
+                ["attr", "href", "/p/{data.id}"],
+                ["attr", "title", "{state.t}"],
+                ["html", ">Hi <!--{data.name}-->"],
+                ["text", "{data.name}"],
+                ["html", "<!--}-->, <!--{state.n}-->"],
+                ["text", "{state.n}"],
+                ["html", "<!--}--></p>"]
+            ])
+        );
     }
 
     #[test]
     fn css_variables_render_on_the_server() {
-        let (nodes, _) = parse(r#"<i class="bar" style="--y:1" data-var-x="data.x" data-var-z="shared.ui.z"></i>"#, 0);
-        let expected = json!([
-            ["html", "<i class=\"bar\" data-var-x=\"data.x\" data-var-z=\"shared.ui.z\""],
-            ["attr", "style", "--y:1;--x:{data.x}"],
-            ["html", "></i>"]
-        ]);
-        assert_eq!(ops(&nodes, &BTreeSet::new(), &[]), expected);
+        assert_eq!(
+            ops_of(r#"<i class="bar" style="--y:1" data-var-x="data.x" data-var-z="shared.ui.z"></i>"#, &[]),
+            json!([["html", "<i class=\"bar\" data-var-x=\"data.x\" data-var-z=\"shared.ui.z\""], ["attr", "style", "--y:1;--x:{data.x}"], ["html", "></i>"]])
+        );
     }
 
     #[test]
-    fn self_calls_render_on_the_server_up_to_a_depth() {
-        let src = r#"<ul data-c="tree"><template data-for="c in state.node.kids" data-key="c.id" data-tid="t1"><ul data-c="tree" data-self="c-tree" data-with-node="c"></ul></template></ul><template data-def="tree"><ul data-c="tree"><template data-for="c in state.node.kids" data-key="c.id" data-tid="t1"><ul data-c="tree" data-self="c-tree" data-with-node="c"></ul></template></ul></template>"#;
-        let (mut nodes, _) = parse(src, 0);
-        let bodies = hoist_with(&mut nodes, 't');
-        let v = ops(&nodes, &BTreeSet::from(["tree".to_string()]), &bodies).to_string();
-        assert_eq!(v.matches(r#"["comp","tree""#).count(), 1 + SSR_SELF_DEPTH, "{v}");
-        assert_eq!(v.matches(r#"["for","t0""#).count(), 1 + SSR_SELF_DEPTH, "{v}");
-        assert!(!v.contains("data-def"), "the def body leaves the page: {v}");
+    fn self_calls_render_on_the_server_up_to_twelve_levels() {
+        let body = r#"<ul data-c="tree"><template data-for="c in state.node.kids" data-key="c.id"><ul data-c="tree" data-self="c-tree" data-with-node="c"></ul></template></ul>"#;
+        let v = ops_of(&format!("{body}<template data-def=\"tree\">{body}</template>"), &["tree"]).to_string();
+        assert_eq!(v.matches(r#"["comp","tree""#).count(), 13, "the page's call and 12 levels: {v}");
+        assert!(!v.contains("data-def"), "the definition leaves the page: {v}");
     }
 
     #[test]
     fn script_component_root_and_slot_content() {
-        let src = r#"<section data-c="box" data-prop-step="2" data-with-items="data.items" data-text="{state.n}"></section><div data-c="plain"><p data-slot="1" data-text="{state.title}"></p></div><div data-c="box"><b data-slot="1" data-text="{state.open}"></b><template data-slot="1" data-if="state.open" data-tid="t9"><i>on</i></template></div>"#;
-        let (mut nodes, _) = parse(src, 0);
-        let bodies = hoist_with(&mut nodes, 't');
-        let v = ops(&nodes, &BTreeSet::from(["box".to_string()]), &bodies);
-        let expected = json!([
-            ["comp", "box", [["step", "text", "2"], ["items", "path", "data.items"]], [
-                ["html", "<section"],
-                ["html", " data-c=\"box\" data-prop-step=\"2\" data-with-items=\"data.items\" data-text=\"{state.n}\">"],
-                ["text", "{state.n}"],
-                ["html", "</section>"]
-            ]],
-            ["html", "<div data-c=\"plain\">"],
-            ["slot", 1, [["html", "<p"], ["html", " data-slot=\"1\" data-text=\"{state.title}\">"], ["text", "{state.title}"], ["html", "</p>"]]],
-            ["html", "</div>"],
-            ["comp", "box", [], [
-                ["html", "<div"],
-                ["html", " data-c=\"box\">"],
-                ["slot", 1, [["html", "<b"], ["html", " data-slot=\"1\" data-text=\"{state.open}\">"], ["text", "{state.open}"], ["html", "</b>"]]],
-                ["html", "<!--p:if1 t0 state.open-->"],
-                ["slot", 1, [["if", "t0", "state.open", false, [["html", "<i"], ["html", ">on</i>"]]]]],
-                ["html", "</div>"]
-            ]]
-        ]);
-        assert_eq!(v, expected);
+        let src = r#"<section data-c="box" data-prop-step="2" data-with-items="data.items" data-text="{state.n}"></section><div data-c="plain"><p data-slot="1" data-text="{state.title}"></p></div><div data-c="box"><b data-slot="1" data-text="{state.open}"></b><template data-slot="1" data-if="state.open"><i>on</i></template></div>"#;
+        assert_eq!(
+            ops_of(src, &["box"]),
+            json!([
+                ["comp", "box", [["step", "text", "2"], ["items", "path", "data.items"]], [
+                    ["html", "<section data-c=\"box\" data-prop-step=\"2\" data-with-items=\"data.items\" data-text=\"{state.n}\">"],
+                    ["text", "{state.n}"],
+                    ["html", "</section>"]
+                ]],
+                ["html", "<div data-c=\"plain\">"],
+                ["slot", 1, [["html", "<p data-slot=\"1\" data-text=\"{state.title}\">"], ["text", "{state.title}"], ["html", "</p>"]]],
+                ["html", "</div>"],
+                ["comp", "box", [], [
+                    ["html", "<div data-c=\"box\">"],
+                    ["slot", 1, [["html", "<b data-slot=\"1\" data-text=\"{state.open}\">"], ["text", "{state.open}"], ["html", "</b>"]]],
+                    ["html", "<!--p:if1 * state.open-->"],
+                    ["slot", 1, [["if", "*", "state.open", false, [["html", "<i>on</i>"]]]]],
+                    ["html", "</div>"]
+                ]]
+            ])
+        );
     }
 
     #[test]
     fn literal_props_are_typed_values() {
-        let (nodes, _) = parse(r#"<p data-c="box" data-with-open="false" data-with-n="-2.5" data-with-label='"a b"' data-with-items="data.items"></p>"#, 0);
-        let v = ops(&nodes, &BTreeSet::from(["box".to_string()]), &[]);
+        let v = ops_of(r#"<p data-c="box" data-with-open="false" data-with-n="-2.5" data-with-label='"a b"' data-with-items="data.items"></p>"#, &["box"]);
         assert_eq!(v[0][2], json!([["open", "text", false], ["n", "text", -2.5], ["label", "text", "a b"], ["items", "path", "data.items"]]));
     }
 
     #[test]
-    fn hoists_block_bodies_once() {
-        let src = r#"<main data-page><ul><template data-for="x in data.xs" data-key="x.id" data-tid="a"><li><template data-if="x.on" data-tid="b"><b>on</b></template></li></template></ul><template data-if="data.on" data-tid="c"><b>on</b></template></main><svg><template data-if="data.on" data-tid="d"><b>on</b></template></svg><template data-if="data.on" data-tid="e"><b>on</b></template><template data-def="x"><i data-c="x"></i></template>"#;
+    fn hoisted_ids_tie_anchors_ops_and_bodies() {
+        let src = r#"<main data-page><ul><template data-for="x in data.xs" data-key="x.id"><li><template data-if="x.on"><b>on</b></template></li></template></ul><template data-if="data.on"><b>on</b></template></main><svg><template data-if="data.on"><b>on</b></template></svg><template data-if="data.on"><b>on</b></template><template data-def="x"><i data-c="x"></i></template>"#;
         let (mut nodes, _) = parse(src, 0);
         let bodies = hoist(&mut nodes);
-        let mut out = String::new();
-        write_nodes(&nodes, &mut out, true);
-        assert_eq!(out, "<main data-page><ul><!--p:for t1 x data.xs x.id--></ul><!--p:if t0 data.on--></main><svg><!--p:if l0 data.on--></svg><!--p:if l1 data.on-->");
-        let ids: Vec<&str> = bodies.iter().filter_map(|t| t.value("data-tpl").or(t.value("data-def"))).collect();
-        assert_eq!(ids, ["t0", "t1", "l0", "l1", "x"], "equal bodies share one id; an <svg> body never shares an HTML one");
+        let mut html = String::new();
+        write_nodes(&nodes, &mut html, true);
+        let id_of = |at: &str| html[html.find(at).unwrap() + at.len()..].split([' ', '-']).next().unwrap().to_string();
+        let (page_for, page_if, svg_if, layout_if) = (id_of("<ul><!--p:for "), id_of("</ul><!--p:if "), id_of("<svg><!--p:if "), id_of("</svg><!--p:if "));
+        assert!(page_for.starts_with('t') && page_if.starts_with('t'), "inside <main data-page>: page ids: {html}");
+        assert!(layout_if.starts_with('l') && svg_if.starts_with('l'), "outside: layout ids: {html}");
+        assert_ne!(svg_if, layout_if, "an <svg> body never shares an HTML one: {html}");
+        assert!(!html.contains("<template"), "{html}");
         let module = template_module(&bodies, true);
-        assert_eq!(module, "export default {t0:'<b>on</b>',t1:'<li><!--p:if t0 x.on--></li>',l0:'<b>on</b>',l1:'<b>on</b>'}\nexport const d = {x:'<i data-c=\"x\"></i>'}\n");
+        assert!(module.contains(&format!("{page_if}:'<b>on</b>'")) && module.contains(&format!("{layout_if}:'<b>on</b>'")), "{module}");
+        assert_eq!(module.matches(&format!("<!--p:if {page_if} x.on-->")).count(), 1, "equal bodies share the page id: {module}");
+        assert!(module.ends_with("export const d = {x:'<i data-c=\"x\"></i>'}\n"), "{module}");
+        let v = ops(page_content(&nodes), &BTreeSet::new(), &bodies).to_string();
+        assert!(v.contains(&format!(r#"["for","{page_for}","x","data.xs","x.id",[["html","<li"]"#)), "{v}");
+        assert!(v.contains(&format!(r#"["if","{page_if}","x.on",false,[["html","<b"],["html",">on</b>"]]]"#)), "the server renders hoisted bodies: {v}");
         assert_eq!(js_object(&[("md-node".into(), "it's \\ a\nb".into())]), r"{'md-node':'it\'s \\ a\nb'}");
-        let v = ops(&nodes, &BTreeSet::new(), &bodies);
-        assert!(v.to_string().contains(r#"["if","t0","x.on",false,[["html","<b"],["html",">on</b>"]]]"#), "the server renders hoisted bodies: {v}");
     }
 
     #[test]

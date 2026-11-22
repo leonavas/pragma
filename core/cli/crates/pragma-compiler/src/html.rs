@@ -358,29 +358,6 @@ pub fn push_attr(out: &mut String, a: &Attr) {
     }
 }
 
-#[cfg(test)]
-pub fn serialize(nodes: &[Node], out: &mut String) {
-    for n in nodes {
-        match n {
-            Node::Text(t, _) => out.push_str(t),
-            Node::Comment => {}
-            Node::Element(e) => serialize_element(e, out),
-        }
-    }
-}
-
-#[cfg(test)]
-pub fn serialize_element(e: &Element, out: &mut String) {
-    open_tag(out, e);
-    if VOID.contains(&e.name.to_ascii_lowercase().as_str()) {
-        return;
-    }
-    serialize(&e.children, out);
-    out.push_str("</");
-    out.push_str(&e.name);
-    out.push('>');
-}
-
 /// Text outside an element, `{path}` included.
 pub fn stray_text(nodes: &[Node]) -> Option<Pos> {
     nodes.iter().find_map(|n| match n {
@@ -414,7 +391,7 @@ mod tests {
         assert_eq!((kids[0].attrs[0].pos.line, kids[0].attrs[0].pos.col), (2, 6));
         assert_eq!(kids[2].value("title"), Some("X"));
         let mut out = String::new();
-        serialize(&nodes, &mut out);
+        crate::compile::write_nodes(&nodes, &mut out, false);
         assert!(out.contains("<c-card title=\"X\"></c-card>"));
     }
 

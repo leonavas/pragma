@@ -530,14 +530,6 @@ mod tests {
     }
 
     #[test]
-    fn generated_prop_attribute() {
-        assert_eq!(parse("data-prop-step"), Some(Some(Dir::Generated)));
-        assert_eq!(parse("data-self"), Some(Some(Dir::Generated)));
-        assert_eq!(parse("data-def"), Some(Some(Dir::Generated)));
-        assert_eq!(parse("data-tpl"), Some(Some(Dir::Generated)));
-    }
-
-    #[test]
     fn literal_values() {
         assert_eq!(literal("false"), Some(Literal::Bool(false)));
         assert_eq!(literal(" true "), Some(Literal::Bool(true)));

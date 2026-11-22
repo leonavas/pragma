@@ -74,6 +74,24 @@ fn page_html(out: &Path, page: &str) -> String {
     html
 }
 
+/// `html` with the tid of every block anchor written as `*` (`<!--p:if * state.on-->`).
+fn anchors(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(i) = rest.find("<!--p:") {
+        let (head, tail) = rest.split_at(i);
+        out.push_str(head);
+        let kind_end = tail.find(' ').unwrap_or(tail.len());
+        out.push_str(&tail[..kind_end]);
+        let after = &tail[kind_end..];
+        let id_end = after[1..].find([' ', '-']).map_or(after.len(), |k| k + 1);
+        out.push_str(" *");
+        rest = &after[id_end..];
+    }
+    out.push_str(rest);
+    out
+}
+
 /// The SSR ops of a route, as embedded in `server/worker.js`.
 fn ssr_ops(out: &Path, pattern: &str) -> String {
     let worker = fs::read_to_string(out.join("server/worker.js")).unwrap();
@@ -376,7 +394,7 @@ fn optional_prop_of_script_component() {
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
     let html = page_html(&out, "flag.html");
     // props are live: the instance reads them (`state.flag`, default false when not passed)
-    assert!(html.contains("<!--p:if t0 state.flag-->") && html.contains("state.clicks"), "{html}");
+    assert!(anchors(&html).contains("<!--p:if * state.flag-->") && html.contains("state.clicks"), "{html}");
     assert!(html.contains("data-prop-label=\"no flag passed\"") && !html.contains("data-prop-flag"), "{html}");
 }
 
@@ -1568,12 +1586,12 @@ fn directives_and_blocks_work_inside_pre_and_code() {
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
     let html = page_html(&out, "index.html");
     for want in [
-        "<pre data-attr-aria-label=\"state.path\"><code><!--p:for t0 line state.lines line.n--></code></pre>",
+        "<pre data-attr-aria-label=\"state.path\"><code><!--p:for * line state.lines line.n--></code></pre>",
         "\n<span data-attr-data-n=\"line.n\" data-text=\"{line.text}\"></span>",
         "<pre>$ curl {url} <span data-text=\"{state.path}\"></span><b data-c=\"tag\">A</b></pre>",
         "<code>{literal}</code>",
     ] {
-        assert!(html.contains(want), "missing {want}:\n{html}");
+        assert!(anchors(&html).contains(want), "missing {want}:\n{html}");
     }
     assert!(!html.contains("<for") && !html.contains(":data-n") && !html.contains("<c-tag"), "{html}");
     let bad = scratch(&[(PAGE, "<pre><span @click=\"nope\">{$missing}</span></pre>")]);
@@ -2008,7 +2026,7 @@ fn component_renders_itself() {
     let html = page_html(&out, "blog/[slug].html");
     let stub = "<li data-c=\"tree\" data-self=\"c-tree\" class=\"tag\" data-with-node=\"child\" data-var-depth=\"child.depth\"></li>";
     assert_eq!(html.matches(stub).count(), 1, "the page and the definition share the body of the <for>: {html}");
-    assert!(html.contains("\n<li data-c=\"tree\" class=\"tag\"><span data-text=\"{state.node.name}\"></span><ul><!--p:for t0 child state.node.children child.id--></ul></li>"), "the definition goes to the template module: {html}");
+    assert!(anchors(&html).contains("\n<li data-c=\"tree\" class=\"tag\"><span data-text=\"{state.node.name}\"></span><ul><!--p:for * child state.node.children child.id--></ul></li>"), "the definition goes to the template module: {html}");
     let page = fs::read_to_string(out.join("client/blog/[slug].html")).unwrap();
     assert!(!page.contains("<template") && !page.contains("data-def"), "{page}");
     let ops = ssr_ops(&out, "/blog/:slug");
@@ -2132,4 +2150,13 @@ fn columns_count_characters_after_non_ascii_text() {
     assert_eq!(col(&page("<p>é {{x}}</p>"), "html/interpolation"), (1, 6));
     let d = check_with(&[("routes/products.server.js", Some("export function GET() {\n  return 'é' ? Response.json({}) : null\n}\n"))]);
     assert_eq!(col(&d, "app/endpoint-json"), (2, 16));
+}
+
+#[test]
+fn attributes_the_build_writes_are_errors_in_source() {
+    for attr in ["data-prop-step", "data-self", "data-def", "data-tpl", "data-tid"] {
+        let d = page(&format!("<p {attr}=\"x\">a</p>"));
+        expect(&d, "html/data-attribute", PAGE, 1);
+        assert!(message(&d, "html/data-attribute").contains("is internal"), "{attr}: {d:#?}");
+    }
 }

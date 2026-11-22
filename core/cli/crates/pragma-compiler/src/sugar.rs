@@ -332,15 +332,22 @@ fn short_form(old: Dir) -> String {
 
 #[cfg(test)]
 mod tests {
-    use crate::html::{parse, serialize};
+    use crate::compile::{hoist, without_ids, write_nodes};
+    use crate::html::parse;
 
+    /// The HTML the build writes for `src` (before component expansion), block bodies after `|`.
     fn sugar(src: &str) -> (String, Vec<(&'static str, String)>) {
         let (mut nodes, _) = parse(src, 0);
         let mut errors = Vec::new();
         super::desugar(&mut nodes, &mut errors);
+        let bodies = hoist(&mut nodes);
         let mut out = String::new();
-        serialize(&nodes, &mut out);
-        (out, errors.into_iter().map(|(_, rule, msg)| (rule, msg)).collect())
+        write_nodes(&nodes, &mut out, false);
+        for b in bodies {
+            out.push('|');
+            write_nodes(&b.children, &mut out, false);
+        }
+        (without_ids(&out), errors.into_iter().map(|(_, rule, msg)| (rule, msg)).collect())
     }
 
     #[test]
@@ -355,8 +362,8 @@ mod tests {
     fn text_beside_elements_gets_markers() {
         let (out, errors) = sugar("<label><input type=\"checkbox\"> {task.title} ({$n})</label>");
         assert!(errors.is_empty(), "{errors:?}");
-        assert_eq!(out, "<label><input type=\"checkbox\"> <#interp data-text=\"{task.title}\"></#interp> (<#interp data-text=\"{$.n}\"></#interp>)</label>");
-        assert_eq!(sugar("<c-button>Save {$n}</c-button>").0, "<c-button>Save <#interp data-text=\"{$.n}\"></#interp></c-button>");
+        assert_eq!(out, "<label><input type=\"checkbox\"> <!--{task.title}--><!--}--> (<!--{$.n}--><!--}-->)</label>");
+        assert_eq!(sugar("<c-button>Save {$n}</c-button>").0, "<c-button>Save <!--{$.n}--><!--}--></c-button>");
     }
 
     #[test]
@@ -370,9 +377,9 @@ mod tests {
     fn directives_blocks_and_child_text_inside_pre_and_code() {
         let (out, errors) = sugar("<pre :aria-label=\"$path\"><code><for line in $lines key=line.n><span :data-n=\"line.n\">{line.text}</span></for></code></pre>");
         assert!(errors.is_empty(), "{errors:?}");
-        assert_eq!(out, "<pre data-attr-aria-label=\"$.path\"><code><template data-for=\"line in $.lines\" data-key=\"line.n\"><span data-attr-data-n=\"line.n\" data-text=\"{line.text}\"></span></template></code></pre>");
+        assert_eq!(out, "<pre data-attr-aria-label=\"$.path\"><code><!--p:for * line $.lines line.n--></code></pre>|<span data-attr-data-n=\"line.n\" data-text=\"{line.text}\"></span>");
         assert_eq!(sugar("<pre>$ curl {url} <span>{$path}</span></pre>").0, "<pre>$ curl {url} <span data-text=\"{$.path}\"></span></pre>");
-        assert_eq!(sugar("<code>a <b>{$x} and <i>y</i> {$z}</b> {raw}</code>").0, "<code>a <b><#interp data-text=\"{$.x}\"></#interp> and <i>y</i> <#interp data-text=\"{$.z}\"></#interp></b> {raw}</code>");
+        assert_eq!(sugar("<code>a <b>{$x} and <i>y</i> {$z}</b> {raw}</code>").0, "<code>a <b><!--{$.x}--><!--}--> and <i>y</i> <!--{$.z}--><!--}--></b> {raw}</code>");
         assert_eq!(sugar("<pre><button @click=\"copy(line)\" .on=\"$on\">c</button></pre>").0, "<pre><button data-on-click=\"copy(line)\" data-class-on=\"$.on\">c</button></pre>");
         assert_eq!(sugar("<pre><span :text=\"$x\"></span></pre>").1[0].0, "html/text-removed");
     }
