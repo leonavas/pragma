@@ -264,29 +264,90 @@ pub fn prune_scoped(css: &str, markup: &Markup, marker: &str) -> String {
     })
 }
 
-/// What an own-element compound of scoped CSS needs from an element: its name and classes
-/// (outside parentheses and brackets). An empty one matches any element.
+/// What a compound of scoped CSS needs from an element: its name, its classes, and one alternative
+/// of each `:is()`/`:where()` (outside other parentheses and brackets). An empty one matches any
+/// element.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct OwnCompound {
     pub tag: Option<String>,
     pub classes: Vec<String>,
+    pub any_of: Vec<Vec<OwnCompound>>,
 }
 
 impl OwnCompound {
     pub fn matches(&self, tag: &str, has_class: &dyn Fn(&str) -> bool) -> bool {
-        self.tag.as_deref().is_none_or(|t| t.eq_ignore_ascii_case(tag)) && self.classes.iter().all(|c| has_class(c))
+        self.tag.as_deref().is_none_or(|t| t.eq_ignore_ascii_case(tag)) && self.classes.iter().all(|c| has_class(c)) && self.any_of.iter().all(|alts| alts.iter().any(|a| a.matches(tag, has_class)))
+    }
+
+    fn is_any(&self) -> bool {
+        self.tag.is_none() && self.classes.is_empty() && self.any_of.is_empty()
+    }
+
+    /// Whether an element pragma did not write (`<html>`, `<body>`, or one with a name or class
+    /// the page's markup lacks) can match.
+    fn may_be_outside(&self, markup: &Markup) -> bool {
+        match self.tag.as_deref().map(str::to_ascii_lowercase) {
+            Some(tag) => ALWAYS_PRESENT.contains(&tag.as_str()) || !markup.tags.contains(&tag),
+            None => (self.classes.is_empty() || self.classes.iter().any(|c| !markup.classes.contains(c))) && self.any_of.iter().all(|alts| alts.iter().any(|a| a.may_be_outside(markup))),
+        }
     }
 }
 
-/// The own-element compounds (those holding `marker`) of every selector in scoped CSS.
-pub fn own_compounds(css: &str, marker: &str) -> BTreeSet<OwnCompound> {
+/// An element above the one being checked: one pragma wrote, or an unknown one (the body of a
+/// component that renders itself is cloned under any element).
+#[derive(Debug, Clone)]
+pub enum Ancestor {
+    Element { tag: String, classes: Vec<String> },
+    Unknown,
+}
+
+/// A scoped selector seen from the element that holds the token: its own-element compound and the
+/// compounds above it, nearest first. Sibling compounds (`+`, `~`) are left out and `>` counts as
+/// any ancestor, so the check can only say yes too often.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct OwnSelector {
+    pub own: OwnCompound,
+    pub ancestors: Vec<OwnCompound>,
+}
+
+impl OwnSelector {
+    /// Whether an element (`tag`, every class it can have) under `ancestors` (outermost first) can
+    /// match. `<html>`, `<body>` and elements pragma did not write may be above all of them.
+    pub fn may_match(&self, tag: &str, classes: &[String], ancestors: &[Ancestor], markup: &Markup) -> bool {
+        if !self.own.matches(tag, &|c| classes.iter().any(|x| x == c)) {
+            return false;
+        }
+        let mut above = ancestors.len();
+        for need in &self.ancestors {
+            let found = ancestors[..above].iter().rposition(|a| match a {
+                Ancestor::Unknown => true,
+                Ancestor::Element { tag, classes } => need.matches(tag, &|c| classes.iter().any(|x| x == c)),
+            });
+            match found {
+                Some(i) => above = if matches!(ancestors[i], Ancestor::Unknown) { i + 1 } else { i },
+                None if need.may_be_outside(markup) => above = 0,
+                None => return false,
+            }
+        }
+        true
+    }
+}
+
+/// The own-element selectors (those holding `marker`) of every style rule in scoped CSS. A selector
+/// with nesting (`&`) or a namespace (`|`) can match any element.
+pub fn own_selectors(css: &str, marker: &str) -> BTreeSet<OwnSelector> {
     let mut out = BTreeSet::new();
     each_rule(&strip_comments(css), &mut |prelude, _| {
         for sel in split_top(prelude, ',') {
             let sel = sel.trim();
-            if let Some((start, end)) = compounds(sel).into_iter().find(|(start, end)| sel[*start..*end].contains(marker)) {
-                out.insert(own_compound(&sel[start..end]));
+            let parts = compounds(sel);
+            let Some(at) = parts.iter().position(|(start, end)| sel[*start..*end].contains(marker)) else { continue };
+            if sel.contains('&') || sel.contains('|') {
+                out.insert(OwnSelector { own: own_compound(""), ancestors: Vec::new() });
+                continue;
             }
+            let ancestors = (0..at).rev().filter(|&i| !sel[parts[i].1..parts[i + 1].0].contains(['+', '~'])).map(|i| own_compound(&sel[parts[i].0..parts[i].1])).filter(|c| !c.is_any()).collect();
+            out.insert(OwnSelector { own: own_compound(&sel[parts[at].0..parts[at].1]), ancestors });
         }
     });
     out
@@ -295,8 +356,9 @@ pub fn own_compounds(css: &str, marker: &str) -> BTreeSet<OwnCompound> {
 fn own_compound(compound: &str) -> OwnCompound {
     let b = compound.as_bytes();
     let tag_len = compound.find(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '_')).unwrap_or(b.len());
-    let tag = (tag_len > 0 && b[0].is_ascii_alphabetic()).then(|| compound[..tag_len].to_ascii_lowercase());
+    let mut tag = (tag_len > 0 && b[0].is_ascii_alphabetic()).then(|| compound[..tag_len].to_ascii_lowercase());
     let mut classes = Vec::new();
+    let mut any_of = Vec::new();
     let (mut depth, mut i, mut quote) = (0i32, tag_len, 0u8);
     while i < b.len() {
         let c = b[i];
@@ -309,6 +371,18 @@ fn own_compound(compound: &str) -> OwnCompound {
         } else {
             match c {
                 b'"' | b'\'' => quote = c,
+                b':' if depth == 0 && [":is(", ":where(", ":matches(", ":-webkit-any("].iter().any(|p| compound[i..].to_ascii_lowercase().starts_with(p)) => {
+                    let open = i + compound[i..].find('(').unwrap();
+                    let close = open + 1 + block_end_with(&compound[open + 1..], '(', ')');
+                    let alts: Vec<OwnCompound> = split_top(&compound[open + 1..close.min(b.len())], ',').into_iter().map(|alt| subject(alt.trim())).collect();
+                    if !alts.iter().any(OwnCompound::is_any) {
+                        any_of.push(alts);
+                    }
+                    i = close;
+                }
+                b':' if depth == 0 && ident(&compound[i + 1..]).0.eq_ignore_ascii_case("root") => {
+                    tag.get_or_insert_with(|| "html".into());
+                }
                 b'(' | b'[' => depth += 1,
                 b')' | b']' => depth -= 1,
                 b'.' if depth == 0 => {
@@ -323,7 +397,14 @@ fn own_compound(compound: &str) -> OwnCompound {
         }
         i += 1;
     }
-    OwnCompound { tag, classes }
+    OwnCompound { tag, classes, any_of }
+}
+
+fn subject(selector: &str) -> OwnCompound {
+    match compounds(selector).last() {
+        Some(&(start, end)) if !selector.contains(['&', '|']) => own_compound(&selector[start..end]),
+        _ => own_compound(""),
+    }
 }
 
 struct Face {
@@ -535,13 +616,63 @@ mod tests {
         assert!(!out.contains("x: 2"), "{out}");
     }
 
+    fn oc(tag: Option<&str>, classes: &[&str]) -> OwnCompound {
+        OwnCompound { tag: tag.map(str::to_string), classes: classes.iter().map(|c| c.to_string()).collect(), any_of: Vec::new() }
+    }
+
+    fn el(tag: &str, classes: &[&str]) -> Ancestor {
+        Ancestor::Element { tag: tag.into(), classes: classes.iter().map(|c| c.to_string()).collect() }
+    }
+
+    fn owns(css: &str) -> Vec<OwnSelector> {
+        own_selectors(css, ":where([data-s~=").into_iter().collect()
+    }
+
     #[test]
-    fn own_compounds_say_which_elements_need_the_token() {
+    fn own_selectors_say_which_elements_need_the_token() {
         let css = ".a:where([data-s~=\"s1\"]) { x: 1 }\n@media (width >= 1px) { li.b.c:where([data-s~=\"s1\"]):hover, .ancestor :global(.x) { x: 2 } }\n.list:where([data-s~=\"s1\"]) .hit, :where([data-s~=\"s1\"])::marker { x: 3 }";
-        let own: Vec<OwnCompound> = own_compounds(css, ":where([data-s~=").into_iter().collect();
-        let oc = |tag: Option<&str>, classes: &[&str]| OwnCompound { tag: tag.map(str::to_string), classes: classes.iter().map(|c| c.to_string()).collect() };
+        let own: Vec<OwnCompound> = owns(css).into_iter().map(|s| s.own).collect();
         assert_eq!(own, [oc(None, &[]), oc(None, &["a"]), oc(None, &["list"]), oc(Some("li"), &["b", "c"])]);
         assert!(own[3].matches("LI", &|c| c == "b" || c == "c") && !own[3].matches("li", &|c| c == "b") && !own[3].matches("p", &|_| true));
+    }
+
+    #[test]
+    fn own_selectors_keep_ancestors_and_alternatives() {
+        let one = |css: &str| owns(css).remove(0);
+        let s = one(".tabela tbody > tr.abre td:where([data-s~=\"s1\"]) { x: 1 }");
+        assert_eq!((s.own, s.ancestors), (oc(Some("td"), &[]), vec![oc(Some("tr"), &["abre"]), oc(Some("tbody"), &[]), oc(None, &["tabela"])]));
+        let s = one(".a .b + .c ~ .d .e:where([data-s~=\"s1\"]) { x: 1 }");
+        assert_eq!(s.ancestors, [oc(None, &["d"]), oc(None, &["a"])], "sibling compounds share the parent of the next one");
+        let s = one(".m[data-x] :is(.p, li.q, .r .s):where([data-s~=\"s1\"]):not(.z) { x: 1 }");
+        assert_eq!(s.own.any_of, [vec![oc(None, &["p"]), oc(Some("li"), &["q"]), oc(None, &["s"])]]);
+        assert!(s.own.matches("span", &|c| c == "s") && !s.own.matches("span", &|c| c == "z" || c == "r"));
+        for any in [".k:is(:hover, .x):where([data-s~=\"s1\"]) { x: 1 }", ":where([data-s~=\"s1\"]) { x: 1 }", "* .x:where([data-s~=\"s1\"]) { x: 1 }"] {
+            let s = one(any);
+            assert!(s.own.any_of.is_empty() && s.ancestors.iter().all(|a| !a.is_any()), "{any}");
+        }
+        let s = one(".a { & .b:where([data-s~=\"s1\"]) { x: 1 } }\n.n &:where([data-s~=\"s1\"]) { x: 2 }");
+        assert!(s.own.is_any() && s.ancestors.is_empty());
+    }
+
+    #[test]
+    fn own_selectors_need_ancestors_the_page_can_give() {
+        let m = markup(&["table", "tr", "td", "div", "span"], &["tabela", "mes", "abre"]);
+        let s = owns(".tabela tr.abre td:where([data-s~=\"s1\"]) { x: 1 }").remove(0);
+        let td = |ancestors: &[Ancestor]| s.may_match("td", &[], ancestors, &m);
+        assert!(td(&[el("div", &["tabela"]), el("table", &[]), el("tr", &["abre"])]));
+        assert!(td(&[el("div", &["tabela"]), el("tr", &["abre"]), el("span", &[])]), "a descendant at any depth");
+        assert!(!td(&[el("div", &["mes"]), el("table", &[]), el("tr", &["abre"])]));
+        assert!(!td(&[el("tr", &["abre"]), el("div", &["tabela"])]), "the order of ancestors counts");
+        assert!(!td(&[]) && !s.may_match("span", &[], &[el("div", &["tabela"]), el("tr", &["abre"])], &m));
+        assert!(td(&[Ancestor::Unknown]), "a self-rendered body can be anywhere");
+        assert!(td(&[el("div", &["tabela"]), Ancestor::Unknown]));
+        let outside = |css: &str| owns(css).remove(0).may_match("span", &[], &[el("div", &[])], &m);
+        for yes in ["html[data-theme=\"dark\"] span:where([data-s~=\"s1\"]) { x: 1 }", "body.locked span:where([data-s~=\"s1\"]) { x: 1 }", ".dark span:where([data-s~=\"s1\"]) { x: 1 }", "x-widget span:where([data-s~=\"s1\"]) { x: 1 }", ":root.mes span:where([data-s~=\"s1\"]) { x: 1 }", ".mes.dark span:where([data-s~=\"s1\"]) { x: 1 }", "div > span:where([data-s~=\"s1\"]) { x: 1 }"] {
+            assert!(outside(yes), "{yes}");
+        }
+        for no in [".mes span:where([data-s~=\"s1\"]) { x: 1 }", "table span:where([data-s~=\"s1\"]) { x: 1 }", ":is(.mes, .abre) span:where([data-s~=\"s1\"]) { x: 1 }", "html .mes span:where([data-s~=\"s1\"]) { x: 1 }"] {
+            assert!(!outside(no), "{no}");
+        }
     }
 
     #[test]

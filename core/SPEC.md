@@ -460,7 +460,8 @@ Usage:
   `[data-c="name"]` (`"name"`, `'name'` or unquoted) in its own CSS to its id.
 - Scoping (automatic, Svelte semantics): a component's or page's CSS matches only the markup that
   owner wrote. The build gives each owner a `data-s` token, writes it on each element the owner
-  wrote that one of its selectors can match, and appends `:where([data-s~="<token>"])` to the
+  wrote that one of its selectors can match (name, classes and `.x` toggles, and the ancestor
+  compounds against the element's ancestors on the page), and appends `:where([data-s~="<token>"])` to the
   subject of each selector that does not already contain its `[data-c="id"]` (before a
   pseudo-element; no added specificity). Child component markup and slot content (it belongs to
   its writer) are not matched. A component root that gets `class` from its caller also carries the

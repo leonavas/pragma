@@ -1315,7 +1315,7 @@ Use utility classes (`classes.md`) first. Write a custom class only when utiliti
 | Component `<style>` or `<name>.css` | Scoped to the markup that component wrote. `:global(…)` opts out. `[data-c="<name>"]` stays as written (unique per folder for `p-`). |
 | Page `<style>` or `<page>.css` | Scoped to the markup that page wrote. |
 
-Scoping works as in Svelte. The build writes a `data-s` token on each element that a page or component wrote, and appends `:where([data-s~="<token>"])` to the last part of each selector (zero specificity). A selector does not match:
+Scoping works as in Svelte. The build appends `:where([data-s~="<token>"])` to the last part of each selector (zero specificity), and writes the `data-s` token on each element that a page or component wrote and that one of its selectors can match (element name, classes including `.x` toggles, and the ancestors on the page). A selector does not match:
 
 - elements inside a child component (style them in that component, or pass a class),
 - slot content: it belongs to the page or component that wrote it.

@@ -96,7 +96,7 @@ app created in my-app (41 files)
           <ul>
             <li>The default sets the prop's type: <code>start="1"</code> arrives as the number 1 because the default is <code>0</code>; a bare attribute is <code>true</code>.</li>
             <li>Props are read-only and live. <code>let count = start</code> copies one into state that the component can change.</li>
-            <li>The <code>&lt;style&gt;</code> is scoped with <code>[data-c="counter"]</code>; utilities from <code>classes.md</code> cover the rest.</li>
+            <li>The <code>&lt;style&gt;</code> is scoped to the markup the component wrote; utilities from <code>classes.md</code> cover the rest.</li>
             <li><code>pragma check</code> reads the script: a name the markup uses but the script lacks is <code>html/unknown-name</code>, an attribute the component does not declare is <code>html/unknown-prop</code>, a write to a prop is <code>js/prop-write</code>.</li>
           </ul>
         </div>

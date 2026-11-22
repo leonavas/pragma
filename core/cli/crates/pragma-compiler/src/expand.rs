@@ -4,7 +4,6 @@ use crate::html::{Attr, Element, Node, Pos, escape_text, is_blank};
 use crate::project::{Component, Page, Project, component_tag, is_component_tag, rel_str};
 use crate::validate::diag;
 use crate::{Fnv, short_hash};
-use pragma_css::prune::OwnCompound;
 use pragma_diag::Diagnostic;
 use pragma_jslint::script::ScriptInfo;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -61,9 +60,9 @@ pub struct Expander<'p> {
     blocks: usize,
     /// Body of each component that renders itself, by `data-c` id (`None` while it is built).
     defs: BTreeMap<String, Option<Element>>,
-    /// Own-element compounds of each owner's scoped CSS, by `data-s` token: only elements one can
+    /// Own-element selectors of each owner's scoped CSS, by `data-s` token: only elements one can
     /// match get the token.
-    owned: Option<&'p HashMap<String, BTreeSet<OwnCompound>>>,
+    owned: Option<&'p crate::owners::Owned>,
 }
 
 fn first_element(nodes: &[Node]) -> Option<&Element> {
@@ -96,18 +95,15 @@ fn collect_slots(nodes: &[Node], out: &mut BTreeSet<String>) {
 }
 
 impl<'p> Expander<'p> {
-    pub fn owned(mut self, owned: &'p HashMap<String, BTreeSet<OwnCompound>>) -> Self {
+    pub fn owned(mut self, owned: &'p crate::owners::Owned) -> Self {
         self.owned = Some(owned);
         self
     }
 
     fn styled(&self, token: &str, el: &Element) -> bool {
         let Some(own) = self.owned.and_then(|o| o.get(token)) else { return true };
-        let static_classes: Vec<&str> = el.attrs.iter().filter(|a| a.name.eq_ignore_ascii_case("class")).flat_map(|a| a.value.as_deref().unwrap_or("").split_whitespace()).collect();
-        let has_class = |c: &str| {
-            static_classes.contains(&c) || el.attrs.iter().any(|a| matches!(directive::parse(&a.name.to_ascii_lowercase()), Some(Some(Dir::Class(n))) if n == c))
-        };
-        own.iter().any(|o| o.matches(&el.name, &has_class))
+        let classes = crate::owners::classes(el);
+        own.iter().any(|s| s.own.matches(&el.name, &|c| classes.iter().any(|x| x == c)))
     }
 
     pub fn new(p: &'p Project, scripts: &'p HashMap<PathBuf, ScriptInfo>) -> Self {
@@ -178,6 +174,9 @@ impl<'p> Expander<'p> {
             }
         }
         merge_head(&mut head, own_head);
+        if let Some(owned) = self.owned {
+            crate::owners::trim(&mut body, &mut page_nodes, owned);
+        }
         (Expanded { head, body, page: page_nodes, components: self.used }, self.diags)
     }
 

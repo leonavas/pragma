@@ -701,6 +701,25 @@ fn component_and_page_css_match_only_their_own_markup() {
 }
 
 #[test]
+fn scoped_token_only_where_ancestors_allow_a_match() {
+    let t = scratch(&[
+        ("lib/components/box/box.html", "<div class=\"box\"><slot></slot></div>"),
+        ("routes/index.html", "<title>Home</title>\n<script>\n  let showTable = true\n</script>\n<table class=\"tabela\"><tr><td>in</td></tr></table>\n<table><tr><td>out</td></tr></table>\n<if $showTable><div class=\"tabela\"><span>block</span></div></if>\n<span>loose</span>\n<c-box><em>slot</em></c-box><em>bare</em>\n<p>dark</p>\n<style>\n  .tabela td, .tabela span { color: red }\n  .box em { margin: 0 }\n  :global(.dark) p { color: white }\n</style>\n"),
+    ]);
+    let app = t.0.join("app");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: app.clone(), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let page = token_after(&html, "<td");
+    for kept in ["<td data-s", "<span data-s=\"PAGE\">block", "<em data-s=\"PAGE\">slot", "<p data-s=\"PAGE\">dark"] {
+        assert!(html.contains(&kept.replace("PAGE", &page)), "{kept}: {html}");
+    }
+    for bare in ["<td>out</td>", "<span>loose</span>", "<em>bare</em>", "<table class=\"tabela\">", "class=\"box\"><em"] {
+        assert!(html.contains(bare), "no selector of the page can match {bare}: {html}");
+    }
+}
+
+#[test]
 fn theme_class_named_like_a_utility_is_an_error() {
     let d = check_with(&[("lib/theme.css", Some("@layer components {\n  .btn { padding: 0.5rem 1rem; border-radius: var(--radius-md); }\n  .tag, .active { font-size: .75rem; }\n  .hero > .contents, .x.mr-auto { margin: 0 }\n  .hidden:hover { color: red }\n}\n"))]);
     expect(&d, "css/utility-name", "lib/theme.css", 5);

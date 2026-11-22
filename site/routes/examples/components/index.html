@@ -21,7 +21,7 @@
         <li><code>function increase(event)</code> is an action when an event names it. Without parentheses, <code>@click="increase"</code> passes the DOM event, here to read <code>event.shiftKey</code>. Assigning <code>count</code> schedules one render per microtask; there is no <code>setState</code> and no <code>this</code>.</li>
         <li>With parentheses the function gets only what you list: paths, literals, <code>event</code> and <code>el</code>, the element that has the <code>@</code>. Reset hides itself after a click, so <code>@click="reset(el)"</code> moves the focus to <strong>+</strong> and keyboard users keep their place.</li>
         <li>A store function works the same way, with no wrapper: <code>@click="shared.cart.add(product)"</code>. A component that only reads and calls a store needs no script, as on the <a href="/examples/stores">stores page</a>.</li>
-        <li><code>&lt;style&gt;</code> is scoped by the build: <code>.counter-step</code> only matches inside this component, with no added specificity, so write plain selectors. <code>:global(…)</code> opts out only what is inside it (<code>:global(html[data-theme="dark"]) .counter-step</code> is still this component's buttons), and the root itself is <code>[data-c="counter"]</code>. A separate <code>counter.css</code> works the same way; having both it and the <code>&lt;style&gt;</code> (or a <code>&lt;script&gt;</code> and a <code>counter.js</code>) is a check error (<code>html/duplicate-module</code>).</li>
+        <li><code>&lt;style&gt;</code> is scoped by the build: <code>.counter-step</code> only matches the markup this component wrote, with no added specificity, so write plain selectors. <code>:global(…)</code> opts out only what is inside it (<code>:global(html[data-theme="dark"]) .counter-step</code> is still this component's buttons), and the root itself is <code>[data-c="counter"]</code>. A separate <code>counter.css</code> works the same way; having both it and the <code>&lt;style&gt;</code> (or a <code>&lt;script&gt;</code> and a <code>counter.js</code>) is a check error (<code>html/duplicate-module</code>).</li>
       </ul>
       <p>The component lives in <code>_components/counter/</code> next to this page, so it is used as <code>&lt;p-counter&gt;</code>. Moving the folder to <code>lib/components/</code> would make it <code>&lt;c-counter&gt;</code> for every route.</p>
     </div>
@@ -118,7 +118,7 @@
         <li>A <code>&lt;p-x&gt;</code> used outside <code>routes/</code> is an error, and so are two components with the same folder name on one page (<code>&lt;c-card&gt;</code> plus <code>&lt;p-card&gt;</code>).</li>
         <li>A component cannot have a <code>.server.js</code>: its data comes from the page's <code>load</code>, as in the list above.</li>
         <li>A component cannot use itself, and its root cannot be <code>&lt;template&gt;</code>, <code>&lt;slot&gt;</code> or another component.</li>
-        <li>A component's script loads only on pages that use it. Its <code>&lt;style&gt;</code> goes into the single app stylesheet, scoped by its <code>data-c</code>.</li>
+        <li>A component's script loads only on pages that use it. Its <code>&lt;style&gt;</code> goes into the CSS of the routes that use it, scoped to the markup it wrote.</li>
       </ul>
     </div>
   </section>

@@ -265,6 +265,19 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   (`.titulo`, `.lista`) because page and component styles leaked into child components.
   *Cost:* slotted items styled by a component need `:global(…)` (starter dropdown updated); HTML
   grows about 7% gzip on a component-heavy page (escalei `/app/[id]`: 56.1 to 59.8 kB).
+- **[firm]** (2026-11-22) The `data-s` token goes only where a selector of its owner can match,
+  ancestors included. After the page is expanded (layout, slots and block bodies in place), each
+  token is checked against its owner's selectors: the own compound needs the element's name,
+  classes and `.x` toggles (`:is()`/`:where()` need one alternative); each compound to its left
+  needs an ancestor on the page, nearest first. When in doubt it keeps the token: `>` counts as any
+  ancestor, sibling compounds are skipped, `:not()`/`:has()`/attributes/pseudo-classes never rule
+  out, `&` or `|` keep it everywhere, the body of a self-rendering component has unknown ancestors,
+  and an ancestor compound that names `html`, `body`, `:root`, a tag or a class the page never
+  writes may be matched outside pragma's markup. *Why:* escalei `/app/[id]` wrote 1641 tokens;
+  `.tabela td` put one on every `td` of the component. Now 1375 (28.0 to 23.5 kB raw; gzip 54.9 to
+  54.6 kB, brotli 42.1 to 41.9 kB); the rest are elements the styles do target. Computed styles
+  of every element (block bodies expanded) and screenshots of all 15 escalei pages are identical. A shorter token value (4 hex) would save about
+  0.3 kB gzip and needs an app-wide collision check, so it stays 6.
 - **[firm]** (2026-11-21) Cascade: `reset, tokens, base, components, utilities` layers, then
   component and page CSS outside any layer. Theme classes < utilities < scoped styles, as with
   Tailwind v4 + Svelte. *Why:* in the port about 20 components had to move utilities into their
