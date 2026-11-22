@@ -142,7 +142,7 @@ Compute every derived value in a script or store function (`const total = () => 
 - Each `<if>`, `<else-if>`, `<else>`, `<for>`, and `<empty>` must contain exactly 1 root element (not another block). Put directives on that element, not on the block tag.
 - Write strict HTML and close every non-void tag. Do not use `<html>`, `<body>`, or `<template>`. Put at most one `<script>` and one `<style>` per file (`state.md`, `css.md`).
 - `@submit` calls `preventDefault()` automatically. Every `<form>` is an agent tool (`webmcp.md`); read values with `new FormData(event.target)`.
-- Pass `<for>` items as arguments (`@click="remove(task)"`). Without parentheses, the handler receives `event` (`@input="search"`). With parentheses, it receives only listed arguments (`@click="reset()"` receives none). Use `el` instead of `event.currentTarget` (events are delegated).
+- Pass `<for>` items as arguments (`@click="remove(task)"`). Without parentheses, the handler receives `event` (`@input="search"`). With parentheses, it receives only listed arguments (`@click="reset()"` receives none). Use `el` instead of `event.currentTarget` (events are delegated; `js/current-target`).
 - Omit `$` in event names (`@click="increase"`). `:attr` takes a bare path (`:disabled="$atMinimum"`) or a literal (`:maxlength="40"`); use `title="Count {$count}"` without `:` for interpolated strings.
 - Pass one bare path to block tags (`<if $hasTasks>` with `const hasTasks = () => tasks.length > 0`).
 - Return `'true'` or `'false'` strings for `aria-*` states (`aria-pressed`, `aria-expanded`), because boolean `false` removes the attribute.

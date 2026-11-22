@@ -1,3 +1,58 @@
+<script>
+  import { frame } from 'pragma'
+
+  export let heading = ''
+  export let lede = ''
+
+  let sections = []
+  let currentId = ''
+
+  const rows = () => sections.map(section => ({
+    ...section,
+    href: '#' + section.id,
+    current: section.id === currentId && 'true',
+  }))
+
+  const currentTitle = () => sections.find(section => section.id === currentId)?.title ?? ''
+
+  function findCurrent(headings) {
+    const atBottom = innerHeight + scrollY >= document.documentElement.scrollHeight - 2
+    if (atBottom) return headings.at(-1)?.id ?? ''
+    const passed = headings.filter(title => title.getBoundingClientRect().top < innerHeight * 0.3)
+    return passed.at(-1)?.id ?? headings[0]?.id ?? ''
+  }
+
+  function revealLink(aside, id) {
+    const link = aside.querySelector('a[href="#' + id + '"]')
+    if (!link) return
+    const box = aside.getBoundingClientRect()
+    const linkBox = link.getBoundingClientRect()
+    if (linkBox.bottom > box.bottom) aside.scrollTop += linkBox.bottom - box.bottom + 24
+    if (linkBox.top < box.top) aside.scrollTop -= box.top - linkBox.top + 24
+  }
+
+  function mount(el) {
+    const aside = el.querySelector('aside')
+    const headings = [...el.querySelectorAll('.doc-section > h2[id]')]
+    sections = headings.map(title => ({ id: title.id, title: title.textContent.trim() }))
+    let pending = null
+    const follow = () => {
+      pending ??= frame(() => {
+        pending = null
+        currentId = findCurrent(headings)
+        revealLink(aside, currentId)
+      })
+    }
+    follow()
+    addEventListener('scroll', follow, { passive: true })
+    addEventListener('resize', follow, { passive: true })
+    return () => {
+      removeEventListener('scroll', follow)
+      removeEventListener('resize', follow)
+    }
+  }
+</script>
+
 <div class="wrap">
   <div class="doc-switcher sticky top-14 z-30 mb-10 flex h-12 items-center gap-2 border-b border-line bg-ground text-sm lg:hidden">
     <a href="/examples" class="flex h-full items-center text-muted no-underline hover:text-ink">Examples</a>
@@ -6,10 +61,21 @@
       <summary class="flex h-9 cursor-pointer items-center gap-1.5 px-2 text-accent-text">{$heading}<svg class="doc-sections-chevron size-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path d="M4 6l4 4 4-4"></path></svg></summary>
       <c-section-nav class="doc-sections-panel compact absolute top-full mt-1 border border-line bg-surface shadow-lg" label="Example sections"></c-section-nav>
     </details>
+    <span class="doc-current min-w-0 truncate text-muted">{$currentTitle}</span>
   </div>
   <aside class="hidden self-start lg:sticky lg:top-24 lg:block">
     <a href="/examples" class="label nav-link">All examples</a>
     <c-section-nav class="compact mt-4" label="Example sections"></c-section-nav>
+    <if $sections.length>
+      <nav class="mt-8 border-t border-line pt-6" aria-label="On this page">
+        <p class="label">On this page</p>
+        <ul class="mt-3 grid gap-0.5">
+          <for row in $rows key=row.id>
+            <li><a class="doc-toc-link nav-link" :href="row.href" :aria-current="row.current">{row.title}</a></li>
+          </for>
+        </ul>
+      </nav>
+    </if>
   </aside>
   <article class="min-w-0">
     <header class="border-b border-line pb-10">
@@ -27,6 +93,10 @@
   [data-c="doc"] .doc-sections summary::-webkit-details-marker { display: none; }
   [data-c="doc"] .doc-sections[open] .doc-sections-chevron { rotate: 180deg; }
   [data-c="doc"] .doc-sections-panel { left: var(--gutter); width: min(18rem, calc(100vw - 2 * var(--gutter))); max-height: min(70vh, 26rem); padding: 0.5rem 0.875rem; overflow-y: auto; }
+  [data-c="doc"] aside { max-height: calc(100vh - 7rem); overflow-y: auto; scrollbar-width: thin; }
+  [data-c="doc"] .doc-toc-link { display: block; padding: 0.3rem 0 0.3rem 0.75rem; border-left: 1px solid var(--color-line); font-size: 0.75rem; line-height: 1.35; }
+  [data-c="doc"] .doc-toc-link[aria-current="true"] { border-left-color: var(--color-accent-text); }
+  [data-c="doc"] .doc-current:not(:empty)::before { content: "/ "; color: var(--color-faint); }
   [data-c="doc"] .doc-title { font-size: clamp(1.875rem, 5vw, 3.25rem); }
   @media (min-width: 64rem) {
     [data-c="doc"] { display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: 4rem; padding-top: 4rem; }

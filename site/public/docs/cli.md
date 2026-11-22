@@ -41,6 +41,7 @@ Fix the root cause; do not work around a rule.
 | `js/top-level-data` | Read `data` inside functions (`const products = () => data.products`), not at top level. |
 | `js/stale-derived` | Convert static derived values to functions (`const doubled = () => count * 2`), or update them in actions. |
 | `js/derived-call` | Call derived functions in JS (`empty()`), not as bare values (`if (empty)`). |
+| `js/current-target` | Pass the element with `el` (`@click="move(event, el)"`): in a handler, `event.currentTarget` is the page root. |
 | `js/dollar-in-script` | Write `x` in JS; `$x` is HTML only. |
 | `html/legacy-syntax`, `html/unknown-directive` | Use pragma syntax (`syntax.md`). Replace foreign attributes (`v-if`, `x-show`, `v-bind:href`, `on:click`, `*ngIf`, `[disabled]`, `className`) with pragma forms (`<if path>`, `:show`, `:href`, `@click`). |
 | `html/data-attribute` | Do not write `data-*` by hand. Use short forms (`{path}` instead of `data-text`), `:data-x="path"`, `.name="path"`, `aria-*`, or role/label/id. |

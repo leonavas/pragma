@@ -37,7 +37,10 @@ async function exists(path) {
 }
 
 async function prepareBase() {
-  if (await exists(join(baseApp, 'node_modules'))) return
+  if (await exists(join(baseApp, 'node_modules'))) {
+    execFileSync('pragma', ['upgrade'], { cwd: baseApp, stdio: 'ignore' })
+    return
+  }
   await mkdir(workRoot, { recursive: true })
   execFileSync('pragma', ['new', baseApp], { stdio: 'ignore' })
   execFileSync('npm', ['i', ...packages, '--ignore-scripts'], { cwd: baseApp, stdio: 'ignore' })
