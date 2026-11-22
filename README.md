@@ -110,7 +110,6 @@ text.
 ```
 core/      the framework: spec, docs, runtime, starter and the Rust CLI (see core/README.md)
 site/      pragma.leonavas.com, built with pragma (see site/README.md)
-npm/       npm packages that wrap the CLI binaries
 install.sh the installer: downloads a release binary and checks its SHA-256
 design/    brand sources: logo, the Pragma Reto font, Open Graph image (see design/README.md)
 ```
@@ -141,6 +140,8 @@ pragma check --strict
   to GitHub Releases with `SHA256SUMS.txt`. It runs when you push a tag `vX.Y.Z`. You can also run it
   by hand with `release: true`: the tag is then `v<version>` from `core/cli/Cargo.toml`.
 - `install.sh` and `pragma self-update` download only from GitHub Releases.
+- No npm package. pragma is not published to npm, now or later: GitHub Releases is the only
+  distribution channel. Do not add npm packaging or a publish job.
 
 ## License
 

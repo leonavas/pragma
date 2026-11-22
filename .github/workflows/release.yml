@@ -15,11 +15,6 @@ on:
         required: false
         default: false
         type: boolean
-      publish_npm:
-        description: "Publish packages to npm"
-        required: false
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -79,13 +74,6 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: Compress-Archive -Path "core/cli/target/${{ matrix.target }}/release/${{ matrix.bin }}" -DestinationPath "${{ matrix.archive }}"
-
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: bin-${{ matrix.target }}
-          path: core/cli/target/${{ matrix.target }}/release/${{ matrix.bin }}
-          if-no-files-found: error
 
       - name: Upload release archive
         uses: actions/upload-artifact@v4
@@ -147,48 +135,3 @@ jobs:
           else
             gh release create "${tag}" release-assets/* --generate-notes --title "${tag}" --target "${GITHUB_SHA}"
           fi
-
-  publish-npm:
-    name: Publish npm packages
-    needs: release
-    if: inputs.publish_npm == true
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-
-      - name: Download binary artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: bin-*
-          path: artifacts
-
-      - name: Stage npm packages
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
-        run: |
-          if [ -n "${INPUT_VERSION}" ]; then
-            node npm/scripts/stage.mjs --artifacts artifacts --version "${INPUT_VERSION}"
-          else
-            node npm/scripts/stage.mjs --artifacts artifacts
-          fi
-
-      - name: Publish platform packages
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          for pkg in cli-linux-x64 cli-linux-arm64 cli-darwin-arm64 cli-darwin-x64 cli-win32-x64; do
-            npm publish "npm/platforms/${pkg}" --provenance --access public
-          done
-
-      - name: Publish root package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish npm/pragma --provenance --access public

@@ -537,11 +537,10 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - **[firm]** The CLI stays in Rust; a Node rewrite was discarded. *Why:* single binary and
   instant startup (good for agents calling the CLI in loops), native parser (oxc), and Node
   adds no security: an npm package runs with the same permissions as a binary.
-- **[firm]** Distribution via npm with prebuilt per-platform binaries (`optionalDependencies`,
-  esbuild/biome model) + minimal JS shim; `npx pragma` works without knowing it's Rust. Also
-  GitHub releases for non-Node users.
+- **[firm]** Distribution only through GitHub Releases (`install.sh`, `pragma self-update`).
+  No npm package, now or later (decided 2026-11-22; the npm wrapper packages were removed).
 - **[firm]** On publishing, the project will be open source and auditable: binaries built only
-  in CI from the public repo, `npm publish --provenance` + GitHub attestations, signed
+  in CI from the public repo, GitHub attestations, signed
   checksums (sigstore), no `postinstall`, and a CLI with no network access and nothing outside
   the project. *Not done yet; only at publishing.*
 - **[likely]** Release tool: `cargo-dist`. Goal: match `tests_1` esbuild (build about 0.33 s,

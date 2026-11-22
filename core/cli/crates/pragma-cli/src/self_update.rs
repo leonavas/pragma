@@ -34,8 +34,8 @@ pub fn run(requested: Option<&str>) -> Result<(), String> {
     Ok(())
 }
 
-/// Release targets: (`std::env::consts::OS`, `ARCH`, Rust target). release.yml, install.sh and
-/// npm/scripts/stage.mjs list the same targets (tests/contracts.rs).
+/// Release targets: (`std::env::consts::OS`, `ARCH`, Rust target). release.yml and install.sh list
+/// the same targets (tests/contracts.rs).
 pub const TARGETS: &[(&str, &str, &str)] = &[
     ("linux", "x86_64", "x86_64-unknown-linux-gnu"),
     ("linux", "aarch64", "aarch64-unknown-linux-gnu"),

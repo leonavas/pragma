@@ -103,7 +103,4 @@ fn release_targets_agree() {
     let install = read("install.sh");
     let installed = install.lines().filter_map(|l| l.split("TARGET=\"").nth(1)).map(|rest| rest.split('"').next().unwrap());
     assert_eq!(set(installed), set(TARGETS.iter().filter(|t| t.0 != "windows").map(|t| t.2)), "install.sh");
-    let stage = read("npm/scripts/stage.mjs");
-    let staged = stage.lines().filter_map(|l| l.trim().strip_prefix("target: \"")).map(|rest| rest.trim_end_matches(['"', ',']));
-    assert_eq!(set(staged), targets, "npm/scripts/stage.mjs");
 }
