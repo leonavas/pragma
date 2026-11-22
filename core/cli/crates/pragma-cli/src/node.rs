@@ -164,7 +164,7 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// OTel JSON record (one per line, as `core/server/log.js` prints) to a readable line.
+/// OTel JSON record (one per line, as `.pragma/server/log.js` prints) to a readable line.
 pub fn format_log(line: &str, paint: Paint) -> String {
     let Ok(Value::Object(rec)) = serde_json::from_str::<Value>(line) else { return line.to_owned() };
     let Some(level) = rec.get("severityText").and_then(Value::as_str) else { return line.to_owned() };

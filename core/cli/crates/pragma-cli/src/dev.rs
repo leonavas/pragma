@@ -141,8 +141,11 @@ fn ignored(root: &Path, path: &Path) -> bool {
     if rel.components().next().is_some_and(|c| IGNORED_DIRS.iter().any(|d| c.as_os_str() == *d)) {
         return true;
     }
-    let name = rel.file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
-    // editor temp files
+    is_editor_temp_file(&rel.file_name().map(|n| n.to_string_lossy()).unwrap_or_default())
+}
+
+/// Backups (`x~`), vim swap files and the file vim writes to probe a folder (`4913`), emacs locks.
+fn is_editor_temp_file(name: &str) -> bool {
     name.ends_with('~') || name.ends_with(".swp") || name.ends_with(".swx") || name.starts_with(".#") || name == "4913"
 }
 

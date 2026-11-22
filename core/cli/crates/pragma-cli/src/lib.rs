@@ -225,7 +225,6 @@ fn cmd_self_update(args: &[String]) -> Result<i32, String> {
     Ok(0)
 }
 
-/// Warnings do not fail the check, except with `--strict`.
 fn check_status(diagnostics: &mut [pragma_diag::Diagnostic], strict: bool) -> i32 {
     if strict {
         for d in diagnostics.iter_mut() {
