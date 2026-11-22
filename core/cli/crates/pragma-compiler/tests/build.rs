@@ -74,6 +74,13 @@ fn page_html(out: &Path, page: &str) -> String {
     html
 }
 
+/// The SSR ops of a route, as embedded in `server/worker.js`.
+fn ssr_ops(out: &Path, pattern: &str) -> String {
+    let worker = fs::read_to_string(out.join("server/worker.js")).unwrap();
+    let line = worker.lines().find(|l| l.contains(&format!("pattern: \"{pattern}\","))).unwrap_or_else(|| panic!("no route {pattern}: {worker}"));
+    line.split("template: ").nth(1).and_then(|r| r.split(", shell: ").next()).unwrap().to_string()
+}
+
 /// Copies the fixture app and applies changes: `Some(content)` writes, `None` deletes.
 fn app_with(changes: &[(&str, Option<&str>)]) -> Tmp {
     let t = tmp();
@@ -131,7 +138,6 @@ fn dev_snapshot() {
         "client/_pragma/manifest.json",
         "client/assets/routes/index.js",
         "client/assets/tpl/index.js",
-        "templates/blog/[slug].json",
         "server/worker.js",
         "server/node.mjs",
         "server/wrangler.jsonc",
@@ -151,7 +157,7 @@ fn dev_snapshot() {
     for f in ["client/assets/app.css", "client/robots.txt", "client/img/icon.svg", "server/routes/shop/[id].server.js", "server/utils/db.js", "server/core/server/render.js", "client/assets/core/lazy.js"] {
         assert!(out.join(f).is_file(), "missing {f}");
     }
-    assert!(!out.join("templates/shop/[id].json").exists(), "template only for ssr routes");
+    assert!(fs::read_to_string(out.join("server/worker.js")).unwrap().contains("pattern: \"/shop/:id\", server: s1, ssr: false, template: null"), "ops only for ssr routes");
 }
 
 fn all_files(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -211,7 +217,6 @@ fn prod_hashes_and_rewrites() {
     let worker = fs::read_to_string(out.join("server/worker.js")).unwrap();
     assert!(worker.contains("service: \"test-shop\""));
     assert!(worker.contains("ssr: true, template: [[\"html\""));
-    assert!(out.join("templates/blog/[slug].json").is_file());
 }
 
 #[test]
@@ -1194,7 +1199,7 @@ fn ssr_runs_page_and_component_scripts_on_the_server() {
     let t = app_with(&files);
     let out = t.0.join("dev");
     build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap_or_else(|d| panic!("{d:#?}"));
-    let ops = fs::read_to_string(out.join("templates/isle.json")).unwrap();
+    let ops = ssr_ops(&out, "/isle");
     assert!(ops.contains("[\"comp\",\"list\",[[\"items\",\"path\",\"data.items\"]],"), "{ops}");
     assert!(ops.contains("[\"text\",\"{state.heading}\"]") && ops.contains("[\"for\","), "{ops}");
     let worker = fs::read_to_string(out.join("server/worker.js")).unwrap();
@@ -1485,7 +1490,7 @@ fn text_interpolation_builds_markers_templates_and_ops() {
         assert!(html.contains(want), "missing {want}:\n{html}");
     }
     assert!(!html.contains("{$") && !html.contains(":text"), "{html}");
-    let ops = fs::read_to_string(out.join("templates/tpl/[id].json")).unwrap();
+    let ops = ssr_ops(&out, "/tpl/:id");
     for want in [
         "[\"text\",\"{data.product.name}\"]",
         "<!--{data.product.price}-->\"],[\"text\",\"{data.product.price}\"],[\"html\",\"<!--}-->",
@@ -1836,7 +1841,7 @@ fn nested_layouts() {
     let api_pos = api.find("<article class=\"p-2\"><header>API</header>").expect("inner nested layout");
     let h1_pos = api.find("<h1 data-text=\"{data.title}\"></h1>").expect("page content");
     assert!(docs_pos < api_pos && api_pos < h1_pos, "{api}");
-    let tpl = fs::read_to_string(out.join("templates/docs/api/index.json")).unwrap();
+    let tpl = ssr_ops(&out, "/docs/api");
     assert!(tpl.contains("API") && tpl.contains("data.title"), "SSR template should include nested layout and page ops: {tpl}");
 
     // Sibling route is not wrapped by nested layouts
@@ -2006,8 +2011,8 @@ fn component_renders_itself() {
     assert!(html.contains("\n<li data-c=\"tree\" class=\"tag\"><span data-text=\"{state.node.name}\"></span><ul><!--p:for t0 child state.node.children child.id--></ul></li>"), "the definition goes to the template module: {html}");
     let page = fs::read_to_string(out.join("client/blog/[slug].html")).unwrap();
     assert!(!page.contains("<template") && !page.contains("data-def"), "{page}");
-    let ops = fs::read_to_string(out.join("templates/blog/[slug].json")).unwrap();
-    assert_eq!(ops.matches("[\"node\",\"path\",\"child\"]").count(), pragma_compiler::SSR_SELF_DEPTH, "{ops}");
+    let ops = ssr_ops(&out, "/blog/:slug");
+    assert_eq!(ops.matches("[\"node\",\"path\",\"child\"]").count(), 12, "the server renders 12 levels: {ops}");
 }
 
 #[test]

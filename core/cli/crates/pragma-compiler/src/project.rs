@@ -73,6 +73,8 @@ pub struct Project {
     /// columns match the `.html`, the `.html`).
     pub embedded: HashMap<PathBuf, (String, PathBuf)>,
     pub public_files: Vec<PathBuf>,
+    /// Folder of the framework runtime: `.pragma`, or `core` in apps made before it moved.
+    pub framework: PathBuf,
     pub diags: Vec<Diagnostic>,
 }
 
@@ -238,6 +240,7 @@ impl Project {
             js_files: Vec::new(),
             embedded: HashMap::new(),
             public_files: Vec::new(),
+            framework: PathBuf::from(if !root.join(".pragma/boot.js").is_file() && root.join("core/boot.js").is_file() { "core" } else { ".pragma" }),
             diags: Vec::new(),
         };
         p.load_config();
@@ -251,12 +254,7 @@ impl Project {
         }
         for f in &all {
             let s = rel_str(f);
-            let skip = s.starts_with(".pragma/docs/")
-                || s.starts_with(".pragma/dev/")
-                || s.starts_with(".pragma/test/")
-                || s.starts_with("core/docs/")
-                || s.starts_with("core/test/")
-                || s.contains("/node_modules/");
+            let skip = s.starts_with("core/docs/") || s.starts_with("core/test/") || s.contains("/node_modules/");
             if !skip && (s.ends_with(".js") || s.ends_with(".mjs")) {
                 p.js_files.push(f.clone());
             }

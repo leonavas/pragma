@@ -122,6 +122,8 @@ impl Deps {
     }
 }
 
+/// Output path of a source file: packages under `npm/`, the framework under `core/` wherever the
+/// app keeps it (the runtime and the worker import it from there).
 pub fn asset_path(rel: &str) -> String {
     if let Some(rest) = rel.strip_prefix("node_modules/") {
         format!("npm/{rest}")

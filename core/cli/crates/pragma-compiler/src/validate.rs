@@ -97,34 +97,6 @@ pub struct FileCheck<'a> {
     pub diags: Vec<Diagnostic>,
 }
 
-pub const BLOCKS: &[&str] = &["data-if", "data-else-if", "data-else", "data-for", "data-empty"];
-
-fn template_kind(e: &Element) -> Option<&'static str> {
-    if !e.is("template") {
-        return None;
-    }
-    BLOCKS.iter().copied().find(|b| e.has(b))
-}
-
-/// Paths read by a value directive: the `{}` paths of a template (`data-text`, `data-attr-*` with `{`), or the path itself.
-pub fn values(d: Dir, v: &str) -> Vec<String> {
-    match d {
-        Dir::Text => directive::template_paths(v),
-        Dir::Attr(_) if directive::has_braces(v) => directive::template_paths(v),
-        _ => vec![v.to_string()],
-    }
-}
-
-pub fn tag_of(block: &str) -> &'static str {
-    match block {
-        "data-if" => "<if>",
-        "data-else-if" => "<else-if>",
-        "data-else" => "<else>",
-        "data-for" => "<for>",
-        _ => "<empty>",
-    }
-}
-
 impl FileCheck<'_> {
     fn err(&mut self, pos: Pos, rule: &'static str, msg: impl Into<String>) {
         self.diags.push(diag(self.files, pos, rule, msg));
@@ -276,13 +248,13 @@ impl FileCheck<'_> {
             }
         }
         if e.is("template") {
-            let blocks: Vec<&str> = BLOCKS.iter().copied().filter(|b| e.has(b)).collect();
+            let blocks: Vec<&str> = directive::BLOCKS.iter().copied().filter(|b| e.has(b)).collect();
             if blocks.is_empty() {
                 self.err(e.pos, "html/outside-template", "bare <template> is not allowed in source: use <if>, <else-if>, <else>, <for> or <empty>");
             } else if blocks.len() > 1 {
                 self.err(e.pos, "html/outside-template", format!("block with more than one kind ({})", blocks.join(", ")));
             }
-            let tag = blocks.first().map_or("<template>", |b| tag_of(b));
+            let tag = blocks.first().map_or("<template>", |b| directive::tag_of(b));
             let roots = e.element_children().count();
             let text = stray_text(&e.children);
             if !blocks.is_empty() && (roots != 1 || text.is_some()) {
@@ -292,16 +264,16 @@ impl FileCheck<'_> {
                 && r.is("template") {
                     self.err(r.pos, "html/block-single-root", format!("the root of {tag} cannot be another block; wrap it in an element"));
                 }
-            let after_if = prev.is_some_and(|p| matches!(template_kind(p), Some("data-if" | "data-else-if")));
+            let after_if = prev.is_some_and(|p| matches!(directive::block_of(p), Some("data-if" | "data-else-if")));
             match blocks.first().copied() {
                 Some("data-for") if !e.has("data-key") => {
                     let var = for_var.as_deref().unwrap_or("x");
                     self.err(e.pos, "html/for-without-key", format!("<for> requires a stable, unique key: add key={var}.id (any field of {var} that identifies it)"))
                 }
                 Some(b @ ("data-else" | "data-else-if")) if !after_if => {
-                    self.err(e.pos, "html/misplaced-else", format!("{} must come right after </if> or </else-if>", tag_of(b)))
+                    self.err(e.pos, "html/misplaced-else", format!("{} must come right after </if> or </else-if>", directive::tag_of(b)))
                 }
-                Some("data-empty") if !prev.is_some_and(|p| template_kind(p) == Some("data-for")) => {
+                Some("data-empty") if !prev.is_some_and(|p| directive::block_of(p) == Some("data-for")) => {
                     self.err(e.pos, "html/misplaced-empty", "<empty> must come right after </for>")
                 }
                 _ => {}
@@ -350,7 +322,7 @@ impl FileCheck<'_> {
         for (off, _, p) in directive::json_ld_paths(text).unwrap_or_default() {
             if let Err(m) = directive::check_path(p, false) {
                 self.err(at(off), "html/invalid-path", m);
-            } else if !matches!(directive::root(p), "data" | "params" | "query") {
+            } else if !directive::HEAD_ROOTS.contains(&directive::root(p)) {
                 self.err(at(off), "html/head", format!("JSON-LD is rendered by the server and reads only data, params or query; \"{p}\""));
             }
         }
@@ -370,10 +342,10 @@ impl FileCheck<'_> {
             self.err(pos, "html/head", format!("<{name}> in the head takes only {}", if name == "title" { "{path} text" } else { ":<attribute> or {path} in an attribute (e.g. :content, href=\"/p/{data.id}\")" }));
             return;
         }
-        for p in values(d, v) {
+        for p in directive::values(d, v) {
             if let Err(m) = directive::check_path(&p, false) {
                 self.err(pos, "html/invalid-path", m);
-            } else if !matches!(directive::root(&p), "data" | "params" | "query") {
+            } else if !directive::HEAD_ROOTS.contains(&directive::root(&p)) {
                 self.err(pos, "html/head", format!("head tags are rendered by the server and read only data, params or query; \"{}\"", p.replace("$.", "$")));
             }
         }
@@ -392,7 +364,7 @@ impl FileCheck<'_> {
         }
         match d {
             Dir::Text => {
-                for p in values(d, v) {
+                for p in directive::values(d, v) {
                     self.path(pos, &p, false, true);
                 }
             }
@@ -409,7 +381,7 @@ impl FileCheck<'_> {
                 } else if n == "class" {
                     self.err(pos, "html/class", ":class is not allowed: write static classes in class=\"…\" and toggle each one with .name=\"path\" (e.g. .text-warning-700=\"$warn\")");
                 }
-                for p in values(d, v).into_iter().filter(|_| directive::literal(v).is_none()) {
+                for p in directive::values(d, v).into_iter().filter(|_| directive::literal(v).is_none()) {
                     self.path(pos, &p, false, true);
                 }
             }

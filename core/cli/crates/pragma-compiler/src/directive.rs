@@ -212,7 +212,44 @@ fn distance(a: &str, b: &str) -> usize {
     row[b.len()]
 }
 
+/// The `<template>` attributes the build writes for `<if>`, `<else-if>`, `<else>`, `<for>` and `<empty>`.
+pub const BLOCKS: &[&str] = &["data-if", "data-else-if", "data-else", "data-for", "data-empty"];
+
+pub fn block_of(e: &crate::html::Element) -> Option<&'static str> {
+    if !e.is("template") {
+        return None;
+    }
+    BLOCKS.iter().copied().find(|b| e.has(b))
+}
+
+pub fn is_block(e: &crate::html::Element) -> bool {
+    block_of(e).is_some()
+}
+
+pub fn tag_of(block: &str) -> &'static str {
+    match block {
+        "data-if" => "<if>",
+        "data-else-if" => "<else-if>",
+        "data-else" => "<else>",
+        "data-for" => "<for>",
+        _ => "<empty>",
+    }
+}
+
+/// Paths read by a value directive: the `{}` paths of a template (`data-text`, `data-attr-*` with `{`), or the path itself.
+pub fn values(d: Dir, v: &str) -> Vec<String> {
+    match d {
+        Dir::Text => template_paths(v),
+        Dir::Attr(_) if has_braces(v) => template_paths(v),
+        _ => vec![v.to_string()],
+    }
+}
+
 pub const ROOTS: &[&str] = &["data", "state", "shared", "params", "query", "page", "props", "$"];
+/// Roots the server knows before it runs any script: the only ones head tags and JSON-LD read.
+pub const HEAD_ROOTS: &[&str] = &["data", "params", "query"];
+/// Roots SSR ops render (`state` when the server can run the owner's script); `shared` stays on the client.
+pub const SSR_ROOTS: &[&str] = &["data", "params", "query", "page", "state"];
 
 /// `None`: not `data-*`. `Some(None)`: unknown directive.
 pub fn parse(name: &str) -> Option<Option<Dir<'_>>> {
@@ -430,13 +467,6 @@ pub fn json_ld_check(text: &str) -> Result<(), (usize, String)> {
         let msg = e.to_string();
         (at.min(text.len()), msg.split(" at line ").next().unwrap_or(&msg).to_string())
     })
-}
-
-/// Replaces the path root (keeping `!`).
-pub fn replace_root(v: &str, new_root: &str) -> String {
-    let (neg, p) = split_neg(v);
-    let rest = &p[root(p).len()..];
-    format!("{}{new_root}{rest}", if neg { "!" } else { "" })
 }
 
 #[cfg(test)]

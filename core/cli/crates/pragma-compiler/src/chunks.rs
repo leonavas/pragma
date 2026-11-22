@@ -152,7 +152,7 @@ pub fn bundle(
     }
     let entry_dir = dir.join("entries");
     let _ = fs::create_dir_all(&entry_dir);
-    let boot_name = format!("core/{}", boot.file_stem().map_or("boot".into(), |s| s.to_string_lossy().to_string()));
+    let boot_name = crate::deps::asset_path(&rel_str(boot)).trim_end_matches(".js").to_string();
     let mut input = vec![InputItem { name: Some(boot_name.clone()), import: src_dir.join(boot).to_string_lossy().into_owned() }];
     let mut route_entries: Vec<Option<String>> = Vec::new();
     for (i, r) in routes.iter().enumerate() {

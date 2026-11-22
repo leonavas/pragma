@@ -3,7 +3,6 @@ use crate::directive::{self, Dir, Part};
 use crate::html::{Attr, Element, Node, Pos, escape_text, is_blank};
 use crate::project::{Component, Page, Project, component_tag, is_component_tag, rel_str};
 use crate::validate::diag;
-use crate::{Fnv, short_hash};
 use pragma_diag::Diagnostic;
 use pragma_jslint::script::ScriptInfo;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -26,12 +25,10 @@ type Slots = HashMap<String, Vec<Node>>;
 struct Scope<'s> {
     from: &'s Path,
     props: Option<&'s Props>,
-    aliases: HashMap<String, String>,
     bound_props: HashMap<String, String>,
     /// The owner has a script: every `$x` is `state.x` (its instance scope, props included).
     script: bool,
     slots: Option<&'s Slots>,
-    inst: u64,
     /// `data-s` token of the owner's CSS: elements written here get it, so its styles match only them.
     css: Option<String>,
 }
@@ -62,7 +59,7 @@ pub struct Expander<'p> {
     defs: BTreeMap<String, Option<Element>>,
     /// Own-element selectors of each owner's scoped CSS, by `data-s` token: only elements one can
     /// match get the token.
-    owned: Option<&'p crate::owners::Owned>,
+    owned: &'p crate::owners::Owned,
 }
 
 fn first_element(nodes: &[Node]) -> Option<&Element> {
@@ -95,32 +92,18 @@ fn collect_slots(nodes: &[Node], out: &mut BTreeSet<String>) {
 }
 
 impl<'p> Expander<'p> {
-    pub fn owned(mut self, owned: &'p crate::owners::Owned) -> Self {
-        self.owned = Some(owned);
-        self
-    }
-
     fn styled(&self, token: &str, el: &Element) -> bool {
-        let Some(own) = self.owned.and_then(|o| o.get(token)) else { return true };
+        let Some(own) = self.owned.get(token) else { return true };
         let classes = crate::owners::classes(el);
         own.iter().any(|s| s.own.matches(&el.name, &|c| classes.iter().any(|x| x == c)))
     }
 
-    pub fn new(p: &'p Project, scripts: &'p HashMap<PathBuf, ScriptInfo>) -> Self {
-        Expander { p, diags: Vec::new(), used: BTreeMap::new(), stack: Vec::new(), scripts, blocks: 0, defs: BTreeMap::new(), owned: None }
+    pub fn new(p: &'p Project, scripts: &'p HashMap<PathBuf, ScriptInfo>, owned: &'p crate::owners::Owned) -> Self {
+        Expander { p, diags: Vec::new(), used: BTreeMap::new(), stack: Vec::new(), scripts, blocks: 0, defs: BTreeMap::new(), owned }
     }
 
     fn err(&mut self, pos: Pos, rule: &'static str, msg: impl Into<String>) {
         self.diags.push(diag(&self.p.files, pos, rule, msg));
-    }
-
-    fn tid(&self, pos: Pos, inst: u64) -> String {
-        let mut h = Fnv::new();
-        h.write(rel_str(&self.p.files[pos.file as usize]).as_bytes());
-        h.write(&pos.line.to_le_bytes());
-        h.write(&pos.col.to_le_bytes());
-        h.write(&inst.to_le_bytes());
-        format!("t{}", &short_hash(h.finish())[..7])
     }
 
     pub fn page(mut self, page: &Page) -> (Expanded, Vec<Diagnostic>) {
@@ -135,7 +118,7 @@ impl<'p> Expander<'p> {
             }
         }
         let css = page.css.as_ref().map(|_| crate::css_owner("page", &page.out_name));
-        let sc = Scope { from: &page.dir, props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: None, inst: 0, css };
+        let sc = Scope { from: &page.dir, props: None, bound_props: HashMap::new(), script: true, slots: None, css };
         let mut page_nodes = self.expand_nodes(&content, &sc);
         if page.out_name != "_404" {
             for dir in page.dir.ancestors() {
@@ -144,7 +127,7 @@ impl<'p> Expander<'p> {
                 }
                 if let Some(&nl_id) = p.nested_layouts.get(dir) {
                     let slots: Slots = HashMap::from([(String::new(), page_nodes)]);
-                    let nl_sc = Scope { from: dir, props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: 0, css: None };
+                    let nl_sc = Scope { from: dir, props: None, bound_props: HashMap::new(), script: true, slots: Some(&slots), css: None };
                     page_nodes = self.expand_nodes(&p.trees[nl_id as usize], &nl_sc);
                 }
             }
@@ -166,7 +149,7 @@ impl<'p> Expander<'p> {
                 }
             }
             let slots: Slots = HashMap::from([(String::new(), page_nodes.clone())]);
-            let lsc = Scope { from: Path::new("routes"), props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: 0, css: None };
+            let lsc = Scope { from: Path::new("routes"), props: None, bound_props: HashMap::new(), script: true, slots: Some(&slots), css: None };
             body = self.expand_nodes(&rest, &lsc);
             body.extend(self.take_defs());
             if page.css.is_some() {
@@ -174,9 +157,7 @@ impl<'p> Expander<'p> {
             }
         }
         merge_head(&mut head, own_head);
-        if let Some(owned) = self.owned {
-            crate::owners::trim(&mut body, &mut page_nodes, owned);
-        }
+        crate::owners::trim(&mut body, &mut page_nodes, self.owned);
         (Expanded { head, body, page: page_nodes, components: self.used }, self.diags)
     }
 
@@ -214,8 +195,6 @@ impl<'p> Expander<'p> {
                 let name = p.split('.').nth(1).unwrap_or("");
                 return Res::Prop(props.get(&name.to_ascii_lowercase()).cloned());
             }
-        } else if let Some(t) = sc.aliases.get(r) {
-            return Res::Path(directive::replace_root(v, t));
         }
         Res::Path(v.to_string())
     }
@@ -337,7 +316,6 @@ impl<'p> Expander<'p> {
         let mut classes: Vec<String> = Vec::new();
         let mut hidden = false;
         let mut vars: Vec<String> = Vec::new();
-        let mut for_var: Option<String> = None;
         for a in &e.attrs {
             let lname = a.name.to_ascii_lowercase();
             let Some(Some(d)) = directive::parse(&lname) else {
@@ -381,7 +359,6 @@ impl<'p> Expander<'p> {
                 Dir::Show | Dir::Attr(_) | Dir::Var(_) | Dir::Class(_) | Dir::If | Dir::ElseIf | Dir::Model => self.resolve(v, sc),
                 Dir::For => {
                     if let Some((var, path)) = directive::parse_for(v) {
-                        for_var = Some(var.to_string());
                         if let Res::Path(p) = self.resolve(path, sc) {
                             el.attrs.push(Attr { value: Some(format!("{var} in {p}")), ..a.clone() });
                             continue;
@@ -436,22 +413,11 @@ impl<'p> Expander<'p> {
         {
             add_css_owner(&mut el, token);
         }
-        if el.is("template") && crate::validate::BLOCKS.iter().any(|b| el.has(b)) {
-            let tid = self.tid(e.pos, sc.inst);
-            el.attrs.push(Attr { name: "data-tid".into(), value: Some(tid), pos: e.pos });
-        }
-        let block = el.is("template") && crate::validate::BLOCKS.iter().any(|b| el.has(b));
+        let block = directive::is_block(&el);
         self.blocks += usize::from(block);
         el.children = match text {
             Some(t) => vec![Node::Text(t, e.pos)],
-            None => match for_var.filter(|v| sc.aliases.contains_key(v)) {
-                Some(var) => {
-                    let mut inner = sc.clone();
-                    inner.aliases.remove(&var);
-                    self.expand_nodes(&e.children, &inner)
-                }
-                None => self.expand_nodes(&e.children, sc),
-            },
+            None => self.expand_nodes(&e.children, sc),
         };
         self.blocks -= usize::from(block);
         el
@@ -480,7 +446,6 @@ impl<'p> Expander<'p> {
             return Vec::new();
         }
         let mut props: Props = HashMap::new();
-        let aliases = sc.aliases.clone();
         let mut bound_props = HashMap::new();
         let mut forward = Vec::new();
         let mut class_extra = None;
@@ -571,13 +536,8 @@ impl<'p> Expander<'p> {
             }
         }
         let Some(root) = tree.iter().find(|n| matches!(n, Node::Element(_))) else { return Vec::new() };
-        let mut h = Fnv::new();
-        h.write(&sc.inst.to_le_bytes());
-        h.write(rel_str(&p.files[e.pos.file as usize]).as_bytes());
-        h.write(&e.pos.line.to_le_bytes());
-        h.write(&e.pos.col.to_le_bytes());
         let css = comp.css.as_ref().map(|_| crate::css_owner("component", &comp.id));
-        let inner = Scope { from: &comp.scope, props: Some(&props), aliases, bound_props, script: comp.module.is_some(), slots: Some(&slots), inst: h.finish(), css };
+        let inner = Scope { from: &comp.scope, props: Some(&props), bound_props, script: comp.module.is_some(), slots: Some(&slots), css };
         let mut nodes = match root {
             Node::Element(r) if recursive => self.expand_nodes(&[Node::Element(Element { children: Vec::new(), ..r.clone() })], &inner),
             _ => {
@@ -659,10 +619,8 @@ impl<'p> Expander<'p> {
         self.defs.insert(comp.id.clone(), None);
         let Some(root) = self.p.trees[comp.html as usize].iter().find(|n| matches!(n, Node::Element(_))) else { return };
         let (props, slots) = (Props::new(), Slots::new());
-        let mut h = Fnv::new();
-        h.write(comp.id.as_bytes());
         let css = comp.css.as_ref().map(|_| crate::css_owner("component", &comp.id));
-        let inner = Scope { from: &comp.scope, props: Some(&props), aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: h.finish(), css };
+        let inner = Scope { from: &comp.scope, props: Some(&props), bound_props: HashMap::new(), script: true, slots: Some(&slots), css };
         let reported = self.diags.len();
         self.stack.push(&comp.dir);
         let outer_blocks = std::mem::replace(&mut self.blocks, 0);
@@ -875,7 +833,7 @@ impl Scoped<'_> {
                     _ => "",
                 };
                 for (_, _, v) in directive::json_ld_paths(text).unwrap_or_default() {
-                    if !matches!(directive::root(v), "data" | "params" | "query") || directive::check_path(v, false).is_err() {
+                    if !directive::HEAD_ROOTS.contains(&directive::root(v)) || directive::check_path(v, false).is_err() {
                         continue;
                     }
                     if !self.ctx.ssr && !std::mem::replace(&mut told, true) {
@@ -888,8 +846,8 @@ impl Scoped<'_> {
             for a in &e.attrs {
                 let lname = a.name.to_ascii_lowercase();
                 let Some(Some(d @ (Dir::Text | Dir::Attr(_)))) = directive::parse(&lname) else { continue };
-                for v in crate::validate::values(d, a.value.as_deref().unwrap_or("")) {
-                    if !matches!(directive::root(&v), "data" | "params" | "query") {
+                for v in directive::values(d, a.value.as_deref().unwrap_or("")) {
+                    if !directive::HEAD_ROOTS.contains(&directive::root(&v)) {
                         continue;
                     }
                     if !self.ctx.ssr && !std::mem::replace(&mut told, true) {
@@ -955,7 +913,7 @@ impl Scoped<'_> {
                     self.model_target(a.pos, v, &owner);
                 }
                 Dir::Text | Dir::Attr(_) => {
-                    for p in crate::validate::values(d, v) {
+                    for p in directive::values(d, v) {
                         self.path(a.pos, &p, vars, &owner, in_page);
                     }
                 }

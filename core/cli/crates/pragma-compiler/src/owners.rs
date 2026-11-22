@@ -1,7 +1,6 @@
 //! Drops the `data-s` tokens that no scoped selector of their owner can use, once the page is whole.
 use crate::directive::{self, Dir};
 use crate::html::{Element, Node};
-use crate::validate::BLOCKS;
 use pragma_css::prune::{Ancestor, Markup, OwnSelector};
 use std::collections::{BTreeSet, HashMap};
 
@@ -15,6 +14,16 @@ pub fn classes(el: &Element) -> Vec<String> {
         _ => None,
     }));
     out
+}
+
+/// Element names and classes of a route's markup.
+pub fn markup_of(nodes: &[Node], out: &mut Markup) {
+    for n in nodes {
+        let Node::Element(e) = n else { continue };
+        out.tags.insert(e.name.to_ascii_lowercase());
+        out.classes.extend(classes(e));
+        markup_of(&e.children, out);
+    }
 }
 
 /// An element an owner writes: its name and every class it can have, or `None` when unknown.
@@ -37,7 +46,7 @@ fn written(nodes: &[Node], root: &dyn Fn(&str) -> Written, out: &mut Vec<Written
                     (tag, cls)
                 }));
             }
-        } else if !e.is("slot") && !(e.is("template") && BLOCKS.iter().any(|b| e.has(b))) {
+        } else if !e.is("slot") && !directive::is_block(e) {
             out.push(Some((e.name.to_ascii_lowercase(), classes(e))));
         }
         written(&e.children, root, out);
@@ -64,7 +73,7 @@ pub fn unmatched(css: &str, marker: &str, tree: &[Node], root: &dyn Fn(&str) -> 
 /// `<main data-page>`: both keep a token only where one of its owner's selectors can match.
 pub fn trim(body: &mut [Node], page: &mut [Node], owned: &Owned) {
     let mut markup = Markup::default();
-    crate::markup_of(if body.is_empty() { page } else { body }, &mut markup);
+    markup_of(if body.is_empty() { page } else { body }, &mut markup);
     let outer = if body.is_empty() { Vec::new() } else { above_page(body, &mut Vec::new()).unwrap_or_else(|| vec![Ancestor::Unknown]) };
     walk(body, &mut Vec::new(), owned, &markup);
     walk(page, &mut outer.clone(), owned, &markup);
@@ -84,7 +93,7 @@ fn above_page(nodes: &[Node], stack: &mut Vec<Ancestor>) -> Option<Vec<Ancestor>
 }
 
 fn push(e: &Element, stack: &mut Vec<Ancestor>) -> usize {
-    if e.is("template") && BLOCKS.iter().any(|b| e.has(b)) {
+    if directive::is_block(e) {
         return 0;
     }
     stack.push(if e.is("template") { Ancestor::Unknown } else { Ancestor::Element { tag: e.name.clone(), classes: classes(e) } });

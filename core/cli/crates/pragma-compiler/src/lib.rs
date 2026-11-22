@@ -14,8 +14,6 @@ mod sugar;
 mod validate;
 mod webmcp;
 
-pub use compile::{SSR_SELF_CALLS, SSR_SELF_DEPTH};
-
 use pragma_diag::{Diagnostic, Severity};
 use pragma_jslint::script::{self, ScriptInfo, ScriptKind};
 use pragma_css::scope::{OWNED, owner_selector};
@@ -160,23 +158,6 @@ fn scope_page_css(css: &str, page: &str) -> String {
     pragma_css::scope::scope(css, &owner_selector(&css_owner("page", page)), &spellings("data-page", page))
 }
 
-/// Element names and classes (static and `.x` toggles) of a route's markup.
-fn markup_of(nodes: &[html::Node], out: &mut pragma_css::prune::Markup) {
-    for n in nodes {
-        let html::Node::Element(e) = n else { continue };
-        out.tags.insert(e.name.to_ascii_lowercase());
-        for a in &e.attrs {
-            let lname = a.name.to_ascii_lowercase();
-            if lname == "class" {
-                out.classes.extend(a.value.iter().flat_map(|v| v.split_whitespace().map(str::to_string)));
-            } else if let Some(Some(directive::Dir::Class(c))) = directive::parse(&lname) {
-                out.classes.insert(c.to_string());
-            }
-        }
-        markup_of(&e.children, out);
-    }
-}
-
 fn sort_diags(mut d: Vec<Diagnostic>) -> Vec<Diagnostic> {
     d.sort_by(|a, b| (&a.file, a.line, a.column, a.rule, &a.message).cmp(&(&b.file, b.line, b.column, b.rule, &b.message)));
     d.dedup();
@@ -317,6 +298,7 @@ struct Module {
 
 fn module_graph(
     root: &Path,
+    framework: &Path,
     entries: &[PathBuf],
     client: bool,
     sources: &HashMap<PathBuf, String>,
@@ -340,22 +322,22 @@ fn module_graph(
             let pos = lines.pos(&src, imp.start, 0);
             let mut ok = None;
             if imp.spec == "pragma/server" {
-                let runtime = [".pragma/server/http.js", "core/server/http.js"].into_iter().map(PathBuf::from).find(|f| root.join(f).is_file());
+                let runtime = Some(framework.join("server/http.js")).filter(|f| root.join(f).is_file());
                 match runtime {
-                    _ if client => diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", "'pragma/server' is only for .server.js files; client code gets data from load and calls actions with call()")),
+                    _ if client => diags.push(Diagnostic::error(&path, pos.line, pos.col, deps::RULE_IMPORT, "'pragma/server' is only for .server.js files; client code gets data from load and calls actions with call()")),
                     Some(t) => {
                         queue.push_back(t.clone());
                         imports.push((imp, Some(t)));
                         continue;
                     }
-                    None => diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", "'pragma/server' needs .pragma/server/http.js; run `pragma upgrade`")),
+                    None => diags.push(Diagnostic::error(&path, pos.line, pos.col, deps::RULE_IMPORT, "'pragma/server' needs .pragma/server/http.js; run `pragma upgrade`")),
                 }
                 imports.push((imp, None));
                 continue;
             }
             if imp.spec == "pragma" {
                 // page, component and store scripts lose this import when they become factories
-                diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", "'pragma' is only for page, component and store scripts; pass what a helper needs as arguments"));
+                diags.push(Diagnostic::error(&path, pos.line, pos.col, deps::RULE_IMPORT, "'pragma' is only for page, component and store scripts; pass what a helper needs as arguments"));
                 imports.push((imp, None));
                 continue;
             }
@@ -391,10 +373,10 @@ fn module_graph(
                     if let Some(name) = store {
                         diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/store-import", format!("stores are reached through `shared`: `import {{ shared }} from 'pragma'`, then `shared.{name}`")));
                     } else if client && rel_str(&t).ends_with(".server.js") {
-                        diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", format!("client module cannot import {} (server code)", imp.spec)));
+                        diags.push(Diagnostic::error(&path, pos.line, pos.col, deps::RULE_IMPORT, format!("client module cannot import {} (server code)", imp.spec)));
                     } else if is_wasm(&t) {
                         if client {
-                            diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", format!("{} is WebAssembly; import .wasm only in server code (.server.js)", imp.spec)));
+                            diags.push(Diagnostic::error(&path, pos.line, pos.col, deps::RULE_IMPORT, format!("{} is WebAssembly; import .wasm only in server code (.server.js)", imp.spec)));
                         } else {
                             ok = Some(t);
                         }
@@ -403,7 +385,7 @@ fn module_graph(
                         ok = Some(t);
                     }
                 }
-                _ if is_rel => diags.push(Diagnostic::error(&path, pos.line, pos.col, "js/import", format!("import \"{}\" not found", imp.spec))),
+                _ if is_rel => diags.push(Diagnostic::error(&path, pos.line, pos.col, deps::RULE_IMPORT, format!("import \"{}\" not found", imp.spec))),
                 _ => {}
             }
             imports.push((imp, ok));
@@ -687,7 +669,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let mut shared_classes: BTreeSet<String> = BTreeSet::new();
     let all_pages: Vec<(&Page, bool)> = p.pages.iter().map(|pg| (pg, false)).chain(p.not_found.iter().map(|pg| (pg, true))).collect();
     for (page, is_404) in all_pages {
-        let (mut exp, d) = expand::Expander::new(&p, &scripts).owned(&owned).page(page);
+        let (mut exp, d) = expand::Expander::new(&p, &scripts, &owned).page(page);
         diags.extend(d);
         if !is_404 && !page.pattern.contains(':') {
             mark_current(&mut exp.body, &page.pattern, false);
@@ -769,9 +751,8 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     }
 
     // client JS
-    let core_dir = if opts.root.join(".pragma/boot.js").is_file() { ".pragma" } else { "core" };
-    let boot = PathBuf::from(format!("{core_dir}/boot.js"));
-    let overlay = PathBuf::from(format!("{core_dir}/overlay.js"));
+    let boot = p.framework.join("boot.js");
+    let overlay = p.framework.join("overlay.js");
     if !opts.root.join(&boot).is_file() {
         diags.push(Diagnostic::error(".pragma/boot.js", 1, 1, "app/structure", ".pragma/boot.js not found; the framework lives in .pragma/ (created by pragma new)"));
     }
@@ -788,7 +769,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let all_entries: Vec<PathBuf> = outs.iter().flat_map(page_entries).collect();
     let deps = deps::Deps::new(&opts.root, &mut diags);
     let mut requests = BTreeMap::new();
-    let mut mods = module_graph(&opts.root, &all_entries, true, &sources, &deps, &mut requests, &mut diags);
+    let mut mods = module_graph(&opts.root, &p.framework, &all_entries, true, &sources, &deps, &mut requests, &mut diags);
     let out_abs = std::path::absolute(&opts.out_dir).unwrap_or_else(|_| opts.out_dir.clone());
     if let Some(b) = bundle::bundle(&opts.root, &out_abs.join(".cache/npm"), prod, &requests, &mut diags) {
         link_packages(&mut mods, &b, &mut diags);
@@ -856,7 +837,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             js::rewrite(&m.src, &m.imports.iter().map(|(i, _)| i.clone()).collect::<Vec<_>>(), |i| map.get(i.spec.as_str()).map(|u| u.to_string()))
         };
         gz.insert(urls[path].clone(), gzip_len(code.as_bytes()));
-        let code = if !prod && urls[path] == "/assets/core/log.js" { with_ignore_map(code) } else { code };
+        let code = if !prod && *path == p.framework.join("log.js") { with_ignore_map(code) } else { code };
         w.write_client(&format!("client{}", urls[path]), code.as_bytes(), prod);
     }
     for (file, code) in chunked.iter().flat_map(|c| &c.files) {
@@ -901,21 +882,21 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     report.css_gzip_bytes = shared_css_gz;
 
     // pages
-    let theme_js = mods.contains_key(&PathBuf::from(format!("{core_dir}/theme.js")));
+    let theme_js = mods.contains_key(&p.framework.join("theme.js"));
     let mut manifest = Vec::new();
     let mut server_routes = Vec::new();
     let boot_url = match &chunked {
         Some(c) => c.boot.clone(),
-        None => urls.get(&boot).cloned().unwrap_or_else(|| "/assets/core/boot.js".into()),
+        None => urls.get(&boot).cloned().unwrap_or_else(|| format!("/assets/{}", deps::asset_path(&rel_str(&boot)))),
     };
     for (i, o) in outs.iter().enumerate() {
         let mut route_css_url: Option<String> = None;
         let mut route_css_src: Option<String> = None;
         let mut route_css_gz: u64 = 0;
         let mut markup = pragma_css::prune::Markup::default();
-        markup_of(if p.layout.is_some() { &o.exp.body } else { &o.exp.page }, &mut markup);
+        owners::markup_of(if p.layout.is_some() { &o.exp.body } else { &o.exp.page }, &mut markup);
         for b in &o.bodies {
-            markup_of(&b.children, &mut markup);
+            owners::markup_of(&b.children, &mut markup);
         }
         let mut scoped = String::new();
         let mut seen_dirs = HashSet::new();
@@ -993,7 +974,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
                     modules.iter().filter(|m| **m != boot).map(|m| urls[m].clone()).collect(),
                     url_of(&o.page.module),
                     o.exp.components.values().filter(|c| c.module.is_some()).map(|c| (c.id.clone(), url_of(&c.module))).collect(),
-                    p.stores.iter().filter(|(name, f)| o.stores.contains(*name) || modules.contains(f)).map(|(name, f)| (name.clone(), url_of(&Some(f.clone())))).collect(),
+                    p.stores.iter().filter(|(name, _)| o.stores.contains(*name)).map(|(name, f)| (name.clone(), url_of(&Some(f.clone())))).collect(),
                 )
             }
         };
@@ -1096,7 +1077,6 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             let (template, shell) = if o.ssr {
                 let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
                 let ops = compile::ops(&o.exp.page, &scripted, &o.bodies);
-                w.write(&format!("templates/{}.json", o.page.out_name), serde_json::to_string(&ops).unwrap().as_bytes());
                 // the server runs a script only when everything it imports is app code (no npm
                 // package, no browser runtime from core/); the others stay client-rendered
                 let runs_on_server = |m: &PathBuf| {
@@ -1129,7 +1109,8 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     diags.extend(check_endpoints(&p, &sources));
     report.has_server = !server_routes.is_empty() || !p.endpoints.is_empty() || p.middleware.is_some();
     let emit_worker = report.has_server || has_public_md;
-    let handler = PathBuf::from(format!("{core_dir}/server/handler.js"));
+    let handler = p.framework.join("server/handler.js");
+    let node_adapter = p.framework.join("server/node.mjs");
     // no *.server.js: static-only app, no node in dev/serve (BUG-S-1); still emit Cloudflare worker
     // when public/**/*.md exists so Accept: text/markdown negotiation works on Cloudflare Workers.
     if emit_worker && opts.root.join(&handler).is_file() {
@@ -1143,14 +1124,14 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         }
         let mut entries = vec![handler.clone()];
         if report.has_server {
-            entries.push(PathBuf::from(format!("{core_dir}/server/node.mjs")));
+            entries.push(node_adapter.clone());
         }
         entries.extend(server_routes.iter().map(|r| r.1.clone()));
         entries.extend(p.endpoints.iter().map(|e| e.file.clone()));
         entries.extend(p.middleware.clone());
         entries.extend(script_ids.keys().cloned());
         entries.retain(|e| opts.root.join(e).is_file() || sources.contains_key(e));
-        let smods = module_graph(&opts.root, &entries, false, &sources, &deps, &mut BTreeMap::new(), &mut diags);
+        let smods = module_graph(&opts.root, &p.framework, &entries, false, &sources, &deps, &mut BTreeMap::new(), &mut diags);
         let mut wasm: BTreeMap<String, PathBuf> = BTreeMap::new();
         for (path, m) in &smods {
             let out_rel = deps::asset_path(&rel_str(path));
@@ -1178,10 +1159,11 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         for (out, file) in &wasm {
             match fs::read(opts.root.join(file)) {
                 Ok(bytes) => w.write(&format!("server/{out}"), &bytes),
-                Err(e) => diags.push(Diagnostic::error(file, 1, 1, "app/package", format!("cannot read {}: {e}", rel_str(file)))),
+                Err(e) => diags.push(Diagnostic::error(file, 1, 1, deps::RULE_PACKAGE, format!("cannot read {}: {e}", rel_str(file)))),
             }
         }
-        let mut worker = String::from("import { createHandler } from './core/server/handler.js'\n");
+        let mut worker = format!("import {{ createHandler }} from './{}'\n", deps::asset_path(&rel_str(&handler)));
+        let node_adapter = deps::asset_path(&rel_str(&node_adapter));
         for (i, r) in server_routes.iter().enumerate() {
             worker.push_str(&format!("import * as s{i} from {}\n", json!(format!("./{}", rel_str(&r.1)))));
         }
@@ -1226,9 +1208,9 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             // a static import graph is loaded before any code runs: the .wasm loader must be
             // registered before worker.js is imported
             let node = if wasm.is_empty() {
-                format!("import h from './worker.js'\nimport {{ serve }} from './core/server/node.mjs'\n\nserve(h, {options})\n")
+                format!("import h from './worker.js'\nimport {{ serve }} from './{node_adapter}'\n\nserve(h, {options})\n")
             } else {
-                format!("import {{ serve, registerWasm }} from './core/server/node.mjs'\n\nregisterWasm()\nconst {{ default: h }} = await import('./worker.js')\nserve(h, {options})\n")
+                format!("import {{ serve, registerWasm }} from './{node_adapter}'\n\nregisterWasm()\nconst {{ default: h }} = await import('./worker.js')\nserve(h, {options})\n")
             };
             w.write("server/node.mjs", node.as_bytes());
         }
@@ -1246,7 +1228,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         diags.push(Diagnostic::error(".pragma/server/handler.js", 1, 1, "app/structure", ".pragma/server/handler.js not found; required by *.server.js"));
     }
 
-    for d in ["client", "server", "templates"] {
+    for d in ["client", "server"] {
         w.prune(&opts.out_dir.join(d));
     }
     for d in &mut diags {

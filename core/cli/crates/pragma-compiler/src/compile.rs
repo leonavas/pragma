@@ -1,7 +1,6 @@
 //! Output: final HTML and compiled ops for SSR (SPEC §3 "Compiled format").
 use crate::directive::{self, Dir};
 use crate::html::{Attr, Element, Node, VOID, open_tag, push_attr};
-use crate::validate::BLOCKS;
 use serde_json::{Value, json};
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -168,7 +167,7 @@ fn hoist_nodes(nodes: &mut [Node], h: &mut Hoisted, foreign: bool) {
         }
         let foreign = !e.is("foreignObject") && (foreign || e.is("svg") || e.is("math"));
         hoist_nodes(&mut e.children, h, foreign);
-        if !e.is("template") || !BLOCKS.iter().any(|b| e.has(b)) {
+        if !directive::is_block(e) {
             continue;
         }
         let mut key = String::from(if foreign { "f" } else { "h" });
@@ -238,7 +237,7 @@ pub fn template_module(bodies: &[Element], compact: bool) -> String {
 /// renders them when it runs the page or component script (`comp` op), else leaves them.
 fn server_path(p: &str, vars: &[String]) -> bool {
     let r = directive::root(p);
-    matches!(r, "data" | "params" | "query" | "page" | "state") || vars.iter().any(|v| v == r)
+    directive::SSR_ROOTS.contains(&r) || vars.iter().any(|v| v == r)
 }
 
 struct Ctx<'s> {
@@ -310,7 +309,7 @@ pub fn ops(nodes: &[Node], scripted: &BTreeSet<String>, bodies: &[Element]) -> V
 
 fn block(e: &Element, vars: &mut Vec<String>, ctx: &Ctx) -> Value {
     let mut o = Ops::new(ctx);
-    if let Some(root) = e.element_children().next().or_else(|| ctx.tpls.get(e.value("data-tid")?)) {
+    if let Some(root) = e.value("data-tid").and_then(|id| ctx.tpls.get(id)) {
         element_ops(root, &mut o, vars, true);
     }
     Value::Array(o.ops)
@@ -341,7 +340,7 @@ fn nodes_ops(nodes: &[Node], o: &mut Ops, vars: &mut Vec<String>, compact: bool)
                 }
             }
             Node::Comment => {}
-            Node::Element(e) if e.is("template") && BLOCKS.iter().any(|b| e.has(b)) => {
+            Node::Element(e) if directive::is_block(e) => {
                 let mut s = String::new();
                 write_element(e, &mut s, false);
                 o.html(&s);
@@ -452,7 +451,7 @@ fn element_body(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
         let Some(Some(d)) = directive::parse(&lname) else { continue };
         let v = a.value.as_deref().unwrap_or("");
         let (neg, p) = directive::split_neg(v);
-        if !crate::validate::values(d, p).iter().all(|p| server_path(p, vars)) {
+        if !directive::values(d, p).iter().all(|p| server_path(p, vars)) {
             continue;
         }
         match d {
@@ -514,15 +513,16 @@ mod tests {
     #[test]
     fn compiles_ops() {
         let src = r#"<ul class="a" data-class-on="data.on"><template data-for="x in data.xs" data-key="x.id" data-tid="t1"><li data-text="{x.name}"></li></template><template data-empty data-tid="t2"><li>empty</li></template></ul><p data-show="!state.ok" data-attr-title="data.t" title="y">z</p>"#;
-        let (nodes, _) = parse(src, 0);
-        let v = ops(&nodes, &BTreeSet::new(), &[]);
+        let (mut nodes, _) = parse(src, 0);
+        let bodies = hoist(&mut nodes, 't');
+        let v = ops(&nodes, &BTreeSet::new(), &bodies);
         let expected = json!([
             ["html", "<ul data-class-on=\"data.on\""],
             ["class", "a", [["on", "data.on", false]]],
-            ["html", "><!--p:for t1 x data.xs x.id-->"],
-            ["for", "t1", "x", "data.xs", "x.id", [["html", "<li"], ["html", " data-text=\"{x.name}\">"], ["text", "{x.name}"], ["html", "</li>"]]],
-            ["html", "<!--p:empty t2-->"],
-            ["empty", "t1", [["html", "<li"], ["html", ">empty</li>"]]],
+            ["html", "><!--p:for t0 x data.xs x.id-->"],
+            ["for", "t0", "x", "data.xs", "x.id", [["html", "<li"], ["html", " data-text=\"{x.name}\">"], ["text", "{x.name}"], ["html", "</li>"]]],
+            ["html", "<!--p:empty t1-->"],
+            ["empty", "t0", [["html", "<li"], ["html", ">empty</li>"]]],
             ["html", "</ul><p data-show=\"!state.ok\" data-attr-title=\"data.t\""],
             ["attr", "title", "data.t"],
             ["show", "state.ok", true],
@@ -580,8 +580,9 @@ mod tests {
     #[test]
     fn script_component_root_and_slot_content() {
         let src = r#"<section data-c="box" data-prop-step="2" data-with-items="data.items" data-text="{state.n}"></section><div data-c="plain"><p data-slot="1" data-text="{state.title}"></p></div><div data-c="box"><b data-slot="1" data-text="{state.open}"></b><template data-slot="1" data-if="state.open" data-tid="t9"><i>on</i></template></div>"#;
-        let (nodes, _) = parse(src, 0);
-        let v = ops(&nodes, &BTreeSet::from(["box".to_string()]), &[]);
+        let (mut nodes, _) = parse(src, 0);
+        let bodies = hoist(&mut nodes, 't');
+        let v = ops(&nodes, &BTreeSet::from(["box".to_string()]), &bodies);
         let expected = json!([
             ["comp", "box", [["step", "text", "2"], ["items", "path", "data.items"]], [
                 ["html", "<section"],
@@ -596,8 +597,8 @@ mod tests {
                 ["html", "<div"],
                 ["html", " data-c=\"box\">"],
                 ["slot", 1, [["html", "<b"], ["html", " data-slot=\"1\" data-text=\"{state.open}\">"], ["text", "{state.open}"], ["html", "</b>"]]],
-                ["html", "<!--p:if1 t9 state.open-->"],
-                ["slot", 1, [["if", "t9", "state.open", false, [["html", "<i"], ["html", ">on</i>"]]]]],
+                ["html", "<!--p:if1 t0 state.open-->"],
+                ["slot", 1, [["if", "t0", "state.open", false, [["html", "<i"], ["html", ">on</i>"]]]]],
                 ["html", "</div>"]
             ]]
         ]);
