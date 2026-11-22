@@ -1,3 +1,4 @@
+use crate::layout::DEV_OUT;
 use crate::node::Node;
 use crate::report::{self, diagnostics_json, print_diagnostics};
 use crate::server::{self, Event, Mode, Site};
@@ -13,13 +14,9 @@ use tokio::sync::mpsc;
 const DEBOUNCE: Duration = Duration::from_millis(30);
 const IGNORED_DIRS: [&str; 5] = [".pragma", "dist", "node_modules", ".git", ".wrangler"];
 
-pub async fn run(root: PathBuf, host: &str, port: u16) -> i32 {
-    run_with(root, host, port, None).await
-}
-
 /// `cf_config`: `pragma dev --cf`, Cloudflare bindings from that wrangler config.
-pub async fn run_with(root: PathBuf, host: &str, port: u16, cf_config: Option<PathBuf>) -> i32 {
-    let out = root.join(".pragma/dev");
+pub async fn run(root: PathBuf, host: &str, port: u16, cf_config: Option<PathBuf>) -> i32 {
+    let out = root.join(DEV_OUT);
     let site = Site::new(out.join("client"), Mode::Dev);
     let mut failed = !rebuild(&root, &out, &site).await;
     let listener = match TcpListener::bind((host, port)).await {
@@ -66,7 +63,7 @@ pub async fn run_with(root: PathBuf, host: &str, port: u16, cf_config: Option<Pa
                 }
                 // after an error the page may be stale beyond the CSS
                 if css_only && !failed {
-                    site.send(Event::Css(newest_css(&out.join("client/assets"))));
+                    site.send(Event::Css);
                 } else {
                     site.send(Event::Reload);
                 }
@@ -106,18 +103,6 @@ async fn rebuild(root: &Path, out: &Path, site: &Site) -> bool {
             false
         }
     }
-}
-
-fn newest_css(assets: &Path) -> String {
-    std::fs::read_dir(assets)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .filter(|e| e.path().extension().is_some_and(|x| x == "css"))
-        .filter_map(|e| Some((e.metadata().ok()?.modified().ok()?, e.file_name())))
-        .max()
-        .map(|(_, name)| format!("/assets/{}", name.to_string_lossy()))
-        .unwrap_or_default()
 }
 
 fn watch(root: &Path, tx: mpsc::UnboundedSender<Vec<PathBuf>>) -> notify::Result<notify::RecommendedWatcher> {

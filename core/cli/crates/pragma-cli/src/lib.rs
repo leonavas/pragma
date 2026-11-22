@@ -1,7 +1,8 @@
-pub mod dev;
+mod dev;
+mod layout;
 pub mod new;
-pub mod node;
-pub mod report;
+mod node;
+mod report;
 pub mod self_update;
 pub mod server;
 pub mod upgrade;
@@ -46,23 +47,11 @@ pub fn run(args: Vec<String>) -> i32 {
             Ok(0)
         }
         "new" => cmd_new(rest),
-        "dev" => {
-            let cf = rest.iter().any(|a| a == "--cf");
-            let rest: Vec<String> = rest.iter().filter(|a| *a != "--cf").cloned().collect();
-            cmd_dev(&rest, cf)
-        }
-        "build" => {
-            let allow = rest.iter().any(|a| a == "--allow-outdated-core");
-            let rest: Vec<String> = rest.iter().filter(|a| *a != "--allow-outdated-core").cloned().collect();
-            parse(&rest, &[]).and_then(|a| no_positional(&a)).and_then(|_| cmd_build(allow))
-        }
-        "check" => {
-            let strict = rest.iter().any(|a| a == "--strict");
-            let rest: Vec<String> = rest.iter().filter(|a| *a != "--strict").cloned().collect();
-            parse(&rest, &[]).and_then(|a| no_positional(&a)).and_then(|_| cmd_check(strict))
-        }
+        "dev" => cmd_dev(rest),
+        "build" => parse(rest, &[], &["allow-outdated-core"]).and_then(|a| no_positional(&a).and_then(|_| cmd_build(a.flag("allow-outdated-core")))),
+        "check" => parse(rest, &[], &["strict"]).and_then(|a| no_positional(&a).and_then(|_| cmd_check(a.flag("strict")))),
         "serve" => cmd_serve(rest),
-        "upgrade" => parse(rest, &[]).and_then(|a| no_positional(&a)).and_then(|_| cmd_upgrade()),
+        "upgrade" => parse(rest, &[], &[]).and_then(|a| no_positional(&a)).and_then(|_| cmd_upgrade()),
         "self-update" => cmd_self_update(rest),
         other => Err(format!("unknown command '{other}'; see `pragma --help`")),
     };
@@ -75,9 +64,14 @@ pub fn run(args: Vec<String>) -> i32 {
 struct Args {
     positional: Vec<String>,
     options: HashMap<String, String>,
+    flags: Vec<String>,
 }
 
 impl Args {
+    fn flag(&self, name: &str) -> bool {
+        self.flags.iter().any(|f| f == name)
+    }
+
     fn port(&self, default: u16) -> Result<u16, String> {
         self.options.get("port").map_or(Ok(default), |p| p.parse().map_err(|_| format!("invalid port: '{p}'")))
     }
@@ -87,9 +81,13 @@ impl Args {
     }
 }
 
-fn parse(args: &[String], allowed: &[&str]) -> Result<Args, String> {
-    let mut out = Args { positional: Vec::new(), options: HashMap::new() };
-    let mut it = args.iter();
+/// `valued`: options that take a value (`--port 3000`, `--port=3000`); `flags`: options without one
+/// (`--strict`), accepted anywhere, also between an option and its value.
+fn parse(args: &[String], valued: &[&str], flags: &[&str]) -> Result<Args, String> {
+    let mut out = Args { positional: Vec::new(), options: HashMap::new(), flags: Vec::new() };
+    let is_flag = |arg: &String| arg.strip_prefix("--").is_some_and(|name| flags.contains(&name));
+    out.flags = args.iter().filter(|a| is_flag(a)).map(|a| a[2..].to_string()).collect();
+    let mut it = args.iter().filter(|a| !is_flag(a));
     while let Some(arg) = it.next() {
         let Some(option) = arg.strip_prefix("--") else {
             if arg.starts_with('-') && arg.len() > 1 {
@@ -102,7 +100,7 @@ fn parse(args: &[String], allowed: &[&str]) -> Result<Args, String> {
             Some((n, v)) => (n.to_owned(), v.to_owned()),
             None => (option.to_owned(), it.next().cloned().ok_or_else(|| format!("missing value for '--{option}'"))?),
         };
-        if !allowed.contains(&name.as_str()) {
+        if !valued.contains(&name.as_str()) {
             return Err(format!("unknown option '--{name}'"));
         }
         out.options.insert(name, value);
@@ -123,7 +121,7 @@ fn runtime() -> Result<tokio::runtime::Runtime, String> {
 }
 
 fn cmd_new(args: &[String]) -> Result<i32, String> {
-    let args = parse(args, &[])?;
+    let args = parse(args, &[], &[])?;
     let [dir] = args.positional.as_slice() else {
         return Err("usage: pragma new <dir>".into());
     };
@@ -140,8 +138,8 @@ fn cmd_new(args: &[String]) -> Result<i32, String> {
     Ok(0)
 }
 
-fn cmd_dev(args: &[String], cf: bool) -> Result<i32, String> {
-    let args = parse(args, &["port", "host"])?;
+fn cmd_dev(args: &[String]) -> Result<i32, String> {
+    let args = parse(args, &["port", "host"], &["cf"])?;
     no_positional(&args)?;
     let port = args.port(5180)?;
     let root = app_root()?;
@@ -149,8 +147,8 @@ fn cmd_dev(args: &[String], cf: bool) -> Result<i32, String> {
         print_diagnostics(&root, &[warning]);
         eprintln!("{} pages may fail to render with an old .pragma/ (e.g. SSR \"unknown op\"); run `pragma upgrade`\n", report::err().yellow("warning:"));
     }
-    let cf_config = if cf { Some(node::cloudflare_config(&root)?) } else { None };
-    Ok(runtime()?.block_on(dev::run_with(root, &args.host(), port, cf_config)))
+    let cf_config = if args.flag("cf") { Some(node::cloudflare_config(&root)?) } else { None };
+    Ok(runtime()?.block_on(dev::run(root, &args.host(), port, cf_config)))
 }
 
 fn cmd_build(allow_outdated_core: bool) -> Result<i32, String> {
@@ -217,7 +215,7 @@ fn cmd_upgrade() -> Result<i32, String> {
 }
 
 fn cmd_self_update(args: &[String]) -> Result<i32, String> {
-    let args = parse(args, &[])?;
+    let args = parse(args, &[], &[])?;
     let requested = match args.positional.as_slice() {
         [] => None,
         [v] => Some(v.as_str()),
@@ -253,8 +251,19 @@ pub async fn shutdown() {
 
 #[cfg(test)]
 mod tests {
-    use super::check_status;
+    use super::{check_status, parse};
     use pragma_diag::Diagnostic;
+
+    #[test]
+    fn flags_go_anywhere_and_options_take_values() {
+        let args = |list: &[&str]| list.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let parsed = parse(&args(&["--port", "--cf", "3000"]), &["port"], &["cf"]).unwrap();
+        assert!(parsed.flag("cf"));
+        assert_eq!(parsed.port(1), Ok(3000));
+        assert_eq!(parse(&args(&["--strict=1"]), &[], &["strict"]).err().unwrap(), "unknown option '--strict'");
+        assert_eq!(parse(&args(&["--strict"]), &["port"], &[]).err().unwrap(), "missing value for '--strict'");
+        assert_eq!(parse(&args(&["--port=1", "x"]), &["port"], &[]).unwrap().positional, ["x"]);
+    }
 
     #[test]
     fn strict_turns_warnings_into_errors() {
@@ -266,7 +275,7 @@ mod tests {
 }
 
 fn cmd_serve(args: &[String]) -> Result<i32, String> {
-    let args = parse(args, &["port", "host"])?;
+    let args = parse(args, &["port", "host"], &[])?;
     no_positional(&args)?;
     let port = args.port(3000)?;
     let host = args.host();

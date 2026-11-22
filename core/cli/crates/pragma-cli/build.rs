@@ -1,6 +1,8 @@
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
 
+include!("src/layout.rs");
+
 fn main() {
     let core = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let mut out = String::new();
@@ -25,7 +27,7 @@ fn collect(base: &Path, dir: &Path, skip_top: &[&str], files: &mut Vec<(String, 
     for entry in entries.flatten() {
         let path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
-        if matches!(name.as_str(), "node_modules" | ".git" | ".DS_Store") {
+        if SKIPPED_NAMES.contains(&name.as_str()) {
             continue;
         }
         if dir == base && skip_top.contains(&name.as_str()) {

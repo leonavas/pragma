@@ -1,3 +1,4 @@
+use crate::layout::{DEV_OUT, SKIPPED_NAMES};
 use crate::new::{core_files, write};
 use pragma_jslint::legacy;
 use pragma_diag::Diagnostic;
@@ -125,10 +126,10 @@ fn collect(dir: &Path, rel: &str, files: &mut Vec<String>) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
-        if matches!(name.as_str(), "node_modules" | ".git" | ".DS_Store") || (rel == ".pragma" && name == "dev") {
+        let child = format!("{rel}/{name}");
+        if SKIPPED_NAMES.contains(&name.as_str()) || child == DEV_OUT {
             continue;
         }
-        let child = format!("{rel}/{name}");
         if entry.file_type().is_ok_and(|kind| kind.is_dir()) {
             collect(&entry.path(), &child, files);
         } else {

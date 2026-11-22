@@ -72,10 +72,14 @@ fn release(ctx: &Ctx, args: &[String]) -> ExitCode {
         }
     };
     let mut replaced = false;
+    let mut section = "";
     let updated: Vec<String> = src
         .lines()
         .map(|line| {
-            if !replaced && line.trim_start().starts_with("version = \"") {
+            if line.starts_with('[') {
+                section = line.trim();
+            }
+            if !replaced && section == "[workspace.package]" && line.trim_start().starts_with("version = \"") {
                 replaced = true;
                 format!("version = \"{ver}\"")
             } else {
@@ -84,7 +88,7 @@ fn release(ctx: &Ctx, args: &[String]) -> ExitCode {
         })
         .collect();
     if !replaced {
-        eprintln!("could not find `version = \"...\"` in {}", cargo_toml.display());
+        eprintln!("could not find `version = \"...\"` under [workspace.package] in {}", cargo_toml.display());
         return ExitCode::FAILURE;
     }
     if let Err(e) = std::fs::write(&cargo_toml, format!("{}\n", updated.join("\n"))) {
@@ -94,11 +98,8 @@ fn release(ctx: &Ctx, args: &[String]) -> ExitCode {
     println!("› updated core/cli/Cargo.toml to {ver}");
 
     let repo = ctx.core.parent().unwrap();
-    let bin = ctx.target.join("release/pragma");
-    let ok = run(
-        "updating Cargo.lock and building release binary",
-        Command::new("cargo").args(["build", "--release", "--quiet", "-p", "pragma-cli"]).current_dir(&ctx.cli),
-    ) && run("upgrading site/.pragma/", Command::new(&bin).arg("upgrade").current_dir(repo.join("site")))
+    let bin = ctx.pragma_bin();
+    let ok = build_release(ctx, "updating Cargo.lock and building release binary") && run("upgrading site/.pragma/", Command::new(&bin).arg("upgrade").current_dir(repo.join("site")))
         && run("upgrading core/example/.pragma/", Command::new(&bin).arg("upgrade").current_dir(ctx.core.join("example")))
         && run(
             "regenerating site agent docs",
@@ -154,6 +155,10 @@ impl Ctx {
             PathBuf::from(env::var_os("HOME").expect("HOME not set")).join(".cache/pragma-tools")
         });
         Self { core, cli, target, tools }
+    }
+
+    fn pragma_bin(&self) -> PathBuf {
+        self.target.join("release").join(format!("pragma{}", env::consts::EXE_SUFFIX))
     }
 
     fn playwright(&self) -> PathBuf {
@@ -223,14 +228,14 @@ fn overlays(ctx: &Ctx) -> bool {
         )
 }
 
-fn pragma_release(ctx: &Ctx) -> bool {
-    run("building pragma (release)", Command::new("cargo").args(["build", "--release", "--quiet", "-p", "pragma-cli"]).current_dir(&ctx.cli))
+fn build_release(ctx: &Ctx, title: &str) -> bool {
+    run(title, Command::new("cargo").args(["build", "--release", "--quiet", "-p", "pragma-cli"]).current_dir(&ctx.cli))
 }
 
 fn e2e(ctx: &Ctx) -> bool {
-    let bin = ctx.target.join("release/pragma");
+    let bin = ctx.pragma_bin();
     tools(ctx)
-        && pragma_release(ctx)
+        && build_release(ctx, "building pragma (release)")
         && run(
             "example app end to end (Chromium and Firefox)",
             Command::new("node")
@@ -242,9 +247,9 @@ fn e2e(ctx: &Ctx) -> bool {
 }
 
 fn packages(ctx: &Ctx) -> bool {
-    let bin = ctx.target.join("release/pragma");
+    let bin = ctx.pragma_bin();
     tools(ctx)
-        && pragma_release(ctx)
+        && build_release(ctx, "building pragma (release)")
         && run(
             "real npm packages: check, build, serve, dev, live reload (Chromium and Firefox)",
             Command::new("node")
