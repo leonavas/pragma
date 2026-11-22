@@ -101,7 +101,8 @@ export function lookup(scope, parts, missing) {
   let value = scope
   for (const key of parts) {
     const owner = value
-    if (owner == null || !(key in Object(owner))) return parts[0] === 'query' ? undefined : missing(parts.join('.'))
+    if (owner == null) return undefined
+    if (!(key in Object(owner))) return parts[0] === 'query' ? undefined : missing(parts.join('.'))
     value = owner[key]
     if (typeof value === 'function') value = value.call(owner)
   }

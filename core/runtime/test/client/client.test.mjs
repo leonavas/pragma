@@ -311,6 +311,13 @@ test('unknown path throws in dev', async () => {
   assert.match(p.errors.join(), /unknown path "state.name"/)
 })
 
+test('null in the middle of a path renders empty in dev, as on the server', async () => {
+  const p = await open('/directives')
+  await p.evaluate(() => __ctx.update(s => { s.person = null }))
+  await p.waitForFunction(() => document.querySelector('#w').textContent === '')
+  assert.deepEqual(p.errors, [])
+})
+
 test('loader: skeleton, data, reused __pd and params', async () => {
   const p = await open('/product/7')
   assert.equal(await p.locator('#sk').count(), 1)

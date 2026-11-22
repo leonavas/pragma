@@ -111,7 +111,6 @@ test('nested for sees outer variables', () => {
 test('unknown path throws', () => {
   assert.throws(() => render([['text', '{data.does.not.exist}']], { data: {} }), /unknown path: data\.does\.not\.exist/)
   assert.throws(() => render([['text', '{page.x}']], { data: {} }), /unknown path/)
-  assert.throws(() => render([['show', 'data.a.b', false]], { data: { a: null } }), /unknown path/)
   assert.equal(render([['text', '{data.s.length}']], { data: { s: 'abc' } }), '3')
 })
 
@@ -209,6 +208,13 @@ test('for variable over data resolves on the server, even alongside state', () =
   for (const path of ['data.x', 'params.x']) {
     assert.throws(() => render([['text', `{${path}}`]], { data: {}, params: {}, query: {} }), /unknown path/)
   }
+})
+
+test('null or undefined in the middle of a path is empty, as in the browser', () => {
+  const scope = { data: { user: null, team: undefined }, params: {}, query: {}, page: {} }
+  const ops = [['html', '<p'], ['attr', 'title', 'data.user.name'], ['show', 'data.team.open', false], ['html', '>'], ['text', 'a{data.user.name}b'], ['html', '</p>'], ['for', 't1', 'm', 'data.team.members', 'm.id', [['html', '<i>x</i>']]], ['empty', 't1', [['html', '<b>none</b>']]]]
+  assert.equal(render(ops, scope), '<p hidden>ab</p><b data-of="t1">none</b>')
+  assert.throws(() => render([['text', '{data.user.name}']], { data: { user: {} } }), /unknown path: data\.user\.name/)
 })
 
 test('a query param missing from the URL is empty, as in the browser', () => {

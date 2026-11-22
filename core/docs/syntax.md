@@ -147,7 +147,7 @@ Compute every derived value in a script or store function (`const total = () => 
 - Pass one bare path to block tags (`<if $hasTasks>` with `const hasTasks = () => tasks.length > 0`).
 - Return `'true'` or `'false'` strings for `aria-*` states (`aria-pressed`, `aria-expanded`), because boolean `false` removes the attribute.
 - `:show` hides an element in the DOM; `<if>` adds or removes it. `autofocus` inside a newly inserted block receives focus.
-- In dev, missing paths throw (except under `query`).
+- In dev, missing paths throw (except under `query`). A path through `null` or `undefined` (`data.user.name` with `user: null`) is empty, in the browser and in SSR.
 - Allowed markers: `data-page` (root layout `<main>`), `data-reload` (full-load `<a>`). Never write `data-c`, `data-of`, `data-slot`, `data-prop-*`, or `<!--p:…-->` block comments. `data-entering` and `data-leaving` are set by the runtime: use them only in CSS selectors.
 - Do not write `data-*` attributes by hand (`html/data-attribute`). Bind `:data-x="path"` for multi-value style hooks (`[data-x=value]`), `.name="path"` for on/off states, and role/label/id for tests.
 - `:text` is removed (`html/text-removed`); use `{path}` inside the element.
