@@ -39,3 +39,13 @@ The SvelteKit × astra × fable experiment moved out of the repo to `../pragma-t
   `sign_guestbook`) not tried in a browser with WebMCP (Chrome origin trial).
 - Site: placeholder origin `https://pragma.dev` in the prompt and md links; landing copy lives in
   `site/routes/*.html` and `site/utils/agent-docs/*.md` (drift check compares headings only).
+
+## Pending: performance (found 2026-11-22, not started)
+
+Lighthouse on a large real app page (escalei-pragma `/app/[id]`, see that repo's README "Status and next session") showed pragma faster on FCP/LCP than the SvelteKit original but worse on TBT, Speed Index and payload. Planned for v0.2.1:
+
+1. Route CSS asset paths keep brackets (`/assets/css/app/[id]-<hash>.css`); Workers answers 307 to `%5Bid%5D`, a redirect on a render-blocking stylesheet. Emit URL-safe names like the JS chunks (`_id_`) for every asset and preload.
+2. DOM/HTML size: prebuilt HTML repeats `<template data-if … data-tid>` inside every list item and recursive `<template data-def>`; that page had 6277 elements / 365 kB HTML vs 1838 / 1.8 kB. Emit each block template once per page and clone by id.
+3. Viewport/MutationObserver link prefetch fires during page load (it fetched `/app/index.html` → 307 → `/app`). Wait for `load` + idle, respect `saveData`, request the clean URL.
+4. `boot.js`: 216 ms script eval and a ~55 ms forced reflow on first render (layout reads in block/motion code). Read styles only when an element has an enter/leave animation; batch reads before writes.
+5. Optional: auto code-split components rendered only inside blocks that start false (modals/sheets), or document the dynamic `import()` pattern in performance.md.
