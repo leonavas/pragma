@@ -1,10 +1,10 @@
 import { readBy, forgetReads } from './state.js'
-import { cssValue, lookup, template as parts } from './binding.js'
-import { KEY, LAYOUT_PREFIX, OF } from './contract.js'
+import { KEY, LAYOUT_PREFIX, OF, cssValue, lookup, template as parts } from './contract.js'
 
 const TEXT = 0, SHOW = 1, ATTR = 2, CLASS = 3, ATTR_TEMPLATE = 4, MARKER = 5, CSS_VAR = 6
 const IF = 1, FOR = 2, ELSE = 3, ELIF = 4
-export const COMPONENT = 1, PAGE = 2
+const COMPONENT = 1
+export const PAGE = 2
 
 const D = Symbol(), S = Symbol(), L = Symbol(), NONE = { b: [] }
 // Outer scope of each open component; slot content (data-slot="n") uses the one n levels up.
@@ -12,7 +12,7 @@ const outer = []
 const SELF_DEPTH = 64
 let deep = 0
 let layoutBodies = null, pageBodies = null
-const parsed = new WeakMap(), overlays = new WeakMap()
+const parsed = new WeakMap()
 const NS = { 'http://www.w3.org/2000/svg': 'svg', 'http://www.w3.org/1998/Math/MathML': 'math' }
 export const DEV = Boolean(self.__pragmaDev)
 
@@ -36,17 +36,6 @@ export function useBodies(mod, boot) {
   pageBodies = mod ?? null
   if (boot) layoutBodies = pageBodies
 }
-
-const OVERLAY = /<dialog[\s>]|\spopover[\s=>]/
-
-function bodiesHaveOverlay(mod) {
-  if (!mod) return false
-  let found = overlays.get(mod)
-  if (found === undefined) overlays.set(mod, (found = [mod.default, mod.d].some(src => src && Object.values(src).some(html => OVERLAY.test(html)))))
-  return found
-}
-
-export const hasOverlay = root => !!root.querySelector('dialog,[popover]') || bodiesHaveOverlay(pageBodies) || bodiesHaveOverlay(layoutBodies)
 
 function bodyOf(src, id, ns) {
   let m = parsed.get(src)
@@ -88,7 +77,7 @@ function call(v) {
     a === 'event' ? EVENT
     : a === 'el' ? EL
     : a[0] === "'" || a[0] === '"' ? { v: a.slice(1, -1) }
-    : a in LITERAL ? { v: LITERAL[a] }
+    : Object.hasOwn(LITERAL, a) ? { v: LITERAL[a] }
     : NUMBER.test(a) && isFinite(a) ? { v: +a }
     : { p: path(a) })
   return { f: m[1], args }
@@ -278,12 +267,13 @@ function timing(n) {
 }
 
 const still = [[], 0]
+const MOTION_GRACE_MS = 50
 
 export const afterMotion = (n, done) => after(reduced.matches ? still : timing(n), done)
 
 function after([finished, ms], done) {
   if (!finished.length) return done()
-  Promise.race([Promise.allSettled(finished), new Promise(r => setTimeout(r, ms + 50))]).then(done)
+  Promise.race([Promise.allSettled(finished), new Promise(r => setTimeout(r, ms + MOTION_GRACE_MS))]).then(done)
 }
 
 function entered(into) {

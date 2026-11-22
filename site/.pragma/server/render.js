@@ -1,5 +1,4 @@
-import { coerce, cssValue as safeCss, instantiate as runScript, lookup, readonlyViews, template } from '../binding.js'
-import { KEY, OF } from '../contract.js'
+import { KEY, OF, coerce, cssValue as safeCss, instantiate as runScript, lookup, readonlyViews, template } from '../contract.js'
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
 

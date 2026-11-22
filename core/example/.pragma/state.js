@@ -1,4 +1,4 @@
-import { STORE_KEY, THEME_KEY } from './contract.js'
+import { STORE_KEY, THEME_KEY, isPlain } from './contract.js'
 
 const proxies = new WeakMap(), raws = new WeakMap(), persisted = []
 let notify = () => {}
@@ -28,9 +28,7 @@ export const onChange = fn => { notify = fn }
 const raw = v => raws.get(v) ?? v
 
 function wrappable(v) {
-  if (v === null || typeof v !== 'object' || raws.has(v)) return false
-  const proto = Object.getPrototypeOf(v)
-  return proto === Object.prototype || proto === null || Array.isArray(v)
+  return v !== null && typeof v === 'object' && !raws.has(v) && isPlain(v)
 }
 
 const handler = {
@@ -67,7 +65,6 @@ export function reactive(v) {
   return p
 }
 
-const key = STORE_KEY
 const pick = (target, keys) => JSON.stringify(Object.fromEntries(keys.filter(k => k in target).map(k => [k, target[k]])))
 
 function restore(target, keys, saved) {
@@ -76,7 +73,7 @@ function restore(target, keys, saved) {
 
 function saved(k) {
   const text = localStorage.getItem(k)
-  if (text != null || k !== key('theme')) return JSON.parse(text)
+  if (text != null || k !== STORE_KEY('theme')) return JSON.parse(text)
   const old = JSON.parse(localStorage.getItem(THEME_KEY))
   if (old === null || typeof old !== 'object') return null
   localStorage.setItem(k, JSON.stringify(old))
@@ -86,8 +83,8 @@ function saved(k) {
 
 export function persist(target, name, keys) {
   if (!keys?.length) return
-  try { restore(target, keys, saved(key(name))) } catch {}
-  persisted.push({ target, keys, k: key(name), j: pick(target, keys) })
+  try { restore(target, keys, saved(STORE_KEY(name))) } catch {}
+  persisted.push({ target, keys, k: STORE_KEY(name), j: pick(target, keys) })
 }
 
 export function persistStores() {
