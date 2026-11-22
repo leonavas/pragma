@@ -27,7 +27,7 @@
     border: 1px solid var(--color-line-strong);
     border-radius: var(--radius-lg);
   }
-  .audience-switch a {
+  .audience-switch > :global(a) {
     display: inline-flex;
     align-items: center;
     min-height: 2.25rem;
@@ -36,15 +36,15 @@
     font-weight: 500;
     text-decoration: none;
   }
-  .audience-switch a + a { border-left: 1px solid var(--color-line-strong); }
-  .audience-switch a:hover { color: var(--color-ink); }
-  .audience-switch a:focus-visible { outline-offset: -2px; }
-  .audience-switch a[aria-current="page"] { background: var(--color-accent); color: var(--color-accent-ink); }
-  .audience-row p {
+  .audience-switch > :global(a + a) { border-left: 1px solid var(--color-line-strong); }
+  .audience-switch > :global(a:hover) { color: var(--color-ink); }
+  .audience-switch > :global(a:focus-visible) { outline-offset: -2px; }
+  .audience-switch > :global(a[aria-current="page"]) { background: var(--color-accent); color: var(--color-accent-ink); }
+  .audience-row > :global(p) {
     min-width: 0;
     color: var(--color-faint);
     line-height: 1.6;
   }
-  .audience-row p a { color: var(--color-ink); text-decoration-color: var(--color-line-strong); }
-  .audience-row p a:hover { text-decoration-color: var(--color-accent); }
+  .audience-row > :global(p a) { color: var(--color-ink); text-decoration-color: var(--color-line-strong); }
+  .audience-row > :global(p a:hover) { text-decoration-color: var(--color-accent); }
 </style>

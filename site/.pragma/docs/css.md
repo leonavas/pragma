@@ -16,6 +16,8 @@ Scoping works as in Svelte. The build appends `:where([data-s~="<token>"])` to t
 
 A component's root element also belongs to the caller when the caller gives it a `class` (`<c-card class="wide">` + `.wide { … }` in the page).
 
+A selector whose last part matches no element its owner writes is a `css/unmatched-selector` warning (`.tabs a` in a component whose links come from a slot: write `.tabs :global(a)`).
+
 Write plain selectors (`button`, `.row:hover`, `li::marker`). Use `:global(…)` only for parts outside the owner's markup:
 
 | Written | Compiled | Matches |
