@@ -4,6 +4,7 @@ use crate::html::{Attr, Element, Node, Pos, escape_text, is_blank};
 use crate::project::{Component, Page, Project, component_tag, is_component_tag, rel_str};
 use crate::validate::diag;
 use crate::{Fnv, short_hash};
+use pragma_css::prune::OwnCompound;
 use pragma_diag::Diagnostic;
 use pragma_jslint::script::ScriptInfo;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -17,8 +18,6 @@ pub struct Expanded {
     pub page: Vec<Node>,
     /// By `data-c` id (`Component::id`).
     pub components: BTreeMap<String, Component>,
-    /// Directories of components used directly in `_layout.html`.
-    pub layout_components: BTreeSet<PathBuf>,
 }
 
 type Props = HashMap<String, Option<String>>;
@@ -34,6 +33,8 @@ struct Scope<'s> {
     script: bool,
     slots: Option<&'s Slots>,
     inst: u64,
+    /// `data-s` token of the owner's CSS: elements written here get it, so its styles match only them.
+    css: Option<String>,
 }
 
 enum Res {
@@ -54,14 +55,15 @@ pub struct Expander<'p> {
     p: &'p Project,
     pub diags: Vec<Diagnostic>,
     used: BTreeMap<String, Component>,
-    layout_used: BTreeSet<PathBuf>,
-    in_layout: bool,
     stack: Vec<&'p Path>,
     scripts: &'p HashMap<PathBuf, ScriptInfo>,
     /// `<if>`/`<for>` blocks open around the current point of the innermost component.
     blocks: usize,
     /// Body of each component that renders itself, by `data-c` id (`None` while it is built).
     defs: BTreeMap<String, Option<Element>>,
+    /// Own-element compounds of each owner's scoped CSS, by `data-s` token: only elements one can
+    /// match get the token.
+    owned: Option<&'p HashMap<String, BTreeSet<OwnCompound>>>,
 }
 
 fn first_element(nodes: &[Node]) -> Option<&Element> {
@@ -94,8 +96,22 @@ fn collect_slots(nodes: &[Node], out: &mut BTreeSet<String>) {
 }
 
 impl<'p> Expander<'p> {
+    pub fn owned(mut self, owned: &'p HashMap<String, BTreeSet<OwnCompound>>) -> Self {
+        self.owned = Some(owned);
+        self
+    }
+
+    fn styled(&self, token: &str, el: &Element) -> bool {
+        let Some(own) = self.owned.and_then(|o| o.get(token)) else { return true };
+        let static_classes: Vec<&str> = el.attrs.iter().filter(|a| a.name.eq_ignore_ascii_case("class")).flat_map(|a| a.value.as_deref().unwrap_or("").split_whitespace()).collect();
+        let has_class = |c: &str| {
+            static_classes.contains(&c) || el.attrs.iter().any(|a| matches!(directive::parse(&a.name.to_ascii_lowercase()), Some(Some(Dir::Class(n))) if n == c))
+        };
+        own.iter().any(|o| o.matches(&el.name, &has_class))
+    }
+
     pub fn new(p: &'p Project, scripts: &'p HashMap<PathBuf, ScriptInfo>) -> Self {
-        Expander { p, diags: Vec::new(), used: BTreeMap::new(), layout_used: BTreeSet::new(), in_layout: false, stack: Vec::new(), scripts, blocks: 0, defs: BTreeMap::new() }
+        Expander { p, diags: Vec::new(), used: BTreeMap::new(), stack: Vec::new(), scripts, blocks: 0, defs: BTreeMap::new(), owned: None }
     }
 
     fn err(&mut self, pos: Pos, rule: &'static str, msg: impl Into<String>) {
@@ -122,7 +138,8 @@ impl<'p> Expander<'p> {
                 _ => content.push(n.clone()),
             }
         }
-        let sc = Scope { from: &page.dir, props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: None, inst: 0 };
+        let css = page.css.as_ref().map(|_| crate::css_owner("page", &page.out_name));
+        let sc = Scope { from: &page.dir, props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: None, inst: 0, css };
         let mut page_nodes = self.expand_nodes(&content, &sc);
         if page.out_name != "_404" {
             for dir in page.dir.ancestors() {
@@ -131,7 +148,7 @@ impl<'p> Expander<'p> {
                 }
                 if let Some(&nl_id) = p.nested_layouts.get(dir) {
                     let slots: Slots = HashMap::from([(String::new(), page_nodes)]);
-                    let nl_sc = Scope { from: dir, props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: 0 };
+                    let nl_sc = Scope { from: dir, props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: 0, css: None };
                     page_nodes = self.expand_nodes(&p.trees[nl_id as usize], &nl_sc);
                 }
             }
@@ -153,17 +170,15 @@ impl<'p> Expander<'p> {
                 }
             }
             let slots: Slots = HashMap::from([(String::new(), page_nodes.clone())]);
-            let lsc = Scope { from: Path::new("routes"), props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: 0 };
-            self.in_layout = true;
+            let lsc = Scope { from: Path::new("routes"), props: None, aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: 0, css: None };
             body = self.expand_nodes(&rest, &lsc);
             body.extend(self.take_defs());
-            self.in_layout = false;
             if page.css.is_some() {
                 name_page_main(&mut body, &page.out_name);
             }
         }
         merge_head(&mut head, own_head);
-        (Expanded { head, body, page: page_nodes, components: self.used, layout_components: self.layout_used }, self.diags)
+        (Expanded { head, body, page: page_nodes, components: self.used }, self.diags)
     }
 
     /// `<template data-def="id">` of each component that rendered itself, for the runtime to clone.
@@ -415,6 +430,13 @@ impl<'p> Expander<'p> {
         if hidden && !el.has("hidden") {
             el.attrs.push(Attr { name: "hidden".into(), value: None, pos: e.pos });
         }
+        if let Some(token) = &sc.css
+            && !el.is("template")
+            && el.name != directive::INTERP
+            && self.styled(token, &el)
+        {
+            add_css_owner(&mut el, token);
+        }
         if el.is("template") && crate::validate::BLOCKS.iter().any(|b| el.has(b)) {
             let tid = self.tid(e.pos, sc.inst);
             el.attrs.push(Attr { name: "data-tid".into(), value: Some(tid), pos: e.pos });
@@ -521,7 +543,8 @@ impl<'p> Expander<'p> {
                 props.insert(lname, a.value.clone());
             }
         }
-        let fwd = self.element(&Element { name: "div".into(), attrs: forward, children: Vec::new(), pos: e.pos }, sc).attrs;
+        let mut fwd = self.element(&Element { name: "div".into(), attrs: forward, children: Vec::new(), pos: e.pos }, sc).attrs;
+        fwd.retain(|a| a.name != "data-s");
         let kids = self.expand_nodes(&e.children, sc);
         let mut slots: Slots = HashMap::new();
         for n in kids {
@@ -554,7 +577,8 @@ impl<'p> Expander<'p> {
         h.write(rel_str(&p.files[e.pos.file as usize]).as_bytes());
         h.write(&e.pos.line.to_le_bytes());
         h.write(&e.pos.col.to_le_bytes());
-        let inner = Scope { from: &comp.scope, props: Some(&props), aliases, bound_props, script: comp.module.is_some(), slots: Some(&slots), inst: h.finish() };
+        let css = comp.css.as_ref().map(|_| crate::css_owner("component", &comp.id));
+        let inner = Scope { from: &comp.scope, props: Some(&props), aliases, bound_props, script: comp.module.is_some(), slots: Some(&slots), inst: h.finish(), css };
         let mut nodes = match root {
             Node::Element(r) if recursive => self.expand_nodes(&[Node::Element(Element { children: Vec::new(), ..r.clone() })], &inner),
             _ => {
@@ -575,9 +599,6 @@ impl<'p> Expander<'p> {
                 self.used.insert(comp.id.clone(), comp.clone());
             }
         }
-        if self.in_layout {
-            self.layout_used.insert(comp.dir.clone());
-        }
         let mut dup = Vec::new();
         if let Some(Node::Element(r)) = nodes.iter_mut().find(|n| matches!(n, Node::Element(_))) {
             r.attrs.insert(0, Attr { name: "data-c".into(), value: Some(comp.id.clone()), pos: r.pos });
@@ -591,6 +612,9 @@ impl<'p> Expander<'p> {
             }
             if let Some(c) = class_extra {
                 merge_class(r, &c);
+                if let Some(token) = &sc.css {
+                    add_css_owner(r, token);
+                }
             }
             for a in fwd {
                 if r.has(&a.name) {
@@ -638,7 +662,8 @@ impl<'p> Expander<'p> {
         let (props, slots) = (Props::new(), Slots::new());
         let mut h = Fnv::new();
         h.write(comp.id.as_bytes());
-        let inner = Scope { from: &comp.scope, props: Some(&props), aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: h.finish() };
+        let css = comp.css.as_ref().map(|_| crate::css_owner("component", &comp.id));
+        let inner = Scope { from: &comp.scope, props: Some(&props), aliases: HashMap::new(), bound_props: HashMap::new(), script: true, slots: Some(&slots), inst: h.finish(), css };
         let reported = self.diags.len();
         self.stack.push(&comp.dir);
         let outer_blocks = std::mem::replace(&mut self.blocks, 0);
@@ -765,6 +790,17 @@ fn merge_head(head: &mut Vec<Node>, own: Vec<Element>) {
                 head.push(Node::Element(e));
             }
         }
+    }
+}
+
+/// Marks an element as written by the owner of `token` (a component root can belong to its caller too).
+fn add_css_owner(el: &mut Element, token: &str) {
+    match el.attrs.iter_mut().find(|a| a.name == "data-s") {
+        Some(a) => {
+            let cur = a.value.take().unwrap_or_default();
+            a.value = Some(if cur.split_whitespace().any(|t| t == token) { cur } else { format!("{cur} {token}") });
+        }
+        None => el.attrs.push(Attr { name: "data-s".into(), value: Some(token.to_string()), pos: el.pos }),
     }
 }
 

@@ -6,19 +6,51 @@ Use utility classes (`classes.md`) first. Write a custom class only when utiliti
 |---|---|
 | `.pragma/base.css` | Preflight, layers, `.skeleton`, `[hidden]`, scroll lock. Do not edit. |
 | `lib/theme.css` | Tokens and global custom classes (`@layer components`). |
-| Component `<style>` or `<name>.css` | Scoped to that component (root and descendants). `:global(…)` opts out. `[data-c="<name>"]` stays as written (unique per folder for `p-`). |
-| Page `<style>` or `<page>.css` | Scoped to that page's `<main data-page="…">`. |
+| Component `<style>` or `<name>.css` | Scoped to the markup that component wrote. `:global(…)` opts out. `[data-c="<name>"]` stays as written (unique per folder for `p-`). |
+| Page `<style>` or `<page>.css` | Scoped to the markup that page wrote. |
 
-Scoping appends `:where(…)` to each selector's last part, adding zero specificity. Write plain selectors (`button`, `.row:hover`, `li::marker`). Use `:global(…)` only for parts outside the component or page:
+Scoping works as in Svelte. The build writes a `data-s` token on each element that a page or component wrote, and appends `:where([data-s~="<token>"])` to the last part of each selector (zero specificity). A selector does not match:
+
+- elements inside a child component (style them in that component, or pass a class),
+- slot content: it belongs to the page or component that wrote it.
+
+A component's root element also belongs to the caller when the caller gives it a `class` (`<c-card class="wide">` + `.wide { … }` in the page).
+
+Write plain selectors (`button`, `.row:hover`, `li::marker`). Use `:global(…)` only for parts outside the owner's markup:
 
 | Written | Compiled | Matches |
 |---|---|---|
-| `.row` | `.row:where(<scope>,<scope> *)` | `.row` inside this component only |
+| `.row` | `.row:where([data-s~="<token>"])` | `.row` written in this component only |
 | `:global(html[data-theme="dark"]) .row` | `html[data-theme="dark"] .row:where(…)` | This component's `.row` in dark mode |
-| `.list :global(.hit)` | `.list:where(…) .hit` | Any `.hit` inside this component's `.list` (including child components) |
+| `.list :global(.hit)` | `.list:where(…) .hit` | Any `.hit` inside this component's `.list` (slot content, child components) |
+| `[popover] > :global(a)` | `[popover]:where(…) > a` | Slot links directly in this component's `[popover]` |
 | `:global(:root)`, `:global(body.locked)` | `:root`, `body.locked` | Global |
 
 An outside ancestor alone needs no `:global`: `html[data-theme="dark"] .row` compiles identically.
+
+## Cascade order
+
+`@layer reset, tokens, base, components, utilities`, then component and page styles outside any layer:
+
+1. `lib/theme.css` custom classes (`@layer components`)
+2. utilities (`@layer utilities`): beat theme classes
+3. component and page `<style>`: beat utilities on the same element (`<div class="flex">` + `.panel { display: grid }` = grid)
+
+Theme rules outside a layer compete with component styles by specificity and order. Put theme rules in `@layer components` or `@layer base`.
+
+A custom class can have the name of a utility in component or page CSS (`.mural > .contents`); the utility is still generated. In `lib/theme.css`, a rule whose whole selector is a utility name (`.flex { … }`, `.hidden:hover { … }`) is a `css/utility-name` error: rename the class.
+
+## What each page loads
+
+Each page gets only the CSS its markup can use:
+
+- `lib/theme.css`: rules whose selectors can match the route's elements and classes (static `class` and `.x` toggles). Rules with only attributes, ids, pseudo-classes, `:root`, `html` or `body` stay. `@keyframes` and `@font-face` stay when the kept CSS names them.
+- Component and page CSS of the components on the page, without rules for classes that never appear on the owner's elements.
+- Utilities used on the page.
+
+Markup that pragma does not render (HTML from an npm widget) gets no theme rule for its classes. Style it in the component that hosts it with `:global(…)`.
+
+Fonts: the build adds `<link rel="preload" as="font" crossorigin>` for each `@font-face` family that the page's CSS uses (directly or through `var(--font-…)`): the upright `.woff2` face that covers Latin letters (weight 400 when there are several). Remove manual font preloads from `_layout.html`: they load fonts on pages that do not use them.
 
 ## Tokens and dark mode
 

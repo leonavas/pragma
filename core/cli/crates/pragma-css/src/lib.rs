@@ -2,6 +2,7 @@
 
 mod base;
 mod doc;
+pub mod prune;
 pub mod scope;
 mod table;
 #[cfg(test)]
@@ -54,6 +55,11 @@ pub fn is_arbitrary(class: &str) -> bool {
 
 pub fn is_utility(class: &str, theme: &Theme) -> bool {
     parse(class, &all_colors(theme)).is_some()
+}
+
+/// A utility that produces CSS (markers such as `group` do not).
+pub fn is_utility_with_css(class: &str, theme: &Theme) -> bool {
+    matches!(parse(class, &all_colors(theme)), Some(Some(_)))
 }
 
 pub fn generate(classes: &[String], theme: &Theme) -> Generated {

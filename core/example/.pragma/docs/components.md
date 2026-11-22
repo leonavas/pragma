@@ -18,7 +18,8 @@ name/
 ```
 
 - `<script>` defines state and behavior (`state.md`). `<style>` or `name.css` defines CSS.
-- The build scopes every selector to the component root and its descendants. `button { … }` never matches outside.
+- The build scopes every selector to the markup the component wrote (`css.md`). `button { … }` never matches outside, in child components, or in slot content.
+- Component CSS beats utilities on the same element (`css.md`, Cascade order).
 - `:global(…)` opts out only its argument (`:global(html[data-theme="dark"]) .x` targets `.x` in dark mode; `:global(body.locked)` is global; see `css.md`).
 - Selectors starting with `[data-c="name"]` stay as written.
 - Using both inline `<script>`/`<style>` and external `name.js`/`name.css` triggers `html/duplicate-module`.
@@ -119,7 +120,7 @@ Usage: `<c-md-node :node="data.message.body"></c-md-node>`.
 
 - `<slot></slot>` receives default children. `<slot name="actions">` receives `slot="actions"`.
 - Filling a slot that does not exist is an error.
-- Slot content belongs to its caller; `$` and `@` resolve in the caller's scope.
+- Slot content belongs to its caller; `$`, `@` and the caller's CSS apply to it. To style it from the component, use `:global(…)` (`[popover] > :global(a)`).
 
 ## Rules
 
