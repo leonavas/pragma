@@ -16,10 +16,10 @@ describe('pragma serve build output', () => {
 
   it('each page preloads only what the first paint uses', async () => {
     const dashboard = await preloads('/')
-    assert.ok(dashboard.includes('core/overlay') && dashboard.includes('lib/components/clock/clock'))
-    assert.ok(!dashboard.some(module => module.startsWith('routes/shop')))
+    assert.ok(dashboard.includes('chunks/overlay') && dashboard.includes('routes/index'))
+    assert.ok(!dashboard.some(chunk => chunk.startsWith('routes/shop')))
     const shop = await preloads('/shop')
-    assert.ok(!shop.includes('lib/components/clock/clock') && !shop.includes('core/theme'))
+    assert.ok(shop.includes('routes/shop/index') && !shop.includes('routes/index'))
     const notFound = await (await fetch(app.url + '/_404.html')).text()
     assert.ok(!notFound.includes('overlay-'))
   })

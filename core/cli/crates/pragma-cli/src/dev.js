@@ -14,7 +14,7 @@ function connect() {
     } else if (type === 'reload') {
       location.reload()
     } else if (type === 'css') {
-      swapCss(data)
+      swapCss()
     } else if (type === 'error') {
       showOverlay(JSON.parse(data))
     }
@@ -23,14 +23,14 @@ function connect() {
   socket.addEventListener('close', () => setTimeout(connect, 1000), { once: true })
 }
 
-function swapCss(href) {
+function swapCss() {
   hideOverlay()
   for (const link of document.querySelectorAll('link[rel="stylesheet"]')) {
     const url = new URL(link.href, location.href)
     if (url.origin !== location.origin || !url.pathname.endsWith('.css')) continue
     const next = link.cloneNode()
-    // In dev the CSS name does not change (/assets/app.css): without ?t= the browser does not refetch.
-    next.href = (href && url.pathname.startsWith('/assets/') ? href : url.pathname) + '?t=' + Date.now()
+    // In dev CSS names do not change (/assets/app.css, /assets/css/<route>.css): without ?t= the browser does not refetch.
+    next.href = url.pathname + '?t=' + Date.now()
     // the old sheet is removed only after the new one loads, to avoid a flash of unstyled content
     next.addEventListener('load', () => link.remove(), { once: true })
     next.addEventListener('error', () => next.remove(), { once: true })

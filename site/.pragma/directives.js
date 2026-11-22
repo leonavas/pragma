@@ -17,6 +17,8 @@ const fail = msg => { throw new Error('pragma: ' + msg) }
 const body = t => t.content ?? t
 const path = v => v.split('.')
 const cond = v => (v[0] === '!' ? [path(v.slice(1)), true] : [path(v), false])
+const JSON_LITERAL = /^(?:true|false|null|-?\d+(?:\.\d+)?|".*")$/s
+const operand = v => (JSON_LITERAL.test(v) ? { v: JSON.parse(v) } : path(v))
 
 // A function met on a path is a derived value: called with no args.
 export function get(s, p) {
@@ -122,7 +124,7 @@ function parse(el) {
       case 'attr-': d.b.push(value.includes('{') ? [4, template(value), 0, a] : [2, path(value), 0, a]); break
       case 'var-': d.b.push([6, path(value), 0, a]); break
       case 'class-': d.b.push([3, ...cond(value), a]); break
-      case 'with-': (d.w ??= []).push([a, path(value)]); break
+      case 'with-': (d.w ??= []).push([a, operand(value)]); break
       case 'on-': hooks.on(a); d.e = 1; break
       case 'model':
         d.m = path(value)
@@ -198,7 +200,7 @@ function visit(el, s, d = el[D] ?? parse(el)) {
   let w = null
   if (d.w) {
     w = {}
-    for (const [a, p] of d.w) w[a] = get(s, p)
+    for (const [a, p] of d.w) w[a] = 'v' in p ? p.v : get(s, p)
     s = Object.assign({ __proto__: s }, w)
   }
   if (d.r && ++deep > SELF_DEPTH) fail(`<${el.getAttribute('data-self')}> is nested more than ${SELF_DEPTH} levels inside itself: stop the recursion on data (a tree without cycles, <if>/<for> around the self call)`)

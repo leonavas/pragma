@@ -16,6 +16,7 @@ const skip = new Set(['dist', '.pragma', 'e2e', 'node_modules'])
 export function copyApp() {
   const dir = mkdtempSync(join(tmpdir(), 'minimart-'))
   cpSync(source, dir, { recursive: true, filter: f => !skip.has(f.slice(source.length).split('/')[0]) })
+  execFileSync(PRAGMA, ['upgrade'], { cwd: dir, stdio: 'ignore' })
   return dir
 }
 

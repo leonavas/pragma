@@ -85,7 +85,7 @@ A page or component is one `.html` file: optional `<script>`, optional `<style>`
 - A function defines an action (`@click="add"`) or a derived value (`{$total}` in HTML, `total()` in JS).
 - `export let step = 1` declares a prop.
 - `function mount(el) { …; return cleanup }` runs after mount.
-- Import services from `'pragma'`: `import { shared, data, params, query, page, call, stream, navigate, open, close, confirm, log } from 'pragma'`.
+- Import services from `'pragma'`: `import { shared, data, params, query, page, call, stream, navigate, open, close, confirm, frame, log } from 'pragma'`.
 - `<style>` scopes to its component or page (`:global(…)` opts out only its argument).
 - `{path}` inserts escaped text in text and attribute strings (`<p>Hi {$name}</p>`, `href="/shop/{p.id}"`).
 - `:` binds a value (`:href`, `:disabled`). `.` toggles a class. `@` binds an event.
@@ -239,7 +239,7 @@ Pragma HTML uses a closed set of directives and block tags. Any other syntax is 
 | Syntax | Target | Effect |
 |---|---|---|
 | `{path}` | Text, attribute string | Inserts escaped text (`<p>Hi {$name}</p>`, `alt="Photo of {p.name}"`, `href="/shop/{p.id}"`). |
-| `:<attr>="v"` | Element | Sets attribute (`:href`, `:disabled`, `:aria-current`). `false`/`null`/`undefined` removes it; `true` sets empty. `:checked` and `:selected` also set the DOM property. Never `:class`, `:style`, `:on*`. |
+| `:<attr>="v"` | Element | Sets attribute (`:href`, `:disabled`, `:aria-current`). `false`/`null`/`undefined` removes it; `true` sets empty. `:checked` and `:selected` also set the DOM property. `v` is a path or a literal (see Values). Never `:class`, `:style`, `:on*`. |
 | `:--<name>="v"` | Element, component tag | Sets the CSS variable `--name` (`:--left="bar.left"`). Numbers stay numbers; `false`/`null`/`undefined`/`""` removes it. Use it in CSS: `left: calc(var(--left) * 1%)` (`css.md`). |
 | `.<class>="[!]v"` | Element | Toggles the class. |
 | `:show="[!]v"` | Element | Sets `hidden` when falsy. |
@@ -319,6 +319,14 @@ Block roots animate with CSS only. The runtime sets two attributes on the root e
 
 Use `root.a.b` paths only. Do not use expressions, calls, indexes, or operators. Use `!` only in `<if>`, `<else-if>`, `:show`, and `.class`.
 
+`:attr`, `:--name`, and component props (`:prop`) also take a literal: `true`, `false`, `null`, a number (`2`, `-0.5`), or a quoted string (`'text'`). The build writes it as a fixed value; a prop keeps its type (`:holiday="false"` gives `false`, not the text `"false"`).
+
+```html
+<p-hours :holiday="false" :step="15" :label="'Opening hours'"></p-hours>
+<input aria-label="Name" :disabled="true" :maxlength="40">
+<div class="bar" :--left="0"></div>
+```
+
 | Root | Value |
 |---|---|
 | `$x` | Owner state (`let`), prop (`export let`), constant, or function. |
@@ -363,7 +371,7 @@ Compute every derived value in a script or store function (`const total = () => 
 - Write strict HTML and close every non-void tag. Do not use `<html>`, `<body>`, or `<template>`. Put at most one `<script>` and one `<style>` per file (`state.md`, `css.md`).
 - `@submit` calls `preventDefault()` automatically. Every `<form>` is an agent tool (`webmcp.md`); read values with `new FormData(event.target)`.
 - Pass `<for>` items as arguments (`@click="remove(task)"`). Without parentheses, the handler receives `event` (`@input="search"`). With parentheses, it receives only listed arguments (`@click="reset()"` receives none). Use `el` instead of `event.currentTarget` (events are delegated).
-- Omit `$` in event names (`@click="increase"`). `:attr` takes a bare path (`:disabled="$atMinimum"`); use `title="Count {$count}"` without `:` for interpolated strings.
+- Omit `$` in event names (`@click="increase"`). `:attr` takes a bare path (`:disabled="$atMinimum"`) or a literal (`:maxlength="40"`); use `title="Count {$count}"` without `:` for interpolated strings.
 - Pass one bare path to block tags (`<if $hasTasks>` with `const hasTasks = () => tasks.length > 0`).
 - Return `'true'` or `'false'` strings for `aria-*` states (`aria-pressed`, `aria-expanded`), because boolean `false` removes the attribute.
 - `:show` hides an element in the DOM; `<if>` adds or removes it. `autofocus` inside a newly inserted block receives focus.
@@ -398,7 +406,8 @@ name/
 ```
 
 - `<script>` defines state and behavior (`state.md`). `<style>` or `name.css` defines CSS.
-- The build scopes every selector to the component root and its descendants. `button { … }` never matches outside.
+- The build scopes every selector to the markup the component wrote (`css.md`). `button { … }` never matches outside, in child components, or in slot content.
+- Component CSS beats utilities on the same element (`css.md`, Cascade order).
 - `:global(…)` opts out only its argument (`:global(html[data-theme="dark"]) .x` targets `.x` in dark mode; `:global(body.locked)` is global; see `css.md`).
 - Selectors starting with `[data-c="name"]` stay as written.
 - Using both inline `<script>`/`<style>` and external `name.js`/`name.css` triggers `html/duplicate-module`.
@@ -499,7 +508,7 @@ Usage: `<c-md-node :node="data.message.body"></c-md-node>`.
 
 - `<slot></slot>` receives default children. `<slot name="actions">` receives `slot="actions"`.
 - Filling a slot that does not exist is an error.
-- Slot content belongs to its caller; `$` and `@` resolve in the caller's scope.
+- Slot content belongs to its caller; `$`, `@` and the caller's CSS apply to it. To style it from the component, use `:global(…)` (`[popover] > :global(a)`).
 
 ## Rules
 
@@ -649,25 +658,48 @@ Keep the original `item` reference (`row.item`) when mutating it. Spreading `{ .
 
 ## Per-frame updates
 
-Assign state from `requestAnimationFrame` (scroll, drag, a progress animation) and bind it with `:--name`, `{}`, `:attr`, `:class`, or `:show`. When a change is read only by such bindings (directly or through derived functions), the runtime updates only those bindings, not the page. A value read by `<if>`, `<for>`, `:model`, or a component prop renders the whole page.
+Assign state from `frame` (scroll, drag, a progress animation) and bind it with `:--name`, `{}`, `:attr`, `:class`, or `:show`. When a change is read only by such bindings (directly or through derived functions), the runtime updates only those bindings, not the page. A value read by `<if>`, `<for>`, `:model`, or a component prop renders the whole page.
+
+`frame(fn)` is `requestAnimationFrame` for all components together: every `frame` callback of the page runs in one animation frame, then the runtime writes all their state changes to the DOM in one pass. It returns a function that cancels the callback.
 
 ```js
+import { frame } from 'pragma'
+
 let progress = 0
 
 function mount() {
   const start = performance.now()
-  let frame = 0
-  const step = now => {
+  let cancel = frame(function step(now) {
     progress = Math.min(1, (now - start) / 520)
-    if (progress < 1) frame = requestAnimationFrame(step)
-  }
-  frame = requestAnimationFrame(step)
-  return () => cancelAnimationFrame(frame)
+    if (progress < 1) cancel = frame(step)
+  })
+  return () => cancel()
 }
 ```
 ```html
 <div class="send" :--progress="$progress"></div>
 ```
+
+Scroll and pointer handlers: read nothing in the event, ask for a frame, then read layout and assign state in the callback.
+
+```js
+function mount(el) {
+  let cancel = null
+  const update = () => {
+    cancel = null
+    const box = el.getBoundingClientRect()
+    progress = Math.min(1, Math.max(0, -box.top / box.height))
+  }
+  const onScroll = () => { cancel ??= frame(update) }
+  addEventListener('scroll', onScroll, { passive: true })
+  return () => { removeEventListener('scroll', onScroll); cancel?.() }
+}
+```
+
+- Read layout (`getBoundingClientRect`, `offsetHeight`, `scrollHeight`) before you assign state in a `frame` callback. Assigning state does not touch the DOM until all callbacks of the frame finish, so the reads of the next callbacks stay fast.
+- With `requestAnimationFrame`, each callback writes its changes when it returns; a later callback that reads layout forces the browser to compute layout again (about 10x slower with 10 callbacks on a 1000-row page).
+- Outside `frame`, the DOM updates in the next microtask after a change (code that waits with `queueMicrotask` sees the new DOM).
+- Animate `transform` and `opacity` with the variable, not layout properties (`css.md`, "Values that change every frame").
 
 Derived functions recompute only when state they read changes. Keep values from outside state (`Date.now()`, module variables) in a `let` you assign (`now = Date.now()`).
 
@@ -682,6 +714,7 @@ Derived functions recompute only when state they read changes. Keep values from 
 | `stream(name, input, { signal })` | Calls a server action that streams NDJSON; `for await` each line (`data.md`). |
 | `navigate(url, { replace })` | Navigates via the router; `replace: true` replaces the history entry. |
 | `open(id)`, `close(id)`, `confirm(id)` | Controls overlays (`overlays.md`). |
+| `frame(fn)` | Runs `fn(now)` in the next animation frame with the other `frame` callbacks, then updates the DOM once; returns a cancel function ("Per-frame updates"). |
 | `log` | Emits logs (`logs.md`). |
 
 ## Stores
@@ -1221,19 +1254,51 @@ Use utility classes (`classes.md`) first. Write a custom class only when utiliti
 |---|---|
 | `.pragma/base.css` | Preflight, layers, `.skeleton`, `[hidden]`, scroll lock. Do not edit. |
 | `lib/theme.css` | Tokens and global custom classes (`@layer components`). |
-| Component `<style>` or `<name>.css` | Scoped to that component (root and descendants). `:global(…)` opts out. `[data-c="<name>"]` stays as written (unique per folder for `p-`). |
-| Page `<style>` or `<page>.css` | Scoped to that page's `<main data-page="…">`. |
+| Component `<style>` or `<name>.css` | Scoped to the markup that component wrote. `:global(…)` opts out. `[data-c="<name>"]` stays as written (unique per folder for `p-`). |
+| Page `<style>` or `<page>.css` | Scoped to the markup that page wrote. |
 
-Scoping appends `:where(…)` to each selector's last part, adding zero specificity. Write plain selectors (`button`, `.row:hover`, `li::marker`). Use `:global(…)` only for parts outside the component or page:
+Scoping works as in Svelte. The build writes a `data-s` token on each element that a page or component wrote, and appends `:where([data-s~="<token>"])` to the last part of each selector (zero specificity). A selector does not match:
+
+- elements inside a child component (style them in that component, or pass a class),
+- slot content: it belongs to the page or component that wrote it.
+
+A component's root element also belongs to the caller when the caller gives it a `class` (`<c-card class="wide">` + `.wide { … }` in the page).
+
+Write plain selectors (`button`, `.row:hover`, `li::marker`). Use `:global(…)` only for parts outside the owner's markup:
 
 | Written | Compiled | Matches |
 |---|---|---|
-| `.row` | `.row:where(<scope>,<scope> *)` | `.row` inside this component only |
+| `.row` | `.row:where([data-s~="<token>"])` | `.row` written in this component only |
 | `:global(html[data-theme="dark"]) .row` | `html[data-theme="dark"] .row:where(…)` | This component's `.row` in dark mode |
-| `.list :global(.hit)` | `.list:where(…) .hit` | Any `.hit` inside this component's `.list` (including child components) |
+| `.list :global(.hit)` | `.list:where(…) .hit` | Any `.hit` inside this component's `.list` (slot content, child components) |
+| `[popover] > :global(a)` | `[popover]:where(…) > a` | Slot links directly in this component's `[popover]` |
 | `:global(:root)`, `:global(body.locked)` | `:root`, `body.locked` | Global |
 
 An outside ancestor alone needs no `:global`: `html[data-theme="dark"] .row` compiles identically.
+
+## Cascade order
+
+`@layer reset, tokens, base, components, utilities`, then component and page styles outside any layer:
+
+1. `lib/theme.css` custom classes (`@layer components`)
+2. utilities (`@layer utilities`): beat theme classes
+3. component and page `<style>`: beat utilities on the same element (`<div class="flex">` + `.panel { display: grid }` = grid)
+
+Theme rules outside a layer compete with component styles by specificity and order. Put theme rules in `@layer components` or `@layer base`.
+
+A custom class can have the name of a utility in component or page CSS (`.mural > .contents`); the utility is still generated. In `lib/theme.css`, a rule whose whole selector is a utility name (`.flex { … }`, `.hidden:hover { … }`) is a `css/utility-name` error: rename the class.
+
+## What each page loads
+
+Each page gets only the CSS its markup can use:
+
+- `lib/theme.css`: rules whose selectors can match the route's elements and classes (static `class` and `.x` toggles). Rules with only attributes, ids, pseudo-classes, `:root`, `html` or `body` stay. `@keyframes` and `@font-face` stay when the kept CSS names them.
+- Component and page CSS of the components on the page, without rules for classes that never appear on the owner's elements.
+- Utilities used on the page.
+
+Markup that pragma does not render (HTML from an npm widget) gets no theme rule for its classes. Style it in the component that hosts it with `:global(…)`.
+
+Fonts: the build adds `<link rel="preload" as="font" crossorigin>` for each `@font-face` family that the page's CSS uses (directly or through `var(--font-…)`): the upright `.woff2` face that covers Latin letters (weight 400 when there are several). Remove manual font preloads from `_layout.html`: they load fonts on pages that do not use them.
 
 ## Tokens and dark mode
 
@@ -1300,8 +1365,30 @@ Use `:--name="path"` when a value comes from state or data (position, width, col
 - Pass numbers without units (`42`) and add the unit in CSS (`* 1%`, `* 1px`). Compute the number in a script function (`const start = shift => (shift.from - dayStart) / dayLength * 100`).
 - `false`, `null`, `undefined`, and `""` remove the variable; use a fallback (`var(--tone, …)`).
 - On a component tag, `:--name` goes to the component root.
-- Values set every frame (scroll, drag, progress) update only their bindings, not the page (`state.md`, "Per-frame updates").
+- Values set every frame (scroll, drag, progress) update only their bindings, not the page (`state.md`, "Per-frame updates"). Use them only in `transform` and `opacity` ("Values that change every frame").
 - The server writes `style="--start:42"` in SSR pages. Do not write `style="..."` yourself (`html/style-inline`).
+
+### Values that change every frame
+
+A variable set every frame (scroll, drag, progress) must drive `transform`, `translate`, `scale`, `rotate`, or `opacity`. Do not use it in layout properties (`top`, `left`, `right`, `bottom`, `inset*`, `width`, `height`, `margin*`, `padding*`, `font-size`, `grid-*`): each frame then computes layout for the element and the elements around it. A transform changes only the composited image.
+
+Layout every frame (avoid):
+
+```css
+.thumb { top: calc(var(--y) * 1px); height: calc(var(--h) * 1px); }
+.card { width: calc(var(--w) * 1px); height: calc(var(--h) * 1px); }
+```
+
+Compositor only (fixed size, then move and scale):
+
+```css
+.thumb { height: 100px; translate: 0 calc(var(--y) * 1px); scale: 1 calc(var(--h) / 100); transform-origin: top; }
+.card { width: 640px; height: 360px; translate: calc(var(--x) * 1px) calc(var(--y) * 1px); scale: calc(var(--w) / 640); transform-origin: 0 0; }
+```
+
+- Give the element its final (or largest) size once, and scale from it. Use `clip-path: inset(…)` to reveal a part without changing the size (paint, no layout).
+- Layout properties are fine for values that change on resize or on a click (column count, a measured height).
+- Set a per-frame variable on the element that uses it. Set on a parent with many children, every child computes its style again each frame.
 
 ## Custom classes
 
@@ -1628,15 +1715,27 @@ Source: https://pragma.leonavas.com/docs/performance.md
 
 # Performance
 
-Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<head>`, per-route CSS (inlined in production when <= 14 kB gzip), per-page JS, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets, and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
+Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<head>`, per-route CSS with only the theme rules the page can match (inlined in production when <= 14 kB gzip, so small pages have no render-blocking stylesheet), per-page font preload, per-route JS chunks, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets, and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
+
+## JS chunks
+
+`pragma build` bundles the client JS (`pragma dev` keeps one file per module):
+
+- The core runtime is one file (`/assets/core/boot-<hash>.js`).
+- Each route gets one chunk with its page, components, stores and the code only it uses (`/assets/routes/<route>-<hash>.js`).
+- Code used by 2+ routes goes to `/assets/chunks/shared<n>-<hash>.js`, one chunk per set of routes. A set under 4 kB joins a chunk that a wider set of routes uses.
+- `await import()` stays a separate chunk. npm packages stay in `/assets/npm/` (`packages.md`).
+- The page `modulepreload`s every chunk it runs. The router prefetches the HTML and chunks of a link on hover, focus, and when the link enters the viewport, also for links rendered after the page loads (`/app/:id` links included).
 
 ## Rules
 
-- Navigate with `<a href>`.
+- Navigate with `<a href>`. A `<button>` that calls `navigate()` gets no prefetch.
 - Match skeleton shapes to the final content.
 - Set `width` and `height` on every `<img>`. Add `loading="lazy"` below the fold. Store AVIF or WebP images in `public/`.
-- Set `font-display: swap` on custom fonts. Avoid `<link rel="preload" as="font">` unless proven faster on slow 4G.
+- Set `font-display: swap` on custom fonts and declare them with `@font-face` in `lib/theme.css`. The build preloads the fonts each page uses (`css.md`). Do not write `<link rel="preload" as="font">` in `_layout.html`.
 - Give `<for>` a stable `key`.
+- Drive per-frame animations (scroll, drag, progress) with `frame` from `'pragma'`: read layout first, then assign state (`state.md`, "Per-frame updates").
+- Use per-frame `:--name` values only in `transform` and `opacity`, never in `top`/`left`/`width`/`height`/`margin`/`padding`/`inset` (`css.md`, "Values that change every frame").
 - Omit `.js` on pages without interaction.
 - Keep heavy single-page code on that page. Load interaction-only code with `await import()` inside the action.
 - Return only displayed fields from `load`. Run independent requests with `Promise.all`.

@@ -288,7 +288,9 @@ The top-level script is the component (no `export default`, `this` or `ctx`):
 - Imports are hoisted out of the per-instance factory. No top-level `await` (do it in `mount()` or
   an action), no `var`, no destructuring `let`, no other `export` (`js/component-script`); `$` and
   `$pragma` are reserved names.
-- Services: `import { shared, data, params, query, page, log, call, stream, navigate, open, close, confirm } from 'pragma'`.
+- Services: `import { shared, data, params, query, page, log, call, stream, navigate, open, close, confirm, frame } from 'pragma'`.
+  `frame(fn)` is `requestAnimationFrame` shared by the page: all callbacks run in one frame and their
+  state changes reach the DOM in one pass; it returns a cancel function.
   They are live: `data` is undefined until the loader is done (read it in functions, or rely on
   `ssr`: then it is already set when the script runs). Only page, component and store scripts
   import `pragma` (`js/import` elsewhere).
@@ -444,20 +446,32 @@ Usage:
 - Custom class: when a combination repeats in 3+ places or needs something outside the subset.
   Component CSS goes in its `<style>` or `<name>.css`; for a `p-` component the build rewrites
   `[data-c="name"]` (`"name"`, `'name'` or unquoted) in its own CSS to its id.
-- Scoping (automatic): each selector of a component's CSS that does not already contain its
-  `[data-c="id"]` gets `:where([data-c="id"],[data-c="id"] *)` on its subject (before a
-  pseudo-element), so it matches only the component root and its content and adds no specificity.
-  A page's `<style>`/`.css` is scoped the same way to `[data-page="<page>"]`: the build writes
-  the page name on the layout `<main data-page>` of pages with CSS, and the router copies it on
-  navigation. `:global(…)` opts out only what is inside it (Svelte semantics; the wrapper is
-  removed): the scope goes on the last compound that does not start with `:global(`
-  (`:global(html.dark) .row` → `html.dark .row:where(…)`, `.list :global(.hit)` →
-  `.list:where(…) .hit`); a selector whose every compound starts with it is global. Style rules
-  inside `@media`, `@supports`, `@layer`, `@container`, `@starting-style` are scoped; other
-  at-rules (`@keyframes`, `@font-face`…) are copied.
+- Scoping (automatic, Svelte semantics): a component's or page's CSS matches only the markup that
+  owner wrote. The build gives each owner a `data-s` token, writes it on each element the owner
+  wrote that one of its selectors can match, and appends `:where([data-s~="<token>"])` to the
+  subject of each selector that does not already contain its `[data-c="id"]` (before a
+  pseudo-element; no added specificity). Child component markup and slot content (it belongs to
+  its writer) are not matched. A component root that gets `class` from its caller also carries the
+  caller's token. `:global(…)` opts out only what is inside it (the wrapper is removed): the scope
+  goes on the last compound that does not start with `:global(` (`:global(html.dark) .row` →
+  `html.dark .row:where(…)`, `.list :global(.hit)` → `.list:where(…) .hit`); a selector whose
+  every compound starts with it is global. Style rules inside `@media`, `@supports`, `@layer`,
+  `@container`, `@starting-style` are scoped; other at-rules (`@keyframes`, `@font-face`…) are
+  copied.
+- Cascade: `@layer reset, tokens, base, components, utilities`, then component and page CSS outside
+  any layer: theme classes < utilities < scoped styles.
+- Utilities are generated even when project CSS uses the same class name. A `lib/theme.css` rule
+  whose whole selector is a utility name (`.flex`, `.hidden:hover`) is `css/utility-name`.
 - WebMCP pseudo-classes `:tool-form-active` and `:tool-submit-active` are valid in any project
   CSS (§3.1).
-- v0 output: one global minified CSS (lightningcss) with hash.
+- Output (lightningcss, minified, hashed): one shared file (base + layout utilities) and one file
+  per route with the `lib/theme.css` rules whose selectors can match the route's markup (element
+  names and classes; attribute, id and pseudo-class parts never drop a rule), the route's
+  component and page CSS without rules for classes their own elements never have, and the route's
+  utilities. Both are inlined when their gzip sum is <= 14 kB.
+- Fonts: per route, one `<link rel="preload" as="font" crossorigin>` per `@font-face` family the
+  route CSS uses (through `var()` too): the upright Latin `.woff2` (weight 400 when there are
+  several). Preloads already in `_layout.html` are not repeated.
 
 ## 9. Build (`pragma build`)
 
@@ -469,10 +483,13 @@ dist/
   server/wrangler.jsonc   assets dist/client, html_handling drop-trailing-slash, run_worker_first (no not_found_handling)
   templates/<route>.json  ssr routes only
 ```
-- JS: ES modules, no bundler in v0. Each module minified (oxc) with hashed name; imports
-  rewritten. Each page gets `<link rel="modulepreload">` only for what first paint uses:
-  the static-import closure (never `import()`), plus `core/overlay.js` if the page has an
-  overlay. The manifest uses the same list.
+- JS: `pragma build` bundles client modules with `rolldown`: the core runtime is one chunk, each
+  route one chunk (page, components, stores, code only it uses), code used by 2+ routes one chunk
+  per exact set of routes (a set under 4 kB joins the closest wider set); `import()` stays a
+  separate chunk and npm packages stay external. Route JSON URLs point to named re-exports
+  (`<chunk>.js#p`, `#c<i>`, `#s<i>`). Each page gets `<link rel="modulepreload">` only for the
+  chunks first paint uses (never `import()`), plus `core/overlay.js` if the page has an overlay.
+  The manifest uses the same list. `pragma dev` keeps one module per file.
 - Client npm packages: prebundled with `rolldown` (tree-shaking, only names the app imports),
   one `/assets/npm/<package>-<hash>.js` per package and shared chunks in `/assets/npm/_*`;
   modulepreloaded like app modules (`docs/packages.md`).
