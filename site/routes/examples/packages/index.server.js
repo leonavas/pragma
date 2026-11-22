@@ -5,10 +5,8 @@ export const ssr = true
 
 export async function load() {
   const examples = await readExamples('routes/examples/packages', {
-    highlighter: ['../_source.server.js', '../../../utils/highlight.js', '../../../lib/components/showcase/showcase.html'],
-    emailCheck: ['_components/email-check/email-check.html'],
-    stockFilter: ['_components/stock-filter/stock-filter.html'],
-    relativeTime: ['_components/relative-time/relative-time.html'],
+    signupEmail: [{ file: '_components/signup-email/signup-email.html', as: 'routes/index.html' }],
+    releaseAge: [{ file: '_components/release-age/release-age.html', as: 'routes/index.html' }],
   })
   return { examples, sizes }
 }

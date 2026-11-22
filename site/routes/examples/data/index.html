@@ -1,65 +1,56 @@
 <title>Data and SSR · pragma examples</title>
-<meta name="description" content="Data in pragma, live: load() in the page .server.js, server actions through call() for writes, skeletons while data loads, and ssr = true for data in the first HTML.">
+<meta name="description" content="Data in pragma, live: load() in the page .server.js, a skeleton while it runs, server actions through call() for writes, error() for failures and ssr = true.">
 <link rel="canonical" href="https://pragma.leonavas.com/examples/data">
 <meta property="og:url" content="https://pragma.leonavas.com/examples/data">
 <meta property="og:title" content="pragma data and SSR: load, server actions, skeletons">
 <meta property="og:description" content="Read data with load(), write it with server actions and render it on the server with ssr = true.">
 
-<c-doc heading="Data and SSR" lede="Data comes from load() in the page .server.js. Writes go through server actions. By default the prebuilt page shows a skeleton while a fetch, started in &lt;head&gt;, completes; with ssr = true the server renders the data into the first HTML instead.">
+<c-doc heading="Data and SSR" lede="A page reads data from load() in its .server.js and writes through server actions. By default the page shows a skeleton until the data arrives; with ssr = true the server renders the data into the first HTML.">
   <section class="doc-section" aria-labelledby="load">
     <h2 id="load"><code>load()</code> with a skeleton</h2>
     <div class="prose">
-      <p><code>load()</code> runs on the server, and its return value is <code>data</code>: <code>{data.loadedAt}</code> in HTML, <code>data.products</code> in a script. Switch categories to watch the skeleton.</p>
+      <p><code>routes/catalog.server.js</code> runs on the server, next to the page <code>routes/catalog.html</code>. Its <code>load</code> function returns the data, and the page reads it as <code>data.products</code>. While <code>load</code> runs, <code>page.loading</code> is true, so the page shows a <code>skeleton</code> block.</p>
     </div>
-    <c-showcase :source="data.examples.catalog" caption="A real route rendered in a frame: 700 ms of simulated latency in the private helper, so the skeleton stays visible.">
-      <c-frame src="/examples/data/demo/catalog" title="Catalog demo route"></c-frame>
+    <c-showcase :source="data.examples.catalog" caption="load waits 800 ms. Press Reload in the frame bar to see the skeleton again.">
+      <c-frame src="/examples/data/demo/catalog" title="Catalog demo route" height="sm"></c-frame>
     </c-showcase>
     <div class="prose">
-      <p><code>load</code> receives <code>{ params, query, request, env, log }</code>. The build adds a script to <code>&lt;head&gt;</code> that starts <code>GET /_data/&lt;path&gt;?&lt;query&gt;</code> before any module loads, and the page shows the <code>&lt;if page.loading&gt;</code> branch until it resolves. Every navigation, including a query change, runs <code>load</code> again. The page's own <code>&lt;script&gt;</code> only derives which category link is current from <code>query</code>.</p>
-      <p>The prebuilt HTML carries the loading chain as an inert template: the skeleton appears once the boot script runs, while content outside the chain, like the category links, is visible immediately. <code>request</code> is the Fetch <code>Request</code> (headers, cookies); <code>env</code> holds the Workers bindings, and on Node it is <code>process.env</code>. Using <code>data.*</code> on a page without a <code>load</code> fails check.</p>
-      <p>Helpers whose name starts with <code>_</code> and ends in <code>.server.js</code> are private to the folder and never reach the browser; JSON is imported with <code>with { type: 'json' }</code>. A client module that imports a <code>.server.js</code> file fails <code>pragma check</code> with <code>js/import</code>, and <code>node:*</code> imports are allowed only in server files.</p>
+      <ul>
+        <li><code>load</code> gets the request context: <code>params</code>, <code>query</code>, <code>request</code>, <code>cookies</code>, <code>env</code>, <code>log</code> and more.</li>
+        <li>A query change is a navigation, so <code>load</code> runs again.</li>
+        <li>A file named <code>_name.server.js</code> is a private helper. It never reaches the browser.</li>
+      </ul>
     </div>
   </section>
 
-  <section class="doc-section" aria-labelledby="actions">
-    <h2 id="actions">A form backed by a server action</h2>
+  <section class="doc-section" aria-labelledby="errors">
+    <h2 id="errors">When <code>load</code> fails</h2>
     <div class="prose">
-      <p>Writes go through <code>call('sign', input)</code>, imported from <code>'pragma'</code>, which runs <code>actions.sign</code> in the page's <code>.server.js</code>.</p>
+      <p><code>error(503, 'message')</code> from <code>'pragma/server'</code> stops <code>load</code> with that status. The page gets it as <code>page.error</code>, so the <code>&lt;else-if page.error&gt;</code> branch shows.</p>
     </div>
-    <c-showcase :source="data.examples.guestbook" caption="Entries live in server memory and are shared by every visitor until the server restarts. Try a one-letter name to see the 422.">
-      <p-guestbook></p-guestbook>
+    <c-showcase :source="data.examples.failure" caption="The same route with ?fail=1 in the URL.">
+      <c-frame src="/examples/data/demo/catalog?fail=1" title="Catalog demo route with a failing load" height="sm"></c-frame>
     </c-showcase>
-    <div class="prose">
-      <p><code>@submit</code> calls <code>preventDefault()</code> for you, then <code>sign()</code> sends a <code>POST /_action/&lt;current path&gt;/sign</code> with a JSON body. <code>data</code> is live: assigning <code>data.guestbook</code> re-renders the list. A non-2xx response makes <code>call</code> throw with the server message, which the component keeps in its <code>let error</code>.</p>
-      <p><code>call</code> works from a component too and always targets the current page's <code>.server.js</code>: this guestbook calls <code>routes/examples/data/index.server.js</code>. A server action may return a raw <code>Response</code> to pick the status, here a 422 for invalid input. Actions also receive <code>query</code> and <code>request</code>.</p>
-      <p>The endpoint answers 404 for an unknown action, 400 for a body that is not JSON and 405 for anything but <code>POST</code>. Actions are the only write path: there are no <code>/api</code> routes and no GET endpoints, so nothing can serve RSS, a sitemap or raw JSON dynamically.</p>
-    </div>
   </section>
 
   <section class="doc-section" aria-labelledby="ssr">
     <h2 id="ssr"><code>ssr = true</code>: data in the first HTML</h2>
     <div class="prose">
-      <p>With <code>export const ssr = true</code> in the <code>.server.js</code>, the server renders the page with its data, so the skeleton never appears. Reload the frame and the counts arrive already in the HTML.</p>
+      <p>With <code>export const ssr = true</code>, the server runs <code>load</code> and sends the page with its data in the HTML. There is no skeleton, and search engines see the data.</p>
     </div>
-    <c-showcase :source="data.examples.ssr" caption="Votes are a server action on an SSR page. Reload the frame and both the list and the page title arrive with the new total.">
-      <c-frame src="/examples/data/demo/ssr" title="SSR demo route"></c-frame>
+    <c-showcase :source="data.examples.clock" caption="Reload the frame: the time is in the HTML at once.">
+      <c-frame src="/examples/data/demo/clock" title="SSR demo route" height="sm"></c-frame>
     </c-showcase>
+  </section>
+  <section class="doc-section" aria-labelledby="actions">
+    <h2 id="actions">Writes go through server actions</h2>
     <div class="prose">
-      <p>The line must be literally <code>export const ssr = true</code>. The server runs <code>load</code>, renders the page into <code>&lt;main data-page&gt;</code>, every <code>{data.x}</code> included, and appends the data as <code>&lt;script type="application/json" id="pragma-data"&gt;</code>. The client binds to that HTML without re-rendering and without a second fetch. The response is <code>text/html</code> with <code>cache-control: private, no-cache</code>, <code>HEAD</code> works, and a client-side navigation to an SSR route fetches the rendered HTML from the server instead of the prebuilt file.</p>
-      <p>The page's script and its components' scripts also run on the server, once per request, so their initial <code>let</code>s, props and derived values are in the first HTML too. <code>mount()</code> runs only in the browser: <code>$hydratedAt</code> is empty in the HTML and gets the time when the page boots. A script that reads <code>window</code>, <code>document</code>, <code>localStorage</code> or a store while it runs is left to the browser, and the rest of the page still renders. Head tags take <code>{}</code> too, but only with SSR: this route writes <code>&lt;title&gt;{data.votes} votes · SSR demo&lt;/title&gt;</code> and the same in <code>og:title</code>, so link previews see the live count (<a href="/examples/seo">SEO and head</a>).</p>
+      <p>A server action writes data. <code>call('sign', input)</code> runs <code>actions.sign</code> in the <code>.server.js</code> file and returns its result; the page assigns it to <code>data</code>. <code>new FormData(event.target)</code> reads the form fields.</p>
+      <p>Every form is also a tool for AI agents in the browser (WebMCP). <code>toolname</code>, <code>tooldescription</code> and <code>toolparamdescription</code> describe it, and <code>event.respondWith</code> gives the agent the result.</p>
     </div>
+    <c-showcase :source="data.examples.guestbook" caption="Sign with your name.">
+      <c-frame src="/examples/data/demo/guestbook" title="Guestbook demo route"></c-frame>
+    </c-showcase>
   </section>
 
-  <section class="doc-section" aria-labelledby="errors">
-    <h2 id="errors">When <code>load</code> throws</h2>
-    <div class="prose">
-      <p>An error thrown in <code>load</code> reaches the page as <code>page.error</code>.</p>
-    </div>
-    <c-showcase :source="data.examples.failure" caption="The same catalog route with ?fail=1. On an SSR route the status is also 500 and the shell arrives without a rendered body.">
-      <c-frame src="/examples/data/demo/catalog?fail=1" title="Catalog demo route with a failing load" height="sm"></c-frame>
-    </c-showcase>
-    <div class="prose">
-      <p>The response is HTTP 500 with <code>{"error":{"message"}}</code>, an ERROR log on the server, and <code>{page.error.message}</code> on the client, rendered by the <code>&lt;else-if page.error&gt;</code> branch. Content outside the loading chain, like the filter links, keeps working. "Not found" is not an error: return <code>{ product: null }</code> and render it.</p>
-    </div>
-  </section>
 </c-doc>

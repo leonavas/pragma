@@ -60,7 +60,7 @@ A request for `/` or `/agents` with `Accept: text/markdown` gets the markdown fi
 
 ## WebMCP tools on this site
 
-This page and the landing page expose these tools to agents in the browser, as declarative WebMCP forms. Humans use the same forms. The landing page also has `add_task` (its demo to-do list), and `/examples/data` has `sign_guestbook`.
+This page and the landing page expose these tools to agents in the browser, as declarative WebMCP forms. Humans use the same forms. The landing page also has `add_task` (its demo to-do list), and `/examples/data/demo/guestbook` has `sign_guestbook`.
 
 {{tools routes/_components/setup-tool/setup-tool.html routes/_components/docs-tool/docs-tool.html}}
 

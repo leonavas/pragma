@@ -1,62 +1,15 @@
 <script>
-  const timeFormat = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  let time = ''
 
-  let now = Date.now()
-  let width = 0
-  let resizes = 0
-
-  const time = () => timeFormat.format(now)
+  function tick() {
+    time = new Date().toLocaleTimeString('en-GB')
+  }
 
   function mount() {
-    width = window.innerWidth
-    const timer = setInterval(() => { now = Date.now() }, 1000)
-    const measure = () => {
-      width = window.innerWidth
-      resizes += 1
-    }
-    window.addEventListener('resize', measure)
-    return () => {
-      clearInterval(timer)
-      window.removeEventListener('resize', measure)
-    }
+    tick()
+    const timer = setInterval(tick, 1000)
+    return () => clearInterval(timer)
   }
 </script>
 
-<dl>
-  <div class="clock-cell">
-    <dt class="label">setInterval</dt>
-    <dd class="clock-value">{$time}</dd>
-  </div>
-  <div class="clock-cell">
-    <dt class="label">window resize</dt>
-    <dd class="clock-value">{$width}px</dd>
-  </div>
-  <div class="clock-cell">
-    <dt class="label">resize events</dt>
-    <dd class="clock-value">{$resizes}</dd>
-  </div>
-</dl>
-
-<style>
-  [data-c="clock"] {
-    display: grid;
-    gap: 1px;
-    width: 100%;
-    max-width: 24rem;
-    border: 1px solid var(--color-line);
-    background: var(--color-line);
-  }
-  .clock-cell {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.875rem 1rem;
-    background: var(--color-surface);
-  }
-  .clock-value {
-    font-family: var(--font-mono);
-    font-size: 1.125rem;
-    font-variant-numeric: tabular-nums;
-  }
-</style>
+<p class="text-3xl">{$time}</p>

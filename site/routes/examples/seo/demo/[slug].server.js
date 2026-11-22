@@ -1,22 +1,17 @@
-import articles from './_articles.json' with { type: 'json' }
+import articles from './_articles.json'
+  with { type: 'json' }
 
 export const ssr = true
 
-const siteOrigin = 'https://pragma.leonavas.com'
-
-function headFor(article) {
-  if (!article) return { title: 'Note not found · pragma field notes', robots: 'noindex' }
-  return {
-    title: article.title + ' · pragma field notes',
-    description: article.summary,
-    url: siteOrigin + '/examples/seo/demo/' + article.slug,
-    image: siteOrigin + article.image,
-    imageAlt: article.imageAlt,
-    published: article.published,
-  }
-}
+const notes = 'https://pragma.leonavas.com/examples/seo/demo/'
 
 export async function load({ params }) {
-  const article = articles.find(entry => entry.slug === params.slug) ?? null
-  return { article, head: headFor(article) }
+  const article = articles.find(
+    entry => entry.slug === params.slug,
+  )
+  if (!article) {
+    return { title: 'Not found', robots: 'noindex' }
+  }
+  const url = notes + article.slug
+  return { article, title: article.title, url }
 }

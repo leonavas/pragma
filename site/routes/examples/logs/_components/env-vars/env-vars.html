@@ -1,37 +1,43 @@
-<dl>
-  <div class="env-vars-row">
-    <dt><code>OTEL_EXPORTER_OTLP_ENDPOINT</code></dt>
-    <dd>Base URL of an OTLP/HTTP collector. Records go to <code>/v1/logs</code> as OTLP JSON. Unset: one JSON line per record on stdout.</dd>
+<dl class="grid divide-y divide-line border-y border-line">
+  <div class="row">
+    <dt class="name">OTEL_EXPORTER_OTLP_ENDPOINT</dt>
+    <dd class="text-muted">Base URL of an OTLP/HTTP collector; records go to <code>/v1/logs</code>. Unset: one JSON line per record on stdout.</dd>
   </div>
-  <div class="env-vars-row">
-    <dt><code>OTEL_EXPORTER_OTLP_LOGS_ENDPOINT</code></dt>
-    <dd>Full logs URL; wins over the base endpoint.</dd>
+  <div class="row">
+    <dt class="name">OTEL_EXPORTER_OTLP_LOGS_ENDPOINT</dt>
+    <dd class="text-muted">Full logs URL; wins over the base endpoint.</dd>
   </div>
-  <div class="env-vars-row">
-    <dt><code>OTEL_EXPORTER_OTLP_HEADERS</code></dt>
-    <dd>Comma-separated <code>key=value</code> pairs sent to the collector, for an API key.</dd>
+  <div class="row">
+    <dt class="name">OTEL_EXPORTER_OTLP_HEADERS</dt>
+    <dd class="text-muted"><code>key=value</code> pairs sent to the collector, for an API key.</dd>
   </div>
-  <div class="env-vars-row">
-    <dt><code>OTEL_SERVICE_NAME</code></dt>
-    <dd>Server <code>service.name</code>. Default: <code>name</code> from <code>pragma.json</code>. Client batches use the page hostname.</dd>
+  <div class="row">
+    <dt class="name">OTEL_SERVICE_NAME</dt>
+    <dd class="text-muted">Server <code>service.name</code>. Default: <code>name</code> in <code>pragma.json</code>.</dd>
   </div>
-  <div class="env-vars-row">
-    <dt><code>OTEL_RESOURCE_ATTRIBUTES</code></dt>
-    <dd>Extra resource attributes, <code>deployment.environment=prod,service.version=1.4.0</code>.</dd>
+  <div class="row">
+    <dt class="name">OTEL_RESOURCE_ATTRIBUTES</dt>
+    <dd class="text-muted">Extra attributes: <code>deployment.environment=prod</code>.</dd>
   </div>
-  <div class="env-vars-row">
-    <dt><code>PRAGMA_LOG_LEVEL</code></dt>
-    <dd>Server minimum level: <code>debug</code>, <code>info</code>, <code>warn</code> or <code>error</code>. Default <code>info</code> in production; <code>pragma dev</code> sets <code>debug</code>, so server <code>log.debug</code> shows up while developing.</dd>
+  <div class="row">
+    <dt class="name">PRAGMA_LOG_LEVEL</dt>
+    <dd class="text-muted">Server minimum level. Default <code>info</code>; <code>pragma dev</code> uses <code>debug</code>.</dd>
   </div>
 </dl>
 
 <style>
-  [data-c="env-vars"] { display: grid; border-top: 1px solid var(--color-line); }
-  .env-vars-row { display: grid; gap: 0.375rem; padding: 1rem 0; border-bottom: 1px solid var(--color-line); }
-  dt code { color: var(--color-accent-text); font-size: 0.75rem; overflow-wrap: anywhere; }
-  dd { max-width: var(--measure); color: var(--color-muted); font-size: 0.9375rem; line-height: 1.6; }
-  dd code { padding: 0.1em 0.35em; background: var(--color-raised); color: var(--color-ink); font-size: 0.8em; }
+  .row {
+    display: grid;
+    gap: 0.25rem;
+    padding-block: 0.75rem;
+  }
+  .name {
+    color: var(--color-accent-text);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    overflow-wrap: anywhere;
+  }
   @media (min-width: 48rem) {
-    .env-vars-row { grid-template-columns: 17rem 1fr; gap: 1.5rem; }
+    .row { grid-template-columns: 18rem 1fr; gap: 1.5rem; }
   }
 </style>

@@ -4,6 +4,7 @@ import { markLines } from '../../utils/highlight.js'
 const languageByExtension = { html: 'html', xml: 'html', js: 'javascript', json: 'javascript', css: 'css' }
 const phoneColumns = 36
 const longSourceRows = 16
+const demoOnlyTag = /^<meta name="robots" content="noindex">\n/m
 
 function joinPath(folder, entry) {
   const stack = []
@@ -36,12 +37,31 @@ function languageOf(fileName) {
   return languageByExtension[fileName.split('.').pop()] ?? 'text'
 }
 
+function appPath(folder, path) {
+  if (!path.startsWith(folder + '/')) return path
+  const rest = path.slice(folder.length + 1)
+  if (rest.startsWith('demo/')) return 'routes/' + rest.slice('demo/'.length)
+  const snippet = rest.match(/^_snippets\/[^/]+\/(.+)$/)
+  if (!snippet) return 'routes/' + rest
+  return 'routes/' + (snippet[1] === 'usage.html' ? 'index.html' : snippet[1])
+}
+
+function appCode(folder, sourcePath, code) {
+  const demoUrl = new RegExp('/examples/' + baseName(folder) + '/demo(/|(?![\\w-]))', 'g')
+  if (!sourcePath.startsWith(folder + '/')) return code
+  const isDemo = sourcePath.startsWith(folder + '/demo/')
+  const visible = isDemo ? code.replace(demoOnlyTag, '') : code
+  return visible.replace(demoUrl, '/')
+}
+
 async function readSource(folder, entry, example, index) {
-  const path = joinPath(folder, entry)
-  const raw = sources[path]
-  if (raw === undefined) throw new Error('missing bundled source: ' + path)
-  const code = raw.trimEnd().replaceAll('\t', '  ')
-  const lines = markLines(code, languageOf(entry))
+  const file = typeof entry === 'string' ? entry : entry.file
+  const sourcePath = joinPath(folder, file)
+  const raw = sources[sourcePath]
+  if (raw === undefined) throw new Error('missing bundled source: ' + sourcePath)
+  const code = appCode(folder, sourcePath, raw.trimEnd().replaceAll('\t', '  '))
+  const path = entry.as ?? appPath(folder, sourcePath)
+  const lines = markLines(code, languageOf(file))
   return {
     id: 'source-' + example + '-' + index,
     name: baseName(path),

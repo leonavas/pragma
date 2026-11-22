@@ -1,0 +1,12 @@
+<script>
+  export let node = null
+</script>
+
+<li>
+  {$node.name}
+  <ul class="pl-4">
+    <for child in $node.children key=child.name>
+      <p-file-tree :node="child"></p-file-tree>
+    </for>
+  </ul>
+</li>

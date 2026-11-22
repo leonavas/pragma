@@ -1,0 +1,12 @@
+<script>
+  let locked = true
+</script>
+
+<div>
+  <label>
+    <input type="checkbox" :model="$locked"> Locked
+  </label>
+  <button class="btn" :disabled="$locked">
+    Deploy
+  </button>
+</div>

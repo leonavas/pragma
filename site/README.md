@@ -82,7 +82,7 @@ when a markdown heading is not in the page sources, or when `docs-tool.html` opt
 go in both the `.html` and the template.
 
 WebMCP is on (`"webmcp": true`). Tools: `get_setup_instructions` and `get_pragma_docs` on `/` and
-`/agents`, `add_task` on `/` (task-list), `sign_guestbook` on `/examples/data`. Every other form
+`/agents`, `add_task` on `/` (task-list), `sign_guestbook` on `/examples/data/demo/guestbook`. Every other form
 has `notool`.
 
 ## Design tokens
@@ -138,6 +138,33 @@ One folder per section under `routes/examples/<section>/`, rendered at `/example
   with a `<pre tabindex="0" aria-label="..."><code>` inside. Classes for the spans: `term-cmd`
   (a command; the `$ ` is added by CSS), `term-ok`, `term-err`, `term-warn`, `term-dim`, `term-ink`,
   `term-link`.
+
+## How an example must look
+
+An example teaches one idea. A reader sees the whole file at once and understands it in a few seconds.
+
+- One concept per example: only the basics of what the section heading teaches. Remove every line that does not serve
+  it, even a small second idea (a derived value in the text example, a `<style>` in the component example, a guard, a
+  formatter, a sort). If the idea has its own section, it belongs there.
+- Short: aim for 25 lines or fewer per file; 35 is the hard limit.
+- No `<style>` unless the example is about CSS. A custom class, when needed, names what the thing is (`.note`, `.bar`),
+  never `<component>-<thing>` prefixes.
+- Name the component after what it is (`greeting`, `task-list`, `order-status`), not after the feature (`interpolation`).
+- Realistic and small data: two or three items, short labels.
+- The live result shows the concept at once; the caption says what to do ("Check Online: the button loses disabled").
+- Prose next to the example: two or three short sentences, aligned with the code. No feature lists the code does not show.
+- `pragma check` output in the page is real output of the current CLI (run it on the file), never written by hand.
+- Order: the pages go from simple to advanced (Syntax, Components, State, Stores, Routing, ...). An example uses only what an
+  earlier section explains; a new idea in an example gets a sentence in its prose.
+- Write the code as it is in a new app (`pragma new`): only utilities, the starter tokens (`surface`, `ink`, `muted`,
+  `line`) and the starter classes (`.btn`, `.btn-primary`, `.btn-danger`). No site classes such as `.label` or `.wrap`.
+  A demo route gets the site chrome from a hidden `demo/_layout.html` with `<c-demo-page>`, never in the shown file.
+- The showcase shows each file at its path in that app, and `npm run check-examples` checks it there:
+  `routes/examples/<section>/_components/x/` shows as `routes/_components/x/`, `demo/x.html` as `routes/x.html`,
+  `_snippets/<name>/usage.html` as `routes/index.html`. Links to `/examples/<section>/demo/...` show as `/...`, and the
+  demo-only `<meta name="robots" content="noindex">` line is hidden. `{ file, as }` in `readExamples` sets any other
+  path (a component shown as the page `routes/index.html`, a snippet shown as `lib/theme.css`).
+- Lines of 56 characters or fewer, as displayed: break a long tag on purpose, never let it wrap.
 
 ## How to add an example
 

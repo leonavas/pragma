@@ -1,49 +1,33 @@
-<title>Refund demo · pragma examples</title>
+<title>Refund</title>
 <meta name="robots" content="noindex">
 
 <script>
-  import { data, call, log } from 'pragma'
+  import { data, call } from 'pragma'
 
-  let sending = false
-  let error = ''
+  let result = ''
 
-  async function send(actionName) {
-    sending = true
-    error = ''
+  async function send(action) {
     try {
-      data.refund.status = (await call(actionName, { id: data.refund.id })).status
+      await call(action, { id: data.refund.id })
+      result = action + ': done'
     } catch (failure) {
-      log.error('refund action failed', { 'refund.action': actionName, 'exception.message': failure.message })
-      error = failure.message
-    } finally {
-      sending = false
+      result = action + ': ' + failure.message
     }
   }
 </script>
 
-<c-demo-page>
-  <h1 class="font-mono text-sm text-muted">Refund queue</h1>
-  <if page.loading>
-    <div class="skeleton h-28" aria-busy="true" aria-label="Loading refund"></div>
-  </if>
-  <else-if page.error>
-    <p class="font-mono text-sm text-error" role="alert">{page.error.message}</p>
-  </else-if>
-  <else>
-    <article class="grid gap-4 border border-line bg-surface p-5" aria-labelledby="refund-title">
-      <div class="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 id="refund-title" class="font-mono text-base">{data.refund.customer}</h2>
-        <p class="font-mono text-xs uppercase tracking-wide text-faint">{data.refund.status}</p>
-      </div>
-      <p class="font-mono text-2xl tabular-nums">{data.refund.amount}</p>
-      <div class="flex flex-wrap gap-2">
-        <button type="button" class="btn btn-small btn-primary" @click="send('approve')" :disabled="$sending">Approve</button>
-        <button type="button" class="btn btn-small" @click="send('escalate')" :disabled="$sending">Escalate</button>
-        <button type="button" class="btn btn-small" @click="send('reopen')" :disabled="$sending">Reopen</button>
-      </div>
-      <if $error>
-        <p class="font-mono text-xs text-error" role="alert">{$error}</p>
-      </if>
-    </article>
-  </else>
-</c-demo-page>
+<if page.loading>
+  <p class="skeleton h-16"></p>
+</if>
+<else>
+  <div>
+    <h1>Refund {data.refund.id}</h1>
+    <button class="btn" @click="send('approve')">
+      Approve
+    </button>
+    <button class="btn" @click="send('escalate')">
+      Escalate
+    </button>
+    <p role="status">{$result}</p>
+  </div>
+</else>

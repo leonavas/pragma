@@ -1,29 +1,27 @@
 <title>SEO and head · pragma examples</title>
-<meta name="description" content="Per-page title, description, canonical, Open Graph and Twitter tags in pragma, from static pages and from server data with ssr = true, plus robots.txt, sitemaps and real 404s.">
+<meta name="description" content="Per-page title, description, canonical and Open Graph tags in pragma, from static pages and from server data with ssr = true, plus JSON-LD, robots.txt, sitemaps and real 404s.">
 <link rel="canonical" href="https://pragma.leonavas.com/examples/seo">
 <meta property="og:url" content="https://pragma.leonavas.com/examples/seo">
 <meta property="og:title" content="SEO and link previews in pragma">
 <meta property="og:description" content="Head tags from static pages and from server data, checked at build time.">
 
-<c-doc heading="SEO and head" lede="The layout &lt;head&gt; holds the defaults every page shares. A page writes its own &lt;title&gt;, &lt;meta&gt; and &lt;link&gt; at the top of its file, and the build moves them into &lt;head&gt;. With ssr = true they can come from server data, so crawlers and link-preview bots get the real values in the first response.">
+<c-doc heading="SEO and head" lede="The layout &lt;head&gt; holds the defaults. A page writes its own &lt;title&gt;, &lt;meta&gt; and &lt;link&gt; at the top of its file, and the build moves them into &lt;head&gt;. With ssr = true they can come from server data.">
   <section class="doc-section" aria-labelledby="static-head">
     <h2 id="static-head">Layout defaults, page overrides</h2>
     <div class="prose">
-      <p>A tag at the top level of a page replaces the layout tag with the same <code>name</code>, <code>property</code>, <code>http-equiv</code> or <code>rel</code> + <code>hreflang</code>, in place; a tag the layout lacks, like <code>canonical</code>, is appended. <code>&lt;html lang&gt;</code> comes from <code>lang</code> in <code>pragma.json</code>, and charset and viewport are always emitted.</p>
-      <p>Keep <code>canonical</code> and <code>og:url</code> out of the layout, or every page claims the same address. X reads <code>og:title</code>, <code>og:description</code> and <code>og:image</code> when the <code>twitter:*</code> versions are missing, so this site's layout sets only <code>twitter:card</code>, and a page overrides <code>og:*</code> once for both. Add a <code>twitter:*</code> tag only when X should show something else, like the shorter title on this demo page.</p>
+      <p>A page tag replaces the layout tag with the same <code>name</code>, <code>property</code> or <code>rel</code>. A new tag, like <code>canonical</code>, is added.</p>
     </div>
-    <c-showcase :source="data.examples.static" caption="The result is this page's load() requesting /examples/seo/demo over HTTP, the same bytes curl gets. page marks a tag the route wrote; layout marks a default it inherited. The card reads twitter:* first, then og:*, as X does.">
+    <c-showcase :source="data.examples.static" caption="The real response for /examples/seo/demo, fetched over HTTP. page marks a tag from this file, layout a default from routes/_layout.html.">
       <p-http-response group="static"></p-http-response>
     </c-showcase>
   </section>
 
   <section class="doc-section" aria-labelledby="ssr-head">
-    <h2 id="ssr-head">Tags from server data with <code>ssr = true</code></h2>
+    <h2 id="ssr-head">Tags from server data</h2>
     <div class="prose">
-      <p>Write <code>{data.post.title}</code> inside <code>&lt;title&gt;</code>, and <code>:content</code>, <code>:href</code> or <code>{}</code> in an attribute of <code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code>, reading <code>data</code>, <code>params</code> or <code>query</code>; then add <code>export const ssr = true</code> to the route's <code>.server.js</code>. The server fills them before it sends the page, so a link-preview bot, which never runs JavaScript, sees the article instead of the site defaults.</p>
-      <p>Build absolute URLs in <code>load</code> from a fixed origin, never from the request's <code>Host</code> header. A missing value keeps the static fallback, such as the <code>&lt;title&gt;</code> text; a <code>&lt;meta&gt;</code> left without <code>content</code> or a <code>&lt;link&gt;</code> without <code>href</code> is dropped. On client navigation the router replaces <code>&lt;title&gt;</code>, <code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> with the next page's.</p>
+      <p>Use <code>{data.x}</code> in <code>&lt;title&gt;</code> and <code>:content</code> on <code>&lt;meta&gt;</code>. With <code>export const ssr = true</code>, the server fills the tags, so link previews see them.</p>
     </div>
-    <c-showcase :source="data.examples.dynamic" caption="Each tab is a separate request to the SSR route. The preview card is drawn only from the served tags; it loads the local /og.png because pragma.dev is a placeholder domain.">
+    <c-showcase :source="data.examples.dynamic" caption="Each tab is a separate request to the SSR route. The card is drawn only from the served tags.">
       <p-http-response group="dynamic"></p-http-response>
     </c-showcase>
   </section>
@@ -31,10 +29,9 @@
   <section class="doc-section" aria-labelledby="not-found">
     <h2 id="not-found">Soft 404 and real 404</h2>
     <div class="prose">
-      <p><code>load</code> returns data, not a status, so a dynamic route whose entity is missing still answers 200: a soft 404, which search engines may index as an empty page. Bind <code>&lt;meta name="robots"&gt;</code> to <code>data.head.robots</code> and return <code>'noindex'</code> only for the missing entity; in every other case the value is undefined and the tag is dropped.</p>
-      <p>An address that matches no route gets <code>routes/_404.html</code> with status 404, from <code>pragma serve</code>, the Node adapter and Workers alike.</p>
+      <p>A <code>[slug]</code> route with no note still answers 200: a soft 404. Return <code>robots: 'noindex'</code> for that case. A URL with no route gets status 404.</p>
     </div>
-    <c-showcase :source="data.examples.missing" caption="/demo/no-such-note matches [slug] and renders the not-found branch; /demo/no/such/page matches no route at all.">
+    <c-showcase :source="data.examples.missing" caption="/no-such-note matches [slug] but has no note; /no/such/page matches no route.">
       <p-http-response group="missing"></p-http-response>
     </c-showcase>
   </section>
@@ -42,9 +39,9 @@
   <section class="doc-section" aria-labelledby="robots-sitemap">
     <h2 id="robots-sitemap"><code>robots.txt</code> and a sitemap</h2>
     <div class="prose">
-      <p>Files in <code>public/</code> are served from the site root as they are, with the right <code>content-type</code>. Routes only produce HTML, so <code>sitemap.xml</code> is a static file too: write it by hand, or generate it from your data with a script before <code>pragma build</code>, and point to it from <code>robots.txt</code> with a <code>Sitemap:</code> line.</p>
+      <p>Files in <code>public/</code> are served from the site root. Routes produce only HTML, so <code>sitemap.xml</code> is a static file: write it by hand or generate it before <code>pragma build</code>.</p>
     </div>
-    <c-showcase :source="data.examples.files" caption="Both files requested live from this site's root.">
+    <c-showcase :source="data.examples.files" caption="The sitemap file is a short version. The responses are the real files of this site.">
       <p-http-response group="files"></p-http-response>
     </c-showcase>
   </section>
@@ -52,96 +49,34 @@
   <section class="doc-section" aria-labelledby="json-ld">
     <h2 id="json-ld">Structured data with JSON-LD</h2>
     <div class="prose">
-      <p>Write one <code>&lt;script type="application/ld+json"&gt;</code> per schema at the top level of the page. The build moves it into <code>&lt;head&gt;</code> and rejects invalid JSON with the line and column. Inside its strings, <code>{data.article.title}</code> works as it does in a <code>&lt;meta&gt;</code>: with <code>ssr = true</code> the server writes each value JSON-escaped, so a quote in a title cannot break the script. JSON-LD without <code>{}</code> is static and needs no <code>ssr</code>.</p>
-      <p>The field notes article in the showcase above declares an <code>Article</code> from the same <code>data</code> as its title and Open Graph tags. This is what the server sends:</p>
+      <p>Write <code>&lt;script type="application/ld+json"&gt;</code> in the page. The build moves it into <code>&lt;head&gt;</code>. With <code>ssr</code>, <code>{data.x}</code> works in its strings. This is what the server sends:</p>
     </div>
     <c-terminal title="~">
-      <pre tabindex="0" aria-label="JSON-LD served by the article route"><code><span class="term-cmd">curl -s http://127.0.0.1:5181/examples/seo/demo/head-tags-from-data | grep -A11 ld+json</span>
+      <pre tabindex="0" aria-label="JSON-LD served by the article route"><code><span class="term-cmd">curl -s http://127.0.0.1:5181/examples/seo/demo/head-tags-from-data | grep -A6 ld+json</span>
 &lt;script type="application/ld+json"&gt;
 {
   "@context": "https://schema.org",
   "@type": "Article",
   "headline": "Head tags rendered from server data",
-  "description": "With ssr = true, bound title, meta and link tags are filled on the server, so previews show the real entity.",
-  "image": "https://pragma.leonavas.com/og.png",
-  "datePublished": "2026-11-16",
-  "mainEntityOfPage": "https://pragma.leonavas.com/examples/seo/demo/head-tags-from-data",
-  "publisher": { "@type": "Organization", "name": "pragma" }
-}
-&lt;/script&gt;</code></pre>
+  "datePublished": "2026-11-16"
+}</code></pre>
     </c-terminal>
   </section>
 
   <section class="doc-section" aria-labelledby="check-head">
     <h2 id="check-head">What <code>pragma check</code> rejects</h2>
     <div class="prose">
-      <p>Head tags have one place to go, and the check enforces it with <code>html/head</code>. Each message below is the real output of <code>pragma check --strict</code> for the code next to it.</p>
+      <p>Head tags have one place to go, and <code>html/head</code> enforces it. A bound tag in the layout <code>&lt;head&gt;</code> fails too: that head is the same on every page.</p>
     </div>
-    <ul class="grid gap-px border border-line bg-line" aria-label="Rejected head code">
-      <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
-        <div class="flex min-w-0 flex-col gap-2">
-          <p class="font-mono text-xs text-faint">routes/about.html</p>
-          <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;section&gt;
-  &lt;meta name="description" content="..."&gt;
-&lt;/section&gt;</code></pre>
-        </div>
-        <p class="font-mono text-xs leading-relaxed text-error">error [html/head] &lt;meta&gt; belongs in &lt;head&gt;: write it at the top level of the page fragment (or in the layout &lt;head&gt;)</p>
-      </li>
-      <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
-        <div class="flex min-w-0 flex-col gap-2">
-          <p class="font-mono text-xs text-faint">lib/components/share/share.html</p>
-          <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;div&gt;
-  &lt;meta property="og:title" content="..."&gt;
-&lt;/div&gt;</code></pre>
-        </div>
-        <p class="font-mono text-xs leading-relaxed text-error">error [html/head] &lt;meta&gt; belongs in &lt;head&gt;: write it at the top level of the page fragment (or in the layout &lt;head&gt;)</p>
-      </li>
-      <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
-        <div class="flex min-w-0 flex-col gap-2">
-          <p class="font-mono text-xs text-faint">routes/_layout.html</p>
-          <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;head&gt;
-  &lt;meta property="og:url" :content="params.slug"&gt;
-&lt;/head&gt;</code></pre>
-        </div>
-        <p class="font-mono text-xs leading-relaxed text-error">error [html/head] the layout &lt;head&gt; is static (the same on every page); put bound tags at the top of the page fragment</p>
-      </li>
-      <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
-        <div class="flex min-w-0 flex-col gap-2">
-          <p class="font-mono text-xs text-faint">routes/post.html, with no ssr in post.server.js</p>
-          <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;title&gt;{data.title}&lt;/title&gt;</code></pre>
-        </div>
-        <p class="font-mono text-xs leading-relaxed text-error">error [html/head] bound head tags are rendered by the server so crawlers see them: add export const ssr = true to routes/post.server.js</p>
-      </li>
-      <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
-        <div class="flex min-w-0 flex-col gap-2">
-          <p class="font-mono text-xs text-faint">routes/post.html</p>
-          <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;meta name="description" :content="$summary"&gt;</code></pre>
-        </div>
-        <p class="font-mono text-xs leading-relaxed text-error">error [html/head] head tags are rendered by the server and read only data, params or query; "$summary"</p>
-      </li>
-      <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
-        <div class="flex min-w-0 flex-col gap-2">
-          <p class="font-mono text-xs text-faint">routes/notes.html</p>
-          <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;script type="application/ld+json"&gt;{ "@type": "Article", "headline": "Notes", }&lt;/script&gt;</code></pre>
-        </div>
-        <p class="font-mono text-xs leading-relaxed text-error">error [html/json-ld] invalid JSON-LD: trailing comma</p>
-      </li>
-      <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
-        <div class="flex min-w-0 flex-col gap-2">
-          <p class="font-mono text-xs text-faint">routes/post.html, with no ssr in post.server.js</p>
-          <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;script type="application/ld+json"&gt;{ "@type": "Article", "headline": "{data.title}" }&lt;/script&gt;</code></pre>
-        </div>
-        <p class="font-mono text-xs leading-relaxed text-error">error [html/head] JSON-LD with &#123;path&#125; is rendered by the server so crawlers see it: add export const ssr = true to routes/post.server.js</p>
-      </li>
-      <li class="grid gap-3 bg-sunken p-4 lg:grid-cols-2 lg:gap-6">
-        <div class="flex min-w-0 flex-col gap-2">
-          <p class="font-mono text-xs text-faint">lib/components/share/share.html</p>
-          <pre class="overflow-x-auto text-xs leading-relaxed text-ink"><code>&lt;div&gt;
-  &lt;script type="application/ld+json"&gt;{ "@type": "Organization", "name": "Shop" }&lt;/script&gt;
-&lt;/div&gt;</code></pre>
-        </div>
-        <p class="font-mono text-xs leading-relaxed text-error">error [html/script] JSON-LD &lt;script type="application/ld+json"&gt; goes at the top level of a page</p>
-      </li>
-    </ul>
+    <c-showcase :source="data.examples.rejected" caption="Real pragma check output. post.server.js has a load but no ssr.">
+      <c-terminal title="~/my-app">
+        <pre tabindex="0" aria-label="pragma check output for post.html"><code><span class="term-cmd">pragma check</span>
+post.html:5 <span class="term-err">[html/head]</span> bound head tags are rendered by the server so crawlers see them: add export const ssr = true to routes/post.server.js
+post.html:6 <span class="term-err">[html/head]</span> head tags are rendered by the server and read only data, params or query; "$summary"
+post.html:8 <span class="term-err">[html/json-ld]</span> invalid JSON-LD: trailing comma
+post.html:12 <span class="term-err">[html/head]</span> &lt;meta&gt; belongs in &lt;head&gt;: write it at the top level of the page fragment (or in the layout &lt;head&gt;)
+<span class="term-err">4 error(s)</span></code></pre>
+      </c-terminal>
+    </c-showcase>
   </section>
 </c-doc>

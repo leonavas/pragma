@@ -1,0 +1,24 @@
+<script>
+  let tasks = [
+    { id: 1, title: 'Write the docs' },
+    { id: 2, title: 'Ship the release' },
+  ]
+
+  function remove(task) {
+    tasks = tasks.filter(other => other.id !== task.id)
+  }
+</script>
+
+<ul>
+  <for task in $tasks key=task.id>
+    <li>
+      {task.title}
+      <button class="btn" @click="remove(task)">
+        Done
+      </button>
+    </li>
+  </for>
+  <empty>
+    <li>All done.</li>
+  </empty>
+</ul>

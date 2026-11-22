@@ -1,0 +1,15 @@
+<script>
+  let order = 'name'
+
+  function sortBy(next) {
+    order = next
+  }
+</script>
+
+<div>
+  <c-dropdown id="sort" label="Sort">
+    <button @close @click="sortBy('name')">Name</button>
+    <button @close @click="sortBy('size')">Size</button>
+  </c-dropdown>
+  <p>Sorted by {$order}</p>
+</div>

@@ -3,18 +3,12 @@ import { readExamples } from '../_source.server.js'
 export const ssr = true
 
 export async function load() {
-  const [section, site] = await Promise.all([
-    readExamples('routes/examples/routing', {
-      files: ['demo/index.html', 'demo/new.html', 'demo/_posts.js'],
-      param: ['demo/[slug].html', 'demo/_posts.js'],
-      local: ['demo/_components/post-meta/post-meta.html', 'demo/_components/demo-nav/demo-nav.html'],
-      tabs: ['demo/tabs.html', 'demo/_components/query-tabs/query-tabs.html'],
-      navigate: ['demo/go.html'],
-    }),
-    readExamples('routes', {
-      layout: ['_layout.html'],
-      missing: ['_404.html'],
-    }),
-  ])
-  return { examples: { ...section, ...site } }
+  const examples = await readExamples('routes/examples/routing', {
+    files: ['demo/index.html', 'demo/about.html'],
+    param: ['demo/shop/index.html', 'demo/shop/[slug].html'],
+    layout: ['demo/shop/_layout.html'],
+    tabs: ['demo/shop/tabs.html'],
+    navigate: ['demo/shop/go.html'],
+  })
+  return { examples }
 }

@@ -1,0 +1,17 @@
+<script>
+  let progress = 40
+</script>
+
+<div>
+  <input type="range" aria-label="Progress"
+    :model="$progress">
+  <div class="bar h-2 bg-primary-500"
+    :--progress="$progress"></div>
+</div>
+
+<style>
+  .bar {
+    scale: calc(var(--progress) / 100) 1;
+    transform-origin: left;
+  }
+</style>

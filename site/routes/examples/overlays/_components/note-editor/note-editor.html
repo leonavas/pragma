@@ -1,0 +1,23 @@
+<script>
+  import { close, confirm } from 'pragma'
+
+  async function discard() {
+    const answer = await confirm('discard')
+    if (answer === 'ok') close('editor')
+  }
+</script>
+
+<div>
+  <button class="btn" @open="editor">Edit note</button>
+  <c-modal id="editor" title="Edit note">
+    <button slot="actions" class="btn" @click="discard">
+      Discard
+    </button>
+  </c-modal>
+  <c-alert id="discard" title="Discard the note?">
+    <button slot="actions" class="btn" @close
+      value="cancel">Keep</button>
+    <button slot="actions" class="btn btn-danger" @close
+      value="ok">Discard</button>
+  </c-alert>
+</div>

@@ -1,0 +1,17 @@
+<script>
+  import { debounce } from 'es-toolkit/function'
+
+  let draft = ''
+  let saved = ''
+
+  const saveLater = debounce(() => {
+    saved = draft
+  }, 500)
+</script>
+
+<div>
+  <input class="border border-line px-2 py-1"
+    aria-label="Draft" :model="$draft"
+    @input="saveLater">
+  <p>Saved: {$saved}</p>
+</div>

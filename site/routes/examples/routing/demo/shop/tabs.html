@@ -1,0 +1,17 @@
+<title>Tabs</title>
+<meta name="robots" content="noindex">
+
+<script>
+  import { query } from 'pragma'
+
+  const reviews = () => query.tab === 'reviews'
+</script>
+
+<a class="underline" href="?tab=specs">Specs</a>
+<a class="underline" href="?tab=reviews">Reviews</a>
+<if $reviews>
+  <p>4.8 out of 5.</p>
+</if>
+<else>
+  <p>87 keys, USB-C.</p>
+</else>

@@ -9,7 +9,11 @@
   <div class="grid gap-12 lg:grid-cols-3 lg:gap-16">
     <header>
       <h1 class="text-3xl sm:text-5xl">Examples</h1>
-      <p class="mt-6 text-lg leading-relaxed text-muted">Every pragma feature, one section at a time. Each example reads its own source files at request time and renders them next to the running component, so the listing can never drift from what you see.</p>
+      <p class="mt-6 text-lg leading-relaxed text-muted">Every pragma feature, one section at a time, from simple to advanced. Each example uses only what the sections before it explain.</p>
+      <ul class="mt-6 grid list-disc gap-2 pl-5 text-muted">
+        <li>Each file shows its path in a new app, made with <code>pragma new</code>. Copy it to that path and it works.</li>
+        <li>Classes like <code>flex gap-2</code> are utility classes, with the names of Tailwind. <code>btn</code> is a button class of the starter theme. Styling explains both.</li>
+      </ul>
     </header>
     <c-section-nav class="lg:col-span-2" label="Example sections"></c-section-nav>
   </div>

@@ -1,99 +1,59 @@
 <title>Routing · pragma examples</title>
-<meta name="description" content="File-based routing in pragma, live: every .html in routes/ is a page, with params, query strings, link prefetch and navigation from actions.">
+<meta name="description" content="File-based routing in pragma, live: every .html in routes/ is a page, with params, nested layouts, query strings and navigation from actions.">
 <link rel="canonical" href="https://pragma.leonavas.com/examples/routing">
 <meta property="og:url" content="https://pragma.leonavas.com/examples/routing">
 <meta property="og:title" content="pragma routing: files as routes">
-<meta property="og:description" content="Params, query and prefetch; the router swaps only the page and keeps the layout alive.">
+<meta property="og:description" content="Params, nested layouts, query and prefetch; the router swaps only the page and keeps the layout alive.">
 
-<c-doc heading="Routing" lede="Every .html in routes/ is a route. The router swaps only the page, prefetches links and keeps the layout alive.">
+<c-doc heading="Routing" lede="Each file in routes/ is a page, and its path is its URL. This page adds params, query strings, layouts for a folder and navigation from a script.">
   <section class="doc-section" aria-labelledby="files">
-    <h2 id="files">Files are routes</h2>
+    <h2 id="files">A file in <code>routes/</code> is a page</h2>
     <div class="prose">
-      <p>The path of a file under <code>routes/</code> is its URL. <code>index.html</code> maps to the folder, <code>[name]</code> in a file or folder name is a param, and a static segment beats a param: <code>demo/new.html</code> wins over <code>demo/[slug].html</code> for <code>/demo/new</code>. A page is a fragment with optional top-level <code>&lt;title&gt;</code>, <code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> tags; it has no <code>&lt;html&gt;</code>, <code>&lt;head&gt;</code> or <code>&lt;body&gt;</code>.</p>
+      <p><code>routes/index.html</code> is the page at <code>/</code>. <code>routes/about.html</code> is the page at <code>/about</code>. A folder adds a segment: <code>routes/blog/index.html</code> is <code>/blog</code>.</p>
+      <p>A page is a piece of HTML, with no <code>&lt;html&gt;</code> or <code>&lt;body&gt;</code>: the app adds them. <code>&lt;title&gt;</code> names the browser tab. A plain <code>&lt;a href&gt;</code> moves between pages, without a full reload. A URL with no file gets <code>routes/_404.html</code>, with status 404.</p>
     </div>
-    <div class="overflow-x-auto">
-      <table class="w-full font-mono text-xs">
-        <thead class="text-left text-faint">
-          <tr class="border-b border-line"><th class="py-2 pr-6 font-normal">File</th><th class="py-2 font-normal">URL</th></tr>
-        </thead>
-        <tbody class="text-muted">
-          <tr class="border-b border-line"><td class="py-2 pr-6 text-ink">routes/index.html</td><td class="py-2">/</td></tr>
-          <tr class="border-b border-line"><td class="py-2 pr-6 text-ink">routes/about.html</td><td class="py-2">/about</td></tr>
-          <tr class="border-b border-line"><td class="py-2 pr-6 text-ink">routes/blog/index.html</td><td class="py-2">/blog</td></tr>
-          <tr class="border-b border-line"><td class="py-2 pr-6 text-ink">routes/blog/[slug].html</td><td class="py-2">/blog/:slug</td></tr>
-          <tr class="border-b border-line"><td class="py-2 pr-6 text-ink">routes/blog/[slug]/edit.html</td><td class="py-2">/blog/:slug/edit</td></tr>
-          <tr class="border-b border-line"><td class="py-2 pr-6 text-ink">routes/[lang]/index.html</td><td class="py-2">/:lang</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="prose">
-      <p>Names starting with <code>_</code> are private; only <code>_layout.html</code> and <code>_404.html</code> are special, any other <code>_x.html</code> is an error. <code>x.html</code> next to <code>x/index.html</code>, or two params in the same folder, is <code>app/route-conflict</code>. There is no <code>[...rest]</code> and no optional param. Subfolders can define nested layouts with <code>routes/&lt;dir&gt;/_layout.html</code> and <code>&lt;slot&gt;&lt;/slot&gt;</code>.</p>
-    </div>
-    <c-showcase :source="data.examples.files" caption="A real route under this page. Follow the links: each one is a client-side navigation inside the frame.">
-      <c-frame src="/examples/routing/demo" title="Routing demo: posts"></c-frame>
+    <c-showcase :source="data.examples.files" caption="Click the links. The address bar shows the URL of each file.">
+      <c-frame src="/examples/routing/demo" title="Two pages" height="sm"></c-frame>
     </c-showcase>
   </section>
 
   <section class="doc-section" aria-labelledby="params">
-    <h2 id="params">Dynamic routes with <code>[slug]</code></h2>
+    <h2 id="params">Params: <code>[slug].html</code></h2>
     <div class="prose">
-      <p>The param is <code>params.slug</code> everywhere: in HTML, in the page's <code>&lt;script&gt;</code> after <code>import { params } from 'pragma'</code>, and in a <code>load</code>. It is always a URL-decoded string. Reading a param the route does not have is a check error that lists the valid ones. Here a derived function in the page's script finds the post in a local module; with a <code>.server.js</code> the same lookup would run in <code>load</code> (see <a href="/examples/data">Data and SSR</a>).</p>
-      <p>A missing post is data, not an error: the branch renders "not found" and the status stays 200, a soft 404. On static hosting something has to map <code>/demo/abc</code> to <code>[slug].html</code>; <code>pragma serve</code>, the Node adapter and the Workers adapter do it from the manifest.</p>
+      <p><code>routes/shop/[slug].html</code> answers every URL of the form <code>/shop/&lt;anything&gt;</code>. The page reads that part of the URL as <code>params.slug</code>.</p>
     </div>
-    <c-showcase :source="data.examples.param" caption="Open /demo/missing-post from the Posts list to see the not-found branch.">
-      <c-frame src="/examples/routing/demo/hello-pragma" title="Routing demo: a post"></c-frame>
-    </c-showcase>
-  </section>
-
-  <section class="doc-section" aria-labelledby="local-components">
-    <h2 id="local-components">Route-local components</h2>
-    <div class="prose">
-      <p>A component in <code>_components/</code> next to a route is used as <code>&lt;p-name&gt;</code> by every page in that folder and below: the lookup walks up from the page to <code>routes/</code>. <code>p-post-meta</code> has no <code>&lt;script&gt;</code>, so <code>:post="$post"</code> aliases the page's path at build time and <code>{$post.author}</code> reads through it. Promoting it means moving the folder to <code>lib/components/</code> and renaming it <code>c-post-meta</code>.</p>
-    </div>
-    <c-showcase :source="data.examples.local" caption="Both components live in demo/_components/ and are invisible to routes outside demo/.">
-      <c-frame src="/examples/routing/demo/closed-syntax" title="Routing demo: route-local components"></c-frame>
+    <c-showcase :source="data.examples.param" caption="Click a product: one file shows both.">
+      <c-frame src="/examples/routing/demo/shop" title="Routing demo: products"></c-frame>
     </c-showcase>
   </section>
 
   <section class="doc-section" aria-labelledby="layout">
-    <h2 id="layout">Layouts and automatic active links</h2>
+    <h2 id="layout">A layout for a folder</h2>
     <div class="prose">
-      <p><code>routes/_layout.html</code> wraps every page. Its optional <code>&lt;head&gt;</code> comes first, is static (a binding there fails check with <code>html/head</code>) and is copied into every page; exactly one <code>&lt;main data-page&gt;</code> holds a lone <code>&lt;slot&gt;</code>. Subfolders can add a nested <code>routes/&lt;dir&gt;/_layout.html</code> with a <code>&lt;slot&gt;&lt;/slot&gt;</code> to wrap every page in that folder inside the parent layout. The layout has no <code>&lt;script&gt;</code> and reads only <code>shared</code>, <code>params</code> and <code>query</code>; behavior goes in a component. A <code>&lt;title&gt;</code> in the layout <code>&lt;head&gt;</code> is the fallback for pages without one, and <code>pragma.json</code>'s <code>name</code> is the last resort. A page can also write <code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> at its top level: the build moves them into <code>&lt;head&gt;</code>, replacing the layout's tag with the same name (see <a href="/examples/seo">SEO and head</a>).</p>
-      <p>Any routed <code>&lt;a href&gt;</code> without query or hash that points to the current page gets <code>aria-current="page"</code>, in the prebuilt HTML and after every navigation. This site styles <code>.nav-link[aria-current="page"]</code> in green: look at the header above, or at the demo nav in any frame on this page.</p>
+      <p><code>routes/shop/_layout.html</code> wraps every page in <code>routes/shop/</code>. The page goes where <code>&lt;slot&gt;</code> is. A link to the current page gets <code>aria-current="page"</code>, ready for CSS.</p>
     </div>
-    <c-showcase :source="data.examples.layout" caption="This site's own layout. The live frame is the same layout around a demo page.">
-      <c-frame src="/examples/routing/demo/new" title="Routing demo: layout around a page" height="lg"></c-frame>
+    <c-showcase :source="data.examples.layout" caption="Click the links: the nav stays, the page changes.">
+      <c-frame src="/examples/routing/demo/shop/tabs" title="Routing demo: shop layout" height="sm"></c-frame>
     </c-showcase>
   </section>
 
   <section class="doc-section" aria-labelledby="query">
-    <h2 id="query">Tabs and filters live in the query</h2>
+    <h2 id="query">The query string: <code>query</code></h2>
     <div class="prose">
-      <p><code>query.tab</code> holds the query as a string, in HTML and in scripts (<code>import { query } from 'pragma'</code>); a repeated key keeps the last value, and a missing <code>query.x</code> never throws. Links build their URL with <code>href="?tab={tab.id}"</code>. Since automatic <code>aria-current</code> ignores links with a query, bind <code>:aria-current</code> to a derived value that is <code>'true'</code> or <code>false</code>.</p>
-      <p>Every navigation, including a query-only one, recreates the page state: click the counter, then switch tabs, and it starts again at zero.</p>
+      <p><code>import { query } from 'pragma'</code> gives the query string: <code>?tab=reviews</code> is <code>query.tab</code>. A tab in the URL survives a reload and a shared link.</p>
     </div>
-    <c-showcase :source="data.examples.tabs" caption="The URL is the state: reload or share a tab link and the same tab opens.">
-      <c-frame src="/examples/routing/demo/tabs?tab=specs" title="Routing demo: query tabs"></c-frame>
+    <c-showcase :source="data.examples.tabs" caption="Switch tabs, then reload the frame.">
+      <c-frame src="/examples/routing/demo/shop/tabs?tab=reviews" title="Routing demo: query tabs" height="sm"></c-frame>
     </c-showcase>
   </section>
 
   <section class="doc-section" aria-labelledby="navigate">
-    <h2 id="navigate">Navigating from an action, and full reloads</h2>
+    <h2 id="navigate">Navigate from a script</h2>
     <div class="prose">
-      <p>After an action, <code>navigate(url)</code> from <code>'pragma'</code> goes through the router like a link click. Use it only when there is no link to click: never a <code>&lt;button&gt;</code> that navigates, <code>location.href</code> or <code>history.pushState</code>. A link with <code>data-reload</code>, <code>target</code> or <code>download</code>, or a click with a modifier key, skips the router and loads the page in full.</p>
+      <p><code>navigate(url)</code> opens a page from a script, like a click on a link. Use it after an action, for example after a save.</p>
     </div>
-    <c-showcase :source="data.examples.navigate" caption="Submit a slug: the form action calls navigate() and the post opens without a page load.">
-      <c-frame src="/examples/routing/demo/go" title="Routing demo: navigate from an action"></c-frame>
-    </c-showcase>
-  </section>
-
-  <section class="doc-section" aria-labelledby="not-found">
-    <h2 id="not-found">The 404 page</h2>
-    <div class="prose">
-      <p>A URL that matches no route renders <code>routes/_404.html</code>, served with status 404 by <code>pragma serve</code> and the Node adapter. It is a normal fragment with a <code>&lt;title&gt;</code>; it may have a <code>&lt;script&gt;</code> for state and actions, but never a <code>.server.js</code>. The Workers adapter resolves param routes and answers unknown URLs with this page and a real 404 too.</p>
-    </div>
-    <c-showcase :source="data.examples.missing" caption="The frame requests /examples/routing/demo/a/b, which no file matches.">
-      <c-frame src="/examples/routing/demo/a/b" title="Routing demo: 404 page"></c-frame>
+    <c-showcase :source="data.examples.navigate" caption="Click Open keyboard.">
+      <c-frame src="/examples/routing/demo/shop/go" title="Routing demo: navigate" height="sm"></c-frame>
     </c-showcase>
   </section>
 
@@ -101,12 +61,11 @@
     <h2 id="router">What the router does for free</h2>
     <div class="prose">
       <ul>
-        <li>Intercepts same-origin <code>&lt;a href&gt;</code> clicks and swaps only <code>&lt;main data-page&gt;</code> plus the page's <code>&lt;title&gt;</code>, <code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code> tags, so description, canonical and Open Graph follow the page (<a href="/examples/seo">SEO and head</a>). The layout stays mounted and its directives are reapplied.</li>
-        <li>Prefetches on hover, on focus and when a link scrolls into view (at idle): the prebuilt HTML plus a <code>modulepreload</code> of the route's modules, which downloads and compiles them without running them until you navigate.</li>
-        <li>Wraps the swap in <code>document.startViewTransition</code> where the browser has it.</li>
-        <li>Scrolls to the top on a new page, restores the position on back and forward, scrolls to <code>#hash</code> targets and moves focus to <code>&lt;main&gt;</code>.</li>
+        <li>Swaps only <code>&lt;main data-page&gt;</code> and the page's <code>&lt;title&gt;</code>, <code>&lt;meta&gt;</code> and <code>&lt;link&gt;</code>. Layouts stay mounted.</li>
+        <li>Prefetches a link on hover, on focus and when it scrolls into view.</li>
+        <li>Uses <code>document.startViewTransition</code> where the browser has it.</li>
+        <li>Scrolls to the top, restores the position on back and forward, follows <code>#hash</code> and moves focus to <code>&lt;main&gt;</code>.</li>
       </ul>
-      <p>None of it needs code: there is no router to configure, and the pages on this site use nothing else.</p>
     </div>
   </section>
 </c-doc>

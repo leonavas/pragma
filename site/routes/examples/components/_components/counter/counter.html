@@ -1,80 +1,11 @@
 <script>
-  export let label = ''
-  export let start = 0
-  export let step = 1
+  let count = 0
 
-  let count = start
-
-  const atMinimum = () => count - step < 0
-  const atStart = () => count === start
-
-  function stepSize(event) {
-    return event.shiftKey ? step * 10 : step
-  }
-
-  function decrease(event) {
-    count = Math.max(0, count - stepSize(event))
-  }
-
-  function increase(event) {
-    count += stepSize(event)
-  }
-
-  function reset(el) {
-    count = start
-    el.parentElement.querySelector('[aria-label="Increase"]').focus()
+  function increase() {
+    count += 1
   }
 </script>
 
-<div role="group" aria-label="{$label}">
-  <span class="counter-label">{$label}</span>
-  <div class="counter-controls">
-    <button type="button" class="counter-step" aria-label="Decrease" @click="decrease" :disabled="$atMinimum">−</button>
-    <output class="counter-value">{$count}</output>
-    <button type="button" class="counter-step" aria-label="Increase" @click="increase">+</button>
-  </div>
-  <button type="button" class="counter-reset" @click="reset(el)" :disabled="$atStart">Reset</button>
-</div>
-
-<style>
-  [data-c="counter"] {
-    display: grid;
-    justify-items: center;
-    gap: 1rem;
-  }
-  .counter-label {
-    color: var(--color-muted);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-  }
-  .counter-controls {
-    display: flex;
-    border: 1px solid var(--color-line-strong);
-    background: var(--color-surface);
-  }
-  .counter-step {
-    width: 3rem;
-    font-size: 1.25rem;
-    cursor: pointer;
-  }
-  .counter-step:hover { background: var(--color-raised); }
-  .counter-step:disabled { color: var(--color-faint); cursor: not-allowed; }
-  .counter-value {
-    min-width: 5rem;
-    padding: 0.75rem 1rem;
-    border-inline: 1px solid var(--color-line-strong);
-    font-family: var(--font-mono);
-    font-size: 1.75rem;
-    font-variant-numeric: tabular-nums;
-    text-align: center;
-  }
-  .counter-reset {
-    color: var(--color-muted);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    text-decoration: underline;
-    text-underline-offset: 0.3em;
-    cursor: pointer;
-  }
-  .counter-reset:disabled { visibility: hidden; }
-</style>
+<button class="btn" @click="increase">
+  Clicks: {$count}
+</button>

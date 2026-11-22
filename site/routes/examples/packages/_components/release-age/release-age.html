@@ -1,0 +1,13 @@
+<script>
+  let today = ''
+
+  async function show() {
+    const { default: dayjs } = await import('dayjs')
+    today = dayjs().format('dddd, D MMMM YYYY')
+  }
+</script>
+
+<div>
+  <button class="btn" @click="show">Show today</button>
+  <p>{$today}</p>
+</div>

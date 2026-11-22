@@ -1,0 +1,28 @@
+<title>Guestbook · data demo</title>
+<meta name="robots" content="noindex">
+
+<script>
+  import { data, call } from 'pragma'
+
+  async function sign(event) {
+    const form = new FormData(event.target)
+    const input = Object.fromEntries(form)
+    const signing = call('sign', input)
+    if (event.agentInvoked) event.respondWith(signing)
+    data.entries = (await signing).entries
+  }
+</script>
+
+<form class="flex gap-2" toolname="sign_guestbook"
+  tooldescription="Sign the guestbook with your name"
+  @submit="sign">
+  <input class="border border-line px-2" name="name"
+    aria-label="Name" required
+    toolparamdescription="Your name">
+  <button class="btn">Sign</button>
+</form>
+<ul>
+  <for entry in data.entries key=entry.id>
+    <li>{entry.name}</li>
+  </for>
+</ul>

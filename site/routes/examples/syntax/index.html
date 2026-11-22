@@ -5,151 +5,104 @@
 <meta property="og:title" content="pragma syntax: \{path}, four sigils and five block tags">
 <meta property="og:description" content="Text interpolation, bindings, class toggles, events with arguments, conditions and lists, each running live next to its source.">
 
-<c-doc heading="Syntax" lede="Braces put a value in text, a colon binds an attribute, a dot toggles a class, an at sign calls a function and a dollar sign names something from the script. Conditions and loops are tags.">
+<c-doc heading="Syntax" lede="A page can have a script. Its values go into the HTML with braces, its functions run on events, and a few tags add conditions and lists.">
   <section class="doc-section" aria-labelledby="text">
-    <h2 id="text">Text: <code>{path}</code></h2>
+    <h2 id="text">Script and text: <code>{$name}</code></h2>
     <div class="prose">
-      <p><code>{$name}</code> is the only way to put a value in text, and it works inside attribute strings too: <code>title="Profile of {$name}"</code>, <code>href="#user-{$slug}"</code>.</p>
+      <p>Each example on this page is <code>routes/index.html</code>, the home page of a new app. A <code>&lt;script&gt;</code> at the top of the page holds its values. A top-level <code>let</code> is state: a value that can change.</p>
+      <p><code>{$name}</code> puts the value of <code>name</code> in the text. The <code>$</code> says that the name comes from the script. Braces work in attribute strings too: <code>title="Hi {$name}"</code>.</p>
     </div>
-    <c-showcase :source="data.examples.interpolation" caption="Type &lt;b&gt;bold&lt;/b&gt; into the field: the value is always escaped text, never HTML.">
-      <p-interpolation></p-interpolation>
+    <c-showcase :source="data.examples.greeting" caption="The paragraph shows the value of name.">
+      <p-greeting></p-greeting>
     </c-showcase>
-    <div class="prose">
-      <ul>
-        <li>Only paths go between the braces: <code>$x</code>, <code>data.x</code>, <code>shared.cart.total</code>, <code>params.id</code> or a <code>&lt;for&gt;</code> variable. A function from the script is a derived value: <code>{$length}</code> calls <code>length()</code> on every render.</li>
-        <li>Values are escaped; <code>null</code> and <code>undefined</code> print nothing. A page with <code>ssr</code> gets them in the first HTML; otherwise the runtime fills them at boot, and the raw <code>{…}</code> never shows.</li>
-        <li>Braces are literal text inside <code>&lt;code&gt;</code> and <code>&lt;pre&gt;</code>, which is how this page shows them. Anywhere else, <code>\{</code> writes a literal brace.</li>
-        <li>For a whole value or a boolean attribute use <code>:attr</code> instead (<code>:disabled="$offline"</code>). <code>{}</code> is not allowed in <code>class</code> (use <code>.name</code>) or in a component prop (pass a path: <code>:title="$title"</code>).</li>
-      </ul>
-    </div>
   </section>
-
+  <section class="doc-section" aria-labelledby="events">
+    <h2 id="events">Events: <code>@click</code></h2>
+    <div class="prose">
+      <p><code>@click="add(1)"</code> calls the function <code>add</code> of the script with the argument <code>1</code>. The function assigns <code>score</code>, and the page shows the new value. No other step is necessary.</p>
+      <p>Without parentheses, <code>@click="add"</code> gives the function the DOM event. Any DOM event works: <code>@input</code>, <code>@keydown</code>, <code>@submit</code>.</p>
+    </div>
+    <c-showcase :source="data.examples.score" caption="Click the buttons.">
+      <p-score></p-score>
+    </c-showcase>
+  </section>
+  <section class="doc-section" aria-labelledby="model">
+    <h2 id="model">Two-way binding: <code>:model</code></h2>
+    <div class="prose">
+      <p><code>:model="$name"</code> keeps the field and <code>name</code> equal: typing changes <code>name</code>, and a new <code>name</code> changes the field. A checkbox gives a boolean, a number field a number.</p>
+    </div>
+    <c-showcase :source="data.examples.nameField" caption="Type in the field.">
+      <p-name-field></p-name-field>
+    </c-showcase>
+  </section>
   <section class="doc-section" aria-labelledby="values">
-    <h2 id="values">Values are paths, never expressions</h2>
+    <h2 id="values">Logic goes in a function</h2>
     <div class="prose">
-      <p>Every directive takes a path of the form <code>root.a.b</code>. The roots are <code>$x</code> (a name from the owner's script: state, prop, constant or function), <code>data</code> (the <code>load</code> result), <code>shared.store</code>, <code>params</code>, <code>query</code>, <code>page.loading</code> / <code>page.error</code> and the variable of an enclosing <code>&lt;for&gt;</code>. Properties work, so <code>$items.length</code> is fine; calls, indexes and operators are not.</p>
-      <p>The only operator is <code>!</code>, and only in <code>&lt;if&gt;</code>, <code>&lt;else-if&gt;</code>, <code>:show</code> and <code>.class</code>. Anything derived (a total, a label, an <code>aria-*</code> string) is a function in the script, <code>const total = () =&gt; …</code>, which is what every example below does.</p>
+      <p>The HTML takes names, not code: <code>{$name.toUpperCase()}</code> is an error. Write a function in the script and use its name: <code>{$loudName}</code> calls <code>loudName()</code> on each render, so it always follows <code>name</code>.</p>
     </div>
+    <c-showcase :source="data.examples.loudName" caption="Type in the field: the function runs again.">
+      <p-loud-name></p-loud-name>
+    </c-showcase>
   </section>
-
   <section class="doc-section" aria-labelledby="bindings">
-    <h2 id="bindings">Bindings: <code>:attr</code>, <code>:aria-*</code>, <code>:data-*</code></h2>
+    <h2 id="bindings">Attributes: <code>:attr</code></h2>
     <div class="prose">
-      <p><code>:href</code>, <code>:title</code>, <code>:disabled</code> or any other <code>:attr</code> sets the whole attribute: <code>false</code>, <code>null</code> and <code>undefined</code> remove it, <code>true</code> sets it empty. Toggle the switch: while the service is down the link has no <code>href</code> at all.</p>
-      <p><code>aria-*</code> states need the strings <code>'true'</code> / <code>'false'</code>, because boolean <code>false</code> removes the attribute. <code>:data-tone</code> is the hook for a style with many values: the component's CSS selects <code>[data-tone="ok"]</code> without touching classes. Only the bound form is allowed; a hand-written <code>data-tone="ok"</code> fails check with <code>html/data-attribute</code>.</p>
+      <p><code>:disabled="$locked"</code> sets the attribute from a value. <code>true</code> adds it and <code>false</code> removes it. This works for any attribute: <code>:href</code>, <code>:title</code>, <code>:aria-expanded</code>.</p>
     </div>
-    <c-showcase :source="data.examples.bindings" caption="One let, online, drives text, href, title, disabled, aria-pressed and data-tone through derived functions.">
-      <p-bindings></p-bindings>
+    <c-showcase :source="data.examples.deployButton" caption="Clear Locked: the button is no longer disabled.">
+      <p-deploy-button></p-deploy-button>
     </c-showcase>
   </section>
-
   <section class="doc-section" aria-labelledby="classes">
-    <h2 id="classes">Class toggles: <code>.class</code> and <code>.class="!v"</code></h2>
+    <h2 id="classes">Class toggles: <code>.class</code></h2>
     <div class="prose">
-      <p><code>.line-through="$done"</code> adds the class while the value is truthy; <code>.is-pending="!$done"</code> does the opposite. The class must be a known utility or a class from the project's CSS, and variants work: <code>.md:font-semibold</code> only bolds from 48rem up. Static classes on the same element are left alone.</p>
-      <p>There is no <code>:class</code> and no <code>{}</code> inside <code>class</code>: both are check errors (<code>html/class</code>), because a computed class name could never be generated into the CSS. Write the static classes in <code>class</code> and toggle each optional one; for a value with many states, bind <code>:data-tone</code> and style the attribute, as the bindings example does.</p>
+      <p><code>.line-through="$done"</code> adds the class <code>line-through</code> while <code>done</code> is true, and removes it when it is false.</p>
     </div>
-    <c-showcase :source="data.examples.classes" caption="Four toggles on one paragraph, one of them negated and one behind the md: breakpoint.">
-      <p-classes></p-classes>
+    <c-showcase :source="data.examples.taskLine" caption="Check the task.">
+      <p-task-line></p-task-line>
     </c-showcase>
   </section>
-
   <section class="doc-section" aria-labelledby="show-if">
     <h2 id="show-if"><code>:show</code> hides, <code>&lt;if&gt;</code> creates</h2>
     <div class="prose">
-      <p><code>:show</code> toggles the <code>hidden</code> attribute, so the element, its listeners and its input state stay in the DOM. <code>&lt;if&gt;</code> inserts and removes its content. An element with <code>autofocus</code> inside a block that was just inserted receives focus, so opening the right pane puts the caret in its input.</p>
+      <p><code>:show</code> hides the element and keeps it in the page. <code>&lt;if $open&gt;</code> adds its content when <code>open</code> is true and removes it when it is false.</p>
     </div>
-    <c-showcase :source="data.examples.visibility" caption="The same flag drives both panes; inspect the DOM to see the difference.">
-      <p-visibility></p-visibility>
+    <c-showcase :source="data.examples.noteToggle" caption="Check Open, then inspect the DOM.">
+      <p-note-toggle></p-note-toggle>
     </c-showcase>
   </section>
-
-  <section class="doc-section" aria-labelledby="model">
-    <h2 id="model">Two-way binding with <code>:model</code></h2>
-    <div class="prose">
-      <p><code>:model</code> works on <code>input</code>, <code>select</code> and <code>textarea</code>, and only with a <code>$x</code> or <code>shared.x</code> path. The value keeps its type: checkboxes are booleans, radios hold the <code>value</code> of the checked one, <code>number</code> and <code>range</code> give a number (or <code>null</code> when the field is empty), everything else a string. A prop cannot be the target (<code>js/prop-write</code>).</p>
-    </div>
-    <c-showcase :source="data.examples.model" caption="The readout shows each let and its JavaScript type. Clear the number field to get null.">
-      <p-model></p-model>
-    </c-showcase>
-  </section>
-
-  <section class="doc-section" aria-labelledby="events">
-    <h2 id="events">Events: <code>event</code> by default, <code>el</code> on request</h2>
-    <div class="prose">
-      <p><code>@keydown="pressed"</code> calls the script's function with the DOM event, so <code>function pressed(event)</code> needs no wrapper. With parentheses the function receives only what is listed: <code>@focusout="record('@focusout', 'field lost focus')"</code>, <code>@change="toggle(item)"</code>, <code>@dblclick="doubled(el, event)"</code>. <code>el</code> is the element that has the directive.</p>
-    </div>
-    <c-showcase :source="data.examples.events" caption="Every handler appends to the log; the newest event is on top.">
-      <p-events></p-events>
-    </c-showcase>
-    <div class="prose">
-      <ul>
-        <li>An argument is a path (<code>item</code>, <code>$draft</code>, <code>data.x</code>), a string in quotes, a number, <code>true</code>, <code>false</code>, <code>null</code>, <code>event</code> or <code>el</code>. Expressions are a check error.</li>
-        <li>Double-click the bold word: <code>event.target</code> is the <code>&lt;strong&gt;</code>, <code>el</code> is still the <code>&lt;p&gt;</code>. Use <code>el</code> instead of an id lookup; <code>event.currentTarget</code> is the root the runtime listens on.</li>
-        <li>A store function is a handler too, with no wrapper in the script: <code>@click="shared.cart.remove(line)"</code> (<a href="/examples/stores">Stores</a>).</li>
-        <li><code>@submit</code> calls <code>preventDefault()</code> for you, so the form never reloads the page.</li>
-        <li>The same function can be an action and a helper: <code>record</code> runs from <code>@focusout</code> and from the other functions.</li>
-      </ul>
-    </div>
-  </section>
-
-  <section class="doc-section" aria-labelledby="overlay-shortcuts">
-    <h2 id="overlay-shortcuts">Overlay shortcuts: <code>@open</code> and bare <code>@close</code></h2>
-    <div class="prose">
-      <p><code>@open="id"</code> opens the overlay with that id and <code>@close</code>, written without a value, closes the overlay around it. The button's <code>value</code> becomes the result of <code>confirm(id)</code>; the <a href="/examples/overlays">overlays section</a> covers modal, alert and dropdown in depth.</p>
-    </div>
-    <c-showcase :source="data.examples.overlay" caption="No script in this component: both directives are handled by the runtime.">
-      <p-overlay-shortcut></p-overlay-shortcut>
-    </c-showcase>
-  </section>
-
   <section class="doc-section" aria-labelledby="conditions">
-    <h2 id="conditions">Conditions: <code>&lt;if&gt;</code>, <code>&lt;else-if&gt;</code>, <code>&lt;else&gt;</code></h2>
+    <h2 id="conditions">Conditions: <code>&lt;else-if&gt;</code> and <code>&lt;else&gt;</code></h2>
     <div class="prose">
-      <p>The path in a block tag is unquoted: <code>&lt;if $loading&gt;</code>, <code>&lt;else-if $noOrders&gt;</code>. Any number of <code>&lt;else-if&gt;</code> may follow, and each one must come right after the closing tag of the previous branch. Every block holds exactly one root element, which carries the directives; the block tag itself takes none.</p>
+      <p>After <code>&lt;if&gt;</code>, add <code>&lt;else-if&gt;</code> and <code>&lt;else&gt;</code>. One branch shows at a time. Each condition is a name: <code>loading</code> and <code>failed</code> are functions.</p>
     </div>
-    <c-showcase :source="data.examples.conditions" caption="Pick a state: four branches, one rendered at a time. Each button passes its own id: pick(option.id).">
-      <p-conditions></p-conditions>
+    <c-showcase :source="data.examples.orderStatus" caption="Pick a status.">
+      <p-order-status></p-order-status>
     </c-showcase>
   </section>
-
   <section class="doc-section" aria-labelledby="lists">
-    <h2 id="lists">Lists: <code>&lt;for&gt;</code> with <code>key</code>, and <code>&lt;empty&gt;</code></h2>
+    <h2 id="lists">Lists: <code>&lt;for&gt;</code> and <code>&lt;empty&gt;</code></h2>
     <div class="prose">
-      <p><code>&lt;for item in group.items key=item.id&gt;</code> repeats its root element; the key is required, starts with the loop variable and must be unique (duplicates throw in dev). Updates diff by key. <code>&lt;empty&gt;</code> right after <code>&lt;/for&gt;</code> renders when the list is empty.</p>
-      <p>Pass the item to the function: <code>@change="toggle(item)"</code>, <code>@click="clear(group)"</code>. State is a deep proxy, so <code>item.done = !item.done</code> and <code>group.items = []</code> render without copying anything. A loop variable cannot shadow a root such as <code>data</code> or <code>page</code>.</p>
+      <p><code>&lt;for task in $tasks key=task.id&gt;</code> repeats its element for each task. The <code>key</code> must be unique for each item. <code>@click="remove(task)"</code> gives the function the task of that row. <code>&lt;empty&gt;</code> shows when the list is empty.</p>
     </div>
-    <c-showcase :source="data.examples.lists" caption="Check an item; clear a group to see its empty branch.">
-      <p-lists></p-lists>
+    <c-showcase :source="data.examples.taskList" caption="Click Done on both tasks.">
+      <p-task-list></p-task-list>
     </c-showcase>
   </section>
-
-  <section class="doc-section" aria-labelledby="static-if">
-    <h2 id="static-if">Static props decide <code>&lt;if&gt;</code> at build time</h2>
-    <div class="prose">
-      <p>In a component without a script, <code>&lt;if $icon&gt;</code> on a static prop is resolved by the compiler. The badge with <code>icon</code> ships the star inline and the other ships nothing, with no template and no runtime work. A bare attribute such as <code>icon</code> is true; <code>icon=""</code>, <code>icon="false"</code> and a missing one are false.</p>
-    </div>
-    <c-showcase :source="data.examples.badge" caption="No script, and both branches settled in the prebuilt HTML.">
-      <div class="flex gap-3">
-        <p-badge label="New" icon></p-badge>
-        <p-badge label="Beta"></p-badge>
-      </div>
-    </c-showcase>
-  </section>
-
   <section class="doc-section" aria-labelledby="rejected">
     <h2 id="rejected">What the compiler rejects</h2>
     <div class="prose">
-      <p>The list above is closed, so <code>pragma check</code> rejects what falls outside it, and every error names the fix:</p>
-      <ul>
-        <li>The old API: <code>:text</code> (<code>html/text-removed</code>), <code>export const state</code> and <code>actions</code>, <code>ctx.$</code>, <code>ctx.update</code> and <code>export function mount(ctx)</code> (<code>js/legacy-api</code>).</li>
-        <li>Expressions in paths and in event arguments, <code>{{ }}</code> and <code>${ }</code>, hand-written <code>data-*</code>, inline <code>style</code> and <code>on*</code>, <code>:class</code>, quoted block paths and a <code>&lt;for&gt;</code> without <code>key</code>.</li>
-        <li>Attributes from other frameworks, with the pragma form in the message: Vue's <code>v-if</code>, Alpine's <code>x-show</code>, Svelte's <code>on:click</code>, Angular's <code>*ngIf</code>, React's <code>className</code>.</li>
-        <li>Script mistakes that would show a stale value: <code>data</code> at the top level, a <code>let</code> derived from another <code>let</code>, a derived function used without <code>()</code> and <code>$name</code> in JS (<a href="/examples/state#script-mistakes">State: script mistakes</a>).</li>
-      </ul>
+      <p><code>pragma check</code> rejects all other syntax, and each error names the fix.</p>
     </div>
-    <c-showcase :source="data.examples.rejected" caption="Real output for these two files, trimmed to one line per error; the full run reports 24 errors.">
-      <p-check-output></p-check-output>
+    <c-showcase :source="data.examples.rejected" caption="Real pragma check output for this file, each message cut after its fix.">
+      <c-terminal title="~/my-app">
+        <pre tabindex="0" aria-label="pragma check output for wrong.html"><code><span class="term-cmd">pragma check</span>
+wrong.html:5 <span class="term-err">[html/invalid-path]</span> invalid path "$items.length &gt; 0": use only root.a.b; move the logic into a function in &lt;script&gt;
+wrong.html:6 <span class="term-err">[html/style-inline]</span> the style attribute is not allowed; use classes
+wrong.html:7 <span class="term-err">[html/unknown-directive]</span> `v-if` is Vue syntax and does nothing in pragma; wrap the element in `&lt;if path&gt;…&lt;/if&gt;`
+wrong.html:8 <span class="term-err">[html/for-without-key]</span> &lt;for&gt; requires a stable, unique key: add key=item.id
+<span class="term-err">4 error(s)</span></code></pre>
+      </c-terminal>
     </c-showcase>
   </section>
 </c-doc>

@@ -1,7 +1,9 @@
 <div>
-  <button type="button" class="btn" @open="about-pragma">What is pragma?</button>
-  <c-modal id="about-pragma" title="What is pragma?">
-    <p>A framework for web apps written in native HTML, CSS and JavaScript, compiled and checked by a Rust CLI.</p>
-    <button slot="actions" type="button" class="btn btn-primary" @close value="ok">Got it</button>
+  <button class="btn" @open="about">About</button>
+  <c-modal id="about" title="About pragma">
+    <p>Native HTML, CSS and JS.</p>
+    <button slot="actions" class="btn" @close>
+      Close
+    </button>
   </c-modal>
 </div>

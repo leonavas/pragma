@@ -75,7 +75,7 @@ A request for `/` or `/agents` with `Accept: text/markdown` gets the markdown fi
 
 ## WebMCP tools on this site
 
-This page and the landing page expose these tools to agents in the browser, as declarative WebMCP forms. Humans use the same forms. The landing page also has `add_task` (its demo to-do list), and `/examples/data` has `sign_guestbook`.
+This page and the landing page expose these tools to agents in the browser, as declarative WebMCP forms. Humans use the same forms. The landing page also has `add_task` (its demo to-do list), and `/examples/data/demo/guestbook` has `sign_guestbook`.
 
 - `get_setup_instructions`: Get the commands to install pragma and create an app, plus a prompt for a coding agent, for a short app description
   - `app`: What the app does, in one sentence, written to follow 'create a pragma app that'

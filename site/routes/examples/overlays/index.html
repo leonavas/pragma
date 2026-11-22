@@ -7,57 +7,55 @@
 
 <c-doc heading="Overlays" lede="Modal, alert and dropdown are native &lt;dialog&gt; and popover, opened from HTML. The runtime handles Esc, Back, focus return and scroll lock, and loads only on pages that contain an overlay.">
   <section class="doc-section" aria-labelledby="modal">
-    <h2 id="modal">Modal with <code>@open</code> and <code>@close</code></h2>
+    <h2 id="modal">Modal: <code>@open</code> and <code>@close</code></h2>
     <div class="prose">
-      <p><code>@open="about-pragma"</code> opens the overlay with that id and <code>@close</code> closes the one it sits in; neither needs a line of JS. <code>&lt;c-modal&gt;</code> takes <code>id</code> and <code>title</code>, a default slot and an <code>actions</code> slot. It closes on Esc, a click on the backdrop, the × button, any <code>@close</code>, and the browser's Back button.</p>
+      <p><code>&lt;c-modal&gt;</code>, <code>&lt;c-alert&gt;</code> and <code>&lt;c-dropdown&gt;</code> come with a new app, in <code>lib/components/</code>. <code>@open="about"</code> opens the overlay with the id <code>about</code>. <code>@close</code> closes the overlay it is in. Esc and the Back button close it too.</p>
     </div>
-    <c-showcase :source="data.examples.modal" caption="Open it, then press Back: the modal closes and the page stays put. Focus returns to the button.">
+    <c-showcase :source="data.examples.modal" caption="Click About.">
       <p-about-modal></p-about-modal>
     </c-showcase>
   </section>
 
   <section class="doc-section" aria-labelledby="alert">
-    <h2 id="alert">Alert with <code>await confirm(id)</code></h2>
+    <h2 id="alert">Alert: <code>await confirm(id)</code></h2>
     <div class="prose">
-      <p><code>import &#123; confirm &#125; from 'pragma'</code>, then <code>await confirm(id)</code> opens the alert and resolves with the <code>value</code> of the <code>@close</code> button that was clicked, or <code>'cancel'</code> on Esc and Back. <code>&lt;c-alert&gt;</code> is a <code>&lt;dialog role="alertdialog"&gt;</code>, so a backdrop click does not dismiss it. For a destructive action, put <code>autofocus</code> on the safe button.</p>
+      <p><code>import { confirm } from 'pragma'</code>. <code>await confirm('delete-file')</code> opens the alert and waits. It returns the <code>value</code> of the clicked button, or <code>'cancel'</code> on Esc.</p>
     </div>
-    <c-showcase :source="data.examples.alert" caption="Try Keep it, Delete and Esc: the status line shows what the promise resolved to.">
-      <p-delete-draft></p-delete-draft>
+    <c-showcase :source="data.examples.alert" caption="Click Delete file, then pick an answer.">
+      <p-delete-file></p-delete-file>
     </c-showcase>
   </section>
 
   <section class="doc-section" aria-labelledby="dropdown">
-    <h2 id="dropdown">Dropdown on the popover API</h2>
+    <h2 id="dropdown">Dropdown</h2>
     <div class="prose">
-      <p><code>&lt;c-dropdown&gt;</code> is a <code>[popover]</code> under its button, flipped above when there is no room below. It closes on an outside click, Esc, <code>@close</code> and Back, and it does not lock scroll. Items can combine <code>@close</code> with <code>@click</code>, and pass arguments: <code>@click="sortBy('size')"</code>.</p>
-      <p>The label here is a dynamic prop, <code>:label="$menuLabel"</code>: the dropdown has no script, so it reads the caller's derived function on every render.</p>
+      <p><code>&lt;c-dropdown&gt;</code> is a menu under its button. It closes on an outside click, Esc and <code>@close</code>.</p>
     </div>
-    <c-showcase :source="data.examples.dropdown" caption="Keyboard: Tab to the button, Enter opens, Tab walks the items, Esc closes and returns focus.">
-      <p-sort-menu></p-sort-menu>
+    <c-showcase :source="data.examples.dropdown" caption="Pick an order.">
+      <p-file-sort></p-file-sort>
     </c-showcase>
   </section>
 
   <section class="doc-section" aria-labelledby="stacking">
-    <h2 id="stacking">Stacking, <code>open</code> and <code>close</code></h2>
+    <h2 id="stacking">Stacking, and <code>close(id)</code> from a script</h2>
     <div class="prose">
-      <p>Overlays stack: Discard with an edited name opens an alert on top of the modal. Each open overlay pushes a history entry, so Back closes only the top one. Focus returns to whatever opened each layer, and the page behind stops scrolling while a modal or alert is open, with the scrollbar gutter reserved only if there was a scrollbar.</p>
-      <p>From a script, <code>open(id)</code> and <code>close(id)</code> from <code>'pragma'</code> do what <code>@open</code> and <code>@close</code> do. Open overlays only in response to a user action, and never keep "is open" in state: the <code>&lt;dialog&gt;</code> already knows.</p>
+      <p>An overlay can open another one. <code>close('editor')</code> from <code>'pragma'</code> closes an overlay from a script.</p>
     </div>
-    <c-showcase :source="data.examples.stacking" caption="Edit the name, press Discard, then press Back: the alert closes and the modal stays.">
-      <p-rename-project></p-rename-project>
+    <c-showcase :source="data.examples.stacking" caption="Click Edit note, then Discard.">
+      <p-note-editor></p-note-editor>
     </c-showcase>
   </section>
 
-  <section class="doc-section" aria-labelledby="restyle">
-    <h2 id="restyle">They are ordinary components</h2>
+  <section class="doc-section" aria-labelledby="motion">
+    <h2 id="motion">Restyle and animate</h2>
     <div class="prose">
-      <p>The three overlays ship in the starter as <code>lib/components/modal</code>, <code>alert</code> and <code>dropdown</code>: one <code>.html</code> each, with no script, that you can restyle like any other component. The behavior lives in <code>.pragma/overlay.js</code>, which the build adds only to pages that contain a <code>&lt;dialog&gt;</code> or <code>[popover]</code>.</p>
-      <ul>
-        <li>Do not create a <code>&lt;dialog&gt;</code> or <code>[popover]</code> by hand, call <code>showModal()</code>, use <code>window.confirm</code> or <code>role="menu"</code>, or import <code>.pragma/overlay.js</code> yourself.</li>
-      </ul>
+      <p>A class on <code>&lt;c-modal&gt;</code> restyles it. To animate the close, style <code>[data-leaving]</code>: the runtime waits for the animation.</p>
     </div>
-    <c-showcase :source="data.examples.library" caption="These are this site's copies, restyled to its tokens.">
-      <p class="font-mono text-xs text-faint">Source only: the live versions are above.</p>
+    <c-showcase :source="data.examples.sheet" caption="Open the sheet, then close it.">
+      <p-side-sheet></p-side-sheet>
     </c-showcase>
+    <div class="prose">
+      <p>Do not write <code>&lt;dialog&gt;</code> or <code>[popover]</code> by hand, call <code>showModal()</code> or <code>window.confirm</code>, or use <code>role="menu"</code>.</p>
+    </div>
   </section>
 </c-doc>

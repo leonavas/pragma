@@ -1,0 +1,14 @@
+<script>
+  let status = 'Not saved'
+
+  async function save() {
+    status = 'Saving…'
+    await new Promise(done => setTimeout(done, 800))
+    status = 'Saved'
+  }
+</script>
+
+<div>
+  <button class="btn" @click="save">Save</button>
+  <p>{$status}</p>
+</div>

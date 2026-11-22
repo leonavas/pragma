@@ -1,8 +1,12 @@
-import { listProducts } from './_catalog.server.js'
+import { error } from 'pragma/server'
 
-export async function load({ query, log }) {
-  if (query.fail) throw new Error('Inventory service timed out after 700 ms')
-  const products = await listProducts(query.category)
-  log.info('catalog loaded', { 'product.total': products.length })
-  return { products, loadedAt: new Date().toISOString().slice(11, 23) }
+const products = [
+  { id: 1, name: 'Keyboard' },
+  { id: 2, name: 'USB-C hub' },
+]
+
+export async function load({ query }) {
+  await new Promise(done => setTimeout(done, 800))
+  if (query.fail) error(503, 'The inventory is down.')
+  return { products }
 }

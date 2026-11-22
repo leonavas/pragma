@@ -1,26 +1,6 @@
-<span .badge-active="$active" title="{$label}">
-  <if $icon>
-    <svg class="badge-icon" viewBox="0 0 8 8" aria-hidden="true"><circle cx="4" cy="4" r="3"></circle></svg>
+<span>
+  <if $star>
+    <b>★</b>
   </if>
-  <span>{$label}</span>
-  <span class="badge-note"><slot>default text</slot></span>
+  {$label}
 </span>
-
-<style>
-  [data-c="badge"] {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.25rem 0.625rem;
-    border: 1px solid var(--color-line-strong);
-    color: var(--color-muted);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-  }
-  [data-c="badge"].badge-active {
-    border-color: var(--color-accent);
-    color: var(--color-accent-text);
-  }
-  .badge-icon { width: 0.5rem; height: 0.5rem; fill: currentColor; }
-  .badge-note { color: var(--color-faint); }
-</style>

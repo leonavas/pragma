@@ -1,0 +1,17 @@
+<script>
+  import { data } from 'pragma'
+
+  let orders = data.orders
+  let discount = 10
+  let label = discount + '% off'
+
+  const empty = () => orders.length === 0
+  const summary = () => (empty ? 'None' : 'Some')
+
+  function clear() {
+    $orders = []
+  }
+</script>
+
+<p>{$summary} {$label}</p>
+<button @click="clear">Clear</button>

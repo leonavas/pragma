@@ -1,0 +1,21 @@
+<script>
+  import { frame } from 'pragma'
+
+  let progress = 0
+
+  function step() {
+    progress = Math.min(progress + 0.01, 1)
+    if (progress < 1) frame(step)
+  }
+
+  function start() {
+    progress = 0
+    frame(step)
+  }
+</script>
+
+<div>
+  <progress aria-label="Upload"
+    :value="$progress"></progress>
+  <button class="btn" @click="start">Upload</button>
+</div>

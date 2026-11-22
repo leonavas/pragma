@@ -1,0 +1,16 @@
+<script>
+  let items = [{ id: 1, title: 'Milk' }]
+
+  function add() {
+    items.push({ id: items.length + 1, title: 'Eggs' })
+  }
+</script>
+
+<div>
+  <button class="btn" @click="add">Add eggs</button>
+  <ul>
+    <for item in $items key=item.id>
+      <li>{item.title}</li>
+    </for>
+  </ul>
+</div>

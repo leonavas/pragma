@@ -1,0 +1,23 @@
+<script>
+  let status = 'loading'
+
+  const loading = () => status === 'loading'
+  const failed = () => status === 'error'
+</script>
+
+<div>
+  <select aria-label="Status" :model="$status">
+    <option>loading</option>
+    <option>error</option>
+    <option>ready</option>
+  </select>
+  <if $loading>
+    <p>Loading…</p>
+  </if>
+  <else-if $failed>
+    <p>Could not load.</p>
+  </else-if>
+  <else>
+    <p>You have 3 orders.</p>
+  </else>
+</div>

@@ -1,0 +1,12 @@
+<script>
+  const people = [
+    { id: 1, name: 'Ada', role: 'Engineer' },
+    { id: 2, name: 'Linus', role: 'Designer' },
+  ]
+</script>
+
+<ul>
+  <for person in $people key=person.id>
+    <p-person-row :person="person"></p-person-row>
+  </for>
+</ul>

@@ -1,0 +1,11 @@
+<script>
+  let name = 'Ada'
+
+  const loudName = () => name.toUpperCase()
+</script>
+
+<div>
+  <input class="border border-line px-2 py-1"
+    aria-label="Name" :model="$name">
+  <p>{$loudName}</p>
+</div>

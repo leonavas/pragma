@@ -2,21 +2,22 @@ import { readExamples } from '../_source.server.js'
 
 export const ssr = true
 
-const component = name => [`_components/${name}/${name}.html`]
+const asPage = name => [
+  { file: `_components/${name}/${name}.html`, as: 'routes/index.html' },
+]
 
 export async function load() {
   const examples = await readExamples('routes/examples/syntax', {
-    interpolation: component('interpolation'),
-    bindings: component('bindings'),
-    classes: component('classes'),
-    visibility: component('visibility'),
-    model: component('model'),
-    events: component('events'),
-    overlay: ['_snippets/overlay-shortcut/usage.html', '_components/overlay-shortcut/overlay-shortcut.html'],
-    conditions: component('conditions'),
-    lists: component('lists'),
-    badge: ['_snippets/badge/usage.html', '_components/badge/badge.html'],
-    rejected: ['_snippets/rejected/wrong.html', '_snippets/rejected/ticker.js'],
+    greeting: asPage('greeting'),
+    score: asPage('score'),
+    nameField: asPage('name-field'),
+    loudName: asPage('loud-name'),
+    deployButton: asPage('deploy-button'),
+    taskLine: asPage('task-line'),
+    noteToggle: asPage('note-toggle'),
+    orderStatus: asPage('order-status'),
+    taskList: asPage('task-list'),
+    rejected: ['_snippets/rejected/wrong.html'],
   })
   return { examples }
 }

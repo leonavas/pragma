@@ -207,6 +207,7 @@
   .btn-danger { border-color: transparent; background: var(--color-danger-500); color: var(--color-white); }
   .btn-danger:hover { background: var(--color-danger-600); }
   .btn-small { height: 2rem; padding: 0 0.75rem; border-radius: var(--radius-md); font-size: 0.8125rem; }
+  :is(input[type="checkbox"], input[type="radio"], input[type="range"]) { accent-color: var(--color-accent); }
 
   .dialog {
     width: min(100% - 2rem, 30rem);
@@ -230,7 +231,7 @@
     transition: color 0.15s var(--ease-out);
   }
   .nav-link:hover { color: var(--color-ink); }
-  .nav-link[aria-current="page"] { color: var(--color-accent-text); }
+  .nav-link:is([aria-current="page"], [aria-current="true"]) { color: var(--color-accent-text); }
 
   .prose {
     max-width: var(--measure);

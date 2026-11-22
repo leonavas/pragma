@@ -28,10 +28,11 @@ async function fetchGroups(origin, log) {
 export async function load({ request, log }) {
   const [examples, served] = await Promise.all([
     readExamples('routes/examples/seo', {
-      static: ['demo/index.html', '../../_layout.html'],
+      static: ['demo/index.html'],
       dynamic: ['demo/[slug].html', 'demo/[slug].server.js', 'demo/_articles.json'],
-      missing: ['demo/[slug].server.js', 'demo/[slug].html', '../../_404.html'],
-      files: ['../../../public/robots.txt', '../../../public/sitemap.xml'],
+      missing: ['demo/[slug].server.js'],
+      files: ['../../../public/robots.txt', { file: '_snippets/files/sitemap.xml', as: 'public/sitemap.xml' }],
+      rejected: ['_snippets/rejected/post.html'],
     }),
     fetchGroups(new URL(request.url).origin, log),
   ])

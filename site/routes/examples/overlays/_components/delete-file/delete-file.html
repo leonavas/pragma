@@ -1,0 +1,20 @@
+<script>
+  import { confirm } from 'pragma'
+
+  let answer = ''
+
+  async function remove() {
+    answer = await confirm('delete-file')
+  }
+</script>
+
+<div>
+  <button class="btn" @click="remove">Delete</button>
+  <p>Answer: {$answer}</p>
+  <c-alert id="delete-file" title="Delete the file?">
+    <button slot="actions" class="btn" @close
+      value="cancel">Keep</button>
+    <button slot="actions" class="btn btn-danger" @close
+      value="ok">Delete</button>
+  </c-alert>
+</div>

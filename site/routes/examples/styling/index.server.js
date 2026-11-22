@@ -4,19 +4,20 @@ export const ssr = true
 
 export async function load() {
   const examples = await readExamples('routes/examples/styling', {
-    utilities: [
-      '_components/build-card/build-card.html',
-      '_snippets/utilities/rejected.html',
-      '_snippets/utilities/check.txt',
+    utilities: [{ file: '_components/hover-button/hover-button.html', as: 'routes/index.html' }],
+    tokens: [
+      { file: '_snippets/tokens/theme.css', as: 'lib/theme.css' },
+      { file: '_components/swatch/swatch.html', as: 'routes/index.html' },
     ],
-    tokens: ['_snippets/tokens/theme.css', '_components/swatches/swatches.html'],
-    scoped: ['_components/density/density.html', '_snippets/scoped/app.css'],
-    dynamic: [
-      '_components/build-status/build-status.html',
-      '_snippets/build-status/rejected.html',
-      '_snippets/build-status/check.txt',
+    scoped: [
+      '_components/note/note.html',
+      { file: '_snippets/scoped/app.css', as: 'dist/client/assets/css/index.css' },
     ],
-    theme: ['_components/theme-preview/theme-preview.html', '_snippets/theme-switch/theme-switch.html'],
+    variables: [{ file: '_components/upload-bar/upload-bar.html', as: 'routes/index.html' }],
+    theme: [
+      '_components/invoice-card/invoice-card.html',
+      '_snippets/theme/usage.html',
+    ],
   })
   return { examples }
 }

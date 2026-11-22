@@ -2,27 +2,13 @@
   {
     "slug": "prebuilt-html",
     "title": "Why pragma ships prebuilt HTML",
-    "summary": "Every route is compiled to a complete HTML file, so the first paint never waits for JavaScript.",
-    "published": "2026-11-02",
-    "date": "2 November 2026",
-    "image": "/og.png",
-    "imageAlt": "pragma: native HTML, CSS and JS with a Rust CLI",
-    "body": [
-      { "id": "p1", "text": "The build expands every component in place and writes one HTML file per route. A visitor, a crawler and a link-preview bot all get the same complete markup on the first request." },
-      { "id": "p2", "text": "JavaScript then binds to that markup instead of rebuilding it, so nothing jumps when the modules arrive." }
-    ]
+    "summary": "Each route is a full HTML file.",
+    "published": "2026-11-02"
   },
   {
     "slug": "head-tags-from-data",
     "title": "Head tags rendered from server data",
-    "summary": "With ssr = true, bound title, meta and link tags are filled on the server, so previews show the real entity.",
-    "published": "2026-11-16",
-    "date": "16 November 2026",
-    "image": "/og.png",
-    "imageAlt": "pragma: native HTML, CSS and JS with a Rust CLI",
-    "body": [
-      { "id": "p1", "text": "A link-preview bot reads the first HTML response and nothing else. If the title and description come from the database, the server has to write them into head before it sends the page." },
-      { "id": "p2", "text": "This page is that case: every tag in its head comes from the article you are reading." }
-    ]
+    "summary": "With ssr, the server fills the head.",
+    "published": "2026-11-16"
   }
 ]

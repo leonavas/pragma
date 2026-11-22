@@ -1,151 +1,100 @@
 <title>State and actions · pragma examples</title>
-<meta name="description" content="State in pragma, live: top-level let is state, functions are actions and derived values, export let declares typed props, mount returns its cleanup and services come from 'pragma'.">
+<meta name="description" content="State in pragma, live: top-level let is state, functions are actions and derived values, async actions just assign, mount returns its cleanup and frame batches animation.">
 <link rel="canonical" href="https://pragma.leonavas.com/examples/state">
 <meta property="og:url" content="https://pragma.leonavas.com/examples/state">
 <meta property="og:title" content="pragma state: let, functions and nothing else">
 <meta property="og:description" content="Assign a let and the runtime reapplies the bindings. No signals, no setState, no manual render.">
 
-<c-doc heading="State and actions" lede="The top-level script of a page or component is its state and behavior. A let is state; a function is an action when an event calls it and a derived value when a binding reads it. Assign the let and the runtime reapplies the bindings: no signals, no setState, no manual render.">
-  <section class="doc-section" aria-labelledby="page-script">
-    <h2 id="page-script">A page's script</h2>
-    <div class="prose">
-      <p>Every top-level <code>let</code> is state, read as <code>$visitor</code> in HTML; every top-level function is reachable from HTML too.</p>
-    </div>
-    <c-showcase :source="data.examples.page" caption="Page state is created again on every navigation, query changes included.">
-      <div class="grid w-full max-w-sm gap-3">
-        <label class="grid gap-1.5">
-          <span class="label">Your name</span>
-          <input class="h-10 border border-line-strong bg-sunken px-3" autocomplete="given-name" :model="$visitor">
-        </label>
-        <p class="text-lg">{$greeting}</p>
-        <div><button type="button" class="btn btn-small" @click="forget" :disabled="$anonymous">Forget</button></div>
-      </div>
-    </c-showcase>
-    <div class="prose">
-      <p><code>{$greeting}</code> calls <code>greeting()</code> on every render, and <code>@click="forget"</code> calls <code>forget()</code>. A page writes its script as a <code>&lt;script&gt;</code> at the top of its <code>.html</code>, or as a <code>.js</code> with the same name; this page uses <code>index.js</code> because its <code>.html</code> is the whole article. A name in HTML that the script does not declare fails check with <code>html/unknown-name</code>.</p>
-    </div>
-  </section>
-
-  <section class="doc-section" aria-labelledby="derived">
-    <h2 id="derived">Derived values are functions</h2>
-    <div class="prose">
-      <p>Anything computed from state is a function, called again on every render, so there is nothing to keep in sync.</p>
-    </div>
-    <c-showcase :source="data.examples.split" caption="No action at all: :model writes the inputs into the lets and the functions follow.">
-      <p-split></p-split>
-    </c-showcase>
-    <div class="prose">
-      <p>HTML only reads paths, never formulas, so the template asks for <code>$perPersonLabel</code> and the script computes it. Inside the script you call them like any function: <code>total()</code> reads <code>bill()</code> and <code>tip()</code>. <code>:model</code> keeps the input's type: a number field writes a number, or <code>null</code> when it is empty. Never keep a derived copy in a <code>let</code> that actions update.</p>
-    </div>
-  </section>
-
+<c-doc heading="State and actions" lede="Assign a let and the page updates. This page shows what that means for lists, async code, timers and animation.">
   <section class="doc-section" aria-labelledby="actions">
-    <h2 id="actions">Actions take arguments</h2>
+    <h2 id="actions">Change state in place</h2>
     <div class="prose">
-      <p>An event calls a function by name, and inside a <code>&lt;for&gt;</code> it passes the item: <code>@change="toggle(job)"</code>.</p>
+      <p>State is tracked deeply: <code>items.push(…)</code> updates the list on the page. There is no need to copy the array.</p>
     </div>
-    <c-showcase :source="data.examples.queue" caption="Toggle and Remove receive the row as an argument; Save awaits a timer and the page renders again when it resolves.">
-      <p-queue></p-queue>
+    <c-showcase :source="data.examples.shoppingList" caption="Click Add eggs.">
+      <p-shopping-list></p-shopping-list>
     </c-showcase>
-    <div class="prose">
-      <p>State is a deep proxy: <code>job.done = true</code>, <code>jobs.push(…)</code> and <code>jobs = jobs.filter(…)</code> all render. Arguments can be paths (<code>job</code>, <code>$draft</code>, <code>data.x</code>), simple literals, <code>event</code> or <code>el</code>, never expressions. An async action renders when its first part returns ("Saving…") and again after each <code>await</code>; renders are batched per microtask.</p>
-    </div>
   </section>
 
-  <section class="doc-section" aria-labelledby="props">
-    <h2 id="props">Props: <code>export let</code>, typed by the default</h2>
+  <section class="doc-section" aria-labelledby="async">
+    <h2 id="async">Async actions</h2>
     <div class="prose">
-      <p><code>export let used = 0</code> declares a prop, and the default's type converts the attribute text.</p>
+      <p>An <code>async</code> function updates the page before each <code>await</code> and again after it.</p>
     </div>
-    <c-showcase :source="data.examples.props" caption="Each meter prints the type of its props after conversion.">
-      <div class="grid w-full max-w-sm gap-3">
-        <p-usage label="Disk" used="72" total="128" critical></p-usage>
-        <p-usage label="Cache" used="9"></p-usage>
-      </div>
+    <c-showcase :source="data.examples.saveButton" caption="Click Save.">
+      <p-save-button></p-save-button>
     </c-showcase>
-    <div class="prose">
-      <p><code>used="72"</code> arrives as the number <code>72</code> because the default is a number; a bare <code>critical</code> is <code>true</code> and <code>"false"</code> is <code>false</code>; a missing prop keeps its default, so the second meter's total is 100. Props are read-only: assigning one fails check with <code>js/prop-write</code>, so copy it into a <code>let</code> to change it (<code>let count = start</code>). That goes deep: in dev, writing into an object prop (<code>item.done = true</code>) throws an error that names the prop; copy it first (<code>let draft = { ...item }</code>). A prop the script does not declare fails at the call site with <code>html/unknown-prop</code>. More in <a href="/examples/components">Components</a>.</p>
-    </div>
   </section>
 
   <section class="doc-section" aria-labelledby="mount">
     <h2 id="mount"><code>mount()</code> and its cleanup</h2>
     <div class="prose">
-      <p><code>function mount()</code> runs once after the first render and returns the cleanup.</p>
+      <p>A function named <code>mount</code> runs in the browser after the page shows. Start timers and listeners there. The function that it returns runs when the reader leaves the page: stop them there.</p>
     </div>
-    <c-showcase :source="data.examples.clock" caption="Resize the window: the listener is on window, added in mount and removed by the function it returns.">
+    <c-showcase :source="data.examples.clock" caption="The interval starts in mount and stops in the cleanup.">
       <p-clock></p-clock>
     </c-showcase>
-    <div class="prose">
-      <p>It is only for external effects: timers, <code>window</code> or <code>document</code> listeners, observers. <code>mount</code> runs only in the browser, so it is also where browser-only reads belong: the clock reads <code>window.innerWidth</code> there, not at the top of the script, because on an SSR page the script also runs on the server. <code>mount(el)</code> receives the component's root element for an observer or a measurement; read from it, never write to it. The cleanup runs when the owner leaves the DOM; for a page, on navigation. An <code>async function mount()</code> works too: the runtime awaits it and uses the function it resolves to as the cleanup, even when the owner left before it resolved. Never fetch data in <code>mount</code>; that is what <code>load</code> is for.</p>
-    </div>
   </section>
 
-  <section class="doc-section" aria-labelledby="timers">
-    <h2 id="timers">Timers and promises just assign</h2>
+  <section class="doc-section" aria-labelledby="frame">
+    <h2 id="frame">Animation: <code>frame</code></h2>
     <div class="prose">
-      <p>A callback that runs later assigns the <code>let</code> like an action does, and the page renders.</p>
+      <p><code>import { frame } from 'pragma'</code> gets a service of the runtime. <code>frame(step)</code> runs <code>step</code> in the next animation frame. To animate, <code>step</code> asks for the next frame until it is done.</p>
     </div>
-    <c-showcase :source="data.examples.stopwatch" caption="Each tick assigns now; changes in the same microtask collapse into one render. Lap keys come from a counter, not from the list length, so they stay unique after old laps drop off.">
-      <p-stopwatch></p-stopwatch>
+    <c-showcase :source="data.examples.uploadBar" caption="Click Upload.">
+      <p-upload-bar></p-upload-bar>
     </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="wrapped">
+    <h2 id="wrapped">Wrapped handlers</h2>
     <div class="prose">
-      <p>The action starts the interval and <code>mount</code> only returns the cleanup that stops it. Maps, Sets, Dates and class instances are not tracked: assign a new value instead of changing them in place.</p>
+      <p>A <code>const</code> that holds a function is a handler too. So a function made by <code>debounce</code>, from the npm package <code>es-toolkit</code>, works in <code>@input="saveLater"</code>.</p>
     </div>
+    <c-showcase :source="data.examples.draftAutosave" caption="Type, then stop: Saved follows 500 ms after the last key.">
+      <p-draft-autosave></p-draft-autosave>
+    </c-showcase>
   </section>
 
   <section class="doc-section" aria-labelledby="services">
-    <h2 id="services"><code>event</code>, <code>el</code> and services from <code>'pragma'</code></h2>
+    <h2 id="services">Services from <code>'pragma'</code></h2>
     <div class="prose">
-      <p>A handler without parentheses receives the DOM event: <code>@keydown="inspectKey"</code> calls <code>inspectKey(event)</code>. With parentheses it receives only what it lists, and two names are always there: <code>event</code> and <code>el</code>, the element that has the directive. Everything else a script needs comes from <code>import { … } from 'pragma'</code>.</p>
-    </div>
-    <c-showcase :source="data.examples.probe" caption="Click the bold name, then the word run: event.target changes, el is always the button.">
-      <p-probe></p-probe>
-    </c-showcase>
-    <div class="prose">
-      <p>Use <code>el</code> instead of an id lookup or <code>event.currentTarget</code>, which is the root the runtime listens on, not your element. The services are <code>shared</code> (stores), <code>data</code> (the <code>load</code> result), <code>params</code>, <code>query</code>, <code>page</code>, <code>log</code>, <code>call</code> (server actions), <code>navigate</code> and <code>open</code>, <code>close</code>, <code>confirm</code> (overlays). Read <code>data</code> and the route inside functions, never at the top level of the script. Never write to the DOM: read <code>event</code>, change state and let the bindings follow.</p>
+      <p>All runtime services come from <code>import { … } from 'pragma'</code>. The next pages show each one:</p>
+      <ul>
+        <li><code>shared</code>: stores (<a href="/examples/stores">Stores</a>).</li>
+        <li><code>params</code>, <code>query</code>, <code>navigate</code>: the URL (<a href="/examples/routing">Routing</a>).</li>
+        <li><code>data</code>, <code>page</code>, <code>call</code>: server data and actions (<a href="/examples/data">Data</a>).</li>
+        <li><code>open</code>, <code>close</code>, <code>confirm</code>: overlays (<a href="/examples/overlays">Overlays</a>).</li>
+        <li><code>log</code>: logs (<a href="/examples/logs">Logs</a>).</li>
+      </ul>
     </div>
   </section>
 
   <section class="doc-section" aria-labelledby="script-mistakes">
     <h2 id="script-mistakes">Script mistakes that <code>check</code> catches</h2>
     <div class="prose">
-      <p>Four mistakes run without an error in the browser and show a wrong or stale value. <code>pragma check</code> stops each one and names the fix. This is real output for one page script:</p>
+      <p>These four mistakes give no error in the browser, only a wrong or stale value. <code>pragma check</code> stops each one and names the fix.</p>
     </div>
-    <c-terminal title="~/my-app">
-      <pre tabindex="0" aria-label="pragma check output for four script mistakes"><code><span class="term-cmd">pragma check --strict</span>
-routes/orders.html:4:16 <span class="term-err">error</span> <span class="term-ink">[js/top-level-data]</span> `data` is read when the script starts, before the loader is done: read it inside a function (`const products = () =&gt; data.products`)
- 4 |   let orders = data.orders
-   |                ^
-routes/orders.html:6:7 <span class="term-err">error</span> <span class="term-ink">[js/stale-derived]</span> `label` reads `discount` once, when the script starts, and never updates: make it a function (`const label = () =&gt; discount + '% off'`) and use `$label` in HTML, `label()` in JS; or assign it in an action to change it
- 6 |   let label = discount + '% off'
-   |       ^
-routes/orders.html:9:26 <span class="term-err">error</span> <span class="term-ink">[js/derived-call]</span> `empty` is a function (a derived value): call it in JS: `empty()` (`$empty` without `()` is only for HTML)
- 9 |   const summary = () =&gt; (empty ? 'No orders' : orders.length + ' orders')
-   |                          ^
-routes/orders.html:12:5 <span class="term-err">error</span> <span class="term-ink">[js/dollar-in-script]</span> `$orders` is HTML only; in &lt;script&gt; write `orders`
- 12 |     $orders = []
-    |     ^
-<span class="term-err">4 error(s)</span>, 0 warning(s)</code></pre>
-    </c-terminal>
-    <div class="prose">
-      <ul>
-        <li><code>js/top-level-data</code>: <code>data</code> is undefined until the loader ends, so read it in a function: <code>const orders = () =&gt; data.orders</code>.</li>
-        <li><code>js/stale-derived</code>: a <code>let</code> computed from another <code>let</code> or a prop is computed once. Make it a function, as in <a href="#derived">Derived values</a>.</li>
-        <li><code>js/derived-call</code>: in JS a derived value is a call, <code>empty()</code>; <code>empty</code> alone is the function, which is always truthy.</li>
-        <li><code>js/dollar-in-script</code>: <code>$</code> is HTML only. In the script every name is plain.</li>
-      </ul>
-    </div>
+    <c-showcase :source="data.examples.mistakes" caption="Real pragma check output for this file, each message cut after its fix.">
+      <c-terminal title="~/my-app">
+        <pre tabindex="0" aria-label="pragma check output for orders.html"><code><span class="term-cmd">pragma check</span>
+orders.html:4 <span class="term-err">[js/top-level-data]</span> `data` is read when the script starts, before the loader is done: read it inside a function
+orders.html:6 <span class="term-err">[js/stale-derived]</span> `label` reads `discount` once, when the script starts, and never updates: make it a function
+orders.html:9 <span class="term-err">[js/derived-call]</span> `empty` is a function (a derived value): call it in JS: `empty()`
+orders.html:12 <span class="term-err">[js/dollar-in-script]</span> `$orders` is HTML only; in &lt;script&gt; write `orders`
+<span class="term-err">4 error(s)</span></code></pre>
+      </c-terminal>
+    </c-showcase>
   </section>
 
   <section class="doc-section" aria-labelledby="what-changed">
     <h2 id="what-changed">Coming from <code>state(ctx)</code></h2>
     <div class="prose">
       <ul>
-        <li><code>export const state = () =&gt; ({ count: 0 })</code> is now <code>let count = 0</code>; getters are functions.</li>
-        <li><code>export const actions</code> is now top-level functions, and <code>ctx.scope.item</code> is an argument: <code>@click="remove(item)"</code>.</li>
+        <li><code>export const state = () =&gt; ({ count: 0 })</code> is now <code>let count = 0</code>.</li>
+        <li><code>export const actions</code> is now top-level functions; <code>ctx.scope.item</code> is an argument: <code>@click="remove(item)"</code>.</li>
         <li><code>ctx.update(fn)</code> is gone: assign the <code>let</code>. <code>ctx.$.prop</code> is <code>export let prop</code>.</li>
-        <li><code>ctx.data</code>, <code>ctx.call</code>, <code>ctx.log</code> and the rest come from <code>'pragma'</code>; <code>:text</code> is <code>{path}</code> inside the element.</li>
+        <li><code>ctx.data</code>, <code>ctx.call</code> and <code>ctx.log</code> come from <code>'pragma'</code>.</li>
       </ul>
       <p>The old API fails check with <code>js/legacy-api</code>, and each message names the replacement.</p>
     </div>

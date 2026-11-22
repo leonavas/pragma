@@ -1,9 +1,0 @@
-<p-search-field label="Filter packages" placeholder="Filter by name or kind" :value="$query"></p-search-field>
-<ul>
-  <for plugin in $visiblePlugins key=plugin.id>
-    <p-plugin-row :plugin="plugin"></p-plugin-row>
-  </for>
-  <empty>
-    <li>No package matches.</li>
-  </empty>
-</ul>

@@ -1,49 +1,16 @@
-<title>Catalog demo · pragma examples</title>
+<title>Catalog · data demo</title>
 <meta name="robots" content="noindex">
 
-<script>
-  import { query } from 'pragma'
-
-  const current = () => query.fail ? 'broken' : query.category ?? 'all'
-  const filterLink = () => ({
-    all: current() === 'all' && 'true',
-    hardware: current() === 'hardware' && 'true',
-    books: current() === 'books' && 'true',
-    broken: current() === 'broken' && 'true',
-  })
-</script>
-
-<c-demo-page>
-  <nav class="flex flex-wrap gap-x-5 gap-y-2 font-mono text-xs" aria-label="Category">
-    <a href="/examples/data/demo/catalog" class="nav-link" :aria-current="$filterLink.all">All</a>
-    <a href="?category=hardware" class="nav-link" :aria-current="$filterLink.hardware">Hardware</a>
-    <a href="?category=books" class="nav-link" :aria-current="$filterLink.books">Books</a>
-    <a href="?fail=1" class="nav-link" :aria-current="$filterLink.broken">Make load throw</a>
-  </nav>
-  <if page.loading>
-    <ul class="grid gap-2" aria-busy="true" aria-label="Loading products">
-      <li class="skeleton h-12"></li>
-      <li class="skeleton h-12"></li>
-      <li class="skeleton h-12"></li>
-    </ul>
-  </if>
-  <else-if page.error>
-    <div class="grid gap-1 border border-error/50 bg-error/10 p-4" role="alert">
-      <p class="font-mono text-sm text-error">{page.error.message}</p>
-      <p class="text-sm text-muted">HTTP 500 from /_data. The rest of the page still works: pick a category.</p>
-    </div>
-  </else-if>
-  <else>
-    <div class="grid gap-2">
-      <ul class="grid gap-2">
-        <for product in data.products key=product.id>
-          <li class="flex items-center justify-between gap-4 border border-line px-4 py-3">
-            <span class="text-sm">{product.name}</span>
-            <span class="font-mono text-xs tabular-nums text-muted">{product.priceLabel}</span>
-          </li>
-        </for>
-      </ul>
-      <p class="font-mono text-xs text-faint">loaded at <span class="tabular-nums">{data.loadedAt}</span> UTC</p>
-    </div>
-  </else>
-</c-demo-page>
+<if page.loading>
+  <p class="skeleton h-12"></p>
+</if>
+<else-if page.error>
+  <p role="alert">{page.error.message}</p>
+</else-if>
+<else>
+  <ul>
+    <for product in data.products key=product.id>
+      <li>{product.name}</li>
+    </for>
+  </ul>
+</else>

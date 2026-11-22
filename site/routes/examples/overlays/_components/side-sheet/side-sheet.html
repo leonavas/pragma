@@ -1,0 +1,24 @@
+<div>
+  <button class="btn" @open="profile">Profile</button>
+  <c-modal id="profile" title="Ada" class="sheet">
+    <p>Wrote the first program, in 1843.</p>
+  </c-modal>
+</div>
+
+<style>
+  .sheet {
+    height: 100dvh;
+    max-height: none;
+    margin: 0 0 0 auto;
+  }
+  .sheet[open] { animation: sheet-in 0.22s ease-out; }
+  .sheet[data-leaving] {
+    animation: sheet-out 0.14s ease-in forwards;
+  }
+  @keyframes sheet-in { from { translate: 100% 0; } }
+  @keyframes sheet-out { to { translate: 100% 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    .sheet[open],
+    .sheet[data-leaving] { animation: none; }
+  }
+</style>

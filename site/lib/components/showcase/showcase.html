@@ -225,7 +225,6 @@
     --line-gutter: 3rem;
     --hang: 2ch;
     flex: 1;
-    max-height: 32rem;
     margin: 0;
     padding: 0.5rem 0 1.25rem;
     overflow: auto;
@@ -314,15 +313,12 @@
   @media (min-width: 40rem) {
     [data-c="showcase"] .showcase-stage { padding: 2.5rem 1.5rem; }
   }
-  @media (min-width: 64rem) {
-    [data-c="showcase"] .code-line { white-space: pre; }
-  }
   @media (min-width: 80rem) {
     [data-c="showcase"] { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
     [data-c="showcase"] .showcase-live { border-top: 0; border-left: 1px solid var(--color-line); }
     [data-c="showcase"]:not(:has(.showcase-stage [data-c="frame"])) .showcase-code {
-      flex: 1 1 0;
-      min-height: 20rem;
+      flex: 1 0 auto;
+      min-height: 14rem;
       max-height: none;
     }
   }

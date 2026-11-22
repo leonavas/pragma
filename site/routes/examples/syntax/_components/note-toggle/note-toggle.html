@@ -1,0 +1,13 @@
+<script>
+  let open = false
+</script>
+
+<div>
+  <label>
+    <input type="checkbox" :model="$open"> Open
+  </label>
+  <p :show="$open">I am hidden, but in the DOM.</p>
+  <if $open>
+    <p>I am added and removed.</p>
+  </if>
+</div>

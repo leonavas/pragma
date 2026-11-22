@@ -2,15 +2,18 @@ import { readExamples } from '../_source.server.js'
 
 export const ssr = true
 
+const asPage = name => [
+  { file: `_components/${name}/${name}.html`, as: 'routes/index.html' },
+]
+
 export async function load() {
   const examples = await readExamples('routes/examples/state', {
-    page: ['index.js', '_snippets/page/usage.html'],
-    split: ['_components/split/split.html'],
-    queue: ['_components/queue/queue.html'],
-    props: ['_components/usage/usage.html', '_snippets/usage/usage.html'],
-    clock: ['_components/clock/clock.html'],
-    stopwatch: ['_components/stopwatch/stopwatch.html'],
-    probe: ['_components/probe/probe.html'],
+    shoppingList: asPage('shopping-list'),
+    saveButton: asPage('save-button'),
+    clock: asPage('clock'),
+    uploadBar: asPage('upload-bar'),
+    draftAutosave: asPage('draft-autosave'),
+    mistakes: ['_snippets/mistakes/orders.html'],
   })
   return { examples }
 }

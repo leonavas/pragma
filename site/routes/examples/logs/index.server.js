@@ -4,8 +4,8 @@ export const ssr = true
 
 export async function load() {
   const examples = await readExamples('routes/examples/logs', {
-    orderLog: ['_components/order-log/order-log.html'],
-    autoCapture: ['_components/auto-capture/auto-capture.html'],
+    orderButton: [{ file: '_components/order-button/order-button.html', as: 'routes/index.html' }],
+    saveButton: [{ file: '_components/save-button/save-button.html', as: 'routes/index.html' }],
     refund: ['demo/refund.html', 'demo/refund.server.js'],
   })
   return { examples }

@@ -1,0 +1,15 @@
+<script>
+  import { email, is, pipe, string } from 'valibot'
+
+  const emailSchema = pipe(string(), email())
+
+  let address = 'ada@example'
+
+  const valid = () => is(emailSchema, address)
+</script>
+
+<div>
+  <input class="border border-line px-2 py-1"
+    aria-label="Email" :model="$address">
+  <p>Valid: {$valid}</p>
+</div>

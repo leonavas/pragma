@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "agent-docs": "node utils/agent-docs/generate.server.js"
+    "agent-docs": "node utils/agent-docs/generate.server.js",
+    "check-examples": "node utils/check-examples.server.js"
   },
   "dependencies": {
     "dayjs": "^1.11.23",

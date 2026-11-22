@@ -1,0 +1,17 @@
+<script>
+  import { log } from 'pragma'
+
+  let orders = 0
+
+  function placeOrder() {
+    orders += 1
+    log.info('order placed', {
+      'order.count': orders,
+    })
+  }
+</script>
+
+<div>
+  <button class="btn" @click="placeOrder">Order</button>
+  <p>Orders placed: {$orders}</p>
+</div>

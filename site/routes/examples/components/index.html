@@ -1,125 +1,81 @@
 <title>Components · pragma examples</title>
-<meta name="description" content="pragma components, live: one .html with a script, the markup and a scoped style. Typed props, slots and per-instance state, expanded at build time.">
+<meta name="description" content="pragma components, live: one .html with a script, the markup and a scoped style. Typed props, object props, slots and recursive trees.">
 <link rel="canonical" href="https://pragma.leonavas.com/examples/components">
 <meta property="og:url" content="https://pragma.leonavas.com/examples/components">
 <meta property="og:title" content="pragma components: one file, typed props, slots">
 <meta property="og:description" content="A component is one .html: script, markup and style. Its JavaScript loads only on pages that use it.">
 
-<c-doc heading="Components" lede="A component is one .html file: an optional &lt;script&gt; for state and behavior, one root element, an optional &lt;style&gt; scoped to it. The build expands it in place, so the markup arrives prebuilt and the script loads only on pages that use it.">
+<c-doc heading="Components" lede="A component is a piece of a page in its own file: script and HTML, used as a tag. Its script loads only on the pages that use it.">
   <section class="doc-section" aria-labelledby="counter">
-    <h2 id="counter">One file: script, markup and style</h2>
+    <h2 id="counter">A component is a file</h2>
     <div class="prose">
-      <p>A top-level <code>let</code> is state, <code>export let</code> is a prop, a function is an action or a derived value, and <code>&#123;$count&#125;</code> puts a value in the text.</p>
+      <p><code>routes/_components/counter/counter.html</code> is the component <code>&lt;p-counter&gt;</code>. The pages in <code>routes/</code> and its folders can use it. It has the same syntax as a page, but exactly one root element.</p>
+      <p>Each instance has its own state: two counters, two counts. A component in <code>lib/components/counter/</code> is <code>&lt;c-counter&gt;</code> and works on every page.</p>
     </div>
-    <c-showcase :source="data.examples.counter" caption="Shift-click moves ten steps. Each click runs a function that assigns count; the runtime reapplies only the bindings, it never rebuilds the DOM.">
-      <p-counter label="Steps of 5" start="10" step="5"></p-counter>
-    </c-showcase>
-    <div class="prose">
-      <ul>
-        <li><code>export let start = 0</code> declares a prop with a default. The default's type converts the attribute: <code>start="10"</code> arrives as the number <code>10</code>, so no <code>Number()</code> anywhere. Props are read-only: <code>let count = start</code> copies one into state.</li>
-        <li><code>const atMinimum = () =&gt; …</code> is a derived value: used in a binding (<code>:disabled="$atMinimum"</code>), it runs on every render. In JS you call it: <code>atMinimum()</code>.</li>
-        <li><code>function increase(event)</code> is an action when an event names it. Without parentheses, <code>@click="increase"</code> passes the DOM event, here to read <code>event.shiftKey</code>. Assigning <code>count</code> schedules one render per microtask; there is no <code>setState</code> and no <code>this</code>.</li>
-        <li>With parentheses the function gets only what you list: paths, literals, <code>event</code> and <code>el</code>, the element that has the <code>@</code>. Reset hides itself after a click, so <code>@click="reset(el)"</code> moves the focus to <strong>+</strong> and keyboard users keep their place.</li>
-        <li>A store function works the same way, with no wrapper: <code>@click="shared.cart.add(product)"</code>. A component that only reads and calls a store needs no script, as on the <a href="/examples/stores">stores page</a>.</li>
-        <li><code>&lt;style&gt;</code> is scoped by the build: <code>.counter-step</code> only matches the markup this component wrote, with no added specificity, so write plain selectors. <code>:global(…)</code> opts out only what is inside it (<code>:global(html[data-theme="dark"]) .counter-step</code> is still this component's buttons), and the root itself is <code>[data-c="counter"]</code>. A separate <code>counter.css</code> works the same way; having both it and the <code>&lt;style&gt;</code> (or a <code>&lt;script&gt;</code> and a <code>counter.js</code>) is a check error (<code>html/duplicate-module</code>).</li>
-      </ul>
-      <p>The component lives in <code>_components/counter/</code> next to this page, so it is used as <code>&lt;p-counter&gt;</code>. Moving the folder to <code>lib/components/</code> would make it <code>&lt;c-counter&gt;</code> for every route.</p>
-    </div>
-  </section>
-
-  <section class="doc-section" aria-labelledby="slots">
-    <h2 id="slots">Slots: content that belongs to the caller</h2>
-    <div class="prose">
-      <p>A component places the caller's children with <code>&lt;slot&gt;</code>; those children keep their own owner.</p>
-    </div>
-    <c-showcase :source="data.examples.slots" caption="Filling a slot the component does not declare is a check error (html/component).">
-      <div class="grid w-full justify-items-center gap-4">
-        <p-panel heading="Release notes">
-          <p>npm packages are bundled with rolldown and tree-shaken per route.</p>
-          <button slot="actions" type="button" class="btn btn-small" @click="like">Like</button>
-          <span slot="actions">{$likesText}</span>
-        </p-panel>
-        <p-panel heading="Empty panel"></p-panel>
+    <c-showcase :source="data.examples.counter" caption="Click each counter: each keeps its own count.">
+      <div class="flex gap-3">
+        <p-counter></p-counter>
+        <p-counter></p-counter>
       </div>
     </c-showcase>
-    <div class="prose">
-      <p><code>&lt;slot&gt;</code> receives the children and <code>&lt;slot name="actions"&gt;</code> receives the children marked <code>slot="actions"</code>. Children of a <code>&lt;slot&gt;</code> are fallback content, rendered only when the caller passes nothing: the second panel shows it.</p>
-      <p>The <strong>Like</strong> button sits inside <code>&lt;p-panel&gt;</code>, yet <code>@click="like"</code> and <code>&#123;$likesText&#125;</code> resolve in the page script (<code>index.js</code>), while <strong>Hide</strong> calls the panel's own <code>toggle</code>, with separate state per instance.</p>
-    </div>
-  </section>
-
-  <section class="doc-section" aria-labelledby="dynamic-props">
-    <h2 id="dynamic-props">Dynamic props from a list</h2>
-    <div class="prose">
-      <p><code>:plugin="plugin"</code> passes a value that updates on every render.</p>
-    </div>
-    <c-showcase :source="data.examples.dynamicProps" caption="The list comes from load() in _plugins.server.js; the filter is a function of the page script over data.">
-      <div class="w-full max-w-sm">
-        <p-search-field label="Filter packages" placeholder="Filter by name or kind" :value="$query"></p-search-field>
-        <ul class="mt-3 border-t border-line">
-          <for plugin in $visiblePlugins key=plugin.id>
-            <p-plugin-row :plugin="plugin"></p-plugin-row>
-          </for>
-          <empty>
-            <li class="px-3 py-3 font-mono text-xs text-faint">No package matches.</li>
-          </empty>
-        </ul>
-      </div>
-    </c-showcase>
-    <div class="prose">
-      <p>Neither component has a script. In a component <strong>without</strong> a script, <code>&#123;$plugin.name&#125;</code> is an alias to the caller's path, resolved at build time, and <code>:model="$value"</code> writes straight back into the page's <code>query</code>, so the search field needs no code at all.</p>
-      <p>In a component <strong>with</strong> a script, <code>export let plugin = null</code> receives the object itself, live on every render, in HTML (<code>$plugin.name</code>) and in JS (<code>plugin.name</code>). It is read-only inside too: it is the caller's data, and in dev <code>plugin.name = 'x'</code> throws "props are read-only, also inside". Copy what you change (<code>let rows = files.map(file =&gt; (&#123; ...file &#125;))</code>) or ask the owner to change it. The page script reads the loader's result with <code>import &#123; data &#125; from 'pragma'</code>.</p>
-    </div>
-  </section>
-
-  <section class="doc-section" aria-labelledby="boolean-props">
-    <h2 id="boolean-props">No script: build-time props, <code>class</code> and slot fallback</h2>
-    <div class="prose">
-      <p>A component without a script is fully expanded at build and ships zero JavaScript.</p>
-    </div>
-    <c-showcase :source="data.examples.badge" caption="The first badge falls back to the slot's default text; the second passes its own.">
-      <div class="flex flex-wrap justify-center gap-2">
-        <p-badge label="New" active icon class="m-1"></p-badge>
-        <p-badge label="Beta" active="false" class="m-1">caller text</p-badge>
-      </div>
-    </c-showcase>
-    <div class="prose">
-      <p>Without a script, <code>&#123;$label&#125;</code> is replaced by the caller's text at build time. A bare attribute like <code>active</code> is truthy; a missing one, <code>""</code> and <code>"false"</code> are falsy. <code>class</code> on the tag is appended to the root's classes.</p>
-    </div>
   </section>
 
   <section class="doc-section" aria-labelledby="typed-props">
-    <h2 id="typed-props">Typed props: the default decides the type</h2>
+    <h2 id="typed-props">Props: <code>export let</code></h2>
     <div class="prose">
-      <p>An attribute is always text; <code>export let</code> converts it with the type of its default.</p>
+      <p><code>export let sale = false</code> declares a prop: a value that the page gives with an attribute, <code>sale</code>. The default decides the type, so <code>sale="false"</code> arrives as the boolean <code>false</code>. A missing attribute gives the default.</p>
     </div>
-    <c-showcase :source="data.examples.propProbe" caption="Each probe declares the same three props and prints what its script receives: the value and its typeof.">
-      <div class="grid w-full justify-items-center gap-3">
-        <p-prop-probe call='step="5" locked' step="5" locked></p-prop-probe>
-        <p-prop-probe call='locked="false" label="Hi"' locked="false" label="Hi"></p-prop-probe>
-        <p-prop-probe call="no attributes"></p-prop-probe>
+    <c-showcase :source="data.examples.product" caption="Lamp has sale=&quot;false&quot;, so no sale tag. Desk gets the default.">
+      <div>
+        <p-product name="Mug" sale></p-product>
+        <p-product name="Lamp" sale="false"></p-product>
+        <p-product name="Desk"></p-product>
       </div>
     </c-showcase>
-    <div class="prose">
-      <ul>
-        <li>A number default turns <code>"5"</code> into <code>5</code>. A boolean default turns a bare attribute or <code>"true"</code> into <code>true</code> and <code>"false"</code> into <code>false</code>. A string default keeps the text. Any other default (an object, <code>null</code>) takes the value as passed with <code>:prop="path"</code>.</li>
-        <li>A missing attribute gives the default. HTML (<code>&lt;if $locked&gt;</code>) and JS (<code>locked</code>) read the same converted value.</li>
-        <li>An attribute the script does not declare is an error at the call site (<code>html/unknown-prop</code>), and assigning a prop is <code>js/prop-write</code>.</li>
-      </ul>
-    </div>
   </section>
 
-  <section class="doc-section" aria-labelledby="where">
-    <h2 id="where">Where a component lives decides its tag</h2>
+  <section class="doc-section" aria-labelledby="object-props">
+    <h2 id="object-props">Object props: <code>:prop="path"</code></h2>
     <div class="prose">
-      <p>Every component on this page sits in <code>routes/examples/components/_components/</code>, so it is a <code>&lt;p-…&gt;</code> visible to this folder and the folders below it. The lookup walks up from the page folder to <code>routes/</code>, so <code>routes/_components/x/</code> is visible to every route. <code>lib/components/x/</code> makes it <code>&lt;c-x&gt;</code> everywhere; promoting one is a move plus a rename from <code>p-</code> to <code>c-</code>.</p>
-      <ul>
-        <li><code>p-</code> names are private to their folder, styles included. This page and the <a href="/examples/syntax#static-if">syntax page</a> each have their own <code>&lt;p-badge&gt;</code>; the build gives each one its own <code>data-c</code> and scopes each <code>&lt;style&gt;</code> to it, so both write <code>.badge-icon</code> and never share a rule.</li>
-        <li>A <code>&lt;p-x&gt;</code> used outside <code>routes/</code> is an error, and so are two components with the same folder name on one page (<code>&lt;c-card&gt;</code> plus <code>&lt;p-card&gt;</code>).</li>
-        <li>A component cannot have a <code>.server.js</code>: its data comes from the page's <code>load</code>, as in the list above.</li>
-        <li>A component cannot use itself, and its root cannot be <code>&lt;template&gt;</code>, <code>&lt;slot&gt;</code> or another component.</li>
-        <li>A component's script loads only on pages that use it. Its <code>&lt;style&gt;</code> goes into the CSS of the routes that use it, scoped to the markup it wrote.</li>
-      </ul>
+      <p>An attribute is text. To give an object, bind it with a colon: <code>:person="person"</code>. The component reads the object and does not change it.</p>
     </div>
+    <c-showcase :source="data.examples.teamList" caption="The page gives each person object to one row.">
+      <p-team-list></p-team-list>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="slots">
+    <h2 id="slots">Slots: content from the page</h2>
+    <div class="prose">
+      <p><code>&lt;slot&gt;</code> shows the children that the page puts in the tag. <code>&lt;slot name="actions"&gt;</code> shows only the children with <code>slot="actions"</code>. The content of a <code>&lt;slot&gt;</code> shows when the page gives nothing.</p>
+    </div>
+    <c-showcase :source="data.examples.slots" caption="The second panel gets no children, so it shows its fallback.">
+      <p-release-notes></p-release-notes>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="static">
+    <h2 id="static">A component without a script</h2>
+    <div class="prose">
+      <p>Without a script, a component still reads its attributes as <code>$label</code> and <code>$star</code>. The compiler resolves it when it builds the page, so it sends plain HTML and no JavaScript.</p>
+    </div>
+    <c-showcase :source="data.examples.badge" caption="Two badges, no JavaScript.">
+      <div class="flex gap-3">
+        <p-badge label="New" star></p-badge>
+        <p-badge label="Beta"></p-badge>
+      </div>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="recursive">
+    <h2 id="recursive">A component that uses itself</h2>
+    <div class="prose">
+      <p>A component can use its own tag. Put it inside <code>&lt;for&gt;</code> or <code>&lt;if&gt;</code>, so it stops when the data ends. Here the data is in <code>routes/index.js</code>: a page script can be a <code>.js</code> file next to the page, instead of a <code>&lt;script&gt;</code>.</p>
+    </div>
+    <c-showcase :source="data.examples.fileTree" caption="One component, three levels of files.">
+      <ul>
+        <p-file-tree :node="$files"></p-file-tree>
+      </ul>
+    </c-showcase>
   </section>
 </c-doc>
