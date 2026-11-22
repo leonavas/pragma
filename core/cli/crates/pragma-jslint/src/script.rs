@@ -6,7 +6,7 @@ use crate::{LineIndex, legacy, parse};
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
     ArrayExpressionElement, ArrowFunctionExpression, AssignmentExpression, AssignmentTargetPropertyIdentifier, AwaitExpression,
-    BindingPattern, CallExpression, Declaration, ExportDefaultDeclarationKind, Expression, ForOfStatement, Function,
+    BindingPattern, CallExpression, FormalParameters, Declaration, ExportDefaultDeclarationKind, Expression, ForOfStatement, Function,
     IdentifierReference, ImportDeclarationSpecifier, ModuleExportName, ObjectProperty, Program, Statement, StaticMemberExpression,
     UnaryExpression, UnaryOperator, UpdateExpression, VariableDeclaration, VariableDeclarationKind,
 };
@@ -16,7 +16,7 @@ use oxc_span::{GetSpan, Span};
 use oxc_syntax::scope::ScopeFlags;
 use oxc_syntax::symbol::SymbolId;
 use pragma_diag::Diagnostic;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 const RULE_LEGACY: &str = "js/legacy-api";
@@ -26,6 +26,7 @@ const RULE_TOP_LEVEL_DATA: &str = "js/top-level-data";
 const RULE_STALE: &str = "js/stale-derived";
 const RULE_DERIVED_CALL: &str = "js/derived-call";
 const RULE_DOLLAR: &str = "js/dollar-in-script";
+const RULE_CURRENT_TARGET: &str = "js/current-target";
 
 /// Names the virtual module `pragma` exports.
 pub const PRAGMA_EXPORTS: &[&str] = &["shared", "data", "params", "query", "page", "log", "call", "stream", "navigate", "open", "close", "confirm", "frame"];
@@ -145,7 +146,7 @@ pub fn transform(path: &Path, source: &str, kind: ScriptKind) -> Script {
     };
     t.top_level(&ret.program);
     t.reserved(scoping);
-    let mut refs = Refs { t: &mut t, scoping, depth: 0, init: None };
+    let mut refs = Refs { t: &mut t, scoping, depth: 0, init: None, handler_params: HashSet::new() };
     refs.visit_program(&ret.program);
     t.stale(scoping);
     if let Some(at) = t.persist_at {
@@ -494,6 +495,8 @@ struct Refs<'t, 's, 'c> {
     depth: u32,
     /// The stale-derived candidate whose value is being visited at the top level.
     init: Option<SymbolId>,
+    /// First parameter of each top-level function: the event when HTML binds it as a handler.
+    handler_params: HashSet<SymbolId>,
 }
 
 impl Refs<'_, '_, '_> {
@@ -532,6 +535,20 @@ impl Refs<'_, '_, '_> {
         if self.sym(id) == Some(Sym::Prop) && self.is_write(id) {
             self.t.err(id.span.start, RULE_PROP_WRITE, format!("`{}` is a prop: props are read-only; copy it into a `let` (`let current = {}`) and change that", id.name, id.name));
         }
+    }
+
+    fn note_handler_param(&mut self, params: &FormalParameters) {
+        if self.depth == 0
+            && let Some(first) = params.items.first()
+            && let BindingPattern::BindingIdentifier(id) = &first.pattern
+            && let Some(sym) = id.symbol_id.get()
+        {
+            self.handler_params.insert(sym);
+        }
+    }
+
+    fn reads_handler_param(&self, id: &IdentifierReference) -> bool {
+        id.reference_id.get().and_then(|r| self.scoping.get_reference(r).symbol_id()).is_some_and(|s| self.handler_params.contains(&s))
     }
 
     /// `root` is changed in place (`root.x = 1`, `root.push(x)`, `delete root.x`).
@@ -694,12 +711,14 @@ impl<'a> Visit<'a> for Refs<'_, '_, '_> {
     }
 
     fn visit_function(&mut self, it: &Function<'a>, flags: ScopeFlags) {
+        self.note_handler_param(&it.params);
         self.depth += 1;
         walk::walk_function(self, it, flags);
         self.depth -= 1;
     }
 
     fn visit_arrow_function_expression(&mut self, it: &ArrowFunctionExpression<'a>) {
+        self.note_handler_param(&it.params);
         self.depth += 1;
         walk::walk_arrow_function_expression(self, it);
         self.depth -= 1;
@@ -720,6 +739,13 @@ impl<'a> Visit<'a> for Refs<'_, '_, '_> {
     }
 
     fn visit_static_member_expression(&mut self, it: &StaticMemberExpression<'a>) {
+        if it.property.name == "currentTarget"
+            && let Expression::Identifier(obj) = &it.object
+            && self.reads_handler_param(obj)
+        {
+            let name = &obj.name;
+            self.t.err(it.span.start, RULE_CURRENT_TARGET, format!("`{name}.currentTarget` is the page root, not the element: the runtime listens once on the root; pass the element: `@click=\"move({name}, el)\"` and `function move({name}, el)`"));
+        }
         if let Expression::Identifier(obj) = &it.object
             && obj.name == "ctx"
         {
