@@ -297,8 +297,7 @@ struct Module {
 }
 
 fn module_graph(
-    root: &Path,
-    framework: &Path,
+    p: &Project,
     entries: &[PathBuf],
     client: bool,
     sources: &HashMap<PathBuf, String>,
@@ -306,6 +305,7 @@ fn module_graph(
     requests: &mut BTreeMap<String, bundle::Request>,
     diags: &mut Vec<Diagnostic>,
 ) -> BTreeMap<PathBuf, Module> {
+    let root = p.root.as_path();
     let mut mods = BTreeMap::new();
     let mut queue: VecDeque<PathBuf> = entries.iter().cloned().collect();
     while let Some(path) = queue.pop_front() {
@@ -322,7 +322,7 @@ fn module_graph(
             let pos = lines.pos(&src, imp.start, 0);
             let mut ok = None;
             if imp.spec == "pragma/server" {
-                let runtime = Some(framework.join("server/http.js")).filter(|f| root.join(f).is_file());
+                let runtime = Some(p.framework.join("server/http.js")).filter(|f| p.root.join(f).is_file());
                 match runtime {
                     _ if client => diags.push(Diagnostic::error(&path, pos.line, pos.col, deps::RULE_IMPORT, "'pragma/server' is only for .server.js files; client code gets data from load and calls actions with call()")),
                     Some(t) => {
@@ -426,6 +426,11 @@ fn check_endpoints(p: &Project, sources: &HashMap<PathBuf, String>) -> Vec<Diagn
         out.push(Diagnostic::error(m, 1, 1, "app/middleware", "export async function handle({ request, url, cookies, locals, next }) that returns next() or a Response"));
     }
     out
+}
+
+/// The app's own code (not the framework, not packages).
+fn is_app_code(path: &Path) -> bool {
+    ["routes/", "lib/", "utils/"].iter().any(|d| rel_str(path).starts_with(d))
 }
 
 fn is_wasm(path: &Path) -> bool {
@@ -540,16 +545,38 @@ fn mark_current(nodes: &mut [html::Node], path: &str, in_page: bool) {
 }
 
 fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
-    let prod = opts.mode == Mode::Prod;
     let mut p = Project::load(&opts.root);
     let mut diags = std::mem::take(&mut p.diags);
     let mut report = BuildReport::default();
+    let mut w = Writer { root: opts.out_dir.clone(), written: HashSet::new() };
+    let a = analyze(&p, &mut diags);
+    let client = emit_client(&p, &a, opts, &mut w, &mut report, &mut diags);
+    emit_server(&p, &a, &client, opts, &mut w, &mut report, &mut diags);
+    for d in ["client", "server"] {
+        w.prune(&opts.out_dir.join(d));
+    }
+    for d in &mut diags {
+        d.file = p.origin(&d.file).to_path_buf();
+    }
+    (sort_diags(diags), report)
+}
 
+/// Everything the build knows before it writes a file: checked sources, scoped CSS, expanded pages.
+struct Analysis<'p> {
+    sources: HashMap<PathBuf, String>,
+    theme_src: String,
+    comp_css: HashMap<PathBuf, String>,
+    page_css: HashMap<PathBuf, String>,
+    classes: validate::ClassCheck,
+    outs: Vec<PageOut<'p>>,
+    shared_classes: BTreeSet<String>,
+}
+
+fn analyze<'p>(p: &'p Project, diags: &mut Vec<Diagnostic>) -> Analysis<'p> {
     let mut sources: HashMap<PathBuf, String> = HashMap::new();
     for f in &p.js_files {
         if let Some(s) = p.read(f) {
-            let app = ["routes/", "lib/", "utils/"].iter().any(|d| rel_str(f).starts_with(d));
-            if app {
+            if is_app_code(f) {
                 diags.extend(pragma_jslint::lint(f, &s));
             }
             sources.insert(f.clone(), s);
@@ -586,7 +613,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             diags.push(Diagnostic::error(path, line, col, "css/comment", "comments are not allowed; the code is the documentation"));
         }
     };
-    css_comment(Path::new("lib/theme.css"), &theme_src, &mut diags);
+    css_comment(Path::new("lib/theme.css"), &theme_src, diags);
     let theme = pragma_css::parse_theme(&theme_src);
     for (class, offset) in pragma_css::prune::utility_redefinitions(&theme_src, &|c| pragma_css::is_utility_with_css(c, &theme)) {
         let (line, col) = html::line_col(&theme_src, offset);
@@ -603,7 +630,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let mut comp_css: HashMap<PathBuf, String> = HashMap::new();
     for c in p.all_components() {
         if let Some(css) = c.css.as_ref().and_then(|f| p.read(f)) {
-            css_comment(c.css.as_ref().unwrap(), &css, &mut diags);
+            css_comment(c.css.as_ref().unwrap(), &css, diags);
             validate::css_classes(&css, &mut project_classes);
             comp_css.insert(c.dir.clone(), scope_component_css(&css, &c.name, &c.id));
         }
@@ -612,7 +639,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let mut page_css: HashMap<PathBuf, String> = HashMap::new();
     for (f, page) in p.pages.iter().chain(p.not_found.iter()).filter_map(|pg| pg.css.as_ref().map(|f| (f, &pg.out_name))) {
         if let Some(css) = p.read(f) {
-            css_comment(f, &css, &mut diags);
+            css_comment(f, &css, diags);
             validate::css_classes(&css, &mut project_classes);
             page_css.insert(f.clone(), scope_page_css(&css, page));
         }
@@ -669,7 +696,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let mut shared_classes: BTreeSet<String> = BTreeSet::new();
     let all_pages: Vec<(&Page, bool)> = p.pages.iter().map(|pg| (pg, false)).chain(p.not_found.iter().map(|pg| (pg, true))).collect();
     for (page, is_404) in all_pages {
-        let (mut exp, d) = expand::Expander::new(&p, &scripts, &owned).page(page);
+        let (mut exp, d) = expand::Expander::new(p, &scripts, &owned).page(page);
         diags.extend(d);
         if !is_404 && !page.pattern.contains(':') {
             mark_current(&mut exp.body, &page.pattern, false);
@@ -704,7 +731,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
                 .filter_map(|(c, (id, tag))| c.module.as_ref().and_then(owner).map(|s| (id.clone(), (tag.as_str(), s))))
                 .collect(),
         };
-        let mut sc = expand::Scoped { p: &p, ctx: &ctx, diags: Vec::new(), stores: BTreeSet::new(), shared_classes: BTreeSet::new(), page_classes: BTreeSet::new(), outer: Vec::new() };
+        let mut sc = expand::Scoped { p, ctx: &ctx, diags: Vec::new(), stores: BTreeSet::new(), shared_classes: BTreeSet::new(), page_classes: BTreeSet::new(), outer: Vec::new() };
         sc.run(&exp.body);
         sc.head(&exp.head);
         // stores used from scripts, and the stores those stores use
@@ -738,7 +765,20 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         let bodies = compile::hoist(&mut exp.body);
         outs.push(PageOut { page, exp, loader, ssr, stores: sc.stores, page_classes, is_404, overlays, bodies });
     }
+    Analysis { sources, theme_src, comp_css, page_css, classes, outs, shared_classes }
+}
 
+/// What the server part needs from the client build: the module graph and each page's HTML.
+struct Client {
+    mods: BTreeMap<PathBuf, Module>,
+    deps: deps::Deps,
+    docs: Vec<String>,
+}
+
+fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, report: &mut BuildReport, diags: &mut Vec<Diagnostic>) -> Client {
+    let prod = opts.mode == Mode::Prod;
+    let Analysis { sources, theme_src, comp_css, page_css, classes, outs, shared_classes } = a;
+    let mut docs = Vec::with_capacity(outs.len());
     // client JS
     let boot = p.framework.join("boot.js");
     let overlay = p.framework.join("overlay.js");
@@ -756,12 +796,12 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         e
     };
     let all_entries: Vec<PathBuf> = outs.iter().flat_map(page_entries).collect();
-    let deps = deps::Deps::new(&opts.root, &mut diags);
+    let deps = deps::Deps::new(&opts.root, diags);
     let mut requests = BTreeMap::new();
-    let mut mods = module_graph(&opts.root, &p.framework, &all_entries, true, &sources, &deps, &mut requests, &mut diags);
+    let mut mods = module_graph(p, &all_entries, true, sources, &deps, &mut requests, diags);
     let out_abs = std::path::absolute(&opts.out_dir).unwrap_or_else(|_| opts.out_dir.clone());
-    if let Some(b) = bundle::bundle(&opts.root, &out_abs.join(".cache/npm"), prod, &requests, &mut diags) {
-        link_packages(&mut mods, &b, &mut diags);
+    if let Some(b) = bundle::bundle(&opts.root, &out_abs.join(".cache/npm"), prod, &requests, diags) {
+        link_packages(&mut mods, &b, diags);
     }
     let content_hash: HashMap<&PathBuf, u64> = mods
         .iter()
@@ -802,12 +842,11 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         })
         .collect();
     let chunked = if prod && !diags.iter().any(|d| d.severity == Severity::Error) {
-        chunks::bundle(&out_abs.join(".cache/app"), &mods, &urls, &boot, &routes, &mut diags)
+        chunks::bundle(&out_abs.join(".cache/app"), &mods, &urls, &boot, &routes, diags)
     } else {
         None
     };
 
-    let mut w = Writer { root: opts.out_dir.clone(), written: HashSet::new() };
     let mut gz: HashMap<String, u64> = HashMap::new();
     for (path, m) in &mods {
         if chunked.is_some() && !path.starts_with("node_modules") {
@@ -840,7 +879,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     let generated = pragma_css::generate(&shared_names, &classes.theme);
     let mut css = if prod {
         let mut all_used = String::with_capacity(theme_src.len() + generated.css.len() + 4096);
-        all_used.push_str(&theme_src);
+        all_used.push_str(theme_src);
         all_used.push_str(&generated.css);
         for s in comp_css.values().chain(page_css.values()) {
             all_used.push_str(s);
@@ -848,7 +887,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         }
         let all_route_vec: Vec<String> = outs.iter().flat_map(|o| o.page_classes.iter()).filter(|c| !shared_classes.contains(*c)).cloned().collect::<BTreeSet<_>>().into_iter().collect();
         all_used.push_str(&pragma_css::generate(&all_route_vec, &classes.theme).css);
-        if let Err(e) = pragma_css::minify(&theme_src) {
+        if let Err(e) = pragma_css::minify(theme_src) {
             diags.push(Diagnostic::error("lib/theme.css", 1, 1, "css/syntax", e));
         }
         pragma_css::base_css_for(&all_used)
@@ -863,7 +902,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             Ok(m) => css = m,
             Err(e) => diags.push(Diagnostic::error("lib/theme.css", 1, 1, "css/syntax", e)),
         }
-        css = public_assets.rewrite(&css, &mut w);
+        css = public_assets.rewrite(&css, w);
     }
     let css_url = if prod { format!("/assets/app-{}.css", hash8(css.as_bytes())) } else { "/assets/app.css".to_string() };
     w.write_client(&format!("client{css_url}"), css.as_bytes(), prod);
@@ -873,7 +912,6 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     // pages
     let theme_js = mods.contains_key(&p.framework.join("theme.js"));
     let mut manifest = Vec::new();
-    let mut server_routes = Vec::new();
     let boot_url = match &chunked {
         Some(c) => c.boot.clone(),
         None => urls.get(&boot).cloned().unwrap_or_else(|| format!("/assets/{}", deps::asset_path(&rel_str(&boot)))),
@@ -903,10 +941,10 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         }
         let route_names: Vec<String> = o.page_classes.iter().filter(|c| !shared_classes.contains(*c)).cloned().collect();
         scoped.push_str(&pragma_css::generate(&route_names, &classes.theme).css);
-        let route_theme = pragma_css::prune::prune_theme(&theme_src, &markup, &scoped);
+        let route_theme = pragma_css::prune::prune_theme(theme_src, &markup, &scoped);
         let mut rcss = if route_theme.trim().is_empty() { scoped } else { format!("/* lib/theme.css */\n{}\n{scoped}", route_theme.trim()) };
         if prod {
-            rcss = public_assets.rewrite(&rcss, &mut w);
+            rcss = public_assets.rewrite(&rcss, w);
         }
         let fonts = pragma_css::prune::font_preloads(&format!("{css}\n{rcss}"), &markup);
         if !rcss.trim().is_empty() {
@@ -1061,24 +1099,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             manifest.push(json!({ "pattern": o.page.pattern, "html": html_url, "modules": module_urls, "loader": o.loader, "ssr": o.ssr }));
             report.pages.push(PageReport { pattern: o.page.pattern.clone(), js_gzip_bytes: initial });
         }
-        if let Some(server) = &o.page.server {
-            let mut ssr_scripts = SsrScripts::default();
-            let (template, shell) = if o.ssr {
-                let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
-                let ops = compile::ops(compile::page_content(&o.exp.body), &scripted, &o.bodies);
-                // the server runs a script only when everything it imports is app code (no npm
-                // package, no browser runtime from core/); the others stay client-rendered
-                let runs_on_server = |m: &PathBuf| {
-                    closure(&mods, std::slice::from_ref(m), true).iter().all(|f| ["routes/", "lib/", "utils/"].iter().any(|d| rel_str(f).starts_with(d)))
-                };
-                ssr_scripts.page = o.page.module.clone().filter(|m| runs_on_server(m));
-                ssr_scripts.components = o.exp.components.values().filter_map(|c| c.module.clone().filter(|m| runs_on_server(m)).map(|m| (c.id.clone(), m))).collect();
-                (ops, Value::String(doc.clone()))
-            } else {
-                (Value::Null, Value::Null)
-            };
-            server_routes.push((o.page.pattern.clone(), server.clone(), o.ssr, template, shell, ssr_scripts));
-        }
+        docs.push(doc);
     }
     w.write_client("client/_pragma/manifest.json", serde_json::to_string_pretty(&Value::Array(manifest)).unwrap().as_bytes(), prod);
 
@@ -1094,8 +1115,43 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         }
     }
 
+    Client { mods, deps, docs }
+}
+
+struct ServerRoute {
+    pattern: String,
+    server: PathBuf,
+    ssr: bool,
+    template: Value,
+    shell: Value,
+    scripts: SsrScripts,
+}
+
+fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, w: &mut Writer, report: &mut BuildReport, diags: &mut Vec<Diagnostic>) {
+    let (sources, deps, mods) = (&a.sources, &client.deps, &client.mods);
+    let mut server_routes = Vec::new();
+    for (o, doc) in a.outs.iter().zip(&client.docs) {
+        if let Some(server) = &o.page.server {
+            let mut ssr_scripts = SsrScripts::default();
+            let (template, shell) = if o.ssr {
+                let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
+                let ops = compile::ops(compile::page_content(&o.exp.body), &scripted, &o.bodies);
+                // the server runs a script only when everything it imports is app code (no npm
+                // package, no browser runtime from core/); the others stay client-rendered
+                let runs_on_server = |m: &PathBuf| {
+                    closure(mods, std::slice::from_ref(m), true).iter().all(|f| is_app_code(f))
+                };
+                ssr_scripts.page = o.page.module.clone().filter(|m| runs_on_server(m));
+                ssr_scripts.components = o.exp.components.values().filter_map(|c| c.module.clone().filter(|m| runs_on_server(m)).map(|m| (c.id.clone(), m))).collect();
+                (ops, Value::String(doc.clone()))
+            } else {
+                (Value::Null, Value::Null)
+            };
+            server_routes.push(ServerRoute { pattern: o.page.pattern.clone(), server: server.clone(), ssr: o.ssr, template, shell, scripts: ssr_scripts });
+        }
+    }
     let has_public_md = p.public_files.iter().any(|f| f.extension().is_some_and(|e| e.eq_ignore_ascii_case("md")));
-    diags.extend(check_endpoints(&p, &sources));
+    diags.extend(check_endpoints(p, sources));
     report.has_server = !server_routes.is_empty() || !p.endpoints.is_empty() || p.middleware.is_some();
     let emit_worker = report.has_server || has_public_md;
     let handler = p.framework.join("server/handler.js");
@@ -1106,7 +1162,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         // page and component scripts the SSR renders with (each imported once)
         let mut script_ids: BTreeMap<PathBuf, usize> = BTreeMap::new();
         for r in &server_routes {
-            for m in r.5.page.iter().chain(r.5.components.iter().map(|(_, m)| m)) {
+            for m in r.scripts.page.iter().chain(r.scripts.components.iter().map(|(_, m)| m)) {
                 let next = script_ids.len();
                 script_ids.entry(m.clone()).or_insert(next);
             }
@@ -1115,12 +1171,12 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         if report.has_server {
             entries.push(node_adapter.clone());
         }
-        entries.extend(server_routes.iter().map(|r| r.1.clone()));
+        entries.extend(server_routes.iter().map(|r| r.server.clone()));
         entries.extend(p.endpoints.iter().map(|e| e.file.clone()));
         entries.extend(p.middleware.clone());
         entries.extend(script_ids.keys().cloned());
         entries.retain(|e| opts.root.join(e).is_file() || sources.contains_key(e));
-        let smods = module_graph(&opts.root, &p.framework, &entries, false, &sources, &deps, &mut BTreeMap::new(), &mut diags);
+        let smods = module_graph(p, &entries, false, sources, deps, &mut BTreeMap::new(), diags);
         let mut wasm: BTreeMap<String, PathBuf> = BTreeMap::new();
         for (path, m) in &smods {
             let out_rel = deps::asset_path(&rel_str(path));
@@ -1154,7 +1210,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         let mut worker = format!("import {{ createHandler }} from './{}'\n", deps::asset_path(&rel_str(&handler)));
         let node_adapter = deps::asset_path(&rel_str(&node_adapter));
         for (i, r) in server_routes.iter().enumerate() {
-            worker.push_str(&format!("import * as s{i} from {}\n", json!(format!("./{}", rel_str(&r.1)))));
+            worker.push_str(&format!("import * as s{i} from {}\n", json!(format!("./{}", rel_str(&r.server)))));
         }
         for (m, i) in &script_ids {
             worker.push_str(&format!("import * as m{i} from {}\n", json!(format!("./{}", rel_str(m)))));
@@ -1171,7 +1227,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             worker.push_str("  middleware,\n");
         }
         worker.push_str("  routes: [\n");
-        for (i, (pattern, _, ssr, template, shell, scripts)) in server_routes.iter().enumerate() {
+        for (i, ServerRoute { pattern, ssr, template, shell, scripts, .. }) in server_routes.iter().enumerate() {
             let mut extra = String::new();
             if let Some(m) = &scripts.page {
                 extra.push_str(&format!(", page: m{}", script_ids[m]));
@@ -1217,13 +1273,6 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         diags.push(Diagnostic::error(".pragma/server/handler.js", 1, 1, "app/structure", ".pragma/server/handler.js not found; required by *.server.js"));
     }
 
-    for d in ["client", "server"] {
-        w.prune(&opts.out_dir.join(d));
-    }
-    for d in &mut diags {
-        d.file = p.origin(&d.file).to_path_buf();
-    }
-    (sort_diags(diags), report)
 }
 
 /// Stores read from JS as `ctx.shared.<name>` (or a destructured `shared.<name>`).
