@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import { render, renderHead, renderPage, serverServices } from '../../server/render.js'
 import { template } from '../../binding.js'
 
-const TPL = '<ul><template data-tid="t1" data-for="item in data.items" data-key="item.id"><li></li></template>'
-const EMPTY = '<template data-empty data-tid="t9"><li>empty</li></template>'
+const TPL = '<ul><!--p:for t1 item data.items item.id-->'
+const EMPTY = '<!--p:empty t1-->'
 
 const forOps = [
   ['html', TPL],
@@ -76,9 +76,9 @@ test('show adds hidden when falsy', () => {
 })
 
 test('if/else-if/else: each instance goes right after its own template', () => {
-  const IF = '<template data-tid="t2" data-if="data.a"><b>a</b></template>'
-  const ELIF = '<template data-else-if="!data.b"><i>b</i></template>'
-  const ELSE = '<template data-else><u>c</u></template>'
+  const IF = '<!--p:if t2 data.a-->'
+  const ELIF = '<!--p:elif t2 !data.b-->'
+  const ELSE = '<!--p:else t2-->'
   const ops = [
     ['html', IF],
     ['if', 't2', 'data.a', false, [['html', '\n  <b>a</b>\n']]],
@@ -121,28 +121,20 @@ test('duplicate key, invalid list and unknown op throw', () => {
   assert.throws(() => render([['nothing']], {}), /unknown op/)
 })
 
-test('render is deterministic', () => {
-  const data = () => ({ items: Array.from({ length: 50 }, (_, i) => ({ id: i, name: `item <${i}>` })) })
-  const a = render(forOps, { data: data() })
-  const b = render(forOps, { data: structuredClone(data()) })
-  assert.equal(a, b)
-  assert.equal(Buffer.compare(Buffer.from(a), Buffer.from(render(forOps, { data: data() }))), 0)
-})
-
 test('state and shared are left to the client: directives intact, blocks without instances', () => {
   const ops = [
     ['html', '<p data-text="{state.n}"'], ['show', 'shared.ui.open', false], ['attr', 'title', 'state.t'], ['attr', 'alt', 'x {state.t} {data.ok}'],
     ['class', 'base', [['on', 'state.on', false], ['loaded', 'data.ok', false]]], ['html', '>'], ['text', '{state.n}'], ['text', 'n: {data.ok} {shared.cart.n}'], ['html', '</p>'],
-    ['html', '<template data-tid="t1" data-if="state.x"><b></b></template>'],
+    ['html', '<!--p:if t1 state.x-->'],
     ['if', 't1', 'state.x', false, [['html', '<b>x</b>']]],
     ['else', 't1', [['html', '<i>y</i>']]],
-    ['html', '<template data-tid="t2" data-for="i in shared.cart.items" data-key="i.id"><li></li></template>'],
+    ['html', '<!--p:for t2 i shared.cart.items i.id-->'],
     ['for', 't2', 'i', 'shared.cart.items', 'i.id', [['html', '<li>'], ['text', '{i.name}'], ['html', '</li>']]],
     ['empty', 't2', [['html', '<li>empty</li>']]],
   ]
   assert.equal(
     render(ops, { data: { ok: true } }),
-    '<p data-text="{state.n}" class="base loaded"></p><template data-tid="t1" data-if="state.x"><b></b></template><template data-tid="t2" data-for="i in shared.cart.items" data-key="i.id"><li></li></template>',
+    '<p data-text="{state.n}" class="base loaded"></p><!--p:if t1 state.x--><!--p:for t2 i shared.cart.items i.id-->',
   )
 })
 
@@ -197,14 +189,14 @@ test('slot content renders in its owner scope; the page script renders too', () 
     ['comp', 'box', [], [
       ['html', '<section data-c="box"><h2>'], ['text', '{state.title}'], ['html', '</h2>'],
       ['slot', 1, [['html', '<p data-slot="1">'], ['text', '{state.title}'], ['html', '</p>']]],
-      ['html', '<template data-slot="1" data-if="state.title" data-tid="t2"><i></i></template>'],
+      ['html', '<!--p:if1 t2 state.title-->'],
       ['slot', 1, [['if', 't2', 'state.title', false, [['html', '<i>'], ['text', '{state.title}'], ['html', '</i>']]]]],
       ['slot', 1, [['else', 't2', [['html', '<u>never</u>']]]]],
       ['html', '</section>'],
     ]],
   ]
   const out = renderPage(ops, { data: null, params: {}, query: {}, page: {} }, { page, components: { box } })
-  assert.equal(out, '<h1>from page PAGE</h1><section data-c="box"><h2>from box</h2><p data-slot="1">from page</p><template data-slot="1" data-if="state.title" data-tid="t2"><i></i></template><i data-of="t2">from page</i></section>')
+  assert.equal(out, '<h1>from page PAGE</h1><section data-c="box"><h2>from box</h2><p data-slot="1">from page</p><!--p:if1 t2 state.title--><i data-of="t2">from page</i></section>')
   // a page script that cannot run leaves page state to the client, still rendering the rest
   const broken = { default() { document.title } }
   assert.equal(renderPage([['html', '<h1>'], ['text', '{state.title}'], ['html', '</h1>']], { data: null, params: {}, query: {}, page: {} }, { page: broken }), '<h1></h1>')

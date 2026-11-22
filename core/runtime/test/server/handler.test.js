@@ -9,13 +9,13 @@ const SHELL = `<!doctype html>
   <title>Post</title>
   <script type="application/json" id="pragma-route">{"pattern":"/blog/:slug","ssr":true}</script>
 </head>
-<body><header>top</header><main data-page class="p-4"><template data-if="page.loading"><p class="skeleton"></p></template></main></body>
+<body><header>top</header><main data-page class="p-4"><!--p:if t0 page.loading--><!--p:else t0--></main></body>
 </html>`
 
 const TEMPLATE = [
   ['html', '<h1>'],
   ['text', '{data.title}'],
-  ['html', '</h1><ul><template data-tid="t1" data-for="tag in data.tags" data-key="tag.id"><li></li></template>'],
+  ['html', '</h1><ul><!--p:for t1 tag data.tags tag.id-->'],
   ['for', 't1', 'tag', 'data.tags', 'tag.id', [['html', '<li>'], ['text', '{tag.name}'], ['html', '</li>']]],
   ['html', '</ul><p>'],
   ['text', '{params.slug}'],
@@ -137,8 +137,8 @@ test('SSR: renders into <main data-page>, escapes and embeds pragma-data', async
   assert.match(res.headers.get('content-type'), /text\/html/)
   const html = await res.text()
   assert.ok(html.includes('<main data-page class="p-4"><h1>&lt;/script&gt;&lt;b&gt;hi&lt;/b&gt;</h1>'))
-  assert.ok(html.includes('</template><li data-of="t1" data-key="a">A&amp;B</li><li data-of="t1" data-key="b">C</li></ul><p>hello</p></main>'))
-  assert.ok(!html.includes('skeleton'))
+  assert.ok(html.includes('<!--p:for t1 tag data.tags tag.id--><li data-of="t1" data-key="a">A&amp;B</li><li data-of="t1" data-key="b">C</li></ul><p>hello</p></main>'))
+  assert.ok(!html.includes('page.loading'))
   assert.ok(html.includes('<header>top</header>'))
   const m = /<script type="application\/json" id="pragma-data">(.*?)<\/script><\/body>/s.exec(html)
   assert.ok(m)
@@ -169,7 +169,7 @@ test('SSR with load error: 500, shell intact and pragma-data with error', async 
   const res = await get('/blog/error')
   assert.equal(res.status, 500)
   const html = await res.text()
-  assert.ok(html.includes('<p class="skeleton">'))
+  assert.ok(html.includes('<main data-page class="p-4"><!--p:if t0 page.loading--><!--p:else t0--></main>'))
   assert.ok(html.includes('<script type="application/json" id="pragma-data">{"error":{"message":"no post","status":500}}</script>'))
   assert.ok(lines.some((l) => l.severityText === 'ERROR' && l.attributes['exception.message'] === 'no post'))
 })

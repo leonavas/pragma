@@ -2,7 +2,7 @@ import { describe, it, before, after, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { serve } from './server.mjs'
 
-const pw = await import(process.env.PLAYWRIGHT ?? '/tmp/pragma-tools-overlays/node_modules/playwright/index.mjs')
+const pw = await import(process.env.PLAYWRIGHT ?? `${process.env.HOME}/.cache/pragma-tools/node_modules/playwright/index.mjs`)
 
 const open = id => document.getElementById(id).matches('[open], :popover-open')
 
@@ -74,8 +74,7 @@ for (const name of ['chromium', 'firefox']) {
       await waitPops(1)
       await page.click('#open-delete')
       await page.mouse.click(5, 5)
-      await page.waitForTimeout(100)
-      assert.equal(await page.evaluate(open, 'delete'), true)
+      assert.deepEqual(await page.evaluate(() => [document.getElementById('delete').open, document.getElementById('delete').hasAttribute('data-leaving')]), [true, false])
       await page.click('#cancel-delete')
       await waitOpen('delete', false)
       await waitPops(2)
@@ -113,8 +112,9 @@ for (const name of ['chromium', 'firefox']) {
       await page.evaluate(() => t.open('about'))
       const locked = await page.evaluate(() => getComputedStyle(document.documentElement).overflow)
       assert.equal(locked, 'hidden')
+      const wheeled = page.evaluate(() => new Promise(r => addEventListener('wheel', () => requestAnimationFrame(() => requestAnimationFrame(r)), { once: true })))
       await page.mouse.wheel(0, 800)
-      await page.waitForTimeout(100)
+      await wheeled
       assert.equal(await page.evaluate(() => scrollY), 500)
       await page.click('#ok-about')
       await waitLock(false)
@@ -246,8 +246,12 @@ for (const name of ['chromium', 'firefox']) {
       assert.equal(await page.evaluate(() => self.r), 'cancel')
       await waitOpen('about', false)
       await waitOpen('details', false)
-      await page.waitForTimeout(100)
-      assert.equal(await page.evaluate(() => self.pops), 0)
+      await page.evaluate(() => new Promise(r => {
+        addEventListener('popstate', r, { once: true })
+        history.pushState(history.state, '')
+        history.back()
+      }))
+      assert.equal(await page.evaluate(() => self.pops), 1, 'only the probe entry was popped')
       assert.equal((await state()).lock, false)
     })
 
@@ -279,7 +283,8 @@ for (const name of ['chromium', 'firefox']) {
       await page.click('#ok-about')
       await page.evaluate(() => t.open('about'))
       assert.deepEqual(await leaving(), [true, false, false])
-      await page.waitForTimeout(400)
+      await page.waitForFunction(() => document.getElementById('about').getAnimations().length === 0)
+      await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
       assert.equal(await page.evaluate(open, 'about'), true)
       await page.keyboard.press('Escape')
       await waitOpen('about', false)
