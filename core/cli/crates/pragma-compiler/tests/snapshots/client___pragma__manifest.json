@@ -18,7 +18,7 @@
     "pattern": "/blog/:slug",
     "html": "/blog/[slug].html",
     "modules": [
-      "/assets/routes/blog/[slug].js",
+      "/assets/routes/blog/_slug_.js",
       "/assets/lib/components/counter/counter.js",
       "/assets/lib/state/cart.js",
       "/assets/core/router.js",
@@ -43,7 +43,7 @@
     "pattern": "/shop/:id",
     "html": "/shop/[id].html",
     "modules": [
-      "/assets/routes/shop/[id].js",
+      "/assets/routes/shop/_id_.js",
       "/assets/lib/components/counter/counter.js",
       "/assets/lib/state/cart.js",
       "/assets/core/router.js",

@@ -2100,6 +2100,7 @@ dependencies = [
  "pragma-jslint",
  "rolldown",
  "rolldown_common",
+ "rolldown_utils",
  "serde_json",
  "tokio",
 ]

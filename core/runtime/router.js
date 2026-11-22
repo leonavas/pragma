@@ -29,6 +29,7 @@ function entry(url) {
 
 // Decoded: the assets binding redirects a raw /a/[id].html to the encoded /a/%5Bid%5D, the same page.
 const pagePath = u => decodeURI(new URL(u, location.href).pathname).replace(/(\/index)?\.html$/, '').replace(/\/$/, '')
+const pageUrl = file => encodeURI(pagePath(file)) || '/'
 
 function html(u, anyStatus = false) {
   return fetch(u, { headers: traceHeaders() }).then(r => {
@@ -104,7 +105,7 @@ async function prefetch(href) {
   seen.add(where(url))
   const e = await entry(url).catch(noop)
   if (!e) return
-  if (!e.ssr) text(e.html).catch(noop)
+  if (!e.ssr) text(pageUrl(e.html)).catch(noop)
   for (const m of e.modules ?? []) preload(m)
 }
 
@@ -132,6 +133,7 @@ function watchAdded(records) {
 }
 
 function observe() {
+  if (navigator.connection?.saveData) return
   ;(self.requestIdleCallback ?? setTimeout)(() => {
     io?.disconnect()
     io = new IntersectionObserver(es => {
@@ -166,7 +168,7 @@ async function go(to, pop, replace) {
       pending = e.loader && !e.ssr ? fetchData(url) : undefined
       pending?.catch(noop)
       for (const m of e.modules ?? []) import(m).catch(noop)
-      doc = new DOMParser().parseFromString(await (e.ssr ? html(url, true) : text(e.html)), 'text/html')
+      doc = new DOMParser().parseFromString(await (e.ssr ? html(url, true) : text(pageUrl(e.html))), 'text/html')
       route = JSON.parse(doc.getElementById('pragma-route').textContent)
       const nextCss = doc.head.querySelector('link[rel=stylesheet][data-pragma-route-css]')?.getAttribute('href')
       if (nextCss) css = loadRouteCss(nextCss)
