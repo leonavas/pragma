@@ -22,11 +22,16 @@ fn rules(src: &str) -> Vec<&'static str> {
 
 #[test]
 fn clean_code_has_no_diagnostics() {
-    let src = "import { store } from '/core/state.js'\nimport { fmt } from '../utils/fmt.js'\n\
-               export const state = () => ({ n: 0 })\n\
-               export const actions = { inc(ctx) { ctx.$.n++ } }\n\
+    let src = "import { fmt } from '../utils/fmt.js'\n\
+               export const total = items => items.reduce((sum, item) => sum + item.price, 0)\n\
+               export function label(item) { return fmt(item.name) }\n\
                const sign = 'a < b and c>d'\nconst text = `x ${sign} < y`\n";
     assert_eq!(app(src), vec![]);
+}
+
+#[test]
+fn runtime_imports_of_the_old_core_layout_still_pass() {
+    assert_eq!(app("import { store } from '/core/state.js'\nimport { log } from '/core/log.js'"), vec![]);
 }
 
 #[test]
@@ -152,7 +157,7 @@ fn comments_are_forbidden() {
 
 #[test]
 fn allowed_imports() {
-    let src = "import a from './a.js'\nimport b from '../b.js'\nimport { c } from '/core/state.js'\n\
+    let src = "import a from './a.js'\nimport b from '../b.js'\nimport { c } from '/.pragma/theme.js'\n\
                export { d } from './d.js'\nexport * from '../e.js'\nimport('./f.js')";
     assert_eq!(app(src), vec![]);
 }

@@ -7,8 +7,7 @@ use oxc_minifier::{CompressOptions, MangleOptions, Minifier, MinifierOptions};
 use oxc_span::Span;
 use oxc_syntax::module_record::{ExportExportName, ExportImportName, ImportImportName};
 
-/// Names exported by the module (`state`, `actions`, `mount`, `load`, `ssr`, `default`…), in source
-/// order. Empty if the file does not parse.
+/// Names exported by the module (`load`, `actions`, `ssr`, `GET`, `default`…), in source order. Empty if the file does not parse.
 pub fn exported_names(source: &str) -> Vec<String> {
     let allocator = Allocator::default();
     let ret = parse(&allocator, source);

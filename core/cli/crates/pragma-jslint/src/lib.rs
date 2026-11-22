@@ -11,7 +11,7 @@ mod module;
 pub mod script;
 mod specifier;
 
-pub use lint::{RULE_COMMENT, RULE_CONSOLE, RULE_HTML, RULE_IMPORT, RULE_JSDOC, RULE_NAME, RULE_PACKAGE, RULE_SYNTAX, SHORT_OK, lint};
+pub use lint::{RULE_IMPORT, RULE_NAME, RULE_PACKAGE, SHORT_OK, lint};
 pub use module::{Imported, alias_package_imports, exported_names, imported_bindings, minify_with_imports, package_alias};
 pub use specifier::{is_node_builtin, is_package, is_workers_module, node_builtin_message, package_name, workers_module_message};
 

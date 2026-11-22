@@ -125,7 +125,7 @@ fn matches_any_element(selector: &str) -> bool {
 /// Whether a selector (one item of a list) can match an element of `markup`: each compound outside
 /// `:is()`, `:not()`, `[…]` and the like needs its element name and all its classes in the markup.
 /// Attributes, ids and pseudo-classes never rule a selector out.
-pub fn may_match(selector: &str, markup: &Markup) -> bool {
+fn may_match(selector: &str, markup: &Markup) -> bool {
     let s = selector.trim();
     if matches_any_element(s) {
         return true;

@@ -19,7 +19,7 @@ impl CoreDiff {
     }
 
     pub fn removes_legacy_files(&self) -> bool {
-        self.removed.iter().any(|rel| !rel.starts_with(".pragma/"))
+        self.removed.iter().any(|rel| is_legacy(rel))
     }
 
     pub fn len(&self) -> usize {
@@ -71,9 +71,9 @@ pub fn upgrade(root: &Path) -> Result<CoreDiff, String> {
     for rel in &changes.removed {
         let path = root.join(rel);
         std::fs::remove_file(&path).map_err(|e| format!("cannot remove '{}': {e}", path.display()))?;
-        let base = root.join(if rel.starts_with(".pragma/") { ".pragma" } else { "core" });
+        let base = root.join(if is_legacy(rel) { legacy::DIR } else { ".pragma" });
         remove_empty_dirs(&base, &path);
-        if !rel.starts_with(".pragma/") && is_empty_dir(&base) {
+        if is_legacy(rel) && is_empty_dir(&base) {
             std::fs::remove_dir(&base).map_err(|e| format!("cannot remove '{}': {e}", base.display()))?;
         }
     }
@@ -120,6 +120,10 @@ pub fn build_gate(root: &Path, allow: bool) -> Result<Option<Diagnostic>, (Diagn
             Err((error, ".pragma/ is older than this pragma: run `pragma upgrade` first (or `pragma build --allow-outdated-core` to build with it anyway)".into()))
         }
     }
+}
+
+fn is_legacy(rel: &str) -> bool {
+    Path::new(rel).starts_with(legacy::DIR)
 }
 
 fn collect(dir: &Path, rel: &str, files: &mut Vec<String>) {

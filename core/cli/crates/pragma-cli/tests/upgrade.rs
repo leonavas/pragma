@@ -28,7 +28,7 @@ fn pragma_build_stops_on_an_outdated_core() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(1), "{stderr}");
     assert!(stderr.contains("error [app/core-outdated]") && stderr.contains("run `pragma upgrade` first"), "{stderr}");
-    assert!(!app.join("dist").exists(), "nothing is built with an outdated core/");
+    assert!(!app.join("dist").exists(), "nothing is built with an outdated .pragma/");
     let out = pragma(&["build", "--allow-outdated-core"]);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(0), "{stderr}");

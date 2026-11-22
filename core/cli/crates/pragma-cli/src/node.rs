@@ -1,6 +1,5 @@
-use crate::report::{self, Paint};
+use crate::report;
 use crate::server::Site;
-use serde_json::Value;
 use std::hash::{Hash, Hasher};
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
@@ -77,7 +76,7 @@ impl Node {
             tokio::spawn(async move {
                 let mut lines = BufReader::new(out).lines();
                 while let Ok(Some(line)) = lines.next_line().await {
-                    println!("{}", if pretty { format_log(&line, report::out()) } else { line });
+                    println!("{}", if pretty { report::format_log(&line, report::out()) } else { line });
                 }
             });
         }
@@ -164,75 +163,6 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// OTel JSON record (one per line, as `.pragma/server/log.js` prints) to a readable line.
-pub fn format_log(line: &str, paint: Paint) -> String {
-    let Ok(Value::Object(rec)) = serde_json::from_str::<Value>(line) else { return line.to_owned() };
-    let Some(level) = rec.get("severityText").and_then(Value::as_str) else { return line.to_owned() };
-    let body = rec.get("body").map(text).unwrap_or_default();
-    let painted = match level {
-        "ERROR" | "FATAL" => paint.red(&format!("{level:5}")),
-        "WARN" => paint.yellow(&format!("{level:5}")),
-        "DEBUG" | "TRACE" => paint.dim(&format!("{level:5}")),
-        _ => paint.cyan(&format!("{level:5}")),
-    };
-    let mut out = format!("{painted} {body}");
-    let mut stack = None;
-    for (key, value) in attributes(rec.get("attributes")) {
-        if key == "exception.stacktrace" {
-            stack = Some(value);
-        } else {
-            out.push_str(&paint.dim(&format!(" {key}={value}")));
-        }
-    }
-    let service = match rec.get("resource") {
-        Some(Value::Object(r)) => r.get("service.name").map(text),
-        _ => None,
-    };
-    if let Some(service) = service {
-        out.push_str(&paint.dim(&format!(" ({service})")));
-    }
-    if let Some(stack) = stack {
-        out.push('\n');
-        out.push_str(&paint.dim(&stack));
-    }
-    out
-}
-
-/// Client batch (`{ resource, logs }`) when dev has no node server to receive it.
-pub fn print_client_logs(body: &[u8]) {
-    let Ok(Value::Object(batch)) = serde_json::from_slice::<Value>(body) else { return };
-    let resource = batch.get("resource").cloned().unwrap_or_else(|| serde_json::json!({ "service.name": "pragma-client" }));
-    for record in batch.get("logs").and_then(Value::as_array).into_iter().flatten() {
-        let mut record = record.clone();
-        if let Value::Object(map) = &mut record {
-            map.insert("resource".into(), resource.clone());
-        }
-        println!("{}", format_log(&record.to_string(), report::out()));
-    }
-}
-
-fn attributes(value: Option<&Value>) -> Vec<(String, String)> {
-    match value {
-        Some(Value::Object(map)) => map.iter().map(|(k, v)| (k.clone(), text(v))).collect(),
-        Some(Value::Array(items)) => items
-            .iter()
-            .filter_map(|kv| Some((kv.get("key")?.as_str()?.to_owned(), text(kv.get("value")?))))
-            .collect(),
-        _ => Vec::new(),
-    }
-}
-
-fn text(value: &Value) -> String {
-    match value {
-        Value::String(s) => s.clone(),
-        Value::Object(map) if map.len() == 1 => {
-            let (_, inner) = map.iter().next().unwrap();
-            text(inner)
-        }
-        other => other.to_string(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -247,15 +177,5 @@ mod tests {
         std::fs::create_dir_all(root.join("node_modules/wrangler")).unwrap();
         std::fs::write(root.join("node_modules/wrangler/package.json"), "{}").unwrap();
         assert_eq!(cloudflare_config(root).unwrap(), root.join("wrangler.jsonc"));
-    }
-
-    #[test]
-    fn formats_otel_record() {
-        let line = r#"{"timeUnixNano":"1","severityNumber":9,"severityText":"INFO","body":"GET /shop","attributes":{"http.response.status_code":200},"resource":{"service.name":"app"}}"#;
-        let out = format_log(line, report::out());
-        assert!(out.contains("GET /shop"));
-        assert!(out.contains("http.response.status_code=200"));
-        assert!(out.contains("(app)"));
-        assert_eq!(format_log("plain text", report::out()), "plain text");
     }
 }

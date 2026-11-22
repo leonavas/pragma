@@ -209,7 +209,7 @@ async fn handle(site: Arc<Site>, req: Request<Incoming>) -> Result<Response<Body
         if let Ok(body) = req.into_body().collect().await
             && site.mode == Mode::Dev
         {
-            crate::node::print_client_logs(&body.to_bytes());
+            crate::report::print_client_logs(&body.to_bytes());
         }
         let mut res = Response::new(empty());
         *res.status_mut() = StatusCode::NO_CONTENT;

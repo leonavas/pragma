@@ -7,6 +7,15 @@ pub enum Severity {
     Error,
 }
 
+impl Severity {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Severity::Error => "error",
+            Severity::Warning => "warning",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
     pub file: PathBuf,
@@ -29,10 +38,6 @@ impl Diagnostic {
 
 impl fmt::Display for Diagnostic {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let level = match self.severity {
-            Severity::Error => "error",
-            Severity::Warning => "warning",
-        };
-        write!(f, "{}:{}:{} {} [{}] {}", self.file.display(), self.line, self.column, level, self.rule, self.message)
+        write!(f, "{}:{}:{} {} [{}] {}", self.file.display(), self.line, self.column, self.severity.as_str(), self.rule, self.message)
     }
 }

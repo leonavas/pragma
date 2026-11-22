@@ -54,9 +54,10 @@ fn short_names_match_the_docs() {
 fn every_rule_the_tools_report_is_in_the_docs() {
     let cli = read("core/docs/cli.md");
     let documented = backticked(&cli);
+    let accessibility = backticked(between(&cli, "## Accessibility (`a11y/*`", "\n## "));
     let crates = repo().join("core/cli/crates");
     let mut sources = String::new();
-    for dir in ["pragma-jslint/src", "pragma-compiler/src", "pragma-cli/src"] {
+    for dir in ["pragma-jslint/src", "pragma-css/src", "pragma-compiler/src", "pragma-cli/src"] {
         for entry in std::fs::read_dir(crates.join(dir)).unwrap().flatten() {
             if entry.path().extension().is_some_and(|e| e == "rs") {
                 sources.push_str(&std::fs::read_to_string(entry.path()).unwrap());
@@ -64,12 +65,14 @@ fn every_rule_the_tools_report_is_in_the_docs() {
         }
     }
     let mut missing = BTreeSet::new();
-    for group in ["js", "html", "css", "app"] {
+    for group in ["js", "html", "css", "app", "a11y", "webmcp"] {
         for (at, _) in sources.match_indices(&format!("\"{group}/")) {
             let rest = &sources[at + 1..];
             let len = group.len() + 1 + rest[group.len() + 1..].find(|c: char| !(c.is_ascii_lowercase() || c == '-')).unwrap_or(0);
             let rule = &rest[..len];
-            let documented = documented.contains(rule) || documented.iter().any(|d| d.starts_with(&format!("{rule} ")));
+            let documented = documented.contains(rule)
+                || documented.iter().any(|d| d.starts_with(&format!("{rule} ")))
+                || rule.strip_prefix("a11y/").is_some_and(|name| accessibility.contains(name));
             if rest[len..].starts_with('"') && len > group.len() + 1 && !documented {
                 missing.insert(rule.to_string());
             }

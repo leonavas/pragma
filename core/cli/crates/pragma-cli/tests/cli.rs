@@ -32,7 +32,10 @@ fn redirected_stdout_has_no_color_when_stderr_is_a_terminal() {
     let app = tmp.path();
     create(app).unwrap();
     let command = format!("'{}' build > out.txt", env!("CARGO_BIN_EXE_pragma"));
-    let Ok(status) = Command::new("script").args(["-qec", &command, "/dev/null"]).current_dir(app).status() else { return };
+    let Ok(status) = Command::new("script").args(["-qec", &command, "/dev/null"]).current_dir(app).status() else {
+        eprintln!("skipped: needs `script` (util-linux) to give stderr a terminal");
+        return;
+    };
     assert!(status.success());
     let stdout = fs::read_to_string(app.join("out.txt")).unwrap();
     assert!(stdout.contains("dist/ built in"), "{stdout}");
