@@ -74,8 +74,9 @@ fn upgrade_restores_core_and_keeps_user_files() {
     assert!(versioned.message.contains("0.0.1") && versioned.message.contains(env!("CARGO_PKG_VERSION")), "{}", versioned.message);
 
     let changes = upgrade(app).unwrap();
-    assert_eq!(changes.updated, [".pragma/page.js", ".pragma/version"]);
-    assert_eq!(changes.added, [".pragma/docs/cli.md", ".pragma/base.css"]);
+    let sorted = |paths: &[String]| paths.iter().cloned().collect::<std::collections::BTreeSet<String>>();
+    assert_eq!(sorted(&changes.updated), [".pragma/page.js", ".pragma/version"].map(String::from).into());
+    assert_eq!(sorted(&changes.added), [".pragma/base.css", ".pragma/docs/cli.md"].map(String::from).into());
     assert_eq!(changes.removed, [".pragma/gone/old.js"]);
     assert_eq!(fs::read(app.join(".pragma/page.js")).unwrap(), page);
     assert_eq!(fs::read(app.join(".pragma/base.css")).unwrap(), base);

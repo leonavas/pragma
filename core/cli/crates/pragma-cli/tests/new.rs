@@ -1,4 +1,5 @@
 use pragma_cli::new::create;
+use std::path::{Path, PathBuf};
 
 #[test]
 fn creates_app_from_embedded_files() {
@@ -13,21 +14,33 @@ fn creates_app_from_embedded_files() {
     let ver = std::fs::read_to_string(dir.join(".pragma/version")).unwrap();
     assert_eq!(ver.trim(), env!("CARGO_PKG_VERSION"));
 
-    let core = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let core = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
     for (src, dest) in [("starter", ""), ("runtime", ".pragma"), ("docs", ".pragma/docs")] {
-        for entry in std::fs::read_dir(core.join(src)).unwrap().flatten() {
-            let name = entry.file_name();
-            if entry.path().is_file() && name != "pragma.json" {
-                let copied = std::fs::read(dir.join(dest).join(&name)).ok();
-                assert_eq!(copied, std::fs::read(entry.path()).ok(), "{src}/{name:?}");
+        for rel in files(&core.join(src)) {
+            if rel == Path::new("pragma.json") || rel.starts_with("test") && src == "runtime" {
+                continue;
             }
+            let copied = std::fs::read(dir.join(dest).join(&rel)).ok();
+            assert_eq!(copied, std::fs::read(core.join(src).join(&rel)).ok(), "{src}/{}", rel.display());
         }
     }
     assert!(!dir.join(".pragma/test").exists(), "runtime tests are not copied to the app");
-    if let Ok(json) = std::fs::read_to_string(dir.join("pragma.json")) {
-        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
-        assert_eq!(value["name"], "shop");
+    let json = std::fs::read_to_string(dir.join("pragma.json")).unwrap();
+    let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(value["name"], "shop");
+}
+
+fn files(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(dir).unwrap().flatten() {
+        let name = PathBuf::from(entry.file_name());
+        if entry.path().is_dir() {
+            out.extend(files(&entry.path()).into_iter().map(|rel| name.join(rel)));
+        } else if name != Path::new(".DS_Store") {
+            out.push(name);
+        }
     }
+    out
 }
 
 #[test]
