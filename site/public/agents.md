@@ -64,6 +64,7 @@ A request for `/` or `/agents` with `Accept: text/markdown` gets the markdown fi
 - [Routes and router](https://pragma.leonavas.com/docs/routes.md): pages, links, params, query, layouts (including nested), head tags
 - [Data: load, server actions, skeleton, SSR, middleware, endpoints](https://pragma.leonavas.com/docs/data.md): load, server actions, skeleton, SSR
 - [Overlays: modal, alert, dropdown](https://pragma.leonavas.com/docs/overlays.md): modal, alert, dropdown
+- [Forms: select and styled select](https://pragma.leonavas.com/docs/forms.md): select, styled select (c-select), form values
 - [CSS](https://pragma.leonavas.com/docs/css.md): styles and theme
 - [Utility classes](https://pragma.leonavas.com/docs/classes.md): every utility class
 - [WebMCP: forms are agent tools](https://pragma.leonavas.com/docs/webmcp.md): forms as WebMCP tools, markdown for agents

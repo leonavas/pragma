@@ -15,6 +15,7 @@ const topics = [
   { id: 'routes', summary: 'pages, links, params, query, layouts (including nested), head tags' },
   { id: 'data', summary: 'load, server actions, skeleton, SSR' },
   { id: 'overlays', summary: 'modal, alert, dropdown' },
+  { id: 'forms', summary: 'select, styled select (c-select), form values' },
   { id: 'css', summary: 'styles and theme' },
   { id: 'classes', summary: 'every utility class' },
   { id: 'webmcp', summary: 'forms as WebMCP tools, markdown for agents' },
