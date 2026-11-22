@@ -66,7 +66,7 @@ export function solver() {
 
 ## Workers modules
 
-`cloudflare:workers`, `cloudflare:sockets` and other `cloudflare:*` modules work in `.server.js` on Workers only. They do not exist on Node (`pragma dev`, `pragma serve`, `node.mjs`). In client code they are an `app/package` error. Prefer the `env` that `load` and actions receive.
+`cloudflare:workers`, `cloudflare:sockets` and other `cloudflare:*` modules work in `.server.js` on Workers only. On Node (`pragma dev`, `pragma serve`, `node.mjs`) the server still starts: `env` from `cloudflare:workers` is the `env` that `load` and actions receive (with `pragma dev --cf`, the wrangler bindings), and every other import (`DurableObject`, `connect`, …) throws when it is used. In client code they are an `app/package` error. Prefer the `env` that `load` and actions receive.
 
 ## Recommended
 

@@ -5,7 +5,7 @@
 <meta property="og:title" content="pragma routing: files as routes">
 <meta property="og:description" content="Params, nested layouts, query and prefetch; the router swaps only the page and keeps the layout alive.">
 
-<c-doc heading="Routing" lede="Each file in routes/ is a page, and its path is its URL. This page adds params, query strings, layouts for a folder and navigation from a script.">
+<c-doc heading="Routing" lede="Each file in routes/ is a page, and its path is its URL. This page adds layouts, params, query strings, the current link and navigation from a script.">
   <section class="doc-section" aria-labelledby="files">
     <h2 id="files">A file in <code>routes/</code> is a page</h2>
     <div class="prose">
@@ -14,6 +14,17 @@
     </div>
     <c-showcase :source="data.examples.files" caption="Click the links. The address bar shows the URL of each file.">
       <c-frame src="/examples/routing/demo" title="Two pages" height="sm"></c-frame>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="root-layout">
+    <h2 id="root-layout">The root layout: <code>routes/_layout.html</code></h2>
+    <div class="prose">
+      <p><code>routes/_layout.html</code> wraps every page: the header and the footer stay, and the page goes in <code>&lt;main data-page&gt;</code>, at <code>&lt;slot&gt;</code>. It has one <code>&lt;main data-page&gt;</code> with only the slot inside.</p>
+      <p>A layout has no <code>&lt;script&gt;</code>. It reads only <code>shared</code>, <code>params</code> and <code>query</code>, for example <code>{shared.cart.count}</code>. For behavior, put a component in it.</p>
+    </div>
+    <c-showcase :source="data.examples.root" caption="Click Home and Shop: the header and the footer stay.">
+      <c-frame src="/examples/routing/demo" title="Routing demo: root layout" height="sm"></c-frame>
     </c-showcase>
   </section>
 
@@ -30,9 +41,10 @@
   <section class="doc-section" aria-labelledby="layout">
     <h2 id="layout">A layout for a folder</h2>
     <div class="prose">
-      <p><code>routes/shop/_layout.html</code> wraps every page in <code>routes/shop/</code>. The page goes where <code>&lt;slot&gt;</code> is. A link to the current page gets <code>aria-current="page"</code>, ready for CSS.</p>
+      <p><code>routes/shop/_layout.html</code> wraps every page in <code>routes/shop/</code> and its subfolders. The root layout wraps it in turn: root, then shop, then the page at the inner <code>&lt;slot&gt;</code>.</p>
+      <p>A folder layout has no <code>&lt;head&gt;</code> and no <code>&lt;main&gt;</code>: only its markup and one <code>&lt;slot&gt;</code>. A link to the current page gets <code>aria-current="page"</code>, ready for CSS.</p>
     </div>
-    <c-showcase :source="data.examples.layout" caption="Click the links: the nav stays, the page changes.">
+    <c-showcase :source="data.examples.layout" caption="Click the shop links: both navs stay, the page changes.">
       <c-frame src="/examples/routing/demo/shop/tabs" title="Routing demo: shop layout" height="sm"></c-frame>
     </c-showcase>
   </section>
@@ -44,6 +56,16 @@
     </div>
     <c-showcase :source="data.examples.tabs" caption="Switch tabs, then reload the frame.">
       <c-frame src="/examples/routing/demo/shop/tabs?tab=reviews" title="Routing demo: query tabs" height="sm"></c-frame>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="active">
+    <h2 id="active">The current link for a query</h2>
+    <div class="prose">
+      <p><code>aria-current</code> is automatic only for a link without a query. For <code>?sort=price</code>, bind <code>:aria-current</code> to a function that gives <code>'true'</code> for the current link and <code>false</code> for the others. <code>false</code> removes the attribute.</p>
+    </div>
+    <c-showcase :source="data.examples.active" caption="Click Cheapest: it gets aria-current and turns bold.">
+      <c-frame src="/examples/routing/demo/shop/sort" title="Routing demo: current query link" height="sm"></c-frame>
     </c-showcase>
   </section>
 

@@ -1,0 +1,15 @@
+<title>Order · data demo</title>
+<meta name="robots" content="noindex">
+
+<script>
+  import { call } from 'pragma'
+
+  async function place() {
+    await call('place')
+  }
+</script>
+
+<p>One keyboard, 49 EUR.</p>
+<button class="btn btn-primary" @click="place">
+  Place order
+</button>

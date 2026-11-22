@@ -2,8 +2,10 @@
   let today = ''
 
   async function show() {
-    const { default: dayjs } = await import('dayjs')
-    today = dayjs().format('dddd, D MMMM YYYY')
+    const { longDate } = await import(
+      '../../_snippets/long-date/long-date.js'
+    )
+    today = longDate()
   }
 </script>
 

@@ -133,14 +133,18 @@ no problems found
 
 Each example shows its real source files next to the live result. The code you read is the code that renders. [Browse all examples]({{origin}}/examples).
 
-- [Syntax]({{origin}}/examples/syntax): {path}, bindings, events, blocks
+- [Syntax]({{origin}}/examples/syntax): {path}, bindings, events, blocks, motion
 - [Components]({{origin}}/examples/components): one file, props, slots
-- [State and actions]({{origin}}/examples/state): let, functions, mount, services
+- [State and actions]({{origin}}/examples/state): let, functions, derived values, mount, services
 - [Stores]({{origin}}/examples/stores): shared and persisted state
-- [Routing]({{origin}}/examples/routing): files as routes, params, query, prefetch
-- [Data and SSR]({{origin}}/examples/data): load, server actions, skeletons
+- [Styling]({{origin}}/examples/styling): utilities, theme tokens, component CSS, dark mode
+- [Layout]({{origin}}/examples/layout): flex, grid, responsive, sticky
+- [Routing]({{origin}}/examples/routing): files as routes, params, layouts, query
+- [Data and SSR]({{origin}}/examples/data): load, actions, redirects, endpoints, streams
+- [Forms]({{origin}}/examples/forms): inputs, select, validation, submit
 - [Overlays]({{origin}}/examples/overlays): modal, alert, dropdown, Back button
-- [Styling]({{origin}}/examples/styling): utilities, theme tokens, component CSS
 - [npm packages]({{origin}}/examples/packages): tree-shaken per package
+- [Performance]({{origin}}/examples/performance): JS chunks, lazy-loaded code
 - [Logs]({{origin}}/examples/logs): OpenTelemetry, client and server
 - [SEO and head]({{origin}}/examples/seo): title, meta, Open Graph
+- [WebMCP]({{origin}}/examples/webmcp): forms as tools for agents

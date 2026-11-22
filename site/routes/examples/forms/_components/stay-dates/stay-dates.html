@@ -1,0 +1,24 @@
+<script>
+  let error = ''
+
+  function book(event) {
+    const form = new FormData(event.target)
+    const valid = form.get('out') > form.get('in')
+    error = valid ? '' : 'Check-out is too early.'
+  }
+</script>
+
+<form class="grid gap-2" toolname="book_stay"
+  tooldescription="Book a stay between two dates"
+  @submit="book">
+  <label>Check-in
+    <input name="in" type="date" required
+      class="border border-line px-2">
+  </label>
+  <label>Check-out
+    <input name="out" type="date" required
+      class="border border-line px-2">
+  </label>
+  <button class="btn btn-primary">Book</button>
+  <p role="alert">{$error}</p>
+</form>

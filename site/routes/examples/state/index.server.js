@@ -9,6 +9,7 @@ const asPage = name => [
 export async function load() {
   const examples = await readExamples('routes/examples/state', {
     shoppingList: asPage('shopping-list'),
+    ticketTotal: asPage('ticket-total'),
     saveButton: asPage('save-button'),
     clock: asPage('clock'),
     uploadBar: asPage('upload-bar'),

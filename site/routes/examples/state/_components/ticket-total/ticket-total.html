@@ -1,0 +1,14 @@
+<script>
+  let tickets = 1
+
+  const total = () => tickets * 12
+
+  function add() {
+    if (total() < 48) tickets += 1
+  }
+</script>
+
+<div class="flex items-center gap-3">
+  <button class="btn" @click="add">Add ticket</button>
+  <p>{$tickets} tickets, total {$total}</p>
+</div>

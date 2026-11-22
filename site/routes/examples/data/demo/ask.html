@@ -1,0 +1,18 @@
+<title>Ask · data demo</title>
+<meta name="robots" content="noindex">
+
+<script>
+  import { stream } from 'pragma'
+
+  let answer = ''
+
+  async function ask() {
+    answer = ''
+    for await (const chunk of stream('ask')) {
+      answer += chunk.word + ' '
+    }
+  }
+</script>
+
+<button class="btn" @click="ask">Ask</button>
+<p>{$answer}</p>

@@ -1,0 +1,98 @@
+<title>WebMCP · pragma examples</title>
+<meta name="description" content="WebMCP in pragma, live: every form is a tool an agent in the browser can call, with a JSON reply, CSS while it fills, check rules and markdown pages.">
+<link rel="canonical" href="https://pragma.leonavas.com/examples/webmcp">
+<meta property="og:url" content="https://pragma.leonavas.com/examples/webmcp">
+<meta property="og:title" content="pragma WebMCP: forms as tools for agents">
+<meta property="og:description" content="A form with toolname is a tool for agents in the browser. Humans use the same form.">
+
+<c-doc heading="WebMCP" lede="WebMCP lets an AI agent in the browser use a page. In pragma, each form is a tool: the agent fills the fields and submits, as a person does. Humans use the same form.">
+  <section class="doc-section" aria-labelledby="tool">
+    <h2 id="tool">A form is a tool</h2>
+    <div class="prose">
+      <p><code>toolname</code> and <code>tooldescription</code> on a <code>&lt;form&gt;</code> make it a tool. Each field with a <code>name</code> is a parameter, and <code>toolparamdescription</code> tells the agent what to type.</p>
+      <p><code>toolautosubmit</code> lets the agent submit without a click. Use it only on safe forms, such as add or search. The handler reads the fields with <code>FormData</code>.</p>
+    </div>
+    <c-showcase :source="data.examples.tool" caption="Add a task. A browser with WebMCP also shows add_task to its agent.">
+      <p-add-task></p-add-task>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="reply">
+    <h2 id="reply">Reply to the agent</h2>
+    <div class="prose">
+      <p><code>event.agentInvoked</code> is true when an agent submits. <code>event.respondWith(promise)</code> gives the agent the result as JSON. Call it before any <code>await</code>.</p>
+      <p>Reply with errors too, so the agent can try again. A reply can also come from a server action: see the <a href="/examples/data#actions">guestbook</a>.</p>
+    </div>
+    <c-showcase :source="data.examples.reply" caption="Book 4 guests, then 4 again: the second reply is an error.">
+      <p-book-table></p-book-table>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="css">
+    <h2 id="css">CSS while an agent fills the form</h2>
+    <div class="prose">
+      <p><code>:tool-form-active</code> matches the form while an agent fills it, and <code>:tool-submit-active</code> matches its submit button. The starter styles both; this component sets its own style.</p>
+    </div>
+    <c-showcase :source="data.examples.css" caption="Without an agent the form looks normal. When an agent calls find_note, the outline shows.">
+      <p-find-note></p-find-note>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="notool">
+    <h2 id="notool">Forms that are not tools: <code>notool</code></h2>
+    <div class="prose">
+      <p>A form without <code>toolname</code> gets a warning. Add <code>notool</code> to keep a form away from agents: sign in, password, payment. The build removes the attribute.</p>
+    </div>
+    <c-showcase :source="data.examples.notool" caption="A normal form. Agents do not see it as a tool.">
+      <p-sign-in></p-sign-in>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="rejected">
+    <h2 id="rejected">What the check rejects</h2>
+    <div class="prose">
+      <p><code>pragma check</code> finds broken tools: a field without <code>name</code>, a bad <code>toolname</code>, a bound description, half a pair. <code>toolautosubmit</code> on a delete is a warning, and an error with <code>--strict</code>.</p>
+    </div>
+    <c-showcase :source="data.examples.rejected" caption="Real pragma check output for this file, each message cut after its fix.">
+      <c-terminal title="~/my-app">
+        <pre tabindex="0" aria-label="pragma check output for orders.html"><code><span class="term-cmd">pragma check</span>
+orders.html:5 <span class="term-warn">[webmcp/autosubmit]</span> toolautosubmit on "delete_order" lets an agent run it without a user click: remove toolautosubmit from forms that delete, pay or send
+orders.html:8 <span class="term-err">[webmcp/param-name]</span> &lt;input&gt; in a tool form without name: add name="…" (it is the tool parameter)
+orders.html:13 <span class="term-err">[webmcp/name]</span> toolname "Find Orders" is invalid: use 1 to 128 characters of A-Z, a-z, 0-9, _, . or -
+orders.html:13 <span class="term-err">[webmcp/dynamic]</span> tooldescription must be static: write tooldescription="…" with fixed text, no : binding or {}
+orders.html:14 <span class="term-warn">[webmcp/param-description]</span> &lt;input name="customer"&gt; has no description for agents: add toolparamdescription="…", a &lt;label&gt; or aria-description
+orders.html:17 <span class="term-err">[webmcp/pair]</span> &lt;form&gt; has tooldescription but no toolname: add toolname="verb_object" (the browser needs both)
+<span class="term-err">4 error(s), 2 warning(s)</span></code></pre>
+      </c-terminal>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="off">
+    <h2 id="off">Turn WebMCP off</h2>
+    <div class="prose">
+      <p>WebMCP is on by default. <code>"webmcp": false</code> in <code>pragma.json</code> turns off the <code>webmcp/*</code> checks for the whole app, and any tool attribute left is an error. To hide one form, <code>notool</code> is better.</p>
+    </div>
+    <c-showcase :source="data.examples.off" caption="The whole app opts out.">
+      <p class="text-muted">No tools on any page.</p>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="markdown">
+    <h2 id="markdown">Markdown for agents without a browser</h2>
+    <div class="prose">
+      <p>An agent that fetches a page without a browser asks for <code>text/markdown</code>. Put a <code>.md</code> file in <code>public/</code> at the route's path: <code>public/pricing.md</code> answers <code>/pricing</code>. Browsers still get the HTML.</p>
+    </div>
+    <c-terminal title="~/pragma/site">
+      <pre tabindex="0" aria-label="curl output for /agents as markdown"><code><span class="term-cmd">curl -i -H 'Accept: text/markdown' 127.0.0.1:5191/agents</span>
+HTTP/1.1 200 OK
+content-type: text/markdown; charset=utf-8
+<span class="term-dim">…</span>
+<span class="term-ink"># pragma, for your agent</span>
+<span class="term-dim">…</span>
+<span class="term-cmd">curl -i 127.0.0.1:5191/agents</span>
+HTTP/1.1 200 OK
+content-type: text/html; charset=utf-8
+<span class="term-dim">…</span></code></pre>
+    </c-terminal>
+  </section>
+</c-doc>

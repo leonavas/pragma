@@ -1,5 +1,5 @@
 <title>Styling · pragma examples</title>
-<meta name="description" content="Styling in pragma, live: a closed subset of Tailwind v4 utilities, theme tokens in lib/theme.css and component CSS scoped by the build, in one stylesheet.">
+<meta name="description" content="Styling in pragma, live: Tailwind-style utilities, theme tokens and classes, scoped component CSS, CSS variables from state, motion and dark mode.">
 <link rel="canonical" href="https://pragma.leonavas.com/examples/styling">
 <meta property="og:url" content="https://pragma.leonavas.com/examples/styling">
 <meta property="og:title" content="pragma styling: utilities, tokens and scoped CSS">
@@ -26,6 +26,16 @@
     </c-showcase>
   </section>
 
+  <section class="doc-section" aria-labelledby="cascade">
+    <h2 id="cascade">Custom classes and the cascade</h2>
+    <div class="prose">
+      <p>A class used in many places, such as <code>.btn</code>, goes in <code>@layer components</code> in <code>lib/theme.css</code>. A utility beats a theme class, and the <code>&lt;style&gt;</code> of a component beats a utility.</p>
+    </div>
+    <c-showcase :source="data.examples.cascade" caption="Three buttons, three corners: theme, then utility, then component.">
+      <p-pill-buttons></p-pill-buttons>
+    </c-showcase>
+  </section>
+
   <section class="doc-section" aria-labelledby="scoped">
     <h2 id="scoped">Component CSS, scoped by the build</h2>
     <div class="prose">
@@ -46,10 +56,30 @@
     </c-showcase>
   </section>
 
+  <section class="doc-section" aria-labelledby="per-frame">
+    <h2 id="per-frame">Values that change every frame</h2>
+    <div class="prose">
+      <p>For a value that changes each frame (pointer, scroll, drag), set it in <code>frame</code> and use it only in <code>translate</code>, <code>scale</code>, <code>rotate</code> or <code>opacity</code>. These properties do not compute the layout again.</p>
+    </div>
+    <c-showcase :source="data.examples.perFrame" caption="Move the pointer over the box: the dot follows.">
+      <p-pointer-dot></p-pointer-dot>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="motion">
+    <h2 id="motion">Enter and leave motion</h2>
+    <div class="prose">
+      <p>The root of an <code>&lt;if&gt;</code> or <code>&lt;for&gt;</code> item gets <code>data-entering</code> when it comes in and <code>data-leaving</code> when it goes. The element stays until its CSS animation ends. Without an animation, it goes at once.</p>
+    </div>
+    <c-showcase :source="data.examples.motion" caption="Click Show tip two times: it fades in, then out.">
+      <p-tip></p-tip>
+    </c-showcase>
+  </section>
+
   <section class="doc-section" aria-labelledby="theme">
     <h2 id="theme">Light and dark theme</h2>
     <div class="prose">
-      <p><code>dark:</code> utilities apply inside <code>data-theme="dark"</code>. In an app, <code>setTheme('dark')</code> from <code>.pragma/theme.js</code> sets it on the page.</p>
+      <p><code>dark:</code> utilities apply inside <code>data-theme="dark"</code>. The next example sets it for the whole page.</p>
     </div>
     <c-showcase :source="data.examples.theme" caption="One component, light and dark.">
       <div class="grid w-full max-w-xs gap-3">
@@ -58,6 +88,16 @@
           <p-invoice-card></p-invoice-card>
         </div>
       </div>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="theme-toggle">
+    <h2 id="theme-toggle">Theme toggle</h2>
+    <div class="prose">
+      <p><code>theme()</code> and <code>setTheme()</code> from <code>.pragma/theme.js</code> read and set the theme of the page. The choice stays for the next visit, and a first visit follows the system setting.</p>
+    </div>
+    <c-showcase :source="data.examples.themeToggle" caption="Click the button: the card follows, also after a reload.">
+      <p-theme-toggle></p-theme-toggle>
     </c-showcase>
   </section>
 </c-doc>

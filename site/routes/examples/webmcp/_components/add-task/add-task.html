@@ -1,0 +1,25 @@
+<script>
+  let tasks = ['Buy milk']
+
+  function add(event) {
+    const form = new FormData(event.target)
+    tasks.push(String(form.get('title')))
+    event.target.reset()
+  }
+</script>
+
+<div class="grid gap-2">
+  <form class="flex gap-2" toolname="add_task"
+    tooldescription="Add a task to the to-do list"
+    toolautosubmit @submit="add">
+    <input class="border border-line px-2" name="title"
+      aria-label="Task" required
+      toolparamdescription="What to do, in a few words">
+    <button class="btn">Add</button>
+  </form>
+  <ul class="list-disc pl-5">
+    <for task in $tasks key=task>
+      <li>{task}</li>
+    </for>
+  </ul>
+</div>

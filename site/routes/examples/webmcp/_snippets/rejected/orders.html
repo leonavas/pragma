@@ -1,0 +1,19 @@
+<script>
+  let kind = 'order'
+</script>
+
+<form toolname="delete_order"
+  tooldescription="Delete one order by its number"
+  toolautosubmit>
+  <input aria-label="Order"
+    toolparamdescription="Order number">
+  <button class="btn btn-danger">Delete</button>
+</form>
+
+<form toolname="Find Orders" :tooldescription="$kind">
+  <input name="customer" aria-label="Customer">
+</form>
+
+<form tooldescription="Export the orders as a file">
+  <button class="btn">Export</button>
+</form>

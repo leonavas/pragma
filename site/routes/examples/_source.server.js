@@ -29,6 +29,22 @@ function camelCase(name) {
   return name.replace(/-(\w)/g, (dash, letter) => letter.toUpperCase())
 }
 
+function relativePath(fromDir, toPath) {
+  const fromParts = fromDir === '.' ? [] : fromDir.split('/')
+  const toParts = toPath.split('/')
+  let shared = 0
+  while (shared < fromParts.length && shared < toParts.length - 1 && fromParts[shared] === toParts[shared]) shared += 1
+  const levelsUp = fromParts.length - shared
+  return (levelsUp ? '../'.repeat(levelsUp) : './') + toParts.slice(shared).join('/')
+}
+
+function shownImports(code, sourcePath, path, shownPaths) {
+  return code.replace(/(['"])(\.\.?\/[^'"]+)\1/g, (specifier, quote, target) => {
+    const shownTarget = shownPaths[joinPath(dirName(sourcePath), target)]
+    return shownTarget ? quote + relativePath(dirName(path), shownTarget) + quote : specifier
+  })
+}
+
 function phoneRows(lines) {
   return lines.reduce((rows, line) => rows + Math.max(1, Math.ceil(line.text.length / phoneColumns)), 0)
 }
@@ -54,14 +70,23 @@ function appCode(folder, sourcePath, code) {
   return visible.replace(demoUrl, '/')
 }
 
-async function readSource(folder, entry, example, index) {
-  const file = typeof entry === 'string' ? entry : entry.file
-  const sourcePath = joinPath(folder, file)
+function sourcePathOf(folder, entry) {
+  return joinPath(folder, typeof entry === 'string' ? entry : entry.file)
+}
+
+function shownPathOf(folder, entry) {
+  return entry.as ?? appPath(folder, sourcePathOf(folder, entry))
+}
+
+async function readSource(folder, entry, example, index, shownPaths) {
+  const sourcePath = sourcePathOf(folder, entry)
   const raw = sources[sourcePath]
   if (raw === undefined) throw new Error('missing bundled source: ' + sourcePath)
-  const code = appCode(folder, sourcePath, raw.trimEnd().replaceAll('\t', '  '))
-  const path = entry.as ?? appPath(folder, sourcePath)
-  const lines = markLines(code, languageOf(file))
+  const path = shownPathOf(folder, entry)
+  const appSource = appCode(folder, sourcePath, raw.trimEnd().replaceAll('\t', '  '))
+  const shown = shownImports(appSource, sourcePath, path, shownPaths)
+  const code = shown.replace(/(?:\.\.\/)+\.pragma\//g, '../'.repeat(dirName(path).split('/').length) + '.pragma/')
+  const lines = markLines(code, languageOf(path))
   return {
     id: 'source-' + example + '-' + index,
     name: baseName(path),
@@ -76,7 +101,8 @@ async function readSource(folder, entry, example, index) {
 
 export async function readExamples(folder, examples) {
   const entries = await Promise.all(Object.entries(examples).map(async ([example, sources]) => {
-    const files = await Promise.all(sources.map((entry, index) => readSource(folder, entry, example, index)))
+    const shownPaths = Object.fromEntries(sources.map(entry => [sourcePathOf(folder, entry), shownPathOf(folder, entry)]))
+    const files = await Promise.all(sources.map((entry, index) => readSource(folder, entry, example, index, shownPaths)))
     return [camelCase(example), { files }]
   }))
   return Object.fromEntries(entries)

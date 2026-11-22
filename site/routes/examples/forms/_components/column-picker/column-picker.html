@@ -1,0 +1,26 @@
+<script>
+  let added = ''
+
+  const columns = () => [
+    { value: 'todo', label: 'To do' },
+    { value: 'doing', label: 'Doing' },
+    { value: 'done', label: 'Done' },
+  ]
+
+  function add(event) {
+    added = new FormData(event.target).get('column')
+  }
+</script>
+
+<div class="grid gap-2">
+  <form class="flex items-center gap-2"
+    toolname="add_card"
+    tooldescription="Add a card to a column"
+    @submit="add">
+    <c-select name="column" label="Column" value="todo"
+      toolparamdescription="todo, doing or done"
+      :options="$columns"></c-select>
+    <button class="btn btn-primary">Add</button>
+  </form>
+  <p>Form value: {$added}</p>
+</div>

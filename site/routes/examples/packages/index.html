@@ -39,7 +39,7 @@
   <section class="doc-section" aria-labelledby="lazy-import">
     <h2 id="lazy-import">Load a package on click with <code>import()</code></h2>
     <div class="prose">
-      <p>When a package is needed only after a click, <code>await import()</code> it in the action. It does not load with the page.</p>
+      <p>When a package is needed only after a click, import it in a <code>utils/</code> module, then <code>await import()</code> that module in the action. The package does not load with the page, and the module keeps its import open to tree shaking.</p>
     </div>
     <c-showcase :source="data.examples.releaseAge" caption="Open the network panel, then click: dayjs-*.js loads only now.">
       <p-release-age></p-release-age>
@@ -89,5 +89,34 @@ shop.js:5 <span class="term-err">[js/import]</span> remote import `https://esm.s
     <div class="prose">
       <p>A <code>.server.js</code> file can import any package from <code>package.json</code> and Node built-ins (<code>node:fs</code>, <code>node:crypto</code>) without listing them. Server code is not bundled: Node resolves <code>node_modules</code> at run time.</p>
     </div>
+  </section>
+
+  <section class="doc-section" aria-labelledby="wasm">
+    <h2 id="wasm">WebAssembly on the server</h2>
+    <div class="prose">
+      <p>A <code>.server.js</code> file can import a <code>.wasm</code> file. The import gives a compiled <code>WebAssembly.Module</code> on Node and on Workers. Here <code>routes/_add.wasm</code> exports one function, <code>add</code>.</p>
+      <p><code>pragma build</code> copies the file to <code>dist/server/</code> and adds the <code>CompiledWasm</code> rule to <code>dist/server/wrangler.jsonc</code>. Workers cannot compile WebAssembly from bytes, so give a package the imported module (Emscripten packages: <code>instantiateWasm</code>).</p>
+    </div>
+    <c-showcase :source="data.examples.sum" caption="Reload the frame: the server adds the numbers each time.">
+      <c-frame src="/examples/packages/demo/sum" title="WebAssembly demo route" height="sm"></c-frame>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="workers">
+    <h2 id="workers">Workers modules and client imports</h2>
+    <div class="prose">
+      <p><code>cloudflare:workers</code>, <code>cloudflare:sockets</code> and the other <code>cloudflare:*</code> modules work in <code>.server.js</code> on Workers only. On Node (<code>pragma dev</code>, <code>pragma serve</code>) <code>env</code> from <code>cloudflare:workers</code> is the same <code>env</code> that <code>load</code> gets; any other export throws when it is used. Prefer the <code>env</code> that <code>load</code> and actions get. In the browser, both imports fail the check:</p>
+    </div>
+    <c-terminal title="~/my-app">
+      <pre tabindex="0" aria-label="pragma check output for server-only imports in a page"><code><span class="term-cmd">cat routes/stats.html</span>
+&lt;script&gt;
+  import addWasm from './_add.wasm'
+  import { env } from 'cloudflare:workers'
+&lt;/script&gt;
+<span class="term-cmd">pragma check</span>
+stats.html:2 <span class="term-err">[js/import]</span> ./_add.wasm is WebAssembly; import .wasm only in server code (.server.js)
+stats.html:3 <span class="term-err">[app/package]</span> `cloudflare:workers` is a Cloudflare Workers module and doesn't run in the browser; use it in a .server.js
+<span class="term-err">2 error(s)</span></code></pre>
+    </c-terminal>
   </section>
 </c-doc>

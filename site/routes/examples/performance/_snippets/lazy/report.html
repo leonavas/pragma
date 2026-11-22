@@ -1,0 +1,13 @@
+<script>
+  let csv = ''
+
+  async function exportCsv() {
+    const { toCsv } = await import('../utils/csv.js')
+    csv = toCsv([['pen', 2], ['ink', 1]])
+  }
+</script>
+
+<title>Report</title>
+
+<button class="btn" @click="exportCsv">Export</button>
+<pre>{$csv}</pre>

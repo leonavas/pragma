@@ -1,33 +1,27 @@
-import { cp, mkdir, writeFile, readFile, rm, access } from 'node:fs/promises'
+import { cp, mkdir, writeFile, readFile, readdir, rm, access } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import { dirname, join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { load as syntaxLoad } from '../routes/examples/syntax/index.server.js'
-import { load as componentsLoad } from '../routes/examples/components/index.server.js'
-import { load as stateLoad } from '../routes/examples/state/index.server.js'
-import { load as storesLoad } from '../routes/examples/stores/index.server.js'
-import { load as routingLoad } from '../routes/examples/routing/index.server.js'
-import { load as dataLoad } from '../routes/examples/data/index.server.js'
-import { load as overlaysLoad } from '../routes/examples/overlays/index.server.js'
-import { load as stylingLoad } from '../routes/examples/styling/index.server.js'
-import { load as packagesLoad } from '../routes/examples/packages/index.server.js'
-import { load as logsLoad } from '../routes/examples/logs/index.server.js'
-import { load as seoLoad } from '../routes/examples/seo/index.server.js'
 
-const sections = {
-  syntax: syntaxLoad,
-  components: componentsLoad,
-  state: stateLoad,
-  stores: storesLoad,
-  routing: routingLoad,
-  data: dataLoad,
-  overlays: overlaysLoad,
-  styling: stylingLoad,
-  packages: packagesLoad,
-  logs: logsLoad,
-  seo: seoLoad,
-}
-const skipped = new Set(['syntax/rejected', 'state/mistakes', 'seo/rejected', 'seo/missing'])
+const sections = [
+  ['syntax', () => import('../routes/examples/syntax/index.server.js')],
+  ['components', () => import('../routes/examples/components/index.server.js')],
+  ['state', () => import('../routes/examples/state/index.server.js')],
+  ['stores', () => import('../routes/examples/stores/index.server.js')],
+  ['styling', () => import('../routes/examples/styling/index.server.js')],
+  ['layout', () => import('../routes/examples/layout/index.server.js')],
+  ['routing', () => import('../routes/examples/routing/index.server.js')],
+  ['data', () => import('../routes/examples/data/index.server.js')],
+  ['forms', () => import('../routes/examples/forms/index.server.js')],
+  ['overlays', () => import('../routes/examples/overlays/index.server.js')],
+  ['packages', () => import('../routes/examples/packages/index.server.js')],
+  ['performance', () => import('../routes/examples/performance/index.server.js')],
+  ['logs', () => import('../routes/examples/logs/index.server.js')],
+  ['seo', () => import('../routes/examples/seo/index.server.js')],
+  ['webmcp', () => import('../routes/examples/webmcp/index.server.js')],
+]
+const skipped = new Set(['syntax/rejected', 'state/mistakes', 'seo/rejected', 'seo/missing',
+  'webmcp/rejected'])
 const packages = ['valibot', 'dayjs', 'es-toolkit']
 const workRoot = join(tmpdir(), 'pragma-check-examples')
 const baseApp = join(workRoot, 'base')
@@ -69,9 +63,22 @@ function checkApp(app) {
   }
 }
 
+async function copyBinaryFiles(app, section) {
+  const demo = join('routes/examples', section, 'demo')
+  if (!(await exists(demo))) return
+  for (const entry of await readdir(demo, { recursive: true })) {
+    if (!entry.endsWith('.wasm')) continue
+    await mkdir(dirname(join(app, 'routes', entry)), { recursive: true })
+    await cp(join(demo, entry), join(app, 'routes', entry))
+  }
+}
+
 await prepareBase()
 let failing = 0
-for (const [section, load] of Object.entries(sections)) {
+const only = process.argv.slice(2)
+for (const [section, importSection] of sections) {
+  if (only.length && !only.includes(section)) continue
+  const { load } = await importSection()
   const { examples } = await load({ request: new Request('http://127.0.0.1:5181/'), log: quietLog, query: {}, params: {} })
   for (const [key, { files }] of Object.entries(examples)) {
     const id = section + '/' + key
@@ -80,7 +87,9 @@ for (const [section, load] of Object.entries(sections)) {
     await rm(app, { recursive: true, force: true })
     await cp(baseApp, app, { recursive: true })
     await writeExample(app, files)
+    await copyBinaryFiles(app, section)
     const problems = checkApp(app)
+    await rm(app, { recursive: true, force: true })
     if (problems) failing += 1
     process.stdout.write((problems ? 'FAIL ' : 'ok   ') + id + '\n' + problems)
   }

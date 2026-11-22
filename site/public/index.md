@@ -205,14 +205,18 @@ no problems found
 
 Each example shows its real source files next to the live result. The code you read is the code that renders. [Browse all examples](https://pragma.leonavas.com/examples).
 
-- [Syntax](https://pragma.leonavas.com/examples/syntax): {path}, bindings, events, blocks
+- [Syntax](https://pragma.leonavas.com/examples/syntax): {path}, bindings, events, blocks, motion
 - [Components](https://pragma.leonavas.com/examples/components): one file, props, slots
-- [State and actions](https://pragma.leonavas.com/examples/state): let, functions, mount, services
+- [State and actions](https://pragma.leonavas.com/examples/state): let, functions, derived values, mount, services
 - [Stores](https://pragma.leonavas.com/examples/stores): shared and persisted state
-- [Routing](https://pragma.leonavas.com/examples/routing): files as routes, params, query, prefetch
-- [Data and SSR](https://pragma.leonavas.com/examples/data): load, server actions, skeletons
+- [Styling](https://pragma.leonavas.com/examples/styling): utilities, theme tokens, component CSS, dark mode
+- [Layout](https://pragma.leonavas.com/examples/layout): flex, grid, responsive, sticky
+- [Routing](https://pragma.leonavas.com/examples/routing): files as routes, params, layouts, query
+- [Data and SSR](https://pragma.leonavas.com/examples/data): load, actions, redirects, endpoints, streams
+- [Forms](https://pragma.leonavas.com/examples/forms): inputs, select, validation, submit
 - [Overlays](https://pragma.leonavas.com/examples/overlays): modal, alert, dropdown, Back button
-- [Styling](https://pragma.leonavas.com/examples/styling): utilities, theme tokens, component CSS
 - [npm packages](https://pragma.leonavas.com/examples/packages): tree-shaken per package
+- [Performance](https://pragma.leonavas.com/examples/performance): JS chunks, lazy-loaded code
 - [Logs](https://pragma.leonavas.com/examples/logs): OpenTelemetry, client and server
 - [SEO and head](https://pragma.leonavas.com/examples/seo): title, meta, Open Graph
+- [WebMCP](https://pragma.leonavas.com/examples/webmcp): forms as tools for agents

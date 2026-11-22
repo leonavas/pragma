@@ -33,8 +33,8 @@ routes/
       index.server.js          load(): which files each showcase shows
       _components/counter/     the live example component (<p-counter>)
       _snippets/counter/usage.html   extra file shown as a tab (usage)
-    syntax/ state/ stores/ routing/ data/ overlays/ styling/ packages/ logs/ seo/
-      index.html               skeleton with a TODO list
+    syntax/ state/ stores/ styling/ layout/ routing/ data/ forms/ overlays/ packages/
+    performance/ logs/ seo/ webmcp/   one folder per section, same shape as components/
 lib/
   theme.css                    tokens (incl. --code-* colors, --skeleton-bg), fonts, global classes
   components/                  every component is one .html (<script>, markup, <style>)
@@ -154,12 +154,13 @@ An example teaches one idea. A reader sees the whole file at once and understand
 - The live result shows the concept at once; the caption says what to do ("Check Online: the button loses disabled").
 - Prose next to the example: two or three short sentences, aligned with the code. No feature lists the code does not show.
 - `pragma check` output in the page is real output of the current CLI (run it on the file), never written by hand.
-- Order: the pages go from simple to advanced (Syntax, Components, State, Stores, Routing, ...). An example uses only what an
+- Order: the pages go from simple to advanced, in the order of `section-nav.html` (Syntax, Components, State, Stores,
+Styling, Layout, Routing, Data, Forms, Overlays, packages, Performance, Logs, SEO, WebMCP). An example uses only what an
   earlier section explains; a new idea in an example gets a sentence in its prose.
 - Write the code as it is in a new app (`pragma new`): only utilities, the starter tokens (`surface`, `ink`, `muted`,
   `line`) and the starter classes (`.btn`, `.btn-primary`, `.btn-danger`). No site classes such as `.label` or `.wrap`.
   A demo route gets the site chrome from a hidden `demo/_layout.html` with `<c-demo-page>`, never in the shown file.
-- The showcase shows each file at its path in that app, and `npm run check-examples` checks it there:
+- The showcase shows each file at its path in that app, and `npm run check-examples [section...]` checks it there:
   `routes/examples/<section>/_components/x/` shows as `routes/_components/x/`, `demo/x.html` as `routes/x.html`,
   `_snippets/<name>/usage.html` as `routes/index.html`. Links to `/examples/<section>/demo/...` show as `/...`, and the
   demo-only `<meta name="robots" content="noindex">` line is hidden. `{ file, as }` in `readExamples` sets any other
@@ -210,7 +211,7 @@ list its files in `readExamples`, and put a frame alone in the showcase slot:
 - A showcase whose slot holds a `<c-frame>` stacks by itself: code on top, frame full width below.
 - The demo route wraps its content in `<c-demo-page>…</c-demo-page>` (after its `<title>`/`<meta>`):
   it gives the page padding and a grid, and hides the site header and footer (CSS `:has()`, no JS).
-  pragma v0 has no nested layouts, so this is the minimal demo layout. Leave it out when the demo
+  Each demo folder has a hidden `demo/_layout.html` (a nested layout) with `<c-demo-page>`. Leave it out when the demo
   must show the real layout. Keep display utilities (`flex`, `block`) off the root `<header>` and
   `<footer>` of `_layout.html`, or the utilities layer wins over the component rule.
 

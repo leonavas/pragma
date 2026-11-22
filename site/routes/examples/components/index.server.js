@@ -10,6 +10,7 @@ export async function load() {
     product: ['_components/product/product.html', '_snippets/product/usage.html'],
     teamList: ['_components/person-row/person-row.html', page('team-list')],
     slots: ['_components/panel/panel.html', page('release-notes')],
+    slotOwner: ['_components/panel/panel.html', page('post')],
     badge: ['_components/badge/badge.html', '_snippets/badge/usage.html'],
     fileTree: ['_components/file-tree/file-tree.html', '_snippets/file-tree/usage.html', 'index.js'],
   })

@@ -56,32 +56,30 @@
     --switcher-height: 3rem;
     --gutter: 1.25rem;
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      color-scheme: dark;
-      --color-ground: oklch(0.158 0.006 255);
-      --color-sunken: oklch(0.132 0.006 255);
-      --color-surface: oklch(0.192 0.007 255);
-      --color-raised: oklch(0.225 0.008 255);
-      --color-line: oklch(0.285 0.008 255);
-      --color-line-strong: oklch(0.38 0.01 255);
-      --color-ink: oklch(0.945 0.004 255);
-      --color-muted: oklch(0.74 0.008 255);
-      --color-faint: oklch(0.6 0.008 255);
-      --color-accent-text: oklch(0.9 0.185 127);
-      --color-error: oklch(0.808 0.114 19.571);
-      --color-warning: oklch(0.85 0.12 85);
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --color-ground: oklch(0.158 0.006 255);
+    --color-sunken: oklch(0.132 0.006 255);
+    --color-surface: oklch(0.192 0.007 255);
+    --color-raised: oklch(0.225 0.008 255);
+    --color-line: oklch(0.285 0.008 255);
+    --color-line-strong: oklch(0.38 0.01 255);
+    --color-ink: oklch(0.945 0.004 255);
+    --color-muted: oklch(0.74 0.008 255);
+    --color-faint: oklch(0.6 0.008 255);
+    --color-accent-text: oklch(0.9 0.185 127);
+    --color-error: oklch(0.808 0.114 19.571);
+    --color-warning: oklch(0.85 0.12 85);
 
-      --code-keyword: oklch(0.8 0.1 295);
-      --code-string: oklch(0.84 0.085 78);
-      --code-number: oklch(0.8 0.11 45);
-      --code-tag: oklch(0.8 0.075 230);
-      --code-attribute: oklch(0.8 0.06 185);
-      --code-property: oklch(0.86 0.03 255);
-      --code-comment: oklch(0.58 0.01 255);
-      --code-punctuation: oklch(0.64 0.012 255);
-      --code-gutter: oklch(0.45 0.008 255);
-    }
+    --code-keyword: oklch(0.8 0.1 295);
+    --code-string: oklch(0.84 0.085 78);
+    --code-number: oklch(0.8 0.11 45);
+    --code-tag: oklch(0.8 0.075 230);
+    --code-attribute: oklch(0.8 0.06 185);
+    --code-property: oklch(0.86 0.03 255);
+    --code-comment: oklch(0.58 0.01 255);
+    --code-punctuation: oklch(0.64 0.012 255);
+    --code-gutter: oklch(0.45 0.008 255);
   }
   @media (max-width: 19.99rem) {
     :root { --gutter: 0.75rem; }

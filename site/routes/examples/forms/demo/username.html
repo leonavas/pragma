@@ -1,0 +1,30 @@
+<title>Pick a username</title>
+<meta name="robots" content="noindex">
+
+<script>
+  import { call } from 'pragma'
+
+  let message = ''
+
+  async function claim(event) {
+    const form = new FormData(event.target)
+    const input = Object.fromEntries(form)
+    const claiming = call('claim', input)
+    if (event.agentInvoked) event.respondWith(claiming)
+    try {
+      message = `${(await claiming).name} is yours.`
+    } catch (failure) {
+      message = failure.message
+    }
+  }
+</script>
+
+<form class="flex gap-2" toolname="claim_username"
+  tooldescription="Claim a free username"
+  @submit="claim">
+  <input name="name" required aria-label="Username"
+    toolparamdescription="The username to claim"
+    class="border border-line px-2">
+  <button class="btn btn-primary">Claim</button>
+</form>
+<p role="status">{$message}</p>

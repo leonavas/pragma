@@ -1,0 +1,20 @@
+<title>Sort</title>
+<meta name="robots" content="noindex">
+
+<script>
+  import { query } from 'pragma'
+
+  const newest = () => query.sort !== 'price' && 'true'
+  const price = () => query.sort === 'price' && 'true'
+</script>
+
+<nav class="flex gap-4" aria-label="Sort">
+  <a href="?sort=new" :aria-current="$newest">Newest</a>
+  <a href="?sort=price" :aria-current="$price">
+    Cheapest
+  </a>
+</nav>
+
+<style>
+  [aria-current] { font-weight: 600; }
+</style>

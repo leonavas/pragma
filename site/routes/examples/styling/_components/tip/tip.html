@@ -1,0 +1,23 @@
+<script>
+  let open = false
+
+  function toggle() {
+    open = !open
+  }
+</script>
+
+<div class="grid gap-3">
+  <button class="btn" @click="toggle">Show tip</button>
+  <if $open>
+    <p class="tip rounded-lg border border-line p-3">
+      Press Tab to move to the next field.
+    </p>
+  </if>
+</div>
+
+<style>
+  .tip[data-entering] { animation: tip-in 0.2s ease-out; }
+  .tip[data-leaving] { animation: tip-out 0.15s ease-in; }
+  @keyframes tip-in { from { opacity: 0; translate: 0 4px; } }
+  @keyframes tip-out { to { opacity: 0; } }
+</style>

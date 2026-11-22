@@ -1,0 +1,14 @@
+<script>
+  let size = 'm'
+</script>
+
+<div class="flex items-center gap-3">
+  <label for="size">Size</label>
+  <select id="size" :model="$size"
+    class="rounded border border-line px-2 py-1">
+    <option value="s">Small</option>
+    <option value="m">Medium</option>
+    <option value="l">Large</option>
+  </select>
+  <p>Value: {$size}</p>
+</div>

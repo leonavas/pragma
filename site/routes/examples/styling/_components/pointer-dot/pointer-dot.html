@@ -1,0 +1,24 @@
+<script>
+  import { frame } from 'pragma'
+
+  let pointerX = 0
+  let cancel = null
+
+  function move(event, track) {
+    cancel ??= frame(() => {
+      cancel = null
+      const box = track.getBoundingClientRect()
+      pointerX = event.clientX - box.left
+    })
+  }
+</script>
+
+<div class="h-12 w-full rounded-lg border border-line"
+  @pointermove="move(event, el)">
+  <div class="dot size-12 rounded-full bg-primary-500"
+    :--x="$pointerX"></div>
+</div>
+
+<style>
+  .dot { translate: calc(var(--x) * 1px - 50%) 0; }
+</style>

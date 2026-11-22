@@ -55,7 +55,7 @@ pragma upgrade
 - [Routes and router](https://pragma.leonavas.com/docs/routes.md): pages, links, params, query, layouts (including nested), head tags
 - [Data: load, server actions, skeleton, SSR, middleware, endpoints](https://pragma.leonavas.com/docs/data.md): load, server actions, skeleton, SSR
 - [Overlays: modal, alert, dropdown](https://pragma.leonavas.com/docs/overlays.md): modal, alert, dropdown
-- [Forms: select and styled select](https://pragma.leonavas.com/docs/forms.md): select, styled select (c-select), form values
+- [Forms: values, select and styled select](https://pragma.leonavas.com/docs/forms.md): select, styled select (c-select), form values
 - [CSS](https://pragma.leonavas.com/docs/css.md): styles and theme
 - [Utility classes](https://pragma.leonavas.com/docs/classes.md): every utility class
 - [WebMCP: forms are agent tools](https://pragma.leonavas.com/docs/webmcp.md): forms as WebMCP tools, markdown for agents
@@ -1247,9 +1247,18 @@ Use `forwards` on exit animations, so the dialog does not flash back before it c
 
 Source: https://pragma.leonavas.com/docs/forms.md
 
-# Forms: select and styled select
+# Forms: values, select and styled select
 
 Every `<form>` is a WebMCP tool (`webmcp.md`). Read values with `new FormData(event.target)` in `@submit`.
+
+## Values from `:model`
+
+| Input | Value in the `let` |
+|---|---|
+| `text`, `email`, `<textarea>`, `<select>` | String (for `<select>`, the `value` of the selected option, not its label). |
+| `number`, `range` | Number; `null` when the field is empty. |
+| `checkbox` | Boolean. |
+| `radio` | The `value` of the checked radio of the group (each radio has the same `:model`). |
 
 ## Select
 
@@ -1605,7 +1614,7 @@ WebMCP is on by default (`"webmcp": true` in `pragma.json`; omitted means `true`
 |---|---|---|
 | `toolname` | `<form>` | Required with `tooldescription`. Lowercase `snake_case` `verb_object` (`search_products`, `add_task`, `create_order`), unique per page. |
 | `tooldescription` | `<form>` | Required with `toolname`. One sentence of 4+ words describing action and purpose. |
-| `toolparamdescription` | input, select, textarea | Describes the expected input. Without it, agents fall back to `<label>` text, then `aria-description`. |
+| `toolparamdescription` | input, select, textarea | Describes the expected input. Without it, agents fall back to `<label>` text, then `aria-description`. `aria-label` is not read. |
 | `toolautosubmit` | `<form>` | Submits without user click. Use only on safe, reversible forms (search, filter, add). Never on delete, pay, buy, cancel, send, or transfer. |
 | `notool` | `<form>` | Excludes the form (login, password, payment). Removed at build time. |
 
@@ -1750,7 +1759,7 @@ export function solver() {
 
 ## Workers modules
 
-`cloudflare:workers`, `cloudflare:sockets` and other `cloudflare:*` modules work in `.server.js` on Workers only. They do not exist on Node (`pragma dev`, `pragma serve`, `node.mjs`). In client code they are an `app/package` error. Prefer the `env` that `load` and actions receive.
+`cloudflare:workers`, `cloudflare:sockets` and other `cloudflare:*` modules work in `.server.js` on Workers only. On Node (`pragma dev`, `pragma serve`, `node.mjs`) the server still starts: `env` from `cloudflare:workers` is the `env` that `load` and actions receive (with `pragma dev --cf`, the wrangler bindings), and every other import (`DurableObject`, `connect`, …) throws when it is used. In client code they are an `app/package` error. Prefer the `env` that `load` and actions receive.
 
 ## Recommended
 
@@ -1789,7 +1798,7 @@ Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<hea
 
 - The core runtime is one file (`/assets/core/boot-<hash>.js`).
 - Each route gets one chunk with its page, components, stores and the code only it uses (`/assets/routes/<route>-<hash>.js`). Asset names are URL-safe: `[id]` becomes `_id_` (`/assets/css/app/_id_-<hash>.css`), so no asset URL gets a redirect.
-- Code used by 2+ routes goes to `/assets/chunks/shared<n>-<hash>.js`, one chunk per set of routes. A set under 4 kB joins a chunk that a wider set of routes uses.
+- Code used by 2+ routes goes to `/assets/chunks/shared<nnn>-<hash>.js` (`shared000`, `shared001`, …), one chunk per set of routes. A set under 4 kB joins a chunk that a wider set of routes uses.
 - `await import()` stays a separate chunk. npm packages stay in `/assets/npm/` (`packages.md`).
 - The bodies of `<if>`, `<else-if>`, `<else>`, `<for>` and `<empty>` go to the page's template module (`/assets/tpl/<route>-<hash>.js`), and the page `modulepreload`s it. The prebuilt HTML keeps only a short comment where each block renders (`<!--p:if t3 state.open-->`), so a page with many blocks or long lists stays small. The browser parses a body only when a block first renders it.
 - The page `modulepreload`s every chunk it runs. The router prefetches the HTML and chunks of a link on hover, focus, and when the link enters the viewport, also for links rendered after the page loads (`/app/:id` links included). Viewport prefetch starts after the `load` event, when the browser is idle, and is off when the user turns on Save-Data. The router requests the clean page URL (`/app`, not `/app/index.html`).
@@ -2065,7 +2074,7 @@ Then deploy with `npx wrangler@4 deploy` (no `--config`).
 2. Create the root `wrangler.jsonc` (above).
 3. Run `pragma dev --cf`.
 
-Without `--cf`, `pragma dev` is unchanged. A change to `wrangler.jsonc` or `.dev.vars` restarts the node server. `cloudflare:workers` imports still do not work on Node (`packages.md`).
+Without `--cf`, `pragma dev` is unchanged. A change to `wrangler.jsonc` or `.dev.vars` restarts the node server. On Node, only `env` from `cloudflare:workers` works; other `cloudflare:*` exports throw when used (`packages.md`).
 
 ### Workers runtime limits
 

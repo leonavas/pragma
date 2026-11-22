@@ -1,0 +1,11 @@
+import { redirect } from 'pragma/server'
+
+export async function handle(context) {
+  const { url, cookies, locals, next } = context
+  locals.user = cookies.get('__Host-user')
+  const isAccount = url.pathname.startsWith('/account')
+  if (isAccount && !locals.user) redirect(303, '/login')
+  const response = await next()
+  response.headers.set('x-frame-options', 'DENY')
+  return response
+}

@@ -1,6 +1,15 @@
-# Forms: select and styled select
+# Forms: values, select and styled select
 
 Every `<form>` is a WebMCP tool (`webmcp.md`). Read values with `new FormData(event.target)` in `@submit`.
+
+## Values from `:model`
+
+| Input | Value in the `let` |
+|---|---|
+| `text`, `email`, `<textarea>`, `<select>` | String (for `<select>`, the `value` of the selected option, not its label). |
+| `number`, `range` | Number; `null` when the field is empty. |
+| `checkbox` | Boolean. |
+| `radio` | The `value` of the checked radio of the group (each radio has the same `:model`). |
 
 ## Select
 

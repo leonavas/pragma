@@ -1,0 +1,19 @@
+<script>
+  import { theme, setTheme } from '../../../../../.pragma/theme.js'
+
+  let dark = theme() === 'dark'
+
+  const label = () => (dark ? 'Light theme' : 'Dark theme')
+
+  function toggle() {
+    dark = !dark
+    setTheme(dark ? 'dark' : 'light')
+  }
+</script>
+
+<div class="grid gap-3 rounded-lg bg-white p-4
+  text-neutral-900 dark:bg-neutral-900
+  dark:text-neutral-100">
+  <p>The theme is saved for the next visit.</p>
+  <button class="btn" @click="toggle">{$label}</button>
+</div>

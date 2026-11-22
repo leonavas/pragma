@@ -54,6 +54,16 @@
     </c-showcase>
   </section>
 
+  <section class="doc-section" aria-labelledby="slot-owner">
+    <h2 id="slot-owner">Slot content belongs to the page</h2>
+    <div class="prose">
+      <p>The page writes the slot content, so <code>{$likes}</code> and <code>@click="like"</code> read the page's script, not the panel's. The panel only decides where the content goes.</p>
+    </div>
+    <c-showcase :source="data.examples.slotOwner" caption="Click Like: the page's state changes inside the panel.">
+      <p-post></p-post>
+    </c-showcase>
+  </section>
+
   <section class="doc-section" aria-labelledby="static">
     <h2 id="static">A component without a script</h2>
     <div class="prose">

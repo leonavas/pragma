@@ -1,0 +1,68 @@
+<title>Layout · pragma examples</title>
+<meta name="description" content="Page layout in pragma, live: rows and stacks with flex, grids with columns and spans, mobile-first breakpoints, sticky and absolute positioning.">
+<link rel="canonical" href="https://pragma.leonavas.com/examples/layout">
+<meta property="og:url" content="https://pragma.leonavas.com/examples/layout">
+<meta property="og:title" content="pragma layout: flex, grid, responsive, sticky">
+<meta property="og:description" content="Rows, stacks, grids, breakpoints and positioning with utility classes, no custom CSS.">
+
+<c-doc heading="Layout" lede="Layout uses the same utilities as Styling: flex for rows and stacks, grid for columns, a breakpoint variant for wider screens and position classes for elements on top. No custom CSS.">
+  <section class="doc-section" aria-labelledby="row">
+    <h2 id="row">A row: <code>flex</code></h2>
+    <div class="prose">
+      <p><code>flex</code> puts the children in a row. <code>items-center</code> aligns them vertically, <code>justify-between</code> pushes them to the two ends and <code>gap-4</code> keeps space between them.</p>
+    </div>
+    <c-showcase :source="data.examples.row" caption="The title stays left, the buttons go right.">
+      <p-toolbar></p-toolbar>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="stack">
+    <h2 id="stack">A stack: <code>flex-col</code> and <code>gap</code></h2>
+    <div class="prose">
+      <p><code>flex-col</code> puts the children in a column. <code>gap-3</code> sets the space between them and <code>p-4</code> the space inside the border. <code>max-w-xs</code> limits the card width, and <code>w-full</code> makes the button as wide as the card.</p>
+    </div>
+    <c-showcase :source="data.examples.stack" caption="The same gap between each line, no margins.">
+      <p-profile></p-profile>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="grid">
+    <h2 id="grid">Columns: <code>grid</code> and <code>col-span</code></h2>
+    <div class="prose">
+      <p><code>grid-cols-3</code> makes three equal columns. A child takes one column, and <code>col-span-2</code> makes it take two: here, a nav and a wider content area.</p>
+    </div>
+    <c-showcase :source="data.examples.grid" caption="The nav takes one column, the content two.">
+      <p-mailbox></p-mailbox>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="responsive">
+    <h2 id="responsive">Responsive: <code>sm:</code>, <code>md:</code>, <code>lg:</code></h2>
+    <div class="prose">
+      <p>Breakpoints are mobile first: a class with no prefix applies on every screen, and <code>sm:grid-cols-2</code> applies from 40rem up. <code>lg:</code> starts at 64rem. <code>mx-auto w-full max-w-3xl</code> centers the content and limits its width.</p>
+    </div>
+    <c-showcase :source="data.examples.responsive" caption="Open the frame in a new tab and change the window width: one, two, then three columns.">
+      <c-frame src="/examples/layout/demo" title="Layout demo: responsive grid" height="sm"></c-frame>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="sticky">
+    <h2 id="sticky">A sticky header in a scrolling list</h2>
+    <div class="prose">
+      <p><code>h-48 overflow-auto</code> gives the list a fixed height and its own scroll bar. <code>sticky top-0</code> keeps each letter at the top while its names scroll under it. <code>bg-surface</code> hides the names below.</p>
+    </div>
+    <c-showcase :source="data.examples.sticky" caption="Scroll the list: A stays on top until B pushes it out.">
+      <p-contacts></p-contacts>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="absolute">
+    <h2 id="absolute">On top: <code>relative</code> and <code>absolute</code></h2>
+    <div class="prose">
+      <p><code>absolute top-0 right-0</code> places the dot at the top right of the nearest <code>relative</code> parent, out of the flow. <code>z-10</code> keeps it above its siblings.</p>
+    </div>
+    <c-showcase :source="data.examples.absolute" caption="The status dot sits on the corner of the avatar.">
+      <p-avatar></p-avatar>
+    </c-showcase>
+  </section>
+</c-doc>

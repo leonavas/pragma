@@ -1,0 +1,23 @@
+<title>Booking · data demo</title>
+<meta name="robots" content="noindex">
+
+<script>
+  import { call } from 'pragma'
+
+  let message = ''
+
+  async function book(day) {
+    try {
+      message = (await call('book', { day })).message
+    } catch (failure) {
+      const taken = failure.status === 409
+      message = taken ? failure.message : 'Try again.'
+    }
+  }
+</script>
+
+<div class="flex gap-2">
+  <button class="btn" @click="book('Mon')">Mon</button>
+  <button class="btn" @click="book('Tue')">Tue</button>
+</div>
+<p role="status">{$message}</p>

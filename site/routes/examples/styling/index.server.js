@@ -14,9 +14,16 @@ export async function load() {
       { file: '_snippets/scoped/app.css', as: 'dist/client/assets/css/index.css' },
     ],
     variables: [{ file: '_components/upload-bar/upload-bar.html', as: 'routes/index.html' }],
+    perFrame: [{ file: '_components/pointer-dot/pointer-dot.html', as: 'routes/index.html' }],
+    motion: [{ file: '_components/tip/tip.html', as: 'routes/index.html' }],
     theme: [
       '_components/invoice-card/invoice-card.html',
       '_snippets/theme/usage.html',
+    ],
+    themeToggle: ['_components/theme-toggle/theme-toggle.html'],
+    cascade: [
+      { file: '_snippets/cascade/theme.css', as: 'lib/theme.css' },
+      { file: '_components/pill-buttons/pill-buttons.html', as: 'routes/index.html' },
     ],
   })
   return { examples }

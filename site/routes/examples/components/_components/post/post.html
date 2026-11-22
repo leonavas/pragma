@@ -1,0 +1,16 @@
+<script>
+  let likes = 0
+
+  function like() {
+    likes += 1
+  }
+</script>
+
+<div>
+  <p-panel heading="Release 1.2">
+    <p>{$likes} likes</p>
+    <button slot="actions" class="btn" @click="like">
+      Like
+    </button>
+  </p-panel>
+</div>

@@ -1,0 +1,86 @@
+<title>Performance · pragma examples</title>
+<meta name="description" content="What each pragma page loads: the runtime, one chunk per route, shared chunks, and code behind import() that loads only on click. Real pragma build output.">
+<link rel="canonical" href="https://pragma.leonavas.com/examples/performance">
+<meta property="og:url" content="https://pragma.leonavas.com/examples/performance">
+<meta property="og:title" content="pragma performance: JS chunks and lazy code">
+<meta property="og:description" content="One chunk per route, shared chunks for shared code, and modules that load only on click.">
+
+<c-doc heading="Performance" lede="pragma build splits the client JS per route and prints what each page costs. This page reads that output for a small app and moves code out of the page.">
+  <section class="doc-section" aria-labelledby="chunks">
+    <h2 id="chunks">What each page loads</h2>
+    <div class="prose">
+      <p>Every page loads the runtime, <code>boot-*.js</code>: it runs the router and the bindings. Each route that has a script gets one chunk. Code that two routes use, such as <code>like-button</code> here, goes to a shared chunk.</p>
+      <p>A page with no script loads only the runtime. The page <code>modulepreload</code>s each chunk it runs.</p>
+    </div>
+    <c-showcase :source="data.examples.chunks" caption="Real pragma build output for these four files.">
+      <c-terminal title="~/my-app">
+        <pre tabindex="0" aria-label="pragma build output and the JS files of each page"><code><span class="term-cmd">pragma build</span>
+page     JS gzip
+/        10.7 KB
+/about   10.5 KB
+/blog    10.7 KB
+CSS       2.8 KB
+3 page(s)
+<span class="term-ok">dist/ built in 31 ms</span>
+<span class="term-cmd">cd dist/client &amp;&amp; find assets -name '*.js' | sort</span>
+assets/chunks/overlay-5e18fa36.js
+assets/chunks/shared000-c4f1c28a.js
+assets/core/boot-819b8b79.js
+assets/routes/blog-217c6bf2.js
+assets/routes/index-217c6bf2.js
+<span class="term-cmd">grep -oE '&lt;(link|script) [^&gt;]*\.js"' about.html</span>
+&lt;script type="module" src="/assets/core/boot-819b8b79.js"
+<span class="term-cmd">grep -oE '&lt;(link|script) [^&gt;]*\.js"' blog.html</span>
+&lt;link rel="modulepreload" href="/assets/routes/blog-217c6bf2.js"
+&lt;link rel="modulepreload" href="/assets/chunks/shared000-c4f1c28a.js"
+&lt;script type="module" src="/assets/core/boot-819b8b79.js"</code></pre>
+      </c-terminal>
+    </c-showcase>
+    <div class="prose">
+      <p><code>overlay-*.js</code> is the runtime code for modals, alerts and dropdowns. The runtime loads it with <code>import()</code> only when a page uses one, so no page here loads it.</p>
+    </div>
+  </section>
+
+  <section class="doc-section" aria-labelledby="lazy">
+    <h2 id="lazy">Load your own code on click</h2>
+    <div class="prose">
+      <p>Code that runs only after a click goes in a <code>utils/</code> module. The action loads it with <code>await import()</code>. The build puts it in its own chunk, which the page does not preload and its size does not count.</p>
+      <p>A static <code>import</code> of the same module anywhere in the route puts it back in the route chunk. For npm packages, see <a href="/examples/packages#lazy-import">Load a package on click</a>.</p>
+    </div>
+    <c-showcase :source="data.examples.lazy" caption="Real pragma build output: csv is a chunk, and report.html does not preload it.">
+      <c-terminal title="~/my-app">
+        <pre tabindex="0" aria-label="pragma build output for the lazy module"><code><span class="term-cmd">pragma build</span>
+page      JS gzip
+/         10.7 KB
+/about    10.5 KB
+/blog     10.7 KB
+/report   10.7 KB
+CSS        2.8 KB
+4 page(s)
+<span class="term-ok">dist/ built in 36 ms</span>
+<span class="term-cmd">cd dist/client &amp;&amp; ls assets/chunks/*.js</span>
+<span class="term-ink">assets/chunks/csv-98e16965.js</span>
+assets/chunks/overlay-5e18fa36.js
+assets/chunks/shared000-c4f1c28a.js
+<span class="term-cmd">grep -oE '&lt;(link|script) [^&gt;]*\.js"' report.html</span>
+&lt;link rel="modulepreload" href="/assets/routes/report-7a37f783.js"
+&lt;script type="module" src="/assets/core/boot-819b8b79.js"</code></pre>
+      </c-terminal>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="rules">
+    <h2 id="rules">Rules that keep a page fast</h2>
+    <div class="prose">
+      <ul>
+        <li>Navigate with <code>&lt;a href&gt;</code>: the router prefetches links. A button that calls <code>navigate()</code> gets no prefetch.</li>
+        <li>Set <code>width</code> and <code>height</code> on every <code>&lt;img&gt;</code>, and <code>loading="lazy"</code> below the fold.</li>
+        <li>Make the skeleton the shape of the final content.</li>
+        <li>Give each <code>&lt;for&gt;</code> a stable <code>key</code>.</li>
+        <li>Return from <code>load</code> only the fields the page shows. Run independent requests with <code>Promise.all</code>.</li>
+        <li>Do not import large modules in <code>lib/state/</code>: every page that uses the store loads them.</li>
+        <li>Read the size table of <code>pragma build</code> after you add a package or a large module.</li>
+      </ul>
+    </div>
+  </section>
+</c-doc>

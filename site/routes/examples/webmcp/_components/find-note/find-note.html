@@ -1,0 +1,19 @@
+<form class="flex gap-2" toolname="find_note"
+  tooldescription="Find a note by words in its title"
+  toolautosubmit>
+  <input class="border border-line px-2" name="words"
+    aria-label="Words" type="search"
+    toolparamdescription="Words from the note title">
+  <button class="btn">Find</button>
+</form>
+
+<style>
+  form:tool-form-active {
+    outline: 2px dashed var(--color-primary-600);
+    outline-offset: 4px;
+  }
+  button:tool-submit-active {
+    background: var(--color-primary-600);
+    color: white;
+  }
+</style>

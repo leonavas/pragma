@@ -5,7 +5,7 @@
 <meta property="og:title" content="pragma state: let, functions and nothing else">
 <meta property="og:description" content="Assign a let and the runtime reapplies the bindings. No signals, no setState, no manual render.">
 
-<c-doc heading="State and actions" lede="Assign a let and the page updates. This page shows what that means for lists, async code, timers and animation.">
+<c-doc heading="State and actions" lede="Assign a let and the page updates. This page shows what that means for lists, derived values, async code, timers and animation.">
   <section class="doc-section" aria-labelledby="actions">
     <h2 id="actions">Change state in place</h2>
     <div class="prose">
@@ -13,6 +13,16 @@
     </div>
     <c-showcase :source="data.examples.shoppingList" caption="Click Add eggs.">
       <p-shopping-list></p-shopping-list>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="derived">
+    <h2 id="derived">Derived values</h2>
+    <div class="prose">
+      <p>A value computed from state is a function: <code>const total = () =&gt; tickets * 12</code>. The markup reads it as <code>{$total}</code>, with no call, and it follows each change. In the script, call it: <code>total()</code>.</p>
+    </div>
+    <c-showcase :source="data.examples.ticketTotal" caption="Click Add ticket: the total follows. It stops at 48.">
+      <p-ticket-total></p-ticket-total>
     </c-showcase>
   </section>
 

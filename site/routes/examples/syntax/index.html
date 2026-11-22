@@ -85,7 +85,7 @@
     <div class="prose">
       <p><code>&lt;for task in $tasks key=task.id&gt;</code> repeats its element for each task. The <code>key</code> must be unique for each item. <code>@click="remove(task)"</code> gives the function the task of that row. <code>&lt;empty&gt;</code> shows when the list is empty.</p>
     </div>
-    <c-showcase :source="data.examples.taskList" caption="Click Done on both tasks.">
+    <c-showcase :source="data.examples.taskList" caption="Click Done on both tasks: the empty branch shows.">
       <p-task-list></p-task-list>
     </c-showcase>
   </section>

@@ -1,11 +1,11 @@
 <title>Data and SSR · pragma examples</title>
-<meta name="description" content="Data in pragma, live: load() in the page .server.js, a skeleton while it runs, server actions through call() for writes, error() for failures and ssr = true.">
+<meta name="description" content="Data in pragma, live: load(), skeletons, ssr = true, cookies, server actions, errors, redirects, middleware, endpoints and streams.">
 <link rel="canonical" href="https://pragma.leonavas.com/examples/data">
 <meta property="og:url" content="https://pragma.leonavas.com/examples/data">
-<meta property="og:title" content="pragma data and SSR: load, server actions, skeletons">
+<meta property="og:title" content="pragma data and SSR: load, actions, redirects, streams">
 <meta property="og:description" content="Read data with load(), write it with server actions and render it on the server with ssr = true.">
 
-<c-doc heading="Data and SSR" lede="A page reads data from load() in its .server.js and writes through server actions. By default the page shows a skeleton until the data arrives; with ssr = true the server renders the data into the first HTML.">
+<c-doc heading="Data and SSR" lede="A page reads data from load() in its .server.js and writes through server actions. Then: errors, redirects, middleware, endpoints and streams.">
   <section class="doc-section" aria-labelledby="load">
     <h2 id="load"><code>load()</code> with a skeleton</h2>
     <div class="prose">
@@ -16,7 +16,6 @@
     </c-showcase>
     <div class="prose">
       <ul>
-        <li><code>load</code> gets the request context: <code>params</code>, <code>query</code>, <code>request</code>, <code>cookies</code>, <code>env</code>, <code>log</code> and more.</li>
         <li>A query change is a navigation, so <code>load</code> runs again.</li>
         <li>A file named <code>_name.server.js</code> is a private helper. It never reaches the browser.</li>
       </ul>
@@ -42,6 +41,18 @@
       <c-frame src="/examples/data/demo/clock" title="SSR demo route" height="sm"></c-frame>
     </c-showcase>
   </section>
+
+  <section class="doc-section" aria-labelledby="context">
+    <h2 id="context">The server context: cookies and more</h2>
+    <div class="prose">
+      <p><code>load</code> and every action get one context object. <code>cookies.get</code> reads a cookie of the request and <code>cookies.set</code> adds it to the response. A cookie is <code>httpOnly</code>, <code>sameSite: 'lax'</code> and <code>secure</code> by default.</p>
+      <p>The context also has <code>request</code>, <code>url</code>, <code>params</code>, <code>query</code>, <code>env</code> (secrets and bindings), <code>log</code>, <code>locals</code>, <code>setHeaders</code> and <code>waitUntil</code>.</p>
+    </div>
+    <c-showcase :source="data.examples.visits" caption="Reload the frame: the count goes up.">
+      <c-frame src="/examples/data/demo/visits" title="Cookie demo route" height="sm"></c-frame>
+    </c-showcase>
+  </section>
+
   <section class="doc-section" aria-labelledby="actions">
     <h2 id="actions">Writes go through server actions</h2>
     <div class="prose">
@@ -53,4 +64,63 @@
     </c-showcase>
   </section>
 
+  <section class="doc-section" aria-labelledby="action-errors">
+    <h2 id="action-errors">When an action fails</h2>
+    <div class="prose">
+      <p><code>error(409, 'message')</code> in an action makes <code>call</code> throw. The error has <code>status</code>, <code>body</code> (what the server sent) and <code>message</code>, so the page can react to each status.</p>
+    </div>
+    <c-showcase :source="data.examples.booking" caption="Click Mon, then Tue: Tue is taken.">
+      <c-frame src="/examples/data/demo/booking" title="Booking demo route" height="sm"></c-frame>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="redirects">
+    <h2 id="redirects">Redirects: <code>redirect()</code></h2>
+    <div class="prose">
+      <p><code>redirect(303, url)</code> from <code>'pragma/server'</code> sends the browser to another page. After an action, the page navigates before <code>call</code> returns. In <code>load</code>, it replaces the current page, so Back skips it.</p>
+    </div>
+    <c-showcase :source="data.examples.redirects" caption="Click Place order, then open /done without an id.">
+      <c-frame src="/examples/data/demo/order" title="Redirect demo route" height="sm"></c-frame>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="middleware">
+    <h2 id="middleware">Middleware: before every request</h2>
+    <div class="prose">
+      <p><code>routes/_middleware.server.js</code> runs before every page, <code>load</code>, action and endpoint. It is the place for auth: it puts the user in <code>locals</code> for <code>load</code> and the actions, and redirects when a path needs a user. <code>next()</code> gives the response, which it can change.</p>
+      <p>An app has one middleware, so this site cannot run this one. The output is real, from a new app with this file.</p>
+    </div>
+    <c-showcase :source="data.examples.middleware" caption="Real responses of a new app with this middleware.">
+      <c-terminal title="~/my-app">
+        <pre tabindex="0" aria-label="Responses with the middleware"><code><span class="term-cmd">curl -sI localhost:5197/account</span>
+<span class="term-warn">HTTP/1.1 303 See Other</span>
+location: /login
+
+<span class="term-cmd">curl -sI localhost:5197/</span>
+<span class="term-ok">HTTP/1.1 200 OK</span>
+x-frame-options: DENY</code></pre>
+      </c-terminal>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="endpoints">
+    <h2 id="endpoints">Endpoints: a <code>.server.js</code> without a page</h2>
+    <div class="prose">
+      <p>A <code>.server.js</code> with no <code>.html</code> next to it is an endpoint. It exports <code>GET</code>, <code>POST</code> and the other methods, and each returns a <code>Response</code>: a file, a stream, a webhook reply. A link with <code>download</code> opens it without the router.</p>
+      <p>Page data comes from <code>load</code>, and writes go through actions. Do not make <code>/api</code> endpoints for them.</p>
+    </div>
+    <c-showcase :source="data.examples.endpoint" caption="Click Download: the browser saves products.csv.">
+      <c-frame src="/examples/data/demo/downloads" title="Endpoint demo route" height="sm"></c-frame>
+    </c-showcase>
+  </section>
+
+  <section class="doc-section" aria-labelledby="stream">
+    <h2 id="stream">Stream from an action: <code>stream()</code></h2>
+    <div class="prose">
+      <p>An action can return a <code>Response</code> with a <code>ReadableStream</code>. With <code>content-type: application/x-ndjson</code>, each line is one JSON value. <code>stream('ask')</code> gives each line as soon as the server writes it, in a <code>for await</code> loop.</p>
+    </div>
+    <c-showcase :source="data.examples.stream" caption="Click Ask: the words arrive one at a time.">
+      <c-frame src="/examples/data/demo/ask" title="Streaming demo route" height="sm"></c-frame>
+    </c-showcase>
+  </section>
 </c-doc>
