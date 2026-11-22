@@ -268,12 +268,29 @@ fn module_graph(
 ) -> BTreeMap<PathBuf, Module> {
     let root = p.root.as_path();
     let mut mods = BTreeMap::new();
+    let mut unreadable = HashSet::new();
     let mut queue: VecDeque<PathBuf> = entries.iter().cloned().collect();
     while let Some(path) = queue.pop_front() {
         if mods.contains_key(&path) {
             continue;
         }
-        let Some(src) = sources.get(&path).cloned().or_else(|| fs::read_to_string(root.join(&path)).ok()) else { continue };
+        let src = match sources.get(&path) {
+            Some(src) => src.clone(),
+            None => match fs::read(root.join(&path)).map(String::from_utf8) {
+                Ok(Ok(src)) => src,
+                Ok(Err(e)) => {
+                    let valid = String::from_utf8_lossy(&e.as_bytes()[..e.utf8_error().valid_up_to()]).into_owned();
+                    let (line, col) = html::line_col(&valid, valid.len());
+                    diags.push(Diagnostic::error(&path, line, col, "js/syntax", "the file is not UTF-8 text; save it as UTF-8"));
+                    unreadable.insert(path);
+                    continue;
+                }
+                Err(_) => {
+                    unreadable.insert(path);
+                    continue;
+                }
+            },
+        };
         let lines = html::LineIndex::new(&src);
         let mut bindings: Option<Vec<(String, pragma_jslint::Imported)>> = None;
         let mut imports = Vec::new();
@@ -352,6 +369,13 @@ fn module_graph(
             imports.push((imp, ok));
         }
         mods.insert(path, Module { src, imports });
+    }
+    for m in mods.values_mut() {
+        for (_, target) in &mut m.imports {
+            if target.as_ref().is_some_and(|t| unreadable.contains(t)) {
+                *target = None;
+            }
+        }
     }
     mods
 }

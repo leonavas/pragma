@@ -2162,3 +2162,15 @@ fn attributes_the_build_writes_are_errors_in_source() {
         assert!(message(&d, "html/data-attribute").contains("is internal"), "{attr}: {d:#?}");
     }
 }
+
+#[test]
+fn an_imported_module_that_is_not_utf8_is_an_error() {
+    let t = app_with(&[]);
+    let app = t.0.join("app");
+    fs::write(app.join("utils/fmt.js"), b"export const format = (value) => \"\xe7\" + value\n").unwrap();
+    let d = check(&app);
+    expect(&d, "js/syntax", "utils/fmt.js", 1);
+    let out = t.0.join("out");
+    let errors = build(&BuildOptions { root: app, out_dir: out, mode: Mode::Dev }).unwrap_err();
+    expect(&errors, "js/syntax", "utils/fmt.js", 1);
+}
