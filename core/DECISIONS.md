@@ -86,7 +86,8 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   Store functions are handlers too (`@click="shared.cart.remove(item.id)"`), so components need no
   wrapper actions. *Why:* every other framework passes the event by default; `fn` with no args
   was the most common first-try bug.
-- **[firm]** (DX review, 2026-11-19) Component and page CSS is scoped by the build: each selector
+- **[superseded]** by "Scoped CSS matches only the owner's markup" (2026-11-21). (DX review,
+  2026-11-19) Component and page CSS is scoped by the build: each selector
   gets `:where(<scope>, <scope> *)` on its last part (no specificity added), unless it already
   names the scope; `:global(…)` opts out. *Why:* `button { color: red }` in a component shipped as
   a global rule and nothing warned; agents from Svelte/Vue expect scoping. The hand-written
@@ -227,7 +228,36 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   classes, no arbitrary values. Goal: fewer classes; custom classes allowed for refined cases
   (SPEC §8). *Why:* CSS stops growing, agents already know the names, no naming decisions.
 - **[firm v0]** `base.css` (preflight + layers) and `lib/theme.css` (tokens and custom
-  classes); dark theme via `[data-theme="dark"]` and `dark:`; one global hashed CSS.
+  classes); dark theme via `[data-theme="dark"]` and `dark:`.
+- **[firm]** (2026-11-21) Scoped CSS matches only the owner's markup (Svelte semantics): the build
+  writes a `data-s` token on each element a page or component wrote (only on elements one of its
+  selectors can match) and appends `:where([data-s~="<token>"])` to each selector's subject. Child
+  component markup and slot content (which belongs to its writer) are not matched; `:global(…)`
+  opts out as before; a component root that gets `class` from its caller also carries the
+  caller's token. *Why:* the escalei port (Svelte) had to rename about 15 owners' classes
+  (`.titulo`, `.lista`) because page and component styles leaked into child components.
+  *Cost:* slotted items styled by a component need `:global(…)` (starter dropdown updated); HTML
+  grows about 7% gzip on a component-heavy page (escalei `/app/[id]`: 56.1 to 59.8 kB).
+- **[firm]** (2026-11-21) Cascade: `reset, tokens, base, components, utilities` layers, then
+  component and page CSS outside any layer. Theme classes < utilities < scoped styles, as with
+  Tailwind v4 + Svelte. *Why:* in the port about 20 components had to move utilities into their
+  CSS, because a utility on the element beat the component's state, hover and media rules.
+- **[firm]** (2026-11-21) Utilities and project classes with the same name coexist: the utility is
+  always generated. A `lib/theme.css` rule whose whole selector is a utility name (`.flex`,
+  `.hidden:hover`) is `css/utility-name`. *Why:* a selector like `.heroi > .contents` silently
+  removed `contents` (and `mr-auto`, `overflow-y-auto`) for the whole app.
+- **[firm]** (2026-11-21) Per-route CSS: one shared file (base + layout utilities) and one route
+  file with the theme rules whose selectors can match the route's markup (element names and
+  classes, static or `.x`; attribute, id and pseudo-class parts never drop a rule), the
+  component and page CSS of the route without rules for classes their own elements never have,
+  and the route's utilities. Both inline when their gzip sum is <= 14 kB. *Why:* the theme (46 kB
+  in escalei) shipped whole and render-blocking on every page.
+- **[firm]** (2026-11-21) Automatic font preload per route: for each `@font-face` family the
+  route's CSS uses (`font-family`/`font`, through `var()` chains, only rules that can match), one
+  `<link rel="preload" as="font" crossorigin>` for the upright `.woff2` that covers Latin letters
+  (weight 400 when there are several). Manual preloads in `_layout.html` should be removed
+  (not repeated when present). *Why:* the layout preloaded 130 kB of fonts the landing did not
+  use. Metric overrides (`size-adjust`) for fallbacks are not generated.
 - **[firm]** (2026-11-21) Computed values (bar position, width, `--cols`, `--i/--n`) go through CSS
   custom properties: `:--name="path"` sets `--name` (Svelte `style:--name`); the CSS reads
   `var(--name)`. `false`/`null`/`undefined`/`""` remove it; a value with `;`, `{`, `}` or `<` is
@@ -236,6 +266,7 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   declarations. The server writes `style="--name:value"` (HTML-escaped).
 - **[superseded]** "No Tailwind, preflight only" and "Tailwind v4 vs own CSS".
 - **[superseded]** Per-route CSS: v0 emits one global CSS (per-route CSS is out of v0).
+- **[superseded]** One global hashed CSS with the whole theme (replaced by per-route CSS, 2026-11-21).
 
 ## Reactivity and state
 
@@ -493,7 +524,7 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
       provenance/attestations and signed checksums (see "Tool (Rust CLI)").
 - [ ] Bundler for app modules after v0 (`rolldown` already bundles npm packages), and whether
       it beats one file per module with `modulepreload`.
-- [ ] Per-route CSS and inline critical CSS.
+- [x] Per-route CSS and inline critical CSS (2026-11-21).
 - [ ] Brotli or gzip; precompress at build.
 - [ ] 103 Early Hints on Cloudflare.
 - [ ] Measure LCP, INP and navigation on simulated slow 4G, with the `tests_1` bench, against

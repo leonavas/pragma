@@ -2,14 +2,14 @@
 
 /// At-rules whose block holds style rules (scoped recursively); any other block is copied as is
 /// (`@keyframes`, `@font-face`, `@property`, `@page`…).
-const NESTING: &[&str] = &["media", "supports", "layer", "container", "starting-style", "document"];
+pub(crate) const NESTING: &[&str] = &["media", "supports", "layer", "container", "starting-style", "document"];
 
 /// Pseudo-elements written with one colon (CSS 2): the scope goes before them.
 const OLD_PSEUDO_ELEMENTS: &[&str] = &[":before", ":after", ":first-line", ":first-letter"];
 
-/// Scopes every style rule of `css` to `scope` (an attribute selector such as `[data-c="card"]`):
-/// a selector that does not mention it (any of `spellings`) gets `:where(scope, scope *)` on its
-/// subject, so it matches the owner's root and what is inside it, with no added specificity.
+/// Scopes every style rule of `css` to `scope` (a selector of the owner's own elements, such as
+/// `[data-s~="s1a2b3"]`): a selector that does not mention any of `spellings` gets `:where(scope)`
+/// on its subject, so it matches only elements the owner wrote, with no added specificity.
 /// `:global(…)` opts out only what is inside it (the wrapper is removed): the scope goes on the last
 /// compound that does not start with it (`:global(html.dark) .row` → `html.dark .row:where(…)`);
 /// a selector made only of `:global(…)` compounds (`:global(:root)`) is not scoped.
@@ -65,7 +65,7 @@ fn selector(s: &str, scope: &str, spellings: &[String]) -> String {
     let scoped = match target {
         Some((start, end)) if !written => {
             let at = pseudo_element(&trimmed[start..end]).map_or(end, |i| start + i);
-            format!("{}:where({scope},{scope} *){}", &trimmed[..at], &trimmed[at..])
+            format!("{}:where({scope}){}", &trimmed[..at], &trimmed[at..])
         }
         _ => trimmed.to_string(),
     };
@@ -88,7 +88,7 @@ fn unwrap_global(s: &str) -> String {
 }
 
 /// Byte ranges of the compound selectors (split at the top-level combinators), in order.
-fn compounds(s: &str) -> Vec<(usize, usize)> {
+pub(crate) fn compounds(s: &str) -> Vec<(usize, usize)> {
     let b = s.as_bytes();
     let (mut depth, mut i, mut quote, mut start) = (0i32, 0, 0u8, None::<usize>);
     let mut out = Vec::new();
@@ -147,7 +147,7 @@ fn pseudo_element(compound: &str) -> Option<usize> {
 }
 
 /// First of `chars` at depth 0, outside strings and comments.
-fn find_top(s: &str, chars: &[char]) -> Option<usize> {
+pub(crate) fn find_top(s: &str, chars: &[char]) -> Option<usize> {
     let b = s.as_bytes();
     let (mut depth, mut i, mut quote) = (0i32, 0, 0u8);
     while i < b.len() {
@@ -175,12 +175,12 @@ fn find_top(s: &str, chars: &[char]) -> Option<usize> {
 }
 
 /// Index of the `}` closing the `{` at `open` (or the end).
-fn block_end(s: &str, open: usize) -> usize {
+pub(crate) fn block_end(s: &str, open: usize) -> usize {
     open + 1 + block_end_with(&s[open + 1..], '{', '}')
 }
 
 /// Index of the `close` matching an already opened `open`, in `s` (or `s.len()`).
-fn block_end_with(s: &str, open: char, close: char) -> usize {
+pub(crate) fn block_end_with(s: &str, open: char, close: char) -> usize {
     let b = s.as_bytes();
     let (mut depth, mut i, mut quote) = (0i32, 0, 0u8);
     while i < b.len() {
@@ -208,7 +208,7 @@ fn block_end_with(s: &str, open: char, close: char) -> usize {
     b.len()
 }
 
-fn split_top(s: &str, sep: char) -> Vec<&str> {
+pub(crate) fn split_top(s: &str, sep: char) -> Vec<&str> {
     let mut parts = Vec::new();
     let mut rest = s;
     while let Some(i) = find_top(rest, &[sep]) {
@@ -225,10 +225,10 @@ mod tests {
 
     fn card(css: &str) -> String {
         let s = "[data-c=\"card\"]";
-        scope(css, s, &[s.to_string(), "[data-c='card']".into(), "[data-c=card]".into()])
+        scope(css, "[data-s~=\"s1\"]", &[s.to_string(), "[data-c='card']".into(), "[data-c=card]".into()])
     }
 
-    const W: &str = ":where([data-c=\"card\"],[data-c=\"card\"] *)";
+    const W: &str = ":where([data-s~=\"s1\"])";
 
     #[test]
     fn subjects_get_the_scope() {

@@ -16,7 +16,7 @@ pub use compile::{SSR_SELF_CALLS, SSR_SELF_DEPTH};
 
 use pragma_diag::{Diagnostic, Severity};
 use pragma_jslint::script::{self, ScriptInfo, ScriptKind};
-use project::{Component, Page, Project, rel_str};
+use project::{Page, Project, rel_str};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::fs;
@@ -128,18 +128,60 @@ fn spellings(attr: &str, value: &str) -> Vec<String> {
     vec![format!("[{attr}=\"{value}\"]"), format!("[{attr}='{value}']"), format!("[{attr}={value}]")]
 }
 
-/// A component's CSS applies only inside it: every selector that does not already name
-/// `[data-c="<name>"]` is scoped to it (`:global(…)` opts out). A `routes/**/_components` one gets a
-/// per-folder id (`Component::id`), so its own selector is rewritten to that id (BUG-S-11).
+/// `data-s` token of a page's or component's CSS: the build writes it on every element that owner
+/// wrote (not on child components' markup, and slot content keeps its writer's token).
+pub(crate) fn css_owner(kind: &str, name: &str) -> String {
+    let mut h = Fnv::new();
+    h.write(kind.as_bytes());
+    h.write(b":");
+    h.write(name.as_bytes());
+    format!("s{}", &short_hash(h.finish())[..6])
+}
+
+/// What scoping adds to a selector's own-element compound (see [`owner_selector`]).
+const OWNED: &str = ":where([data-s~=";
+
+fn owner_selector(token: &str) -> String {
+    format!("[data-s~=\"{token}\"]")
+}
+
+/// A component's CSS applies only to the markup it wrote: every selector that does not already name
+/// `[data-c="<name>"]` is scoped to its `data-s` token (`:global(…)` opts out). A
+/// `routes/**/_components` one gets a per-folder id (`Component::id`), so its own selector is
+/// rewritten to that id (BUG-S-11).
 fn scope_component_css(css: &str, name: &str, id: &str) -> String {
     let to = format!("[data-c=\"{id}\"]");
     let css = if name == id { css.to_string() } else { spellings("data-c", name).iter().fold(css.to_string(), |out, from| out.replace(from.as_str(), &to)) };
-    pragma_css::scope::scope(&css, &to, &spellings("data-c", id))
+    pragma_css::scope::scope(&css, &owner_selector(&css_owner("component", id)), &spellings("data-c", id))
 }
 
-/// A page's CSS applies only inside its `<main data-page="<page>">`.
+/// A page's CSS applies only to the markup its `.html` wrote.
 fn scope_page_css(css: &str, page: &str) -> String {
-    pragma_css::scope::scope(css, &format!("[data-page=\"{page}\"]"), &spellings("data-page", page))
+    pragma_css::scope::scope(css, &owner_selector(&css_owner("page", page)), &spellings("data-page", page))
+}
+
+/// Element names and classes (static and `.x` toggles) of a route's markup.
+fn markup_of(nodes: &[html::Node], out: &mut pragma_css::prune::Markup) {
+    for n in nodes {
+        let html::Node::Element(e) = n else { continue };
+        out.tags.insert(e.name.to_ascii_lowercase());
+        for a in &e.attrs {
+            let lname = a.name.to_ascii_lowercase();
+            if lname == "class" {
+                out.classes.extend(a.value.iter().flat_map(|v| v.split_whitespace().map(str::to_string)));
+            } else if let Some(Some(directive::Dir::Class(c))) = directive::parse(&lname) {
+                out.classes.insert(c.to_string());
+            }
+        }
+        markup_of(&e.children, out);
+    }
+}
+
+fn line_col(src: &str, offset: usize) -> (u32, u32) {
+    let before = &src[..offset.min(src.len())];
+    let line = before.matches('\n').count() as u32 + 1;
+    let col = before.rsplit('\n').next().map_or(0, |l| l.chars().count()) as u32 + 1;
+    (line, col)
 }
 
 fn sort_diags(mut d: Vec<Diagnostic>) -> Vec<Diagnostic> {
@@ -508,6 +550,16 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     };
     css_comment(Path::new("lib/theme.css"), &theme_src, &mut diags);
     let theme = pragma_css::parse_theme(&theme_src);
+    for (class, offset) in pragma_css::prune::utility_redefinitions(&theme_src, &|c| pragma_css::is_utility_with_css(c, &theme)) {
+        let (line, col) = line_col(&theme_src, offset);
+        diags.push(Diagnostic::error(
+            "lib/theme.css",
+            line,
+            col,
+            "css/utility-name",
+            format!(".{class} has the name of a utility: class=\"{class}\" would get both rules and the utility wins; rename the custom class (e.g. .x-{class}) or use the utility"),
+        ));
+    }
     let mut project_classes = HashSet::new();
     validate::css_classes(&theme_src, &mut project_classes);
     let mut comp_css: HashMap<PathBuf, String> = HashMap::new();
@@ -518,7 +570,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             comp_css.insert(c.dir.clone(), scope_component_css(&css, &c.name, &c.id));
         }
     }
-    // a page <style> goes into its per-route CSS (or shared CSS for _404) in @layer components, scoped to its <main>
+    // a page <style> goes into its per-route CSS, after the layers (beats utilities), scoped to its own markup
     let mut page_css: HashMap<PathBuf, String> = HashMap::new();
     for (f, page) in p.pages.iter().chain(p.not_found.iter()).filter_map(|pg| pg.css.as_ref().map(|f| (f, &pg.out_name))) {
         if let Some(css) = p.read(f) {
@@ -527,6 +579,11 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             page_css.insert(f.clone(), scope_page_css(&css, page));
         }
     }
+    let owned: HashMap<String, BTreeSet<pragma_css::prune::OwnCompound>> = p
+        .all_components()
+        .filter_map(|c| comp_css.get(&c.dir).map(|css| (css_owner("component", &c.id), pragma_css::prune::own_compounds(css, OWNED))))
+        .chain(p.pages.iter().chain(p.not_found.iter()).filter_map(|pg| pg.css.as_ref().and_then(|f| page_css.get(f)).map(|css| (css_owner("page", &pg.out_name), pragma_css::prune::own_compounds(css, OWNED)))))
+        .collect();
     let mut classes = validate::ClassCheck::new(project_classes, theme);
 
     let comp_ids: HashSet<u32> = p.all_components().map(|c| c.html).collect();
@@ -551,10 +608,9 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
 
     let mut outs: Vec<PageOut> = Vec::new();
     let mut shared_classes: BTreeSet<String> = BTreeSet::new();
-    let mut shared_components: BTreeMap<PathBuf, Component> = BTreeMap::new();
     let all_pages: Vec<(&Page, bool)> = p.pages.iter().map(|pg| (pg, false)).chain(p.not_found.iter().map(|pg| (pg, true))).collect();
     for (page, is_404) in all_pages {
-        let (mut exp, d) = expand::Expander::new(&p, &scripts).page(page);
+        let (mut exp, d) = expand::Expander::new(&p, &scripts).owned(&owned).page(page);
         diags.extend(d);
         if !is_404 && !page.pattern.contains(':') {
             mark_current(&mut exp.body, &page.pattern);
@@ -626,11 +682,6 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         } else {
             sc.page_classes
         };
-        for c in exp.components.values() {
-            if is_404 || exp.layout_components.contains(&c.dir) {
-                shared_components.insert(c.dir.clone(), c.clone());
-            }
-        }
         outs.push(PageOut { page, exp, loader, ssr, stores: sc.stores, page_classes, is_404, overlays });
     }
 
@@ -708,45 +759,28 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         w.write_client(&format!("client{}", urls[path]), code.as_bytes(), prod);
     }
 
-    // Shared CSS (base + theme + layout/_404 components and utilities)
-    let shared_names: Vec<String> = shared_classes.iter().filter(|c| !classes.project.contains(*c)).cloned().collect();
+    // Shared CSS (base + layout/_404 utilities); the theme, components and pages go per route
+    let shared_names: Vec<String> = shared_classes.iter().cloned().collect();
     let generated = pragma_css::generate(&shared_names, &classes.theme);
-    let mut shared_tail = String::new();
-    shared_tail.push_str(&theme_src);
-    shared_tail.push('\n');
-    for c in shared_components.values() {
-        if let Some(s) = comp_css.get(&c.dir) {
-            shared_tail.push_str(&format!("/* {} */\n@layer components {{\n{}\n}}\n", rel_str(p.origin(c.css.as_ref().unwrap())), s.trim()));
-        }
-    }
-    if let Some(f) = p.not_found.as_ref().and_then(|pg| pg.css.as_ref())
-        && let Some(s) = page_css.get(f)
-    {
-        shared_tail.push_str(&format!("/* {} */\n@layer components {{\n{}\n}}\n", rel_str(p.origin(f)), s.trim()));
-    }
-    shared_tail.push_str(&generated.css);
     let mut css = if prod {
-        let mut all_used = String::with_capacity(shared_tail.len() + 4096);
-        all_used.push_str(&shared_tail);
+        let mut all_used = String::with_capacity(theme_src.len() + generated.css.len() + 4096);
+        all_used.push_str(&theme_src);
+        all_used.push_str(&generated.css);
         for s in comp_css.values().chain(page_css.values()) {
             all_used.push_str(s);
             all_used.push('\n');
         }
-        let all_route_names: BTreeSet<String> = outs
-            .iter()
-            .filter(|o| !o.is_404)
-            .flat_map(|o| o.page_classes.iter())
-            .filter(|c| !classes.project.contains(*c) && !shared_classes.contains(*c))
-            .cloned()
-            .collect();
-        let all_route_vec: Vec<String> = all_route_names.into_iter().collect();
+        let all_route_vec: Vec<String> = outs.iter().flat_map(|o| o.page_classes.iter()).filter(|c| !shared_classes.contains(*c)).cloned().collect::<BTreeSet<_>>().into_iter().collect();
         all_used.push_str(&pragma_css::generate(&all_route_vec, &classes.theme).css);
+        if let Err(e) = pragma_css::minify(&theme_src) {
+            diags.push(Diagnostic::error("lib/theme.css", 1, 1, "css/syntax", e));
+        }
         pragma_css::base_css_for(&all_used)
     } else {
         String::from(pragma_css::base_css())
     };
     css.push('\n');
-    css.push_str(&shared_tail);
+    css.push_str(&generated.css);
     if prod {
         match pragma_css::minify(&css) {
             Ok(m) => css = m,
@@ -767,50 +801,46 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         let mut route_css_url: Option<String> = None;
         let mut route_css_src: Option<String> = None;
         let mut route_css_gz: u64 = 0;
-        if !o.is_404 {
-            let mut rcss = String::new();
-            let mut seen_dirs = HashSet::new();
-            for c in o.exp.components.values() {
-                if !shared_components.contains_key(&c.dir)
-                    && seen_dirs.insert(&c.dir)
-                    && let Some(s) = comp_css.get(&c.dir)
-                {
-                    rcss.push_str(&format!("/* {} */\n@layer components {{\n{}\n}}\n", rel_str(p.origin(c.css.as_ref().unwrap())), s.trim()));
-                }
-            }
-            if let Some(f) = &o.page.css
-                && let Some(s) = page_css.get(f)
+        let mut markup = pragma_css::prune::Markup::default();
+        markup_of(if p.layout.is_some() { &o.exp.body } else { &o.exp.page }, &mut markup);
+        let mut scoped = String::new();
+        let mut seen_dirs = HashSet::new();
+        for c in o.exp.components.values() {
+            if seen_dirs.insert(&c.dir)
+                && let Some(s) = comp_css.get(&c.dir)
             {
-                rcss.push_str(&format!("/* {} */\n@layer components {{\n{}\n}}\n", rel_str(p.origin(f)), s.trim()));
+                scoped.push_str(&format!("/* {} */\n{}\n", rel_str(p.origin(c.css.as_ref().unwrap())), pragma_css::prune::prune_scoped(s, &markup, OWNED).trim()));
             }
-            let route_names: Vec<String> = o
-                .page_classes
-                .iter()
-                .filter(|c| !classes.project.contains(*c) && !shared_classes.contains(*c))
-                .cloned()
-                .collect();
-            let route_gen = pragma_css::generate(&route_names, &classes.theme);
-            rcss.push_str(&route_gen.css);
-            if !rcss.trim().is_empty() {
-                if prod {
-                    match pragma_css::minify(&rcss) {
-                        Ok(m) => rcss = m,
-                        Err(e) => {
-                            let file = o.page.css.as_deref().unwrap_or(&p.files[o.page.html as usize]);
-                            diags.push(Diagnostic::error(file, 1, 1, "css/syntax", e));
-                        }
+        }
+        if let Some(f) = &o.page.css
+            && let Some(s) = page_css.get(f)
+        {
+            scoped.push_str(&format!("/* {} */\n{}\n", rel_str(p.origin(f)), pragma_css::prune::prune_scoped(s, &markup, OWNED).trim()));
+        }
+        let route_names: Vec<String> = o.page_classes.iter().filter(|c| !shared_classes.contains(*c)).cloned().collect();
+        scoped.push_str(&pragma_css::generate(&route_names, &classes.theme).css);
+        let route_theme = pragma_css::prune::prune_theme(&theme_src, &markup, &scoped);
+        let mut rcss = if route_theme.trim().is_empty() { scoped } else { format!("/* lib/theme.css */\n{}\n{scoped}", route_theme.trim()) };
+        let fonts = pragma_css::prune::font_preloads(&format!("{css}\n{rcss}"), &markup);
+        if !rcss.trim().is_empty() {
+            if prod {
+                match pragma_css::minify(&rcss) {
+                    Ok(m) => rcss = m,
+                    Err(e) => {
+                        let file = o.page.css.as_deref().unwrap_or(&p.files[o.page.html as usize]);
+                        diags.push(Diagnostic::error(file, 1, 1, "css/syntax", e));
                     }
                 }
-                let url = if prod {
-                    format!("/assets/css/{}-{}.css", o.page.out_name, hash8(rcss.as_bytes()))
-                } else {
-                    format!("/assets/css/{}.css", o.page.out_name)
-                };
-                w.write_client(&format!("client{url}"), rcss.as_bytes(), prod);
-                route_css_gz = gzip_len(rcss.as_bytes());
-                route_css_url = Some(url);
-                route_css_src = Some(rcss);
             }
+            let url = if prod {
+                format!("/assets/css/{}-{}.css", o.page.out_name, hash8(rcss.as_bytes()))
+            } else {
+                format!("/assets/css/{}.css", o.page.out_name)
+            };
+            w.write_client(&format!("client{url}"), rcss.as_bytes(), prod);
+            route_css_gz = gzip_len(rcss.as_bytes());
+            route_css_url = Some(url);
+            route_css_src = Some(rcss);
         }
         let entries = page_entries(o);
         let modules = closure(&mods, &entries, false);
@@ -843,6 +873,9 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         if !ex.is_empty() {
             doc.push_str(ex);
             doc.push('\n');
+        }
+        for href in fonts.iter().filter(|h| !ex.contains(&format!("href=\"{h}\""))) {
+            doc.push_str(&format!("<link rel=\"preload\" href=\"{}\" as=\"font\" type=\"font/woff2\" crossorigin>\n", html::escape_attr(href)));
         }
         if theme_js {
             doc.push_str(THEME);

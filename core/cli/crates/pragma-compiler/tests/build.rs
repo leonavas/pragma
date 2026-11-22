@@ -579,6 +579,69 @@ fn slot_marks_lexical_owner_and_module_props() {
     assert!(html.contains("<div data-slot=\"1\"><section data-c=\"box\" data-prop-step=\"2\" class=\"p-4\">"), "{html}");
     assert!(html.contains("<b data-text=\"{state.open}\" data-slot=\"1\"></b> and <!--1{state.open}--><!--}-->"), "{html}");
     assert!(html.contains("<div data-c=\"card\" class=\"card p-4\" data-class-featured=\"state.featured\" data-prop-heading=\"x\">"), "{html}");
+    assert!(!html.contains("data-s="), "card's CSS names [data-c=\"card\"] itself, so nothing needs a token: {html}");
+}
+
+#[test]
+fn component_and_page_css_match_only_their_own_markup() {
+    let t = scratch(&[
+        ("lib/theme.css", "@layer components {\n  .panel { padding: 1rem; }\n}\n"),
+        ("lib/components/panel/panel.html", "<section class=\"panel\"><h2 class=\"title\">Panel</h2><p>text</p><slot></slot></section>\n<style>\n  .title { font-size: 2rem }\n  .panel { display: grid }\n</style>\n"),
+        ("lib/components/item/item.html", "<div><h3 class=\"title\">Item</h3></div>"),
+        ("routes/index.html", "<title>Home</title>\n<c-panel class=\"wide flex\"><c-item></c-item><b class=\"title wide\">slot</b></c-panel>\n<style>\n  .wide { margin: 0 }\n  .flex { gap: 1rem }\n</style>\n"),
+    ]);
+    let app = t.0.join("app");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: app.clone(), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let panel = token_after(&html, "<h2 class=\"title\"");
+    let page = token_after(&html, "<b class=\"title wide\"");
+    assert_ne!(panel, page);
+    assert!(html.contains(&format!("<b class=\"title wide\" data-s=\"{page}\">")), "slot content belongs to the page, not to the panel: {html}");
+    assert!(html.contains(&format!("class=\"panel wide flex\" data-s=\"{panel} {page}\"")), "the root belongs to the component and, with a class from the caller, to the caller too: {html}");
+    assert!(html.contains("<p>text</p>"), "an element no selector can match gets no token: {html}");
+    assert!(html.contains("<h3 class=\"title\">Item</h3>"), "a child component's markup is not the panel's: {html}");
+    let css = fs::read_to_string(out.join("client/assets/css/index.css")).unwrap();
+    assert!(css.contains(&format!(".title:where([data-s~=\"{panel}\"]) {{ font-size: 2rem }}")), "{css}");
+    let theme_at = css.find(".panel { padding").unwrap();
+    let panel_at = css.find(&format!(".panel:where([data-s~=\"{panel}\"]) {{ display: grid }}")).unwrap();
+    let utilities_at = css.find("@layer utilities").unwrap();
+    assert!(theme_at < panel_at && panel_at < utilities_at, "{css}");
+    assert!(!css[panel_at..utilities_at].contains("@layer"), "component and page CSS stay outside layers, so they beat utilities: {css}");
+    assert!(css.contains(".flex {") && css.contains(&format!(".flex:where([data-s~=\"{page}\"]) {{ gap: 1rem }}")), "a project selector named like a utility keeps the utility: {css}");
+}
+
+#[test]
+fn theme_class_named_like_a_utility_is_an_error() {
+    let d = check_with(&[("lib/theme.css", Some("@layer components {\n  .btn { padding: 0.5rem 1rem; border-radius: var(--radius-md); }\n  .tag, .active { font-size: .75rem; }\n  .hero > .contents, .x.mr-auto { margin: 0 }\n  .hidden:hover { color: red }\n}\n"))]);
+    expect(&d, "css/utility-name", "lib/theme.css", 5);
+    assert_eq!(d.iter().filter(|x| x.rule == "css/utility-name").count(), 1, "{d:#?}");
+    assert!(message(&d, "css/utility-name").contains(".hidden"), "{d:#?}");
+}
+
+#[test]
+fn route_css_keeps_only_matching_theme_rules_and_preloads_used_fonts() {
+    let theme = "@font-face { font-family: 'Body'; font-weight: 100 900; src: url('/fonts/body-latin.woff2') format('woff2'); unicode-range: U+0000-00FF; }\n@font-face { font-family: 'Body'; font-weight: 100 900; src: url('/fonts/body-ext.woff2') format('woff2'); unicode-range: U+0100-024F; }\n@font-face { font-family: 'Title'; src: url('/fonts/title.woff2') format('woff2'); }\n@layer tokens {\n  :root { --font-sans: 'Body', sans-serif; --font-title: 'Title', serif; }\n}\n@layer components {\n  .hero { font-family: var(--font-title); }\n  .note { color: red; }\n}\n";
+    let t = scratch(&[
+        ("lib/theme.css", theme),
+        ("routes/_layout.html", "<head>\n  <link rel=\"preload\" href=\"/fonts/body-latin.woff2\" as=\"font\" type=\"font/woff2\" crossorigin>\n</head>\n<main data-page><slot></slot></main>"),
+        ("routes/index.html", "<title>Home</title><h1 class=\"hero\">Hi</h1>"),
+        ("routes/plain.html", "<title>Plain</title><p class=\"note\">Plain</p>"),
+    ]);
+    let app = t.0.join("app");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: app.clone(), out_dir: out.clone(), mode: Mode::Prod }).unwrap();
+    let index = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let plain = fs::read_to_string(out.join("client/plain.html")).unwrap();
+    for html in [&index, &plain] {
+        assert!(!html.contains("rel=\"stylesheet\""), "small pages inline their CSS: {html}");
+        assert_eq!(html.matches("href=\"/fonts/body-latin.woff2\"").count(), 1, "the layout's own preload is not repeated: {html}");
+        assert!(!html.contains("body-ext.woff2\" as"), "{html}");
+    }
+    assert!(index.contains("<link rel=\"preload\" href=\"/fonts/title.woff2\" as=\"font\" type=\"font/woff2\" crossorigin>"), "{index}");
+    assert!(!plain.contains("<link rel=\"preload\" href=\"/fonts/title.woff2\""), "{plain}");
+    assert!(index.contains(".hero{") && !index.contains(".note{"), "{index}");
+    assert!(plain.contains(".note{") && !plain.contains(".hero{"), "{plain}");
 }
 
 #[test]
@@ -644,6 +707,15 @@ fn script_tag() {
     expect(&check_with(&[("routes/_layout.html", Some("<script>let n = 1</script>\n<main data-page><slot></slot></main>"))]), "html/script", "routes/_layout.html", 1);
 }
 
+/// The `data-s` token written on the element whose opening tag contains `marker`.
+fn token_after(html: &str, marker: &str) -> String {
+    let at = html.find(marker).unwrap_or_else(|| panic!("{marker} not in {html}"));
+    let tag_end = at + html[at..].find('>').unwrap();
+    let tag = &html[html[..=at].rfind('<').unwrap()..tag_end];
+    let start = tag.find("data-s=\"").unwrap_or_else(|| panic!("no data-s in {tag}")) + "data-s=\"".len();
+    tag[start..start + tag[start..].find('"').unwrap()].to_string()
+}
+
 #[test]
 fn script_and_style_inside_the_html() {
     let page = "<title>Shop</title>\n<script>\n  import { log } from 'pragma'\n\n  let count = 0\n  function add() {\n    count += 1\n    log.info('added')\n  }\n</script>\n\n<button class=\"shop-btn\" @click=\"add\">{$count}</button>\n\n<style>\n  .shop-btn { padding: 1rem }\n</style>\n";
@@ -663,11 +735,17 @@ fn script_and_style_inside_the_html() {
     assert!(meter.contains("$pragma.prop(\"step\", 1)"), "{meter}");
     let shop_css = fs::read_to_string(out.join("client/assets/css/shop/index.css")).unwrap();
     let index_css = fs::read_to_string(out.join("client/assets/css/index.css")).unwrap();
-    // styles are scoped: a component's to its root, a page's to its <main data-page="…">
-    assert!(shop_css.contains("/* routes/shop/index.html */") && shop_css.contains(".shop-btn:where([data-page=\"shop/index\"],[data-page=\"shop/index\"] *) { padding: 1rem }"), "{shop_css}");
-    assert!(index_css.contains("/* lib/components/meter/meter.html */") && index_css.contains("[data-c=\"meter\"] .x, .meter:where([data-c=\"meter\"],[data-c=\"meter\"] *) { margin: 0 }"), "{index_css}");
+    // styles are scoped to the markup their owner wrote (data-s token), outside any layer
+    let shop_token = token_after(&html, "class=\"shop-btn\"");
+    assert!(shop_css.contains("/* routes/shop/index.html */") && shop_css.contains(&format!(".shop-btn:where([data-s~=\"{shop_token}\"]) {{ padding: 1rem }}")), "{shop_css}");
+    assert!(!shop_css.split("/* routes/shop/index.html */").nth(1).unwrap().contains("@layer"), "{shop_css}");
+    assert!(shop_css.contains(".btn { padding") && !shop_css.contains(".tag"), "theme rules the route cannot match are dropped: {shop_css}");
+    let index_html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let meter_token = token_after(&index_html, "class=\"meter\"");
+    let meter_scope = format!(":where([data-s~=\"{meter_token}\"])");
+    assert!(index_css.contains("/* lib/components/meter/meter.html */") && index_css.contains(&format!("[data-c=\"meter\"] .x, .meter{meter_scope} {{ margin: 0 }}")), "{index_css}");
     // :global(…) opts out only what is inside it: `.meter` stays scoped (BUG-S-21)
-    assert!(index_css.contains("html[data-theme=\"dark\"] .meter:where([data-c=\"meter\"],[data-c=\"meter\"] *) { color: blue }"), "{index_css}");
+    assert!(index_css.contains(&format!("html[data-theme=\"dark\"] .meter{meter_scope} {{ color: blue }}")), "{index_css}");
     assert!(html.contains("<main data-page=\"shop/index\">"), "{html}");
     // diagnostics in an embedded script point at the .html line
     let bad = page.replace("count += 1", "count += 1\n    console.log(count)");
