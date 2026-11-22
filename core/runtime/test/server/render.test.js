@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { render, renderHead, renderPage, resolve, serverServices, template } from '../../server/render.js'
+import { render, renderHead, renderPage, serverServices } from '../../server/render.js'
+import { template } from '../../binding.js'
 
 const TPL = '<ul><template data-tid="t1" data-for="item in data.items" data-key="item.id"><li></li></template>'
 const EMPTY = '<template data-empty data-tid="t9"><li>empty</li></template>'
@@ -111,7 +112,7 @@ test('unknown path throws', () => {
   assert.throws(() => render([['text', '{data.does.not.exist}']], { data: {} }), /unknown path: data\.does\.not\.exist/)
   assert.throws(() => render([['text', '{page.x}']], { data: {} }), /unknown path/)
   assert.throws(() => render([['show', 'data.a.b', false]], { data: { a: null } }), /unknown path/)
-  assert.equal(resolve({ data: { s: 'abc' } }, 'data.s.length'), 3)
+  assert.equal(render([['text', '{data.s.length}']], { data: { s: 'abc' } }), '3')
 })
 
 test('duplicate key, invalid list and unknown op throw', () => {
@@ -213,9 +214,14 @@ test('for variable over data resolves on the server, even alongside state', () =
   const ops = [['for', 't1', 'item', 'data.items', 'item.id', [['html', '<li'], ['class', '', [['sel', 'state.sel', false]]], ['html', '>'], ['text', '{item.name}'], ['html', '</li>']]]]
   assert.equal(render(ops, { data: { items: [{ id: 1, name: 'a' }] } }), '<li data-of="t1" data-key="1">a</li>')
   assert.throws(() => render([['for', 't1', 'item', 'data.items', 'item.id', [['html', '<li>'], ['text', '{item.missing}'], ['html', '</li>']]]], { data: { items: [{ id: 1 }] } }), /unknown path: item\.missing/)
-  for (const path of ['data.x', 'params.x', 'query.x']) {
+  for (const path of ['data.x', 'params.x']) {
     assert.throws(() => render([['text', `{${path}}`]], { data: {}, params: {}, query: {} }), /unknown path/)
   }
+})
+
+test('a query param missing from the URL is empty, as in the browser', () => {
+  const ops = [['html', '<p'], ['attr', 'title', 'query.q'], ['html', '>'], ['text', 'q={query.q}'], ['html', '</p>'], ['if', 't1', 'query.q', false, [['html', '<b>on</b>']]], ['else', 't1', [['html', '<i>off</i>']]]]
+  assert.equal(render(ops, { data: null, params: {}, query: {}, page: {} }), '<p>q=</p><i data-of="t1">off</i>')
 })
 
 test('head: title and attribute templates and paths are filled by the server', () => {

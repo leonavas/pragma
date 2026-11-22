@@ -1,11 +1,11 @@
-export const SEVERITY = { DEBUG: 5, INFO: 9, WARN: 13, ERROR: 17 }
+const SEVERITY = { DEBUG: 5, INFO: 9, WARN: 13, ERROR: 17 }
 
 const hex = (bytes) => Array.from(crypto.getRandomValues(new Uint8Array(bytes)), (b) => b.toString(16).padStart(2, '0')).join('')
 const nonZero = (id) => /[1-9a-f]/.test(id)
 
 export const newTraceId = () => hex(16)
 export const newSpanId = () => hex(8)
-export const nowUnixNano = () => `${Date.now()}000000`
+const nowUnixNano = () => `${Date.now()}000000`
 
 export function parseTraceparent(header) {
   const m = /^([0-9a-f]{2})-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})(-.*)?$/.exec(header?.trim() ?? '')
@@ -13,7 +13,7 @@ export function parseTraceparent(header) {
   return { traceId: m[2], spanId: m[3], flags: m[4] }
 }
 
-export function exceptionAttributes(error) {
+function exceptionAttributes(error) {
   if (!(error instanceof Error)) return { 'exception.message': String(error) }
   const attrs = { 'exception.type': error.name, 'exception.message': error.message }
   if (error.stack) attrs['exception.stacktrace'] = error.stack
@@ -62,8 +62,6 @@ export function createLogger({ resource = { 'service.name': 'pragma-app' }, trac
 
 export const writeLine = (rec) => console.log(JSON.stringify(rec))
 
-export const log = createLogger({ resource: resourceFrom(globalThis.process?.env), min: minSeverity(globalThis.process?.env), sink: writeLine })
-
 function anyValue(v) {
   if (typeof v === 'string') return { stringValue: v }
   if (typeof v === 'boolean') return { boolValue: v }
@@ -101,7 +99,7 @@ export function toOtlp(records) {
   }
 }
 
-export function otlpEndpoint(env = {}) {
+function otlpEndpoint(env = {}) {
   if (env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT) return env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT
   if (env.OTEL_EXPORTER_OTLP_ENDPOINT) return env.OTEL_EXPORTER_OTLP_ENDPOINT.replace(/\/+$/, '') + '/v1/logs'
   return null

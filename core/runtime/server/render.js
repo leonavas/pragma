@@ -1,39 +1,17 @@
-import { coerce } from '../props.js'
+import { coerce, cssValue as safeCss, instantiate as runScript, lookup, readonlyViews, template } from '../binding.js'
+import { KEY, OF } from '../contract.js'
 
 const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }
 
-export function escape(value) {
+function escape(value) {
   return String(value).replace(/[&<>"']/g, (c) => ESC[c])
 }
 
-// A function met on the path is a derived value of a script: it is called (as in the browser).
-const call = (value) => (typeof value === 'function' ? value() : value)
-
-export function resolve(scope, path) {
-  const parts = path.split('.')
-  if (!Object.hasOwn(scope, parts[0])) throw new Error(`unknown path: ${path}`)
-  let value = call(scope[parts[0]])
-  for (let i = 1; i < parts.length; i++) {
-    if (value == null || !(parts[i] in Object(value))) throw new Error(`unknown path: ${path}`)
-    value = call(value[parts[i]])
-  }
-  return value
+const unknown = (path) => {
+  throw new Error(`unknown path: ${path}`)
 }
 
-// Template "a {path} b" → [literal, path, literal, …]; `\{` is a literal brace. Literals are HTML source.
-const TPL = /\\\{|\{([^{}]*)\}/g
-export function template(value) {
-  const parts = ['']
-  let at = 0
-  for (const m of value.matchAll(TPL)) {
-    parts[parts.length - 1] += value.slice(at, m.index)
-    if (m[1] == null) parts[parts.length - 1] += '{'
-    else parts.push(m[1], '')
-    at = m.index + m[0].length
-  }
-  parts[parts.length - 1] += value.slice(at)
-  return parts
-}
+const resolve = (scope, path) => lookup(scope, path.split('.'), unknown)
 
 const isTemplate = (value) => value.includes('{')
 const pathsOf = (value) => (isTemplate(value) ? template(value).filter((_, i) => i % 2) : [value])
@@ -51,7 +29,7 @@ function fill(scope, value, literal = (text) => text) {
 const quoted = (text) => text.replace(/"/g, '&quot;')
 
 const CSS_VAR_END = /(?:^|;)--[a-z0-9-]+:$/
-const cssValue = (v) => (v == null || v === false || v === '' || /[;{}<]/.test(String(v)) ? null : String(v))
+const cssValue = (v) => safeCss(v, () => null)
 
 function style(scope, value) {
   const parts = template(value)
@@ -69,7 +47,7 @@ function style(scope, value) {
 const PATH_AT = { text: 1, attr: 2, show: 1, if: 2, elif: 2, for: 3 }
 const CLIENT_ROOTS = new Set(['state', 'shared'])
 
-export function clientOnly(scope, value) {
+function clientOnly(scope, value) {
   return pathsOf(value).some((path) => {
     const root = path.split('.', 1)[0]
     return CLIENT_ROOTS.has(root) && !Object.hasOwn(scope, root)
@@ -78,9 +56,10 @@ export function clientOnly(scope, value) {
 
 const test = (scope, path, neg) => Boolean(resolve(scope, path)) !== Boolean(neg)
 
-// ctx.instance(id, props): instance scope of a component with a script, or null (left to the client).
+const scopeOf = (values) => ({ __proto__: null, ...values })
+
 export function render(ops, scope, ctx = {}) {
-  return run(ops, scope, { outer: [], instance: () => null, ...ctx }, { done: null })
+  return run(ops, scopeOf(scope), { outer: [], instance: () => null, ...ctx }, { done: null })
 }
 
 // `chain.done` (if/elif/else and for/empty): true = a branch was rendered, false = none, null = decided
@@ -125,30 +104,30 @@ function run(ops, scope, ctx, chain) {
         break
       case 'if':
       case 'elif': {
-        const [kind, tid, path, neg, body] = op
+        const [kind, id, path, neg, body] = op
         if (kind === 'elif' && chain.done !== false) break
         chain.done = test(scope, path, neg)
-        if (chain.done && body.length) out += instance(run(body, scope, ctx, { done: null }), tid)
+        if (chain.done && body.length) out += instance(run(body, scope, ctx, { done: null }), id)
         break
       }
       case 'else':
       case 'empty': {
-        const [, tid, body] = op
-        if (chain.done === false && body.length) out += instance(run(body, scope, ctx, { done: null }), tid)
+        const [, id, body] = op
+        if (chain.done === false && body.length) out += instance(run(body, scope, ctx, { done: null }), id)
         chain.done = null
         break
       }
       case 'for': {
-        const [, tid, name, path, keyPath, body] = op
+        const [, id, name, path, keyPath, body] = op
         const list = resolve(scope, path) ?? []
         if (!Array.isArray(list)) throw new Error(`<for> expects a list: ${path}`)
         const seen = new Set()
         for (const item of list) {
-          const inner = { ...scope, [name]: item }
+          const inner = scopeOf({ ...scope, [name]: item })
           const key = String(resolve(inner, keyPath))
           if (seen.has(key)) throw new Error(`duplicate key in ${path}: ${key}`)
           seen.add(key)
-          out += instance(run(body, inner, ctx, { done: null }), tid, key)
+          out += instance(run(body, inner, ctx, { done: null }), id, key)
         }
         chain.done = list.length > 0
         break
@@ -183,10 +162,10 @@ function component([, id, props, body], scope, ctx) {
     const state = known ? ctx.instance(id, values) : null
     if (state) {
       try {
-        return run(body, { ...outside, state }, ctx, { done: null })
+        return run(body, scopeOf({ ...outside, state }), ctx, { done: null })
       } catch {}
     }
-    return run(body, outside, ctx, { done: null })
+    return run(body, scopeOf(outside), ctx, { done: null })
   } finally {
     ctx.outer.pop()
   }
@@ -196,19 +175,10 @@ const browserOnly = (name) => () => {
   throw new Error(`${name} runs only in the browser`)
 }
 
-const readonlyCache = new WeakMap()
-function readonly(value) {
-  if (value === null || typeof value !== 'object') return value
-  let view = readonlyCache.get(value)
-  if (!view) {
-    const deny = () => {
-      throw new TypeError('data, params, query and page are read-only while the server renders')
-    }
-    view = new Proxy(value, { get: (t, k) => readonly(Reflect.get(t, k)), set: deny, deleteProperty: deny, defineProperty: deny })
-    readonlyCache.set(value, view)
-  }
-  return view
-}
+const readonly = readonlyViews(
+  () => true,
+  () => 'data, params, query and page are read-only while the server renders',
+)
 
 // What a script's `import { … } from 'pragma'` gives while the server renders: read-only data;
 // stores and browser actions throw, which leaves that page or component to the client.
@@ -220,18 +190,11 @@ export function serverServices({ data, params, query, page }, log) {
   }
 }
 
-// Runs a compiled page or component script once (no mount, no events): its top-level `let`s,
-// props and functions. Null when it has no script or throws (e.g. reads window or a store).
-export function instantiate(mod, props, services) {
+function instantiate(mod, props, services) {
   if (typeof mod?.default !== 'function') return null
   const target = {}
-  const prop = (name, d) => {
-    const k = name.toLowerCase()
-    Object.defineProperty(target, name, { enumerable: true, get: () => coerce(Object.hasOwn(props, k) ? props[k] : undefined, d) })
-  }
   try {
-    const api = mod.default(target, { __proto__: services, prop }) ?? {}
-    for (const k in api) if (k !== 'mount') target[k] = api[k]
+    runScript(mod, target, target, services, (key, d) => coerce(Object.hasOwn(props, key) ? props[key] : undefined, d))
     return target
   } catch {
     return null
@@ -252,11 +215,11 @@ export function renderPage(ops, scope, { page, components = {}, log } = {}) {
   return render(ops, scope, ctx)
 }
 
-function instance(html, tid, key) {
+function instance(html, id, key) {
   const root = html.trim()
   const m = /^<[a-zA-Z][^\s/>]*/.exec(root)
-  if (!m) throw new Error(`block ${tid} has no root element`)
-  const marks = ` data-of="${escape(tid)}"` + (key === undefined ? '' : ` data-key="${escape(key)}"`)
+  if (!m) throw new Error(`block ${id} has no root element`)
+  const marks = ` ${OF}="${escape(id)}"` + (key === undefined ? '' : ` ${KEY}="${escape(key)}"`)
   return m[0] + marks + root.slice(m[0].length)
 }
 
@@ -265,7 +228,7 @@ const ATTR = /\s([^\s=]+)(?:="([^"]*)")?/g
 const BOUND = /^data-(?:attr-(.+)|(text))$/
 
 // Escaped value of a bound head attribute or title: a template, or a path (`true` = empty attribute).
-function lookup(scope, value) {
+function headValue(scope, value) {
   try {
     if (isTemplate(value)) return fill(scope, value)
     const v = resolve(scope, value)
@@ -288,7 +251,7 @@ function jsonValue(scope, path) {
 }
 
 // JSON-LD: `{path}` inside its strings becomes the value; JSON syntax outside strings is kept.
-export function fillJsonLd(body, scope) {
+function fillJsonLd(body, scope) {
   let out = ''
   let inString = false
   for (let i = 0; i < body.length; i++) {
@@ -312,9 +275,10 @@ export function fillJsonLd(body, scope) {
   return out
 }
 
-export function renderHead(html, scope) {
+export function renderHead(html, values) {
   const end = html.indexOf('</head>')
   if (end < 0) return html
+  const scope = scopeOf(values)
   const head = html.slice(0, end).replace(JSON_LD, (tag, open, body, close) => open + fillJsonLd(body, scope) + close).replace(HEAD_TAG, (tag, name, raw, text, nl) => {
     const attrs = new Map()
     const bound = []
@@ -325,7 +289,7 @@ export function renderHead(html, scope) {
     }
     if (!bound.length) return tag
     for (const [attr, value] of bound) {
-      const v = lookup(scope, value)
+      const v = headValue(scope, value)
       if (v == null) continue
       if (attr === 'text') text = v === true ? '' : v
       else attrs.set(attr, v === true ? undefined : v)

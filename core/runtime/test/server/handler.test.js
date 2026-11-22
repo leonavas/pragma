@@ -1,12 +1,12 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { compileRoutes, createHandler, earlyHints, matchRoute, prefersMarkdown } from '../../server/handler.js'
+import { createHandler, earlyHints, prefersMarkdown } from '../../server/handler.js'
+import { matchRoute, sortRoutes } from '../../contract.js'
 
 const SHELL = `<!doctype html>
 <html lang="en">
 <head>
   <title>Post</title>
-  <script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}})</script>
   <script type="application/json" id="pragma-route">{"pattern":"/blog/:slug","ssr":true}</script>
 </head>
 <body><header>top</header><main data-page class="p-4"><template data-if="page.loading"><p class="skeleton"></p></template></main></body>
@@ -66,7 +66,7 @@ function capture(t) {
 const get = (path, init) => handler.fetch(new Request('http://x' + path, init), {})
 
 test('static beats param and params are decoded', () => {
-  const table = compileRoutes(routes)
+  const table = sortRoutes(routes)
   assert.equal(matchRoute(table, '/shop/new').route.pattern, '/shop/new')
   assert.deepEqual(matchRoute(table, '/shop/caf%C3%A9%20x').params, { id: 'café x' })
   assert.deepEqual(matchRoute(table, '/shop/a%2Fb').params, { id: 'a/b' })
@@ -139,7 +139,6 @@ test('SSR: renders into <main data-page>, escapes and embeds pragma-data', async
   assert.ok(html.includes('<main data-page class="p-4"><h1>&lt;/script&gt;&lt;b&gt;hi&lt;/b&gt;</h1>'))
   assert.ok(html.includes('</template><li data-of="t1" data-key="a">A&amp;B</li><li data-of="t1" data-key="b">C</li></ul><p>hello</p></main>'))
   assert.ok(!html.includes('skeleton'))
-  assert.ok(!html.includes('self.__pd'))
   assert.ok(html.includes('<header>top</header>'))
   const m = /<script type="application\/json" id="pragma-data">(.*?)<\/script><\/body>/s.exec(html)
   assert.ok(m)
@@ -153,6 +152,16 @@ test('SSR: a .html path is a prebuilt file, not an SSR page', async () => {
   const env = { ASSETS: { fetch: async (r) => new Response('static ' + new URL(r.url).pathname) } }
   const res = await handler.fetch(new Request('http://x/blog/index.html'), env)
   assert.equal(await res.text(), 'static /blog/index.html')
+})
+
+test('SSR: a query param missing from the URL renders empty, not a 500', async (t) => {
+  capture(t)
+  const search = createHandler({
+    routes: [{ pattern: '/search', server: {}, ssr: true, template: [['html', '<p>'], ['text', 'q={query.q}'], ['html', '</p>']], shell: SHELL }],
+  })
+  const res = await search.fetch(new Request('http://x/search'), {})
+  assert.equal(res.status, 200)
+  assert.ok((await res.text()).includes('<main data-page class="p-4"><p>q=</p></main>'))
 })
 
 test('SSR with load error: 500, shell intact and pragma-data with error', async (t) => {

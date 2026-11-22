@@ -5,7 +5,7 @@ import { extname, join, resolve, sep } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { compileRoutes, matchRoute } from './handler.js'
+import { ASSETS, IMMUTABLE } from '../contract.js'
 import { createLogger, minSeverity, resourceFrom, writeLine } from './log.js'
 
 const MIME = {
@@ -49,10 +49,6 @@ async function statFile(path) {
   }
 }
 
-async function isFile(path) {
-  return (await statFile(path)) !== null
-}
-
 function acceptsEncoding(header, encoding) {
   if (!header) return false
   for (const part of header.split(',')) {
@@ -65,20 +61,8 @@ function acceptsEncoding(header, encoding) {
   return false
 }
 
-export function createStatic(root) {
+function createStatic(root) {
   const dir = resolve(toPath(root))
-  let manifest
-
-  const routes = async () => {
-    if (!manifest) {
-      try {
-        manifest = compileRoutes(JSON.parse(await readFile(join(dir, '_pragma', 'manifest.json'), 'utf8')))
-      } catch {
-        manifest = []
-      }
-    }
-    return manifest
-  }
 
   const inside = (rel) => {
     const file = resolve(dir, '.' + rel)
@@ -96,12 +80,7 @@ export function createStatic(root) {
     const candidates = rel.endsWith('/') ? [rel + 'index.html'] : [rel, rel + '.html', rel + '/index.html']
     for (const c of candidates) {
       const file = inside(c)
-      if (file && (await isFile(file))) return { file, rel: c }
-    }
-    const m = matchRoute(await routes(), pathname)
-    if (m?.route.html) {
-      const file = inside(m.route.html)
-      if (file && (await isFile(file))) return { file, rel: m.route.html }
+      if (file && (await statFile(file))) return { file, rel: c }
     }
     return null
   }
@@ -120,7 +99,7 @@ export function createStatic(root) {
         status = 404
         file = join(dir, '_404.html')
         rel = '/_404.html'
-        if (!(await isFile(file))) return new Response('Not found', { status, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+        if (!(await statFile(file))) return new Response('Not found', { status, headers: { 'content-type': 'text/plain; charset=utf-8' } })
       }
       const contentType = MIME[extname(file).toLowerCase()] ?? 'application/octet-stream'
       let servedFile = file
@@ -149,7 +128,7 @@ export function createStatic(root) {
       const etag = `W/"${info.size.toString(16)}-${Math.floor(info.mtimeMs).toString(16)}${encoding ? `-${encoding}` : ''}"`
       const headers = {
         'content-type': contentType,
-        'cache-control': rel.startsWith('/assets/') ? 'public, max-age=31536000, immutable' : 'no-cache',
+        'cache-control': rel.startsWith(ASSETS) ? IMMUTABLE : 'no-cache',
         'x-content-type-options': 'nosniff',
       }
       if (hasCompressed) headers.vary = 'accept-encoding'
@@ -217,10 +196,7 @@ export function serve(handler, { root, port = 3000, service } = {}) {
   const log = createLogger({ resource: resourceFrom(process.env, service), min: minSeverity(process.env), sink: writeLine })
   const assets = createStatic(root)
   const env = { ...process.env, ASSETS: assets }
-  let ctx = {
-    waitUntil: (p) => Promise.resolve(p).catch((err) => log.error('waitUntil failed', err)),
-    passThroughOnException() {},
-  }
+  let ctx = { waitUntil: (p) => Promise.resolve(p).catch((err) => log.error('waitUntil failed', err)) }
   const cfConfig = process.env.PRAGMA_CF_CONFIG
   const ready = cfConfig
     ? cloudflarePlatform(cfConfig).then((proxy) => {
