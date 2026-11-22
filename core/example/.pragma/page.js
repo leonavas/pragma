@@ -196,7 +196,8 @@ export function enter(route, mods, url, params, doc, pending) {
   if (document.querySelector('dialog,[popover]')) overlays()
   const p = (cur = { route, url, params, query: Object.fromEntries(url.searchParams), page: { loading: false, error: null } })
   // with ssr the loader sets `data` synchronously, so the page script sees it as the server did
-  const done = load(p, doc, pending).then(to => cur === p && (to ? redirect(to, true) : schedule()))
+  const loaded = load(p, doc, pending), waiting = p.page.loading
+  const done = loaded.then(to => cur === p && (to ? redirect(to, true) : waiting && schedule()))
   p.o = instance(document.querySelector('main[data-page]'), mods.page ?? {}, null)
   whole = true
   flush()

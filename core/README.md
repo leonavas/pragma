@@ -40,7 +40,7 @@ The SvelteKit × astra × fable experiment moved out of the repo to `../pragma-t
 - Site: placeholder origin `https://pragma.dev` in the prompt and md links; landing copy lives in
   `site/routes/*.html` and `site/utils/agent-docs/*.md` (drift check compares headings only).
 
-## Pending: performance (found 2026-11-22, not started)
+## Performance work from escalei-pragma (found 2026-11-22, shipped in v0.2.1)
 
 Lighthouse on a large real app page (escalei-pragma `/app/[id]`, see that repo's README "Status and next session") showed pragma faster on FCP/LCP than the SvelteKit original but worse on TBT, Speed Index and payload. Planned for v0.2.1:
 

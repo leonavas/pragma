@@ -7,7 +7,7 @@ let auto = 0
 // Open `data-self` roots (a component inside itself); more than SELF_DEPTH means the data never ends.
 export const SELF_DEPTH = 64
 let deep = 0
-const defs = new Map()
+const defs = new Map(), tpls = new Map()
 
 export const hooks = { on() {}, enter: (el, s) => s, remove() {} }
 export const scopeOf = el => el[S]
@@ -61,12 +61,18 @@ function cssValue(v, name) {
   return null
 }
 
+function source(cache, attr, id, missing) {
+  let t = cache.get(id)
+  if (!t?.isConnected) cache.set(id, (t = document.querySelector(`template[${attr}="${CSS.escape(id)}"]`) ?? fail(missing())))
+  return body(t).firstElementChild
+}
+
 // A component inside itself: its root arrives empty and gets the body from the page's <template data-def>.
 function fillSelf(el, id) {
-  let t = defs.get(id)
-  if (!t?.isConnected) defs.set(id, (t = document.querySelector(`template[data-def="${CSS.escape(id)}"]`) ?? fail(`<${el.getAttribute('data-self')}> renders itself but the page has no <template data-def="${id}">`)))
-  el.append(...body(t).firstElementChild.cloneNode(true).childNodes)
+  el.append(...source(defs, 'data-def', id, () => `<${el.getAttribute('data-self')}> renders itself but the page has no <template data-def="${id}">`).cloneNode(true).childNodes)
 }
+
+const root = (t, d) => body(t).firstElementChild ?? (d.s ? source(tpls, 'data-tpl', d.s, () => `the page has no <template data-tpl="${d.s}">`) : null)
 
 function fill(s, t) {
   let o = t[0]
@@ -111,7 +117,8 @@ function parse(el) {
     } else if (el.hasAttribute('data-else') || el.hasAttribute('data-empty')) d.t = 3
     else if ((v = el.getAttribute('data-else-if')) != null) [d.p, d.n] = cond(v), (d.t = 4)
     d.u = +el.getAttribute('data-slot')
-    if (d.t < 3) d.id = el.getAttribute('data-tid') ?? (el.setAttribute('data-tid', (v = 't' + auto++)), v)
+    d.s = el.getAttribute('data-tid')
+    if (d.t < 3) d.id = d.s ?? (el.setAttribute('data-tid', (v = 't' + auto++)), v)
     return (el[D] = d.t ? d : NONE)
   }
   const d = { b: [] }
@@ -231,11 +238,11 @@ function walk(parent, s) {
 
 // Motion is CSS only: a block root inserted after the block's first render gets `data-entering`
 // until its animations end; a removed one gets `data-leaving` + inert and stays until they end.
-let leaving = [], entering = []
+let leaving = [], entering = [], focusing = null
 const reduced = matchMedia('(prefers-reduced-motion: reduce)')
 
 function clone(t, d, id) {
-  const n = body(t).firstElementChild.cloneNode(true)
+  const n = root(t, d).cloneNode(true)
   n.setAttribute('data-of', id)
   if (d.r && !reduced.matches) {
     n.setAttribute('data-entering', '')
@@ -263,14 +270,30 @@ function gone(n, token) {
   n.remove()
 }
 
-const running = n => n.getAnimations({ subtree: true }).filter(a => a.effect?.getComputedTiming().endTime < Infinity)
+function timing(n) {
+  const finished = []
+  let ms = 0
+  for (const a of n.getAnimations({ subtree: true })) {
+    const end = a.effect?.getComputedTiming().endTime
+    if (!(end < Infinity)) continue
+    finished.push(a.finished)
+    ms = Math.max(ms, end - (a.currentTime ?? 0))
+  }
+  return [finished, ms]
+}
 
-export const afterMotion = (n, done) => after(reduced.matches ? [] : running(n), done)
+const still = [[], 0]
 
-function after(animations, done) {
-  if (!animations.length) return done()
-  const ms = Math.max(...animations.map(a => a.effect.getComputedTiming().endTime - (a.currentTime ?? 0)))
-  Promise.race([Promise.allSettled(animations.map(a => a.finished)), new Promise(r => setTimeout(r, ms + 50))]).then(done)
+export const afterMotion = (n, done) => after(reduced.matches ? still : timing(n), done)
+
+function after([finished, ms], done) {
+  if (!finished.length) return done()
+  Promise.race([Promise.allSettled(finished), new Promise(r => setTimeout(r, ms + 50))]).then(done)
+}
+
+function entered(into) {
+  const waits = into.filter(n => n.hasAttribute('data-entering')).map(n => [timing(n), () => n.removeAttribute('data-entering')])
+  for (const [m, done] of waits) after(m, done)
 }
 
 function settle() {
@@ -283,8 +306,9 @@ function settle() {
     n.setAttribute('data-leaving', '')
     n.inert = true
   }
-  const waits = [...out.map(n => [motion ? running(n) : [], gone.bind(null, n, n[L])]), ...into.map(n => [running(n), () => n.removeAttribute('data-entering')])]
-  for (const [animations, done] of waits) after(animations, done)
+  const waits = out.map(n => [motion ? timing(n) : still, gone.bind(null, n, n[L])])
+  for (const [m, done] of waits) after(m, done)
+  if (into.length) requestAnimationFrame(() => setTimeout(entered, 0, into))
 }
 
 const next = n => {
@@ -316,7 +340,7 @@ function branch(t, d, s, last, id) {
   } else {
     t.after((n = clone(t, d, id)))
     visit(n, s)
-    ;(n.matches('[autofocus]') ? n : n.querySelector('[autofocus]'))?.focus()
+    focusing = (n.matches('[autofocus]') ? n : n.querySelector('[autofocus]')) ?? focusing
   }
   return [n, true, id]
 }
@@ -354,8 +378,12 @@ export function render(el, s) {
   deep = 0
   forgetReads()
   readBy(0)
+  focusing = null
   try { visit(el, s) } finally { readBy(null) }
   settle()
+  const target = focusing
+  focusing = null
+  target?.focus()
 }
 
 // After a change read only by bindings (state.js `readers`): runs just those, nothing else is walked.

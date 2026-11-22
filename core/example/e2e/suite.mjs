@@ -134,7 +134,7 @@ export function appSuite(mode, app) {
 
         it('hover prefetch downloads the route HTML before the click', async () => {
           await page.goto('/')
-          const html = page.waitForRequest(request => request.url().endsWith('/tasks/index.html'))
+          const html = page.waitForRequest(request => new URL(request.url()).pathname === '/tasks')
           await nav('Tasks').hover()
           await html
         })
