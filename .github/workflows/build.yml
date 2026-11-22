@@ -4,7 +4,15 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "core/**"
+      - "site/**"
+      - ".github/workflows/build.yml"
   pull_request:
+    paths:
+      - "core/**"
+      - "site/**"
+      - ".github/workflows/build.yml"
   workflow_dispatch:
 
 permissions:
