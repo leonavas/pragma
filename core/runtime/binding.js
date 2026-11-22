@@ -40,6 +40,11 @@ export function cssValue(v, unsafe) {
   return /[;{}<]/.test(v) ? unsafe(v) : v
 }
 
+export function isPlain(v) {
+  const proto = Object.getPrototypeOf(v)
+  return proto === Object.prototype || proto === null || Array.isArray(v)
+}
+
 export function readonlyViews(wraps, message) {
   const views = new WeakMap()
   const view = (value, name) => {

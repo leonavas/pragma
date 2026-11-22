@@ -1,7 +1,8 @@
-export const DATA = '/_data'
-export const ACTION = '/_action'
+const DATA = '/_data'
+const ACTION = '/_action'
 export const OTEL = '/_otel'
-export const MANIFEST = '/_pragma/manifest.json'
+export const PRAGMA = '/_pragma/'
+export const MANIFEST = PRAGMA + 'manifest.json'
 export const ASSETS = '/assets/'
 export const IMMUTABLE = 'public, max-age=31536000, immutable'
 

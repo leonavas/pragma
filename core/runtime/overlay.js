@@ -70,6 +70,7 @@ function refocus(el, o) {
 
 // data-placement="bottom-start" (default) | "bottom-end" | "top-start" | "top-end": side of the
 // trigger, then the edge both share. Flips to the other side or edge when there is no room.
+const GAP = 4
 const AREA = { bottom: 'block-end', top: 'block-start', start: 'span-inline-end', end: 'span-inline-start' }
 function place(el, o) {
   const [side, edge] = (el.dataset.placement || 'bottom-start').split('-'), s = el.style
@@ -80,19 +81,19 @@ function place(el, o) {
     s.positionAnchor = name
     s.positionArea = AREA[side] + ' ' + AREA[edge]
     s.positionTryFallbacks = 'flip-block, flip-inline, flip-block flip-inline'
-    s.margin = side == 'top' ? '0 0 4px' : '4px 0 0'
+    s.margin = side == 'top' ? `0 0 ${GAP}px` : `${GAP}px 0 0`
     return
   }
   s.margin = 0
   s.top = s.left = 0
   const r = o.getBoundingClientRect(), h = el.offsetHeight, w = el.offsetWidth, vw = document.documentElement.clientWidth
-  const below = r.bottom + h + 4 <= innerHeight, above = r.top >= h + 4
+  const below = r.bottom + h + GAP <= innerHeight, above = r.top >= h + GAP
   const up = side == 'top' ? above || !below : above && !below
   const left = edge == 'end'
-    ? r.right - w >= 4 || r.left + w > vw - 4 ? r.right - w : r.left
-    : r.left + w <= vw - 4 || r.right - w < 4 ? r.left : r.right - w
-  s.top = (up ? r.top - h - 4 : r.bottom + 4) + 'px'
-  s.left = Math.max(4, Math.min(left, vw - w - 4)) + 'px'
+    ? r.right - w >= GAP || r.left + w > vw - GAP ? r.right - w : r.left
+    : r.left + w <= vw - GAP || r.right - w < GAP ? r.left : r.right - w
+  s.top = (up ? r.top - h - GAP : r.bottom + GAP) + 'px'
+  s.left = Math.max(GAP, Math.min(left, vw - w - GAP)) + 'px'
 }
 
 function onClick(ev) {

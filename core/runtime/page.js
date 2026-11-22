@@ -1,7 +1,7 @@
 import { render, patch, hooks, scopeOf, input, eventCall, useBodies, hasOverlay, DEV, PAGE } from './directives.js'
 import { log } from './log.js'
 import { reactive, readers, onChange, persist, persistStores } from './state.js'
-import { coerce, instantiate, readonlyViews } from './binding.js'
+import { coerce, instantiate, isPlain, readonlyViews } from './binding.js'
 import { fetchData, load, loadResult, call, stream } from './loader.js'
 import { navigate, redirect } from './router.js'
 import { DATA_ID, MAIN, PERSIST_SUFFIX, matchPattern } from './contract.js'
@@ -76,11 +76,7 @@ function frame(fn) {
   }
 }
 
-const plain = v => {
-  const proto = Object.getPrototypeOf(v)
-  return proto === Object.prototype || proto === null || Array.isArray(v)
-}
-const readonly = readonlyViews(plain, name => `pragma: "${name}" is a prop: props are read-only, also inside; copy what you change into a let (\`let rows = ${name}.map(row => ({ ...row }))\`)`)
+const readonly = readonlyViews(isPlain, name => `pragma: "${name}" is a prop: props are read-only, also inside; copy what you change into a let (\`let rows = ${name}.map(row => ({ ...row }))\`)`)
 
 const services = {
   shared, log, navigate, open, close, confirm, frame,

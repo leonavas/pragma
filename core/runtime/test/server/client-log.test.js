@@ -45,7 +45,7 @@ test('sends batches via keepalive fetch in the /_otel format', () => {
   mod.log.debug('dropped')
   mod.log.info('hi', { 'app.x': 1 })
   mod.log.warn('careful')
-  mod.flush()
+  mod.log.flush()
   assert.equal(posts.length, 1)
   const { url, init } = posts[0]
   assert.equal(url, '/_otel')
@@ -62,7 +62,7 @@ test('sends batches via keepalive fetch in the /_otel format', () => {
   assert.match(info.timeUnixNano, /^\d{19}$/)
   assert.match(info.traceId, /^[0-9a-f]{32}$/)
   assert.equal(warn.severityNumber, 13)
-  mod.flush()
+  mod.log.flush()
   assert.equal(posts.length, 1)
 })
 
@@ -79,7 +79,7 @@ test('captures error and unhandledrejection with exception.*', () => {
   listeners.error({ message: 'Uncaught TypeError: x is undefined', error: err })
   listeners.unhandledrejection({ reason: new Error('failed') })
   listeners.unhandledrejection({ reason: 'text' })
-  mod.flush()
+  mod.log.flush()
   const [a, b, c] = JSON.parse(posts[0].init.body).logs
   assert.equal(a.severityText, 'ERROR')
   assert.equal(a.attributes['exception.type'], 'TypeError')
@@ -109,7 +109,7 @@ test('the client batch is accepted by the server /_otel', async (t) => {
   t.mock.method(console, 'log', (l) => lines.push(JSON.parse(l)))
   posts.length = 0
   mod.log.warn('end', { 'app.n': 2 })
-  mod.flush()
+  mod.log.flush()
   const res = await createHandler({ routes: [] }).fetch(new Request('http://x/_otel', { method: 'POST', body: posts[0].init.body }), {})
   assert.equal(res.status, 204)
   assert.equal(lines[0].body, 'end')

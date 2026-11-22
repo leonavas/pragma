@@ -40,7 +40,7 @@ export const log = {
   flush: () => flush(),
 }
 
-export function flush(beacon) {
+function flush(beacon) {
   clearTimeout(timer)
   timer = 0
   if (!queue.length || !endpoint) return

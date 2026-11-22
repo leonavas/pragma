@@ -4,7 +4,8 @@ import { KEY, LAYOUT_PREFIX, OF } from './contract.js'
 
 const TEXT = 0, SHOW = 1, ATTR = 2, CLASS = 3, ATTR_TEMPLATE = 4, MARKER = 5, CSS_VAR = 6
 const IF = 1, FOR = 2, ELSE = 3, ELIF = 4
-export const COMPONENT = 1, PAGE = 2
+const COMPONENT = 1
+export const PAGE = 2
 
 const D = Symbol(), S = Symbol(), L = Symbol(), NONE = { b: [] }
 // Outer scope of each open component; slot content (data-slot="n") uses the one n levels up.
@@ -278,12 +279,13 @@ function timing(n) {
 }
 
 const still = [[], 0]
+const MOTION_GRACE_MS = 50
 
 export const afterMotion = (n, done) => after(reduced.matches ? still : timing(n), done)
 
 function after([finished, ms], done) {
   if (!finished.length) return done()
-  Promise.race([Promise.allSettled(finished), new Promise(r => setTimeout(r, ms + 50))]).then(done)
+  Promise.race([Promise.allSettled(finished), new Promise(r => setTimeout(r, ms + MOTION_GRACE_MS))]).then(done)
 }
 
 function entered(into) {
