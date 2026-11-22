@@ -128,6 +128,20 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   escalei `/app/[id]` cloned 66 kB and 234 nested templates; now 220 B), and equal bodies from
   repeated components are emitted once (365 → 317 kB). Separate `l`/`t` prefixes keep the
   persistent layout and the swapped page from sharing an id.
+- **[firm]** (2026-11-22) Block anchors are comments, `<!--p:<kind>[slot] <tid> <values>-->`
+  (values percent-encoded outside `[A-Za-z0-9_$.!]`), and every block and self-call body goes to
+  one template module per page, `/assets/tpl/<route>-<hash>.js` (`export default { tid: 'html' }`,
+  `d` for self calls). The page modulepreloads it; the runtime imports it with the route modules
+  and parses a body on its first render (in the SVG/MathML namespace when the anchor sits there).
+  Tids are `l`/`t` + a base36 counter per page; `l` ids resolve in the module the page booted with
+  (the layout stays), `t` ids in the current page's, so pages never collide. *Why:* escalei
+  `/app/[id]` shipped 317 kB of HTML whose DOM held 1442 `<template>` elements next to 546 visible
+  ones; now 14 kB of HTML and none. A JS module, not `.html`: Workers redirects `*.html` to the
+  clean URL, and modules get modulepreload, the router's prefetch and the module cache for free.
+  No inline threshold for small pages: one path in build and runtime, and the extra request runs
+  in parallel with the route chunk the first render already waits for. Instances must follow their
+  anchor (text nodes aside), since a comment does not stop `nextElementSibling` the way a
+  `<template>` did.
 - **[firm]** (2026-11-21) A component may render itself (Svelte's `<svelte:self>`): only
   directly, only inside `<if>`/`<for>`, only with a `<script>` (live props), never filling slots.
   The build expands the body once more into a `<template data-def>`; each self call is an empty

@@ -6,18 +6,19 @@
   <title>Tree</title>
   <script>self.__pragmaDev=true</script>
   <link rel="modulepreload" href="/assets/tree.js">
-  <script type="application/json" id="pragma-route">{"pattern":"/tree","page":"/assets/tree.js","components":{"node":"/assets/node.js"},"stores":{},"loader":false,"ssr":false}</script>
+  <script type="application/json" id="pragma-route">{"pattern":"/tree","page":"/assets/tree.js","components":{"node":"/assets/node.js"},"stores":{},"loader":false,"ssr":false,"tpl":"/assets/tpl/tree.js"}</script>
   <script type="module" src="/core/boot.js"></script>
 </head>
 <body>
   <main data-page>
     <span id="qty" data-text="{state.count}"></span>
     <div id="bar" class="bar" style="--fixed:1" data-var-left="state.left" data-var-tone="state.tone"></div>
-    <ul id="rows"><template data-for="row in state.rows" data-key="row.id" data-tid="t1"><li data-var-x="row.x" data-text="{row.id}"></li></template></ul>
-    <ul id="tree"><li data-c="node" class="node" data-with-node="state.root"><span data-text="{state.node.name}"></span><ul><template data-for="child in state.node.children" data-key="child.id" data-tid="t9"></template><li data-c="node" data-self="c-node" class="node" data-with-node="child" data-var-depth="child.depth" data-of="t9" data-key="a" style="--depth:1"><span id="adopted" data-text="{state.node.name}">A</span><ul><template data-for="child in state.node.children" data-key="child.id" data-tid="t9"></template></ul></li></ul></li></ul>
+    <ul id="rows"><!--p:for t1 row state.rows row.id--></ul>
+    <svg id="dots" viewBox="0 0 10 10" aria-hidden="true"><!--p:for t2 row state.rows row.id--></svg>
+    <ul id="tree"><li data-c="node" class="node" data-with-node="state.root"><span data-text="{state.node.name}"></span><ul><!--p:for t9 child state.node.children child.id--><li data-c="node" data-self="c-node" class="node" data-with-node="child" data-var-depth="child.depth" data-of="t9" data-key="a" style="--depth:1"><span id="adopted" data-text="{state.node.name}">A</span><ul><!--p:for t9 child state.node.children child.id--></ul></li></ul></li></ul>
     <a id="go-b" href="/b">B</a>
-    <template data-def="node"><li data-c="node" class="node"><span data-text="{state.node.name}"></span><ul><template data-for="child in state.node.children" data-key="child.id" data-tid="t9"></template></ul></li></template>
-    <template data-tpl="t9"><li data-c="node" data-self="c-node" class="node" data-with-node="child" data-var-depth="child.depth"></li></template>
+    
+    
   </main>
 </body>
 </html>

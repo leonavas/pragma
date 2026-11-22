@@ -6,15 +6,15 @@
   <title>Missing</title>
   <script>self.__pragmaDev=true</script>
 
-  <script type="application/json" id="pragma-route">{"pattern":"/missing","page":null,"components":{},"stores":{"cart":"/assets/cart.js"},"loader":true,"ssr":false}</script>
+  <script type="application/json" id="pragma-route">{"pattern":"/missing","page":null,"components":{},"stores":{"cart":"/assets/cart.js"},"loader":true,"ssr":false,"tpl":"/assets/tpl/missing.js"}</script>
   <script type="module" src="/core/boot.js"></script>
 </head>
 <body>
   <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
   <main data-page>
-    <template data-if="page.loading" data-tid="x1"><p id="sk">loading</p></template>
-    <template data-else-if="page.error"><p id="error"><span id="status" data-text="{page.error.status}"></span> <span id="code" data-text="{page.error.code}"></span> <span id="message" data-text="{page.error.message}"></span></p></template>
-    <template data-else><h1 id="found">found</h1></template>
+    <!--p:if x1 page.loading-->
+    <!--p:elif z1 page.error-->
+    <!--p:else z2-->
   </main>
 </body>
 </html>

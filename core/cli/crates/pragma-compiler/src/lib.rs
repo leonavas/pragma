@@ -483,6 +483,8 @@ struct PageOut<'a> {
     page_classes: BTreeSet<String>,
     is_404: bool,
     overlays: bool,
+    /// Block and self-call bodies `compile::hoist` moved out of the page (its template module).
+    bodies: Vec<html::Element>,
 }
 
 const PD: &str = "<script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}});self.__pd.catch(()=>{})</script>";
@@ -687,13 +689,13 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         } else {
             sc.page_classes
         };
-        if p.layout.is_some() {
+        let bodies = if p.layout.is_some() {
             compile::hoist(&mut exp.page, 't');
-            compile::hoist(&mut exp.body, 'l');
+            compile::hoist(&mut exp.body, 'l')
         } else {
-            compile::hoist(&mut exp.page, 'l');
-        }
-        outs.push(PageOut { page, exp, loader, ssr, stores: sc.stores, page_classes, is_404, overlays });
+            compile::hoist(&mut exp.page, 'l')
+        };
+        outs.push(PageOut { page, exp, loader, ssr, stores: sc.stores, page_classes, is_404, overlays, bodies });
     }
 
     // client JS
@@ -840,6 +842,9 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
         let mut route_css_gz: u64 = 0;
         let mut markup = pragma_css::prune::Markup::default();
         markup_of(if p.layout.is_some() { &o.exp.body } else { &o.exp.page }, &mut markup);
+        for b in &o.bodies {
+            markup_of(&b.children, &mut markup);
+        }
         let mut scoped = String::new();
         let mut seen_dirs = HashSet::new();
         for c in o.exp.components.values() {
@@ -917,7 +922,16 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
                 )
             }
         };
-        let route = json!({
+        let mut module_urls = module_urls;
+        let tpl_url = (!o.bodies.is_empty()).then(|| {
+            let module = compile::template_module(&o.bodies, prod);
+            let name = url_safe(&o.page.out_name);
+            let url = if prod { format!("/assets/tpl/{name}-{}.js", hash8(module.as_bytes())) } else { format!("/assets/tpl/{name}.js") };
+            w.write_client(&format!("client{url}"), module.as_bytes(), prod);
+            module_urls.push(url.clone());
+            url
+        });
+        let mut route = json!({
             "pattern": o.page.pattern,
             "page": page_js,
             "components": comps,
@@ -925,6 +939,9 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             "loader": o.loader,
             "ssr": o.ssr,
         });
+        if let Some(u) = &tpl_url {
+            route["tpl"] = json!(u);
+        }
         let mut doc = String::with_capacity(4096);
         doc.push_str(&format!("<!doctype html>\n<html lang=\"{}\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n", html::escape_attr(&p.config.lang)));
         match o.exp.head.iter().find_map(|n| match n {
@@ -1003,7 +1020,7 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             let mut ssr_scripts = SsrScripts::default();
             let (template, shell) = if o.ssr {
                 let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
-                let ops = compile::ops(&o.exp.page, &scripted);
+                let ops = compile::ops(&o.exp.page, &scripted, &o.bodies);
                 w.write(&format!("templates/{}.json", o.page.out_name), serde_json::to_string(&ops).unwrap().as_bytes());
                 // the server runs a script only when everything it imports is app code (no npm
                 // package, no browser runtime from core/); the others stay client-rendered

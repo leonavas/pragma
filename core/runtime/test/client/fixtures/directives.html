@@ -7,7 +7,7 @@
   <style>#tall{height:3000px}</style>
   <script>self.__pragmaDev=true</script>
   <link rel="modulepreload" href="/assets/directives.js">
-  <script type="application/json" id="pragma-route">{"pattern":"/directives","page":"/assets/directives.js","components":{"counter":"/assets/counter.js"},"stores":{"cart":"/assets/cart.js"},"loader":false,"ssr":false}</script>
+  <script type="application/json" id="pragma-route">{"pattern":"/directives","page":"/assets/directives.js","components":{"counter":"/assets/counter.js"},"stores":{"cart":"/assets/cart.js"},"loader":false,"ssr":false,"tpl":"/assets/tpl/directives.js"}</script>
   <script type="module" src="/core/boot.js"></script>
 </head>
 <body>
@@ -18,24 +18,17 @@
     <p id="cls" class="base" data-class-active="state.active" data-class-inactive="!state.active">class</p>
     <p id="show" data-show="state.active">show</p>
     <p id="hide" data-show="!state.active">hide</p>
-    <template data-if="state.visible" data-tid="t1"><p id="yes">yes</p></template>
-    <template data-else><p id="no">no</p></template>
+    <!--p:if t1 state.visible-->
+    <!--p:else z1-->
     <ul id="list">
-      <template data-for="item in state.items" data-key="item.id" data-tid="t2"><li>
-        <span class="n" data-text="{item.name}"></span>
-        <template data-if="item.ok" data-tid="t3"><b class="ok">ok</b></template>
-        <template data-for="tag in item.tags" data-key="tag.t" data-tid="t4"><i class="tag" data-text="{tag.t}"></i></template>
-        <template data-empty><i class="none">no tags</i></template>
-        <div data-c="counter"><button class="inc" data-on-click="inc">+</button><span class="count" data-text="{state.n}"></span><span class="owner" data-text="{item.name}"></span></div>
-        <button class="rm" data-on-click="remove(item)">x</button>
-      </li></template>
-      <template data-empty><li id="empty">empty</li></template>
+      <!--p:for t2 item state.items item.id-->
+      <!--p:empty z3-->
     </ul>
     <div data-with-p="state.person"><span id="w" data-text="{p.name}"></span></div>
     <input id="m-text" data-model="state.name">
     <input id="m-check" type="checkbox" data-model="state.accepted">
     <input id="m-num" type="number" data-model="state.qty">
-    <select id="m-sel" data-model="state.color"><template data-for="c in state.colors" data-key="c" data-tid="t5"><option data-attr-value="c" data-text="{c}"></option></template></select>
+    <select id="m-sel" data-model="state.color"><!--p:for t5 c state.colors c--></select>
     <input id="r-p" type="radio" name="size" value="p" data-model="state.size">
     <input id="r-g" type="radio" name="size" value="g" data-model="state.size">
     <span id="echo-qty" data-text="{state.qty}"></span>
@@ -46,7 +39,7 @@
     <button id="save" data-on-click="save">save</button>
     <button id="fail" data-on-click="fail">fail</button>
     <span id="saving" data-show="state.saving">saving</span>
-    <template data-if="state.response" data-tid="t6"><span id="response" data-text="{state.response.input.name}"></span></template>
+    <!--p:if t6 state.response-->
     <p id="error" data-text="{state.error}"></p>
     <button id="buy" data-on-click="buy">buy</button>
     <span id="tick" data-text="{state.tick}"></span>

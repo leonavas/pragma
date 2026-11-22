@@ -858,6 +858,7 @@ test('a component renders itself: tree from data, adopts prerendered levels, dep
   assert.deepEqual(await p.$$eval('#tree li[data-self]', ls => ls.map(l => l.style.getPropertyValue('--depth'))), ['1', '2', '1'])
   assert.equal(await p.locator('#adopted').textContent(), 'A')
   assert.equal(await p.locator('#tree li[data-key="a"] > span').count(), 1)
+  assert.deepEqual(await p.$$eval('#dots circle', cs => cs.map(c => [c.namespaceURI, c.getAttribute('cx')])), [['http://www.w3.org/2000/svg', '1'], ['http://www.w3.org/2000/svg', '2']], 'a body inside <svg> is parsed as SVG')
 
   await p.evaluate(() => {
     __page.root.children[1].children.push({ id: 'b1', name: 'B1', depth: 2, children: [{ id: 'b2', name: 'B2', depth: 3, children: [] }] })
@@ -869,7 +870,11 @@ test('a component renders itself: tree from data, adopts prerendered levels, dep
   await p.evaluate(() => { __page.root.children.shift() })
   await tick(p)
   assert.deepEqual(await names(), ['root', 'B', 'B1', 'B2'])
-  assert.deepEqual(await p.$$eval('#tree template', ts => ts.map(t => t.content.childElementCount)), [0, 0, 0, 0], 'items clone empty anchors, the body stays in <template data-tpl>')
+  assert.deepEqual(await p.$eval('#tree', el => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_COMMENT), anchors = []
+    while (walker.nextNode()) anchors.push(walker.currentNode.data)
+    return [anchors, el.querySelectorAll('template').length]
+  }), [Array(4).fill('p:for t9 child state.node.children child.id'), 0], 'items clone comment anchors; bodies come from the template module')
   assert.deepEqual(p.errors, [])
 
   await p.evaluate(() => document.querySelector('#go-b').click())

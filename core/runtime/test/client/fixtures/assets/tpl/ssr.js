@@ -1,0 +1,1 @@
+export default {"s1": "<li data-text=\"{x.name}\"></li>", "z1": "<li>nothing</li>", "s2": "<p id=\"d\">featured</p>", "z2": "<p id=\"none\">not featured</p>", "s4": "<p id=\"nd\">without</p>", "z3": "<p id=\"cd\">with</p>", "s3": "<p id=\"open\">open</p>"}

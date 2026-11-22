@@ -1,0 +1,1 @@
+export default {"p1": "<div class=\"skeleton\" id=\"sk\">loading</div>", "p2": "<p id=\"error\" data-text=\"{page.error.message}\"></p>", "z1": "<h1 id=\"name\" data-text=\"{data.product.name}\"></h1>", "z2": "<div id=\"ready\">\n      <!--p:if p2 page.error-->\n      <!--p:else z1-->\n    </div>"}

@@ -1,0 +1,2 @@
+export default {"t2": "<circle data-attr-cx=\"row.id\" r=\"1\"></circle>", "t1": "<li data-var-x=\"row.x\" data-text=\"{row.id}\"></li>", "t9": "<li data-c=\"node\" data-self=\"c-node\" class=\"node\" data-with-node=\"child\" data-var-depth=\"child.depth\"></li>"}
+export const d = {"node": "<li data-c=\"node\" class=\"node\"><span data-text=\"{state.node.name}\"></span><ul><!--p:for t9 child state.node.children child.id--></ul></li>"}

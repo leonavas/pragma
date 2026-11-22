@@ -148,7 +148,7 @@ Compute every derived value in a script or store function (`const total = () => 
 - Return `'true'` or `'false'` strings for `aria-*` states (`aria-pressed`, `aria-expanded`), because boolean `false` removes the attribute.
 - `:show` hides an element in the DOM; `<if>` adds or removes it. `autofocus` inside a newly inserted block receives focus.
 - In dev, missing paths throw (except under `query`).
-- Allowed markers: `data-page` (root layout `<main>`), `data-reload` (full-load `<a>`). Never write `data-c`, `data-tid`, `data-of`, `data-slot`, or `data-prop-*`. `data-entering` and `data-leaving` are set by the runtime: use them only in CSS selectors.
+- Allowed markers: `data-page` (root layout `<main>`), `data-reload` (full-load `<a>`). Never write `data-c`, `data-of`, `data-slot`, `data-prop-*`, or `<!--p:…-->` block comments. `data-entering` and `data-leaving` are set by the runtime: use them only in CSS selectors.
 - Do not write `data-*` attributes by hand (`html/data-attribute`). Bind `:data-x="path"` for multi-value style hooks (`[data-x=value]`), `.name="path"` for on/off states, and role/label/id for tests.
 - `:text` is removed (`html/text-removed`); use `{path}` inside the element.
 - Computed sizes, positions, colors, and counts go in CSS variables: `:--x="path"` on the element, `var(--x)` in CSS (`css.md`). Write the name in lowercase kebab-case (`:--bar-left`, `html/css-var`). A value with `;`, `{`, `}`, or `<` is refused.

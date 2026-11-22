@@ -251,6 +251,7 @@ CSS       3.9 KB
           <ul>
             <li>Every route is prebuilt HTML, and a page with a <code>load</code> starts its data fetch from an inline script in <code>&lt;head&gt;</code>, before any module runs.</li>
             <li>Exactly the modules a page imports get a <code>modulepreload</code>. Modules are minified and hashed one by one; there is no app bundle.</li>
+            <li>The bodies of <code>&lt;if&gt;</code> and <code>&lt;for&gt;</code> blocks go to one preloaded template module per page; the HTML keeps a short comment where each block renders.</li>
             <li>The CSS contains only the classes the app uses.</li>
             <li>Links prefetch on hover, focus or when visible; navigations use view transitions.</li>
             <li>HTML is served <code>no-cache</code>, <code>/assets/</code> as <code>immutable</code>, both brotli or gzip compressed.</li>
@@ -288,7 +289,7 @@ dist/server/routes/orders/index.server.js</code></pre>
         </c-terminal>
         <div class="prose">
           <ul>
-            <li><code>dist/client/</code>: one HTML file per route (a param route keeps its name, <code>blog/[slug].html</code>), <code>_404.html</code>, hashed <code>assets/</code>, the files from <code>public/</code> and <code>_pragma/manifest.json</code>.</li>
+            <li><code>dist/client/</code>: one HTML file per route (a param route keeps its name, <code>blog/[slug].html</code>), <code>_404.html</code>, hashed <code>assets/</code> (with <code>assets/tpl/</code>, the block bodies of each page), the files from <code>public/</code> and <code>_pragma/manifest.json</code>.</li>
             <li><code>dist/server/</code>: <code>worker.js</code> (a fetch handler with the route table), <code>node.mjs</code> (a Node adapter around it), <code>wrangler.jsonc</code>, and your <code>.server.js</code> files copied unbundled with their relative imports.</li>
             <li><code>dist/templates/&lt;route&gt;.json</code>: only for routes with <code>ssr = true</code>.</li>
           </ul>

@@ -14,7 +14,8 @@
 <link rel="modulepreload" href="/assets/lib/state/cart.js">
 <link rel="modulepreload" href="/assets/core/router.js">
 <link rel="modulepreload" href="/assets/core/log.js">
-<script type="application/json" id="pragma-route">{"pattern":"/blog/:slug","page":"/assets/routes/blog/_slug_.js","components":{"counter":"/assets/lib/components/counter/counter.js"},"stores":{"cart":"/assets/lib/state/cart.js"},"loader":true,"ssr":true}</script>
+<link rel="modulepreload" href="/assets/tpl/blog/_slug_.js">
+<script type="application/json" id="pragma-route">{"pattern":"/blog/:slug","page":"/assets/routes/blog/_slug_.js","components":{"counter":"/assets/lib/components/counter/counter.js"},"stores":{"cart":"/assets/lib/state/cart.js"},"loader":true,"ssr":true,"tpl":"/assets/tpl/blog/_slug_.js"}</script>
 <script type="module" src="/assets/core/boot.js"></script>
 <script type="module" src="/_pragma/dev.js"></script>
 </head>
@@ -28,12 +29,11 @@
 <article class="p-4">
   <h1 data-text="{data.post.heading}"></h1>
   <ul>
-    <template data-for="t in data.post.tags" data-key="t.id" data-tid="tbfe151a"></template>
+    <!--p:for t0 t data.post.tags t.id-->
   </ul>
   <p data-show="state.read">read</p>
 </article>
-
-<template data-tpl="tbfe151a"><li data-class-active="t.active" class="tag" data-text="{t.name}"></li></template></main>
+</main>
 <footer class="text-sm text-neutral-500" data-text="{query.ref}"></footer>
 </body>
 </html>

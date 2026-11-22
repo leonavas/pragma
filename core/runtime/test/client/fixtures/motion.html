@@ -12,16 +12,16 @@
     #on[data-leaving], #off[data-leaving], li[data-leaving] { animation: out .3s }
     #on[data-entering], #off[data-entering], li[data-entering] { animation: in .3s }
   </style>
-  <script type="application/json" id="pragma-route">{"pattern":"/motion","page":"/assets/motion.js","components":{},"stores":{"cart":"/assets/cart.js"},"loader":false,"ssr":false}</script>
+  <script type="application/json" id="pragma-route">{"pattern":"/motion","page":"/assets/motion.js","components":{},"stores":{"cart":"/assets/cart.js"},"loader":false,"ssr":false,"tpl":"/assets/tpl/motion.js"}</script>
   <script type="module" src="/core/boot.js"></script>
 </head>
 <body>
   <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
   <main data-page>
-    <template data-if="state.on" data-tid="m1"><p id="on">on</p></template>
-    <template data-else><p id="off">off</p></template>
-    <ul id="l"><template data-for="i in state.items" data-key="i" data-tid="m2"><li data-text="{i}"></li></template></ul>
-    <template data-if="state.plain" data-tid="m3"><p id="plain" class="spin">plain</p></template>
+    <!--p:if m1 state.on-->
+    <!--p:else z1-->
+    <ul id="l"><!--p:for m2 i state.items i--></ul>
+    <!--p:if m3 state.plain-->
   </main>
 </body>
 </html>

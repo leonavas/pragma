@@ -7,17 +7,14 @@
   <style>#tall{height:3000px}</style>
   <script>self.__pragmaDev=true</script>
   <script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}})</script>
-  <script type="application/json" id="pragma-route">{"pattern":"/product/:id","page":null,"components":{},"stores":{"cart":"/assets/cart.js"},"loader":true,"ssr":false}</script>
+  <script type="application/json" id="pragma-route">{"pattern":"/product/:id","page":null,"components":{},"stores":{"cart":"/assets/cart.js"},"loader":true,"ssr":false,"tpl":"/assets/tpl/product/_id_.js"}</script>
   <script type="module" src="/core/boot.js"></script>
 </head>
 <body>
   <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
   <main data-page>
-    <template data-if="page.loading" data-tid="p1"><div class="skeleton" id="sk">loading</div></template>
-    <template data-else><div id="ready">
-      <template data-if="page.error" data-tid="p2"><p id="error" data-text="{page.error.message}"></p></template>
-      <template data-else><h1 id="name" data-text="{data.product.name}"></h1></template>
-    </div></template>
+    <!--p:if p1 page.loading-->
+    <!--p:else z2-->
     <p id="param" data-text="{params.id}"></p>
   </main>
 </body>

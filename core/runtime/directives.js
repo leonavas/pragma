@@ -3,18 +3,17 @@ import { readBy, forgetReads } from './state.js'
 const D = Symbol(), S = Symbol(), L = Symbol(), NONE = { b: [] }
 // Outer scope of each open component; slot content (data-slot="n") uses the one n levels up.
 const outer = []
-let auto = 0
 // Open `data-self` roots (a component inside itself); more than SELF_DEPTH means the data never ends.
 export const SELF_DEPTH = 64
 let deep = 0
-const defs = new Map(), tpls = new Map()
+let layoutBodies = null, pageBodies = null
+const parsed = new WeakMap()
+const NS = { 'http://www.w3.org/2000/svg': 'svg', 'http://www.w3.org/1998/Math/MathML': 'math' }
 
 export const hooks = { on() {}, enter: (el, s) => s, remove() {} }
 export const scopeOf = el => el[S]
 
 const fail = msg => { throw new Error('pragma: ' + msg) }
-// Inside <svg> a <template> is a plain SVG element without .content: its body is its own children.
-const body = t => t.content ?? t
 const path = v => v.split('.')
 const cond = v => (v[0] === '!' ? [path(v.slice(1)), true] : [path(v), false])
 const JSON_LITERAL = /^(?:true|false|null|-?\d+(?:\.\d+)?|".*")$/s
@@ -61,18 +60,34 @@ function cssValue(v, name) {
   return null
 }
 
-function source(cache, attr, id, missing) {
-  let t = cache.get(id)
-  if (!t?.isConnected) cache.set(id, (t = document.querySelector(`template[${attr}="${CSS.escape(id)}"]`) ?? fail(missing())))
-  return body(t).firstElementChild
+export function useBodies(mod, boot) {
+  pageBodies = mod ?? null
+  if (boot) layoutBodies = pageBodies
 }
 
-// A component inside itself: its root arrives empty and gets the body from the page's <template data-def>.
+function bodyOf(src, id, ns) {
+  let m = parsed.get(src)
+  if (!m) parsed.set(src, (m = new Map()))
+  let r = m.get(id)
+  if (!r) {
+    const t = document.createElement('template')
+    t.innerHTML = ns ? `<${ns}>${src[id]}</${ns}>` : src[id]
+    r = t.content.firstElementChild
+    m.set(id, (r = ns ? r.firstElementChild : r))
+  }
+  return r
+}
+
+function source(id, parent) {
+  const src = (id[0] === 'l' ? layoutBodies : pageBodies)?.default
+  return src && Object.hasOwn(src, id) ? bodyOf(src, id, NS[parent.namespaceURI]) : fail(`no template body "${id}": the page's template module is missing or out of date`)
+}
+
+// A component inside itself: its root arrives empty and gets the body from the page's template module (`d`).
 function fillSelf(el, id) {
-  el.append(...source(defs, 'data-def', id, () => `<${el.getAttribute('data-self')}> renders itself but the page has no <template data-def="${id}">`).cloneNode(true).childNodes)
+  const src = [pageBodies, layoutBodies].map(m => m?.d).find(d => d && Object.hasOwn(d, id)) ?? fail(`<${el.getAttribute('data-self')}> renders itself but the template module has no definition "${id}"`)
+  el.append(...bodyOf(src, id, NS[el.namespaceURI]).cloneNode(true).childNodes)
 }
-
-const root = (t, d) => body(t).firstElementChild ?? (d.s ? source(tpls, 'data-tpl', d.s, () => `the page has no <template data-tpl="${d.s}">`) : null)
 
 function fill(s, t) {
   let o = t[0]
@@ -106,21 +121,21 @@ export function eventCall(el, type, event) {
   return [c.f, args, typeof fn === 'function' ? fn.bind(store) : undefined]
 }
 
+const ANCHOR = /^p:(if|elif|else|for|empty)(\d*) (\S+)(?: (.*))?$/
+const decode = v => (v.includes('%') ? decodeURIComponent(v) : v)
+
+function anchor(n) {
+  const m = ANCHOR.exec(n.data)
+  if (!m) return (n[D] = NONE)
+  const [, kind, slot, s, rest] = m, a = rest ? rest.split(' ').map(decode) : [], d = { s, u: +slot }
+  if (kind === 'if' || kind === 'elif') [d.p, d.n] = cond(a[0]), (d.t = kind === 'if' ? 1 : 4)
+  else if (kind === 'for') Object.assign(d, { t: 2, v: a[0], p: path(a[1]), k: path(a[2]) })
+  else d.t = 3
+  if (d.t < 3) d.id = s
+  return (n[D] = d)
+}
+
 function parse(el) {
-  if (el.localName === 'template') {
-    const d = {}
-    let v
-    if ((v = el.getAttribute('data-if')) != null) [d.p, d.n] = cond(v), (d.t = 1)
-    else if ((v = el.getAttribute('data-for')) != null) {
-      const [x, , p] = v.trim().split(/\s+/)
-      Object.assign(d, { t: 2, v: x, p: path(p), k: path(el.getAttribute('data-key') ?? fail(`<for> without key: "${v}"`)) })
-    } else if (el.hasAttribute('data-else') || el.hasAttribute('data-empty')) d.t = 3
-    else if ((v = el.getAttribute('data-else-if')) != null) [d.p, d.n] = cond(v), (d.t = 4)
-    d.u = +el.getAttribute('data-slot')
-    d.s = el.getAttribute('data-tid')
-    if (d.t < 3) d.id = d.s ?? (el.setAttribute('data-tid', (v = 't' + auto++)), v)
-    return (el[D] = d.t ? d : NONE)
-  }
   const d = { b: [] }
   for (const { name, value } of el.attributes) {
     if (!name.startsWith('data-')) continue
@@ -220,7 +235,7 @@ function visit(el, s, d = el[D] ?? parse(el)) {
   }
   readBy(0)
   if (d.e) el[S] = s
-  if (el.firstElementChild) walk(el, s)
+  if (el.firstChild) walk(el, s)
   if (d.m) model(el, s, d.m)
   if (d.x === 1) outer.pop()
   if (d.r) deep--
@@ -228,11 +243,13 @@ function visit(el, s, d = el[D] ?? parse(el)) {
 
 function walk(parent, s) {
   let last, id
-  for (let n = parent.firstElementChild; n; n = n.nextElementSibling) {
-    if (n[L]) continue
-    const d = n[D] ?? parse(n)
-    if (d.t) [n, last, id] = block(n, d, lexical(s, d), last, d.id ?? id)
-    else visit(n, s, d)
+  for (let n = parent.firstChild; n; n = n.nextSibling) {
+    if (n.nodeType === 1) {
+      if (!n[L]) visit(n, s)
+    } else if (n.nodeType === 8) {
+      const d = n[D] ?? anchor(n)
+      if (d.t) [n, last, id] = block(n, d, lexical(s, d), last, d.id ?? id)
+    }
   }
 }
 
@@ -242,7 +259,7 @@ let leaving = [], entering = [], focusing = null
 const reduced = matchMedia('(prefers-reduced-motion: reduce)')
 
 function clone(t, d, id) {
-  const n = root(t, d).cloneNode(true)
+  const n = source(d.s, t.parentNode).cloneNode(true)
   n.setAttribute('data-of', id)
   if (d.r && !reduced.matches) {
     n.setAttribute('data-entering', '')
@@ -311,8 +328,14 @@ function settle() {
   if (into.length) requestAnimationFrame(() => setTimeout(entered, 0, into))
 }
 
+const sibling = n => {
+  do n = n.nextSibling
+  while (n?.nodeType === 3)
+  return n
+}
+const of = (n, id) => n?.nodeType === 1 && n.getAttribute('data-of') === id
 const next = n => {
-  do n = n.nextElementSibling
+  do n = sibling(n)
   while (n?.[L])
   return n
 }
@@ -328,8 +351,8 @@ function block(t, d, s, last, id) {
 function branch(t, d, s, last, id) {
   const chained = d.t > 2 && last
   const on = !chained && (d.t === 3 || !get(s, d.p) === d.n)
-  let n = t.nextElementSibling
-  if (n?.getAttribute('data-of') !== id) n = null
+  let n = sibling(t)
+  if (!of(n, id)) n = null
   if (!on) {
     if (n) drop(n)
     return [t, chained, id]
@@ -347,7 +370,7 @@ function branch(t, d, s, last, id) {
 
 function list(t, d, s) {
   const id = d.id, old = new Map(), scopes = [], keys = []
-  for (let n = t.nextElementSibling; n?.getAttribute('data-of') === id; n = n.nextElementSibling) old.set(n.getAttribute('data-key'), n)
+  for (let n = sibling(t); of(n, id); n = sibling(n)) old.set(n.getAttribute('data-key'), n)
   for (const it of get(s, d.p) ?? []) {
     const c = { __proto__: s, [d.v]: it }
     scopes.push(c)

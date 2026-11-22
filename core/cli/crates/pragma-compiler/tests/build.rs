@@ -37,6 +37,43 @@ fn fixture() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/app")
 }
 
+/// A built page and the bodies of its template module (`compile::hoist`), as one text.
+fn page_html(out: &Path, page: &str) -> String {
+    let mut html = fs::read_to_string(out.join("client").join(page)).unwrap();
+    let Some(url) = html.split("\"tpl\":\"").nth(1).and_then(|r| r.split('"').next()).map(str::to_string) else { return html };
+    let module = fs::read_to_string(out.join("client").join(url.trim_start_matches('/'))).unwrap();
+    let mut chars = module.chars();
+    let mut value = false;
+    while let Some(c) = chars.next() {
+        match c {
+            ':' => value = true,
+            '\'' => {
+                let mut text = String::new();
+                while let Some(c) = chars.next() {
+                    match c {
+                        '\'' => break,
+                        '\\' => text.push(match chars.next() {
+                            Some('n') => '\n',
+                            Some('r') => '\r',
+                            Some(c) => c,
+                            None => break,
+                        }),
+                        c => text.push(c),
+                    }
+                }
+                if value {
+                    html.push('\n');
+                    html.push_str(&text);
+                }
+                value = false;
+            }
+            ',' | '{' => value = false,
+            _ => {}
+        }
+    }
+    html
+}
+
 /// Copies the fixture app and applies changes: `Some(content)` writes, `None` deletes.
 fn app_with(changes: &[(&str, Option<&str>)]) -> Tmp {
     let t = tmp();
@@ -93,6 +130,7 @@ fn dev_snapshot() {
         "client/_404.html",
         "client/_pragma/manifest.json",
         "client/assets/routes/index.js",
+        "client/assets/tpl/index.js",
         "templates/blog/[slug].json",
         "server/worker.js",
         "server/node.mjs",
@@ -331,9 +369,9 @@ fn optional_prop_of_script_component() {
     assert!(d.is_empty(), "{d:#?}");
     let out = t.0.join("dev");
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/flag.html")).unwrap();
+    let html = page_html(&out, "flag.html");
     // props are live: the instance reads them (`state.flag`, default false when not passed)
-    assert!(html.contains("data-if=\"state.flag\"") && html.contains("state.clicks"), "{html}");
+    assert!(html.contains("<!--p:if t0 state.flag-->") && html.contains("state.clicks"), "{html}");
     assert!(html.contains("data-prop-label=\"no flag passed\"") && !html.contains("data-prop-flag"), "{html}");
 }
 
@@ -353,7 +391,7 @@ fn literal_values_in_bindings_and_props() {
     assert!(d.is_empty(), "{d:#?}");
     let out = t.0.join("dev");
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/hours.html")).unwrap();
+    let html = page_html(&out, "hours.html");
     assert!(html.contains("data-with-holiday=\"false\"") && html.contains("data-with-label=\"&quot;a b&quot;\"") && html.contains("data-with-count=\"-2.5\""), "{html}");
     assert!(html.contains("<p data-c=\"plain\"><i title=\"$5 off\">x</i></p>"), "{html}");
     assert!(html.contains("<input aria-label=\"Name\" disabled maxlength=\"20\" placeholder=\"Your name\">"), "{html}");
@@ -625,7 +663,7 @@ fn slot_marks_lexical_owner_and_module_props() {
     let t = app_with(&[BOX[0], BOX[1], (PAGE, Some(src))]);
     let out = t.0.join("out");
     build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let html = page_html(&out, "index.html");
     assert!(html.contains("<p>fixed</p>"), "{html}");
     assert!(html.contains("<div data-slot=\"1\"><section data-c=\"box\" data-prop-step=\"2\" class=\"p-4\">"), "{html}");
     assert!(html.contains("<b data-text=\"{state.open}\" data-slot=\"1\"></b> and <!--1{state.open}--><!--}-->"), "{html}");
@@ -644,7 +682,7 @@ fn component_and_page_css_match_only_their_own_markup() {
     let app = t.0.join("app");
     let out = t.0.join("dist");
     build(&BuildOptions { root: app.clone(), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let html = page_html(&out, "index.html");
     let panel = token_after(&html, "<h2 class=\"title\"");
     let page = token_after(&html, "<b class=\"title wide\"");
     assert_ne!(panel, page);
@@ -682,8 +720,8 @@ fn route_css_keeps_only_matching_theme_rules_and_preloads_used_fonts() {
     let app = t.0.join("app");
     let out = t.0.join("dist");
     build(&BuildOptions { root: app.clone(), out_dir: out.clone(), mode: Mode::Prod }).unwrap();
-    let index = fs::read_to_string(out.join("client/index.html")).unwrap();
-    let plain = fs::read_to_string(out.join("client/plain.html")).unwrap();
+    let index = page_html(&out, "index.html");
+    let plain = page_html(&out, "plain.html");
     for html in [&index, &plain] {
         assert!(!html.contains("rel=\"stylesheet\""), "small pages inline their CSS: {html}");
         assert_eq!(html.matches("href=\"/fonts/body-latin.woff2\"").count(), 1, "the layout's own preload is not repeated: {html}");
@@ -777,7 +815,7 @@ fn script_and_style_inside_the_html() {
     assert!(d.iter().all(|x| x.severity == pragma_diag::Severity::Warning), "{d:#?}");
     let out = t.0.join("dev");
     build(&BuildOptions { root: app.clone(), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/shop/index.html")).unwrap();
+    let html = page_html(&out, "shop/index.html");
     assert!(!html.contains("<script>\n") && !html.contains("<style>"), "{html}");
     assert!(html.contains("\"page\":\"/assets/routes/shop/index.js\""), "{html}");
     let js = fs::read_to_string(out.join("client/assets/routes/shop/index.js")).unwrap();
@@ -791,7 +829,7 @@ fn script_and_style_inside_the_html() {
     assert!(shop_css.contains("/* routes/shop/index.html */") && shop_css.contains(&format!(".shop-btn:where([data-s~=\"{shop_token}\"]) {{ padding: 1rem }}")), "{shop_css}");
     assert!(!shop_css.split("/* routes/shop/index.html */").nth(1).unwrap().contains("@layer"), "{shop_css}");
     assert!(shop_css.contains(".btn { padding") && !shop_css.contains(".tag"), "theme rules the route cannot match are dropped: {shop_css}");
-    let index_html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let index_html = page_html(&out, "index.html");
     let meter_token = token_after(&index_html, "class=\"meter\"");
     let meter_scope = format!(":where([data-s~=\"{meter_token}\"])");
     assert!(index_css.contains("/* lib/components/meter/meter.html */") && index_css.contains(&format!("[data-c=\"meter\"] .x, .meter{meter_scope} {{ margin: 0 }}")), "{index_css}");
@@ -826,7 +864,7 @@ fn stores_are_reached_through_shared() {
     ]);
     let out = t.0.join("dev");
     build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let html = page_html(&out, "index.html");
     assert!(html.contains("\"prefs\":\"/assets/lib/state/prefs.js\""), "{html}");
 }
 
@@ -891,7 +929,7 @@ fn real_starter_is_clean() {
     assert!(check(&app).is_empty(), "{:#?}", check(&app));
     let out = t.0.join("dist");
     let r = build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Prod }).unwrap();
-    let index = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let index = page_html(&out, "index.html");
     assert!(index.contains("data-c=\"modal\"") && !index.contains("props."));
     // no *.server.js: static-only, no server bundle (so no node in dev/serve)
     assert!(!r.has_server && !out.join("server").exists(), "server bundle without *.server.js");
@@ -905,8 +943,8 @@ fn preload_only_what_first_paint_uses() {
     ]);
     let out = t.0.join("out");
     build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let index = fs::read_to_string(out.join("client/index.html")).unwrap();
-    let about = fs::read_to_string(out.join("client/about.html")).unwrap();
+    let index = page_html(&out, "index.html");
+    let about = page_html(&out, "about.html");
     assert!(out.join("client/assets/core/lazy.js").is_file());
     assert!(!index.contains("lazy.js"), "dynamic import() is not modulepreloaded");
     assert!(!index.contains("overlay.js"), "page without overlay does not preload overlay.js");
@@ -921,7 +959,7 @@ fn theme_script_only_when_used() {
     ]);
     let out = t.0.join("out");
     build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/shop/[id].html")).unwrap();
+    let html = page_html(&out, "shop/[id].html");
     let theme = html.find("localStorage.getItem('pragma:theme')").expect("theme script on every page");
     assert!(theme < html.find("rel=\"stylesheet\"").unwrap(), "before the CSS");
     let d = check(&fixture());
@@ -936,7 +974,7 @@ fn aria_current_on_links_to_the_page() {
     let t = app_with(&[(PAGE, Some("<a href=\"/\">here</a> <a href=\"/?x=1\">q</a> <a href=\"/shop/1\">l</a> <a href=\"/\" target=\"_blank\">n</a>"))]);
     let out = t.0.join("out");
     build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let html = page_html(&out, "index.html");
     assert!(html.contains("<a href=\"/\" aria-current=\"page\">here</a> <a href=\"/?x=1\">q</a> <a href=\"/shop/1\">l</a> <a href=\"/\" target=\"_blank\">n</a>"), "{html}");
 }
 
@@ -1033,7 +1071,7 @@ fn state_passed_to_script_component_prop() {
     let t = app_with(&[tally[0], tally[1], (PAGE, Some("<c-tally :total=\"$items.length\"></c-tally>\n<c-tally total=\"3\"></c-tally>"))]);
     let out = t.0.join("out");
     build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap_or_else(|d| panic!("{d:#?}"));
-    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let html = page_html(&out, "index.html");
     // the caller's state goes in live as data-with-<prop>; a literal as data-prop-<prop>
     assert!(html.contains("data-with-total=\"state.items.length\""), "{html}");
     assert!(html.contains("data-prop-total=\"3\""), "{html}");
@@ -1154,7 +1192,7 @@ fn npm_package_in_dev_build() {
     build(&BuildOptions { root: t.0.join("app"), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
     let clock = fs::read_to_string(out.join("client/assets/npm/clock.js")).unwrap();
     assert!(clock.contains("\"development\"") && clock.contains("internal"), "{clock}");
-    let index = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let index = page_html(&out, "index.html");
     assert!(index.contains("href=\"/assets/npm/clock.js\""), "{index}");
     let page_js = fs::read_to_string(out.join("client/assets/routes/index.js")).unwrap();
     assert!(page_js.contains("'/assets/npm/clock.js'") && !page_js.contains("clock/sub"), "{page_js}");
@@ -1330,7 +1368,7 @@ fn text_interpolation_builds_markers_templates_and_ops() {
     assert!(d.is_empty(), "{d:#?}");
     let out = t.0.join("dist");
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/tpl/[id].html")).unwrap();
+    let html = page_html(&out, "tpl/[id].html");
     for want in [
         "<h1 data-text=\"{data.product.name}\"></h1>",
         "<p><b>Price:</b> <!--{data.product.price}--><!--}--> USD {net}</p>",
@@ -1408,7 +1446,7 @@ fn event_call_arguments_are_checked_and_resolved() {
     assert!(d.is_empty(), "{d:#?}");
     let out = t.0.join("dist");
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let html = page_html(&out, "index.html");
     assert!(html.contains("data-on-click=\"pick(p, 'One', event, 2, 'x')\">One</button>"), "{html}");
 }
 
@@ -1421,11 +1459,10 @@ fn directives_and_blocks_work_inside_pre_and_code() {
     assert!(d.is_empty(), "{d:#?}");
     let out = t.0.join("dist");
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let html = page_html(&out, "index.html");
     for want in [
-        "<pre data-attr-aria-label=\"state.path\"><code><template data-for=\"line in state.lines\" data-key=\"line.n\"",
-        "\"></template></code></pre>",
-        "\"><span data-attr-data-n=\"line.n\" data-text=\"{line.text}\"></span></template>",
+        "<pre data-attr-aria-label=\"state.path\"><code><!--p:for t0 line state.lines line.n--></code></pre>",
+        "\n<span data-attr-data-n=\"line.n\" data-text=\"{line.text}\"></span>",
         "<pre>$ curl {url} <span data-text=\"{state.path}\"></span><b data-c=\"tag\">A</b></pre>",
         "<code>{literal}</code>",
     ] {
@@ -1486,7 +1523,7 @@ fn events_pass_the_event_el_and_call_store_functions() {
     assert!(d.is_empty(), "{d:#?}");
     let out = t.0.join("dist");
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let html = page_html(&out, "index.html");
     for want in ["data-on-input=\"increase\"", "data-on-click=\"increase()\"", "data-on-click=\"shared.cart.remove(item.id)\"", "data-on-focus=\"increase(el, event)\"", "\"stores\":{\"cart\""] {
         assert!(html.contains(want), "missing {want}:\n{html}");
     }
@@ -1522,7 +1559,7 @@ fn json_ld_goes_to_head_with_server_values() {
     assert!(d.is_empty(), "{d:#?}");
     let out = t.0.join("dist");
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/blog/[slug].html")).unwrap();
+    let html = page_html(&out, "blog/[slug].html");
     let head = &html[..html.find("</head>").unwrap()];
     assert!(head.contains("<script type=\"application/ld+json\">\n{\"@context\": \"https://schema.org\""), "{html}");
     assert!(head.contains("\"headline\": \"{data.post.title}\""), "{html}");
@@ -1570,7 +1607,7 @@ fn webmcp_valid_forms_and_notool_stripped() {
     assert!(d.is_empty(), "{d:#?}");
     let out = t.0.join("dist");
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Prod }).unwrap();
-    let built = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let built = page_html(&out, "index.html");
     assert!(built.contains("toolname=\"search_products\""), "{built}");
     assert!(!built.contains("notool"), "notool must be stripped from built HTML: {built}");
 }
@@ -1625,8 +1662,8 @@ fn per_route_css_splitting() {
     let app = t.0.join("app");
     let out = t.0.join("dist");
     build(&BuildOptions { root: app.clone(), out_dir: out.clone(), mode: Mode::Prod }).unwrap();
-    let index = fs::read_to_string(out.join("client/index.html")).unwrap();
-    let plain = fs::read_to_string(out.join("client/plain.html")).unwrap();
+    let index = page_html(&out, "index.html");
+    let plain = page_html(&out, "plain.html");
     assert!(index.contains("data-pragma-route-css>"), "route with page-only classes gets route CSS: {index}");
     assert!(!plain.contains("data-pragma-route-css"), "route with no extra CSS skips route CSS: {plain}");
     assert!(!out.join("client/assets/css/plain.css").exists());
@@ -1642,14 +1679,14 @@ fn prod_precompression_and_speculation_rules() {
     let app = t.0.join("app");
     let prod_out = t.0.join("prod");
     build(&BuildOptions { root: app.clone(), out_dir: prod_out.clone(), mode: Mode::Prod }).unwrap();
-    let prod_html = fs::read_to_string(prod_out.join("client/index.html")).unwrap();
+    let prod_html = page_html(&prod_out, "index.html");
     assert!(prod_html.contains("<script type=\"speculationrules\">{\"prefetch\":"), "{prod_html}");
     assert!(prod_out.join("client/large.txt.br").is_file() && prod_out.join("client/large.txt.gz").is_file());
     assert!(!prod_out.join("client/tiny.txt.br").exists() && !prod_out.join("client/tiny.txt.gz").exists());
     assert!(prod_out.join("client/index.html.br").is_file() && prod_out.join("client/index.html.gz").is_file());
     let dev_out = t.0.join("dev");
     build(&BuildOptions { root: app, out_dir: dev_out.clone(), mode: Mode::Dev }).unwrap();
-    let dev_html = fs::read_to_string(dev_out.join("client/index.html")).unwrap();
+    let dev_html = page_html(&dev_out, "index.html");
     assert!(!dev_html.contains("speculationrules"), "{dev_html}");
     assert!(!dev_out.join("client/large.txt.br").exists() && !dev_out.join("client/large.txt.gz").exists());
 }
@@ -1687,12 +1724,12 @@ fn nested_layouts() {
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
 
     // 1 level deep: wrapped by routes/docs/_layout.html (with <p-nav> resolved relative to routes/docs)
-    let docs = fs::read_to_string(out.join("client/docs/index.html")).unwrap();
+    let docs = page_html(&out, "docs/index.html");
     assert!(docs.contains("<main data-page><div class=\"flex\"><nav data-c=\"nav-"), "{docs}");
     assert!(docs.contains("<h1>Overview</h1></section></div></main>"), "{docs}");
 
     // 2 levels deep: wrapped outermost-to-innermost (docs -> api -> page) + SSR template includes both
-    let api = fs::read_to_string(out.join("client/docs/api/index.html")).unwrap();
+    let api = page_html(&out, "docs/api/index.html");
     let docs_pos = api.find("<div class=\"flex\">").expect("outer nested layout");
     let api_pos = api.find("<article class=\"p-2\"><header>API</header>").expect("inner nested layout");
     let h1_pos = api.find("<h1 data-text=\"{data.title}\"></h1>").expect("page content");
@@ -1701,7 +1738,7 @@ fn nested_layouts() {
     assert!(tpl.contains("API") && tpl.contains("data.title"), "SSR template should include nested layout and page ops: {tpl}");
 
     // Sibling route is not wrapped by nested layouts
-    let home = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let home = page_html(&out, "index.html");
     assert!(!home.contains("aria-label=\"Docs\"") && !home.contains("<header>API</header>"), "{home}");
 
     // Validation: missing <slot></slot>
@@ -1741,7 +1778,7 @@ fn webmcp_component_passes_caller_text_to_tool_attribute() {
     assert!(d.is_empty(), "{d:#?}");
     let out = t.0.join("dist");
     build(&BuildOptions { root: app.clone(), out_dir: out.clone(), mode: Mode::Prod }).unwrap();
-    let built = fs::read_to_string(out.join("client/index.html")).unwrap();
+    let built = page_html(&out, "index.html");
     assert!(built.contains("toolparamdescription=\"Column id: todo\""), "{built}");
 
     let missing = page.replace(" toolparamdescription=\"Column id: todo\"", "");
@@ -1824,7 +1861,7 @@ fn css_variable_binding() {
     assert!(d.is_empty(), "{d:#?}");
     let out = t.0.join("dev");
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/bars.html")).unwrap();
+    let html = page_html(&out, "bars.html");
     assert!(html.contains("<li class=\"row\" data-var-left=\"row.left\">"), "{html}");
     assert!(html.contains("data-var-share=\"state.share\"") && html.contains("data-with-share=\"row.left\" data-var-left=\"row.left\""), "{html}");
     assert!(html.contains("<div data-c=\"bar\" class=\"bar\" style=\"--left:30\"></div>"), "{html}");
@@ -1861,12 +1898,12 @@ fn component_renders_itself() {
     assert!(d.is_empty(), "{d:#?}");
     let out = t.0.join("dev");
     build(&BuildOptions { root: app, out_dir: out.clone(), mode: Mode::Dev }).unwrap();
-    let html = fs::read_to_string(out.join("client/blog/[slug].html")).unwrap();
+    let html = page_html(&out, "blog/[slug].html");
     let stub = "<li data-c=\"tree\" data-self=\"c-tree\" class=\"tag\" data-with-node=\"child\" data-var-depth=\"child.depth\"></li>";
     assert_eq!(html.matches(stub).count(), 1, "the page and the definition share the body of the <for>: {html}");
-    let def = html.split("<template data-def=\"tree\">").nth(1).expect("definition");
-    assert!(def.starts_with("<li data-c=\"tree\" class=\"tag\"><span data-text=\"{state.node.name}\"></span><ul><template data-for=\"child in state.node.children\""), "{def}");
-    assert!(html.find("<template data-def").unwrap() < html.find("</main>").unwrap(), "the definition goes with the page: {html}");
+    assert!(html.contains("\n<li data-c=\"tree\" class=\"tag\"><span data-text=\"{state.node.name}\"></span><ul><!--p:for t0 child state.node.children child.id--></ul></li>"), "the definition goes to the template module: {html}");
+    let page = fs::read_to_string(out.join("client/blog/[slug].html")).unwrap();
+    assert!(!page.contains("<template") && !page.contains("data-def"), "{page}");
     let ops = fs::read_to_string(out.join("templates/blog/[slug].json")).unwrap();
     assert_eq!(ops.matches("[\"node\",\"path\",\"child\"]").count(), pragma_compiler::SSR_SELF_DEPTH, "{ops}");
 }

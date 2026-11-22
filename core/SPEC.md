@@ -111,7 +111,7 @@ template; children emptied); text next to child elements becomes `<!--{path}-->v
 `{` a path). Templates made only of static props are inlined at build time. Without `ssr` the
 prebuilt HTML never shows `{…}`: the value is empty until the runtime fills it at boot.
 
-Blocks (path unquoted; the build emits `<template data-if>` etc.):
+Blocks (path unquoted; the build emits a comment anchor, see "Rendered block DOM"):
 
 | Syntax | Effect |
 |---|---|
@@ -148,9 +148,9 @@ any ancestor up to `routes/`. 1 root element. Expanded at build (macro).
 - `<slot></slot>` receives children; `<slot name="actions">` receives children with `slot="actions"`.
 - **Self call**: a component with a script may render itself, directly, inside `<if>`/`<for>`,
   without slot content (`html/component` otherwise; indirect cycles too). The build emits the call
-  as its root with no children and `data-self="<tag>"`, and once per page a
-  `<template data-def="<data-c id>">` with the expanded body (at the end of the page content; at
-  the end of the body for layout components). The runtime fills an empty `data-self` root from it
+  as its root with no children and `data-self="<tag>"`, and once per page the expanded root in the
+  page's template module (`export const d = { "<data-c id>": "<html>" }`, see "Rendered block
+  DOM"). The runtime fills an empty `data-self` root from it
   and throws past 64 nested levels. SSR ops inline the body for 12 levels (64 calls per page); the
   rest stays empty for the client.
 - The build marks the root with `data-c="x"` for `c-x`, and `data-c="x-<hash>"` for `p-x` (6 hex
@@ -159,15 +159,22 @@ any ancestor up to `routes/`. 1 root element. Expanded at build (macro).
 
 ### Rendered block DOM (client and SSR identical)
 
-The generated `<template>` stays in the DOM as an empty anchor: the build moves its body to one
-`<template data-tpl="<tid>">` per page (at the end of the page content; at the end of the body for
-the layout), and the runtime and SSR clone it from there, so a list item or a self call never
-carries the bodies of its inner blocks. The tid is a hash of the body (equal bodies share one;
-`l…` outside `<main data-page>`, `t…` inside); blocks inside `<svg>`/`<math>` keep their body.
-Each instance is inserted as a sibling right after
-the template of the branch that produced it, with `data-of="<tid>"` (the `data-tid` of the
-`if`/`for` opening the chain) and, in `for`, `data-key="<value>"`. Updates diff by key; existing
-nodes are not recreated.
+Each block is a comment anchor in the DOM: `<!--p:<kind>[n] <tid>[ <value>…]-->`, kind `if`/`elif`
+(value `[!]path`), `else`, `for` (values `var path key`) or `empty`; `n` is the `data-slot` count
+of slot content. Values percent-encode every byte outside `[A-Za-z0-9_$.!]`, so none can end the
+comment. The build moves every block body to the page's template module,
+`/assets/tpl/<route>-<hash>.js` (dev: `/assets/tpl/<route>.js`; URL-safe like the other assets):
+`export default { "<tid>": "<body html>" }` plus `d` for self calls. The page `modulepreload`s it
+and names it in the route JSON (`"tpl"`); the runtime imports it with the route modules (the first render
+already waits for them; it downloads in parallel), and parses a body (in a `<template>`; in the
+SVG or MathML namespace when the anchor's parent is) only when a block first renders it. A tid is
+`<prefix><base36 counter>`, unique per page, equal bodies sharing one: `l…` outside `<main
+data-page>` (looked up in the module the page booted with, since the layout stays), `t…` inside
+(the current page's module). Without JS a page shows what it shows today; an SSR instance is
+already in the HTML and needs the module only to change.
+Each instance is inserted as a sibling right after the anchor of the branch that produced it (only
+text nodes may sit between), with `data-of="<tid>"` (the tid of the `if`/`for` opening the chain)
+and, in `for`, `data-key="<value>"`. Updates diff by key; existing nodes are not recreated.
 
 Motion (client only, CSS-driven): an instance inserted after its block's first render gets
 `data-entering` until its finite animations end (`getAnimations({ subtree: true })`). A removed
@@ -324,7 +331,7 @@ export const actions = { async save({ input, params, env, log }) { return { ok: 
 export const ssr = false
 ```
 - Default, no SSR: prebuilt HTML has everything outside blocks; the `<if page.loading>` chain is
-  an inert `<template>` the runtime instantiates on boot, so the skeleton appears once
+  a comment anchor the runtime renders on boot, so the skeleton appears once
   `core/boot.js` runs, not in the raw HTML.
   The client fetches `GET /_data/<path>?<query>` → `{ "data": ... }` or `{ "error": { "message" } }`.
 - In the `<head>` of pages with a loader, the build injects a minimal inline script that starts
@@ -482,7 +489,7 @@ Usage:
 
 ```
 dist/
-  client/                 HTML per route, hashed assets, /_pragma/manifest.json
+  client/                 HTML per route, hashed assets (assets/tpl/: block bodies per page), /_pragma/manifest.json
   server/worker.js        Cloudflare Workers entry (if any *.server.js)
   server/node.mjs         Node adapter (node:http) with static files
   server/wrangler.jsonc   assets dist/client, html_handling drop-trailing-slash, run_worker_first (no not_found_handling)
@@ -493,7 +500,8 @@ dist/
   per exact set of routes (a set under 4 kB joins the closest wider set); `import()` stays a
   separate chunk and npm packages stay external. Route JSON URLs point to named re-exports
   (`<chunk>.js#p`, `#c<i>`, `#s<i>`). Each page gets `<link rel="modulepreload">` only for the
-  chunks first paint uses (never `import()`), plus `core/overlay.js` if the page has an overlay.
+  chunks first paint uses (never `import()`), plus `core/overlay.js` if the page has an overlay
+  and its template module when it has blocks (§3 "Rendered block DOM").
   The manifest uses the same list. `pragma dev` keeps one module per file.
 - Client npm packages: prebundled with `rolldown` (tree-shaking, only names the app imports),
   one `/assets/npm/<package>-<hash>.js` per package and shared chunks in `/assets/npm/_*`;
