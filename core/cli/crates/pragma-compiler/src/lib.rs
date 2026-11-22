@@ -8,6 +8,7 @@ mod directive;
 mod expand;
 mod html;
 mod js;
+mod owners;
 mod project;
 mod sugar;
 mod validate;
@@ -584,10 +585,10 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
             page_css.insert(f.clone(), scope_page_css(&css, page));
         }
     }
-    let owned: HashMap<String, BTreeSet<pragma_css::prune::OwnCompound>> = p
+    let owned: owners::Owned = p
         .all_components()
-        .filter_map(|c| comp_css.get(&c.dir).map(|css| (css_owner("component", &c.id), pragma_css::prune::own_compounds(css, OWNED))))
-        .chain(p.pages.iter().chain(p.not_found.iter()).filter_map(|pg| pg.css.as_ref().and_then(|f| page_css.get(f)).map(|css| (css_owner("page", &pg.out_name), pragma_css::prune::own_compounds(css, OWNED)))))
+        .filter_map(|c| comp_css.get(&c.dir).map(|css| (css_owner("component", &c.id), pragma_css::prune::own_selectors(css, OWNED))))
+        .chain(p.pages.iter().chain(p.not_found.iter()).filter_map(|pg| pg.css.as_ref().and_then(|f| page_css.get(f)).map(|css| (css_owner("page", &pg.out_name), pragma_css::prune::own_selectors(css, OWNED)))))
         .collect();
     let mut classes = validate::ClassCheck::new(project_classes, theme);
 

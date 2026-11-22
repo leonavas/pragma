@@ -1315,7 +1315,7 @@ Use utility classes (`classes.md`) first. Write a custom class only when utiliti
 | Component `<style>` or `<name>.css` | Scoped to the markup that component wrote. `:global(…)` opts out. `[data-c="<name>"]` stays as written (unique per folder for `p-`). |
 | Page `<style>` or `<page>.css` | Scoped to the markup that page wrote. |
 
-Scoping works as in Svelte. The build writes a `data-s` token on each element that a page or component wrote, and appends `:where([data-s~="<token>"])` to the last part of each selector (zero specificity). A selector does not match:
+Scoping works as in Svelte. The build appends `:where([data-s~="<token>"])` to the last part of each selector (zero specificity), and writes the `data-s` token on each element that a page or component wrote and that one of its selectors can match (element name, classes including `.x` toggles, and the ancestors on the page). A selector does not match:
 
 - elements inside a child component (style them in that component, or pass a class),
 - slot content: it belongs to the page or component that wrote it.
@@ -1701,6 +1701,7 @@ let today = format(new Date(), 'PPP')
 - Import named exports from the index or a subpath. The build tree-shakes each ES module package.
 - Each package outputs `/assets/npm/<package>-<hash>.js` (`@date-fns/tz` -> `date-fns__tz`) with `modulepreload`. Shared chunks go to `/assets/npm/_*.js`. Package size counts in the page JS size that `pragma build` prints.
 - Avoid `import * as x from 'pkg'` and `import('pkg')` when possible; they bundle the whole package.
+- To load a package only on use, import it in a `utils/` module and `import()` that module (`performance.md`, "Lazy-load heavy code").
 - `process.env.NODE_ENV` evaluates to `"production"` in build and `"development"` in dev.
 
 ## Supported packages
@@ -1780,10 +1781,48 @@ Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<hea
 `pragma build` bundles the client JS (`pragma dev` keeps one file per module):
 
 - The core runtime is one file (`/assets/core/boot-<hash>.js`).
-- Each route gets one chunk with its page, components, stores and the code only it uses (`/assets/routes/<route>-<hash>.js`).
+- Each route gets one chunk with its page, components, stores and the code only it uses (`/assets/routes/<route>-<hash>.js`). Asset names are URL-safe: `[id]` becomes `_id_` (`/assets/css/app/_id_-<hash>.css`), so no asset URL gets a redirect.
 - Code used by 2+ routes goes to `/assets/chunks/shared<n>-<hash>.js`, one chunk per set of routes. A set under 4 kB joins a chunk that a wider set of routes uses.
 - `await import()` stays a separate chunk. npm packages stay in `/assets/npm/` (`packages.md`).
-- The page `modulepreload`s every chunk it runs. The router prefetches the HTML and chunks of a link on hover, focus, and when the link enters the viewport, also for links rendered after the page loads (`/app/:id` links included).
+- The page `modulepreload`s every chunk it runs. The router prefetches the HTML and chunks of a link on hover, focus, and when the link enters the viewport, also for links rendered after the page loads (`/app/:id` links included). Viewport prefetch starts after the `load` event, when the browser is idle, and is off when the user turns on Save-Data. The router requests the clean page URL (`/app`, not `/app/index.html`).
+
+## Lazy-load heavy code
+
+Code that runs only after a click (export to XLSX or PDF, a parser, a chart in a closed modal) does not need to be in the route chunk. Put it in a `utils/` module and load that module with `await import()` inside the action.
+
+`utils/export-xlsx.js`:
+
+```js
+import { utils, writeFile } from 'xlsx'
+
+export function exportXlsx(rows, name) {
+  const book = utils.book_new()
+  utils.book_append_sheet(book, utils.json_to_sheet(rows), 'Data')
+  writeFile(book, name)
+}
+```
+
+`routes/report.html`:
+
+```html
+<script>
+  let rows = []
+
+  async function download() {
+    const { exportXlsx } = await import('../utils/export-xlsx.js')
+    exportXlsx(rows, 'report.xlsx')
+  }
+</script>
+
+<button type="button" @click="download">Export XLSX</button>
+```
+
+- `pragma build` puts the module in `/assets/chunks/<name>-<hash>.js` and the packages it imports in `/assets/npm/`. The page does not `modulepreload` them; the browser fetches them on the first click. `pragma dev` does the same per file.
+- Import named exports in the `utils/` module, not `import('pkg')` in the page: the build tree-shakes the package only through named imports.
+- Use `import()` only. A static `import` of the same module anywhere in the route (page, component, store) puts it back in the route chunk.
+- It works the same in a component `<script>` (for example the action of a modal). The markup of the component stays in the route; only the imported code is lazy.
+- The page JS size that `pragma build` prints does not count lazy chunks.
+- Show a pending state if the first load can be slow (`let exporting = true` before the `await`).
 
 ## Rules
 
@@ -1795,7 +1834,7 @@ Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<hea
 - Drive per-frame animations (scroll, drag, progress) with `frame` from `'pragma'`: read layout first, then assign state (`state.md`, "Per-frame updates").
 - Use per-frame `:--name` values only in `transform` and `opacity`, never in `top`/`left`/`width`/`height`/`margin`/`padding`/`inset` (`css.md`, "Values that change every frame").
 - Omit `.js` on pages without interaction.
-- Keep heavy single-page code on that page. Load interaction-only code with `await import()` inside the action.
+- Keep heavy single-page code on that page. Load interaction-only code with `await import()` inside the action ("Lazy-load heavy code").
 - Return only displayed fields from `load`. Run independent requests with `Promise.all`.
 - Keep page JS small. Read the size table of `pragma build` after you add a package or a large module.
 - Do not import large modules in `lib/state/`. Do not fetch data in `mount`. Do not enable `ssr` by default.
