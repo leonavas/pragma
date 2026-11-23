@@ -44,7 +44,7 @@ function style(scope, value) {
 }
 
 const PATH_AT = { text: 1, attr: 2, show: 1, if: 2, elif: 2, for: 3 }
-const CLIENT_ROOTS = new Set(['state', 'shared'])
+const CLIENT_ROOTS = new Set(['state', 'shared', 'data', 'params', 'query', 'page', 'layout'])
 
 function clientOnly(scope, value) {
   return pathsOf(value).some((path) => {
@@ -177,12 +177,20 @@ const readonly = readonlyViews(
   () => 'data, params, query and page are read-only while the server renders',
 )
 
-export function serverServices({ data, params, query, page }, log) {
-  return {
-    data: readonly(data), params: readonly(params), query: readonly(query), page: readonly(page), log,
-    shared: new Proxy({}, { get: browserOnly('shared') }),
-    call: browserOnly('call'), stream: browserOnly('stream'), frame: browserOnly('frame'), navigate: browserOnly('navigate'), open: browserOnly('open'), close: browserOnly('close'), confirm: browserOnly('confirm'),
-  }
+const browserServices = {
+  shared: new Proxy({}, { get: browserOnly('shared') }),
+  call: browserOnly('call'), stream: browserOnly('stream'), frame: browserOnly('frame'), navigate: browserOnly('navigate'), open: browserOnly('open'), close: browserOnly('close'), confirm: browserOnly('confirm'),
+}
+
+export function serverServices({ data, params, query, page, layout }, log) {
+  return { ...browserServices, data: readonly(data), params: readonly(params), query: readonly(query), page: readonly(page), layout: readonly(layout), log }
+}
+
+const unknownAtBuild = (name) => new Proxy({}, { get: () => { throw new Error(`${name} is known only when the page opens`) } })
+const silent = new Proxy({}, { get: () => () => {} })
+
+function buildServices() {
+  return { ...browserServices, data: unknownAtBuild('data'), params: unknownAtBuild('params'), query: unknownAtBuild('query'), page: unknownAtBuild('page'), layout: unknownAtBuild('layout'), log: silent }
 }
 
 function instantiate(mod, props, services) {
@@ -197,7 +205,15 @@ function instantiate(mod, props, services) {
 }
 
 export function renderPage(ops, scope, { page, components = {}, log } = {}) {
-  const services = serverServices(scope, log)
+  return renderWith(ops, scope, serverServices(scope, log), page, components)
+}
+
+// The build renders each prebuilt page once, without a request: data, params, query, page and layout stay to the browser.
+export function prerender(ops, { page, components = {} } = {}) {
+  return renderWith(ops, {}, buildServices(), page, components)
+}
+
+function renderWith(ops, scope, services, page, components) {
   const ctx = { instance: (id, props) => instantiate(components[id], props, services) }
   const state = instantiate(page, {}, services)
   if (state) {

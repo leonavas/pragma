@@ -35,7 +35,28 @@
 
 - `<head>` is optional and must come first. Its tags apply to every page and must be static (no `:` bindings, no `{}`).
 - Include exactly one `<main data-page>` containing only `<slot></slot>`.
-- The layout has no `<script>` and no `.server.js`. It reads only `shared`, `params`, and `query`. Use a component with `<script>` for behavior.
+- The layout has no `<script>`. It reads only `layout`, `shared`, `params`, and `query`. Use a component with `<script>` for behavior.
+- The layout and the components in it never read `data`: `data` belongs to each page and is empty during every navigation (`layout/data-in-layout`). What the layout shows on every page (the signed-in user, a counter) comes from `layout`.
+
+## Layout data
+
+`routes/_layout.server.js` exports only `load`. It gets the same context as a page `load` (`request`, `url`, `cookies`, `locals` from the middleware) and returns what the layout shows. Read it as `layout` in any HTML (layout, pages, components) and as `import { layout } from 'pragma'` in scripts.
+
+`routes/_layout.server.js`:
+```js
+export async function load({ locals }) {
+  return { user: locals.user }
+}
+```
+
+`routes/_layout.html`:
+```html
+<span>{layout.user.name}</span>
+```
+
+- `load` runs on the full page load (with the page `load`, in parallel) and again after each action (`call`, `stream`). A client navigation keeps the value, so the layout does not change while the next page loads.
+- Before the first answer, `layout` is `null`; with `ssr`, the value comes in the page.
+- Actions that change it (sign in, sign out, edit the profile) need nothing extra: `layout` updates after them.
 - `routes/_404.html` renders unknown routes. It has no `.server.js`.
 
 ## Nested layouts
@@ -57,7 +78,7 @@ Any subfolder in `routes/` can add `_layout.html` with `<slot></slot>` to wrap r
 
 - A nested `_layout.html` wraps the page inside the root `<main data-page>`.
 - A nested `_layout.html` has no `<head>`, no `<script>`, and no `.server.js`.
-- It reads only `shared`, `params`, and `query`.
+- It reads only `layout`, `shared`, `params`, and `query`.
 - Include one `<slot></slot>` for the child route or inner layout.
 
 ## SEO and link previews
@@ -115,7 +136,7 @@ export async function load({ params, request }) {
 
 ## Active link
 
-- `<a href="/path">` (no query or hash) automatically gets `aria-current="page"` on the current route. Style `.nav-link[aria-current="page"]` in `lib/theme.css`.
+- `<a href="/path">` (no query or hash) automatically gets `aria-current="page"` on the current route. The router sets it on the clicked link at the click, before the new page loads. Style `.nav-link[aria-current="page"]` in `lib/theme.css`.
 - For query links (filters, tabs), bind `:aria-current` to a derived function that returns `'true'` or `false`:
 
 ```html

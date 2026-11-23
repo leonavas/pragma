@@ -62,7 +62,7 @@ function later(promise, ctx) {
   else return promise
 }
 
-export function createHandler({ routes, middleware, service }) {
+export function createHandler({ routes, middleware, service, layout }) {
   const table = sortRoutes(routes)
   const markdownFiles = new Map()
   let manifest
@@ -176,10 +176,11 @@ export function createHandler({ routes, middleware, service }) {
           return withVary(asMarkdown(await env.ASSETS.fetch(new Request(new URL(md, request.url), request))))
         }
         if (kind === 'data') return data(m, event)
+        if (kind === 'layout') return layoutData(layout, event)
         if (kind === 'action') return action(m, api.action, event)
         if (kind === 'endpoint') return endpoint(m, event)
         if (kind === 'page') {
-          const res = await page(m, event)
+          const res = await page(m, event, layout)
           return md ? withVary(res) : res
         }
         return serveFile()
@@ -267,6 +268,12 @@ async function data(m, event) {
   return json({ data: (await load(event)) ?? null })
 }
 
+async function layoutData(layout, event) {
+  if (event.request.method !== 'GET' && event.request.method !== 'HEAD') return fail('Method not allowed', 405)
+  if (!layout?.load) return fail('The app has no routes/_layout.server.js', 404)
+  return json({ layout: (await layout.load(event)) ?? null })
+}
+
 async function action(m, name, event) {
   const { request } = event
   if (request.method !== 'POST') return fail('Method not allowed', 405)
@@ -333,17 +340,18 @@ export function earlyHints(html) {
   return hints.length ? hints.join(', ') : null
 }
 
-async function page(m, event) {
+async function page(m, event, layout) {
   const { route, params } = m
   const { request, query, log } = event
   let payload
   let body
   let status = 200
-  const scope = { data: null, params, query, page: { loading: false, error: null } }
+  const scope = { data: null, layout: null, params, query, page: { loading: false, error: null } }
   try {
-    const value = route.server?.load ? await route.server.load(event) : null
-    payload = { data: value ?? null }
+    const [value, shared] = await Promise.all([route.server?.load ? route.server.load(event) : null, layout?.load ? layout.load(event) : null])
+    payload = layout?.load ? { data: value ?? null, layout: shared ?? null } : { data: value ?? null }
     scope.data = payload.data
+    scope.layout = payload.layout ?? null
     body = renderPage(route.template, scope, { page: route.page, components: route.components, log })
   } catch (err) {
     if (err instanceof Redirect) throw err
