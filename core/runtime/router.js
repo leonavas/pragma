@@ -99,10 +99,10 @@ async function prefetch(href) {
   for (const m of e.modules ?? []) preload(m)
 }
 
-function mark() {
+function mark(path = location.pathname) {
   for (const a of document.querySelectorAll('a[href]')) {
     if (!link(a)) continue
-    if (a.pathname === location.pathname && !a.search && !a.hash) a.setAttribute('aria-current', 'page')
+    if (a.pathname === path && !a.search && !a.hash) a.setAttribute('aria-current', 'page')
     else if (a.getAttribute('aria-current') === 'page') a.removeAttribute('aria-current')
   }
 }
@@ -218,6 +218,7 @@ export function startRouter(pageApi) {
     if (!a || ev.defaultPrevented || ev.button || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return
     if (a.hash && where(a) === here) return
     ev.preventDefault()
+    mark(a.pathname)
     navigate(a.href)
   })
   addEventListener('popstate', () => {

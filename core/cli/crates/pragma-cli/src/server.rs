@@ -391,7 +391,7 @@ fn accepts(header: &str, encoding: &str) -> bool {
 }
 
 fn is_server_path(path: &str) -> bool {
-    path == "/_otel" || path.starts_with("/_data/") || path == "/_data" || path.starts_with("/_action/")
+    path == "/_otel" || path.starts_with("/_data/") || path == "/_data" || path.starts_with("/_layout/") || path == "/_layout" || path.starts_with("/_action/")
 }
 
 fn inject_dev(html: &[u8]) -> Bytes {

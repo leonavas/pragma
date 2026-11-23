@@ -52,7 +52,7 @@ Each page gets only the CSS its markup can use:
 
 Markup that pragma does not render (HTML from an npm widget) gets no theme rule for its classes. Style it in the component that hosts it with `:global(…)`.
 
-Fonts: the build adds `<link rel="preload" as="font" crossorigin>` for each `@font-face` family that the page's CSS uses (directly or through `var(--font-…)`): the upright `.woff2` face that covers Latin letters (weight 400 when there are several). Remove manual font preloads from `_layout.html`: they load fonts on pages that do not use them.
+Fonts: the build adds `<link rel="preload" as="font" crossorigin>` for each `@font-face` family that the page's CSS uses (directly or through `var(--font-…)`): the `.woff2` face that covers Latin letters for each style and weight the page uses. The style and weight come from the rule that names the family (`font: italic 700 1rem var(--font-serif)`). A matching rule without a family (`font-style: italic`) and the tags the browser styles (`em`, `i`, `cite`: italic; `strong`, `b`, `h1`–`h6`, `th`: 700) apply to every family the page uses. Without them, the upright 400 face. At most six files per page. Remove manual font preloads from `_layout.html`: they load fonts on pages that do not use them.
 
 Files in CSS `url()`: put fonts and CSS images in `public/` and write the path from the site root (`url('/fonts/inter.woff2')`). `pragma build` copies each `public/` file that any CSS names to `/assets/<folder>/<name>-<hash>.<ext>` (`/assets/fonts/inter-1a2b3c4d.woff2`) and writes that URL in the CSS and in the font preload. The browser caches it as `immutable`, so a returning visit uses the font with no request and the text does not change font after the first paint. The file also stays at its `public/` URL. `pragma dev` keeps the `public/` URL.
 
@@ -153,3 +153,17 @@ Compositor only (fixed size, then move and scale):
 
 - Create a custom class only when the same combination repeats in 3+ places, or when you need state selectors or animations.
 - Forbidden: inline `style="..."` and `:style` (use `:--name`), arbitrary values (`w-[37px]`), negative utilities (`-mt-2`), undefined classes, `!important`, ID selectors, external `@import`, and single-use custom classes.
+
+## Scroll that starts at the end
+
+A chat, log, or feed that opens at its last item: make the scroll container a reverse column with one child. The browser opens it at the end before the first paint, and keeps the end in view when items are added. Do not call `scrollTo` in `mount`: it runs after the first paint, and the user sees the jump.
+
+```html
+<div class="flex flex-col-reverse overflow-y-auto">
+  <ol>
+    <for m in $messages key=m.id><li>{m.text}</li></for>
+  </ol>
+</div>
+```
+
+- Keep the items in reading order inside the one child: only the container is reversed.

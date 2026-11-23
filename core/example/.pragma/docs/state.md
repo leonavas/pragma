@@ -185,6 +185,7 @@ Derived functions recompute only when state they read changes. Keep values from 
 |---|---|
 | `shared` | Stores (`shared.tasks.items`, `shared.tasks.add(title)`). |
 | `data` | `load` result (`data.md`); undefined until `load` finishes. |
+| `layout` | `load` result of `routes/_layout.server.js` (`routes.md`, "Layout data"); kept across navigations, reloaded after each action. |
 | `params`, `query`, `page` | Route params, query strings, `page.loading`, `page.error`. |
 | `call(name, input)` | Calls a server action; throws `ActionError` (`status`, `body`) on failure (`data.md`). |
 | `stream(name, input, { signal })` | Calls a server action that streams NDJSON; `for await` each line (`data.md`). |

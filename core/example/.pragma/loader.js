@@ -1,5 +1,5 @@
 import { traceHeaders } from './log.js'
-import { actionUrl, dataUrl } from './contract.js'
+import { actionUrl, dataUrl, layoutUrl } from './contract.js'
 
 let leaving = false
 addEventListener('beforeunload', () => { leaving = true })
@@ -21,6 +21,7 @@ class ActionError extends Error {
 }
 
 export const fetchData = url => fetch(dataUrl(url), { headers: headers() })
+export const fetchLayout = url => fetch(layoutUrl(url), { headers: headers() })
 
 const problem = (body, status) => ({ ...(isObject(body) ? body : { message: body == null ? `Failed to load data (HTTP ${status})` : String(body) }), ...(status && { status }) })
 
@@ -28,7 +29,7 @@ export function loadResult(r) {
   const to = redirectOf(r)
   if (to) return { redirect: to }
   r = isObject(r) ? r : {}
-  return { data: r.data, error: r.error ? problem(r.error, r.error.status ?? 500) : null }
+  return { data: r.data, layout: r.layout, error: r.error ? problem(r.error, r.error.status ?? 500) : null }
 }
 
 export async function load(response) {

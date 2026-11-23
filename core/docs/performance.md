@@ -1,6 +1,6 @@
 # Performance
 
-Pragma optimizes builds by default: prebuilt HTML, `load` fetch started in `<head>`, per-route CSS with only the theme rules the page can match (inlined in production when <= 14 kB gzip, so small pages have no render-blocking stylesheet), per-page font preload, per-route JS chunks, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets (JS, CSS, and the `public/` files that CSS names with `url()`, such as fonts), and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
+Pragma optimizes builds by default: prebuilt HTML with the scripts' initial state rendered (`data.md`, "Prebuilt HTML"), `load` fetch started in `<head>`, per-route CSS with only the theme rules the page can match (inlined in production when <= 14 kB gzip, so small pages have no render-blocking stylesheet), per-page font preload, per-route JS chunks, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets (JS, CSS, and the `public/` files that CSS names with `url()`, such as fonts), and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
 
 ## JS chunks
 
@@ -51,6 +51,10 @@ export function exportXlsx(rows, name) {
 - The page JS size that `pragma build` prints does not count lazy chunks.
 - Show a pending state if the first load can be slow (`let exporting = true` before the `await`).
 
+## Page transitions
+
+The router swaps pages inside a View Transition. Only `<main data-page>` fades in (150 ms, from opacity 0.5); the layout around it (header, sidebar) changes at once and does not blink. To animate another element across pages, give it its own `view-transition-name`. With `prefers-reduced-motion`, there is no transition.
+
 ## Rules
 
 - Navigate with `<a href>`. A `<button>` that calls `navigate()` gets no prefetch.
@@ -65,3 +69,4 @@ export function exportXlsx(rows, name) {
 - Return only displayed fields from `load`. Run independent requests with `Promise.all`.
 - Keep page JS small. Read the size table of `pragma build` after you add a package or a large module.
 - Do not import large modules in `lib/state/`. Do not fetch data in `mount`. Do not enable `ssr` by default.
+- Do not set the first scroll position in `mount` (`scrollTo`): it runs after the first paint. Open a chat or log at its end with a reverse column (`css.md`, "Scroll that starts at the end").

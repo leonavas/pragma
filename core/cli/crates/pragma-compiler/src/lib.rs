@@ -11,6 +11,7 @@ mod html;
 mod js;
 pub mod layout;
 mod owners;
+mod prerender;
 mod project;
 mod sugar;
 mod validate;
@@ -405,6 +406,17 @@ fn check_endpoints(p: &Project, sources: &HashMap<PathBuf, String>) -> Vec<Diagn
             out.push(Diagnostic::warning(&e.file, line, col, "app/endpoint-json", "endpoint answers JSON: page data comes from load and writes from actions (.pragma/docs/data.md); keep endpoints for files, streams, webhooks and WebSockets"));
         }
     }
+    if let Some(l) = &p.layout_server
+        && let Some(src) = sources.get(l)
+    {
+        let names = pragma_jslint::exported_names(src);
+        if !names.iter().any(|n| n == "load") {
+            out.push(Diagnostic::error(l, 1, 1, "app/layout-load", "export async function load({ request, url, cookies, locals }) that returns what the layout shows (read it as `layout`)"));
+        }
+        if let Some(n) = names.iter().find(|n| *n != "load") {
+            out.push(Diagnostic::error(l, 1, 1, "app/layout-load", format!("routes/_layout.server.js exports only load; move `{n}` to a page's .server.js")));
+        }
+    }
     if let Some(m) = &p.middleware
         && let Some(src) = sources.get(m)
         && !pragma_jslint::exported_names(src).iter().any(|n| n == "handle")
@@ -501,6 +513,7 @@ struct PageOut<'a> {
 }
 
 const PD: &str = "<script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}});self.__pd.catch(()=>{})</script>";
+const PL: &str = "<script>self.__pl=fetch('/_layout'+location.pathname+location.search,{headers:{accept:'application/json'}});self.__pl.catch(()=>{})</script>";
 const THEME: &str = "<script>try{document.documentElement.dataset.theme=localStorage.getItem('pragma:theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}catch{}</script>";
 const SPECULATION_RULES: &str = r#"<script type="speculationrules">{"prefetch":[{"where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":"/_*"}},{"not":{"selector_matches":"[data-reload]"}}]},"eagerness":"moderate"}]}</script>"#;
 
@@ -894,6 +907,8 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
         Some(c) => c.boot.clone(),
         None => urls.get(&boot).cloned().unwrap_or_else(|| format!("/assets/{}", deps::asset_path(&rel_str(&boot)))),
     };
+    let prerender = prerender::Prerender::new(&opts.root, &p.framework, mods.iter().map(|(path, m)| (path.clone(), m.src.clone())));
+    let on_server = |m: &PathBuf| closure(&mods, std::slice::from_ref(m), true).iter().all(|f| is_app_code(f));
     for (i, o) in outs.iter().enumerate() {
         let mut route_css_url: Option<String> = None;
         let mut route_css_src: Option<String> = None;
@@ -1000,6 +1015,9 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
             "loader": o.loader,
             "ssr": o.ssr,
         });
+        if p.layout_server.is_some() {
+            route["layout"] = json!(true);
+        }
         if let Some(u) = &tpl_url {
             route["tpl"] = json!(u);
         }
@@ -1053,6 +1071,10 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
             doc.push_str(PD);
             doc.push('\n');
         }
+        if p.layout_server.is_some() && !o.ssr {
+            doc.push_str(PL);
+            doc.push('\n');
+        }
         for u in &module_urls {
             doc.push_str(&format!("<link rel=\"modulepreload\" href=\"{u}\">\n"));
         }
@@ -1066,8 +1088,18 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
             doc.push_str("<script type=\"module\" src=\"/_pragma/dev.js\"></script>\n");
         }
         doc.push_str("</head>\n<body>\n");
-        let mut body = String::new();
-        compile::write_nodes(&o.exp.body, &mut body, prod);
+        let rendered = prerender.as_ref().and_then(|r| {
+            let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
+            let ops = compile::ops(&o.exp.body, &scripted, &o.bodies);
+            let page = o.page.module.as_deref().filter(|m| on_server(&m.to_path_buf()));
+            let comps: Vec<(String, PathBuf)> = o.exp.components.values().filter_map(|c| c.module.clone().filter(|m| on_server(m)).map(|m| (c.id.clone(), m))).collect();
+            r.body(&ops, page, &comps)
+        });
+        let body = rendered.unwrap_or_else(|| {
+            let mut body = String::new();
+            compile::write_nodes(&o.exp.body, &mut body, prod);
+            body
+        });
         doc.push_str(body.trim());
         doc.push_str("\n</body>\n</html>\n");
         let html_url = format!("/{}.html", o.page.out_name);
@@ -1133,7 +1165,7 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
     }
     let has_public_md = p.public_files.iter().any(|f| f.extension().is_some_and(|e| e.eq_ignore_ascii_case("md")));
     diags.extend(check_endpoints(p, sources));
-    report.has_server = !server_routes.is_empty() || !p.endpoints.is_empty() || p.middleware.is_some();
+    report.has_server = !server_routes.is_empty() || !p.endpoints.is_empty() || p.middleware.is_some() || p.layout_server.is_some();
     let emit_worker = report.has_server || has_public_md;
     let handler = p.framework.join("server/handler.js");
     let node_adapter = p.framework.join("server/node.mjs");
@@ -1154,6 +1186,7 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
         entries.extend(server_routes.iter().map(|r| r.server.clone()));
         entries.extend(p.endpoints.iter().map(|e| e.file.clone()));
         entries.extend(p.middleware.clone());
+        entries.extend(p.layout_server.clone());
         entries.extend(script_ids.keys().cloned());
         entries.retain(|e| opts.root.join(e).is_file() || sources.contains_key(e));
         let smods = module_graph(p, &entries, false, sources, deps, &mut BTreeMap::new(), diags);
@@ -1201,10 +1234,16 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
         if let Some(m) = &p.middleware {
             worker.push_str(&format!("import {{ handle as middleware }} from {}\n", json!(format!("./{}", rel_str(m)))));
         }
+        if let Some(l) = &p.layout_server {
+            worker.push_str(&format!("import * as layout from {}\n", json!(format!("./{}", rel_str(l)))));
+        }
         worker.push_str("\nexport default createHandler({\n");
         worker.push_str(&format!("  service: {},\n", json!(p.config.name)));
         if p.middleware.is_some() {
             worker.push_str("  middleware,\n");
+        }
+        if p.layout_server.is_some() {
+            worker.push_str("  layout,\n");
         }
         worker.push_str("  routes: [\n");
         for (i, ServerRoute { pattern, ssr, template, shell, scripts, .. }) in server_routes.iter().enumerate() {
@@ -1224,7 +1263,7 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
         worker.push_str("  ],\n})\n");
         w.write("server/worker.js", worker.as_bytes());
         if report.has_server {
-            let routing = json!({ "middleware": p.middleware.is_some(), "endpoints": p.endpoints.iter().map(|e| e.pattern.clone()).collect::<Vec<_>>() });
+            let routing = json!({ "middleware": p.middleware.is_some(), "layout": p.layout_server.is_some(), "endpoints": p.endpoints.iter().map(|e| e.pattern.clone()).collect::<Vec<_>>() });
             w.write(layout::SERVER_ROUTES, serde_json::to_string_pretty(&routing).unwrap().as_bytes());
         }
         w.write("server/package.json", b"{ \"type\": \"module\" }\n");

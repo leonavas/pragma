@@ -241,11 +241,11 @@ pub fn values(d: Dir, v: &str) -> Vec<String> {
     }
 }
 
-pub const ROOTS: &[&str] = &["data", "state", "shared", "params", "query", "page", "props", "$"];
+pub const ROOTS: &[&str] = &["data", "layout", "state", "shared", "params", "query", "page", "props", "$"];
 /// Roots the server knows before it runs any script: the only ones head tags and JSON-LD read.
 pub const HEAD_ROOTS: &[&str] = &["data", "params", "query"];
 /// Roots SSR ops render (`state` when the server can run the owner's script); `shared` stays on the client.
-pub const SSR_ROOTS: &[&str] = &["data", "params", "query", "page", "state"];
+pub const SSR_ROOTS: &[&str] = &["data", "layout", "params", "query", "page", "state"];
 
 /// `None`: not `data-*`. `Some(None)`: unknown directive.
 pub fn parse(name: &str) -> Option<Option<Dir<'_>>> {

@@ -233,6 +233,22 @@ const stop = () => controller?.abort()
 
 Keep titles, back links, and filters outside `<if page.loading>`. Match the skeleton shape to the final content.
 
+## Prebuilt HTML
+
+Without `ssr`, `pragma build` still runs each page and component script once, without a request, so initial `let`s, props, derived values, and the `<if>`/`<for>` blocks they decide are in the prebuilt HTML (layout included). The first paint then shows the same thing as after boot. What depends on the request stays to the browser and fills at boot:
+
+| At build, in a page or component script | Build behavior |
+|---|---|
+| Top-level `let`, props, derived functions, slot content | Rendered into the prebuilt HTML |
+| `data`, `layout`, `params`, `query`, `page`, and the bindings that read them | Left to the browser |
+| `shared`, `call`, `stream`, `navigate`, `open`, `close`, `confirm` | Script left to the browser |
+| `Date`, `Math.random()`, `toLocaleString()`, `localeCompare()` | Script left to the browser (the value changes per visit and per locale) |
+| Top-level `window`, `document`, `localStorage` | Script left to the browser |
+| Imports of npm packages or `.pragma/` | Script left to the browser |
+| `mount(el)`, events | Browser only |
+
+A script left to the browser fills its `$x` bindings at boot; the rest of the page stays prebuilt. To get a value into the first paint, keep it in a top-level `let` or a prop, not in a value the build cannot know.
+
 ## SSR behavior
 
 With `ssr = true`, page and component scripts run once per request on the server so initial `let`s, props, and derived values appear in the first HTML. Keep browser-only code in `mount(el)` and actions.
@@ -255,7 +271,7 @@ When a script is deferred to the browser, its `$x` bindings fill at boot while t
 - Put every write and every secret-using operation in a server action. Update `data` or a `let` after the call.
 - Read `data` inside functions only (`js/top-level-data`). Without `ssr`, `data` is undefined until `load` finishes.
 - Load data from `fetch` with secrets from `env`, a database via `env`, or `import products from './_products.json' with { type: 'json' }`.
-- Default mode is no SSR: prebuilt HTML holds static content outside `<if>`/`<for>`, and `.pragma/boot.js` renders the skeleton.
+- Default mode is no SSR: prebuilt HTML holds static content and what the scripts' initial state decides ("Prebuilt HTML"), and `.pragma/boot.js` renders the skeleton and what depends on `data`.
 - Enable `ssr = true` when crawlers, link previews, or data-bound `<head>`/JSON-LD tags need server data (`routes.md`).
 - Do not fetch data in `mount` or client actions. Do not create `/api/...` routes or endpoints for page data. Do not return secrets from `load`. `env` exists only on the server.
 - Put auth checks in `routes/_middleware.server.js` and keep the user in `locals`. Store sessions in `__Host-` cookies.

@@ -161,6 +161,9 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - **[firm]** Path params and query string on client and server.
 - **[firm v0]** Client router: swaps `<main data-page>` with the route's prebuilt HTML, with
   prefetch on hover, focus and viewport (SPEC §7). Replaces the open "MPA vs router".
+- **[firm]** (2026-11-23) The router marks the clicked link `aria-current="page"` at the click,
+  before the next page loads; the swap marks again. *Why:* a sidebar marker moved only 60–90 ms
+  after the click (v3chat). A failed navigation is a full page load, so nothing reverts.
 
 ## Data and SSR
 
@@ -226,6 +229,25 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - **[superseded]** SSR via `HTMLRewriter` on Workers and `lol_html` in `pragma serve`: replaced
   by compiled ops rendered by the JS handler.
 - **[superseded]** "No SSR (SPA + API)".
+- **[firm]** (2026-11-23) The build renders every prebuilt page once with the SSR renderer
+  (`server/render.js`) in QuickJS embedded in the CLI (rquickjs; no Node to build): page and
+  component scripts run with no request, so initial `let`s, props, derived values and the blocks
+  they decide are in the HTML, layout included. `data`, `layout`, `params`, `query` and `page`
+  are unknown at build (bindings on them stay to the browser; a script that reads them at the
+  top falls back like SSR). `Date`, `Math.random`, `toLocale*` and `localeCompare` throw at
+  build, so their scripts fall back too (stale or wrong-locale first paint, non-deterministic
+  builds). A failed render keeps the unrendered HTML. 2 s and 256 MB per page. *Why:* the first
+  paint must equal the state after boot; a `<c-logo size="sm">` painted at the default size and
+  shrank at boot. Rejected: resolving only literal props in Rust (derived values and blocks still
+  flash), Node at build (breaks "one binary").
+- **[firm]** (2026-11-23) `routes/_layout.server.js` exports only `load`; its result is
+  `layout` (HTML root and `import { layout } from 'pragma'`), fetched from `/_layout/<path>` (an
+  inline `<head>` fetch, like `/_data`), embedded with `ssr`, kept across client navigations and
+  fetched again after each `call`/`stream`. *Why:* the signed-in user in a sidebar read the
+  page's `data`, which is empty during every navigation, so the sidebar blinked. Rejected:
+  keeping the previous page's `data` until the next arrives (another page's shape, wrong values
+  for a moment), a store fed by an endpoint (one more API per app). `layout/data-in-layout`
+  warns on a component in the layout whose script reads `data`.
 
 ## Motion
 
@@ -247,6 +269,13 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   Opening again while leaving closes it at once and reopens. `autofocus` on the component focuses
   the dialog itself (WAI-ARIA, text-first content); otherwise the first focusable element.
   *Why:* the ported app's sheets and modals slide/fade out; a native `<dialog>` vanished at once.
+- **[firm]** (2026-11-23) Page transitions: `<main data-page>` has `view-transition-name: page`;
+  only that group fades in (150 ms from opacity 0.5); `root` (the layout) swaps without
+  animation. The old snapshots stay hidden (Chromium can paint an empty old snapshot white).
+  *Why:* the whole document faded from opacity 0, so a fixed sidebar blinked on every navigation.
+- **[firm]** (2026-11-23) No directive for the first scroll position (`data-scroll="end"`): a
+  reverse-column scroll container opens at its end before the first paint (`css.md`). *Why:* CSS
+  already does it, and the syntax stays closed.
 
 ## CSS
 
@@ -430,6 +459,11 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 - **[superseded]** Per-route chunks with a bundler and chunk manifest: v0 uses loose modules
   and the `/_pragma/manifest.json` manifest. (Route chunks came back on 2026-11-21, above; the
   manifest stays.)
+- **[firm]** (2026-11-23) Font preload follows the faces the page uses: for each used family,
+  the Latin `.woff2` of each style and weight that the rules naming the family set, plus italic
+  and 700 for every family when a rule without a family or a UA-styled tag (`em`, `i`,
+  `strong`, `h1`…) needs them; at most six. *Why:* only the upright 400 face was preloaded, so
+  an italic wordmark in the layout swapped fonts after the first paint (v3chat).
 
 ## npm dependencies
 

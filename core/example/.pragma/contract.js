@@ -1,5 +1,6 @@
 const DATA = '/_data'
 const ACTION = '/_action'
+const LAYOUT = '/_layout'
 export const OTEL = '/_otel'
 export const PRAGMA = '/_pragma/'
 export const MANIFEST = PRAGMA + 'manifest.json'
@@ -63,10 +64,13 @@ export const pageUrl = file => encodeURI(file.replace(/(\/index)?\.html$/, '')) 
 
 export const dataUrl = url => DATA + url.pathname + url.search
 
+export const layoutUrl = url => LAYOUT + url.pathname + url.search
+
 export const actionUrl = (url, name) => `${ACTION}${url.pathname.replace(/\/$/, '')}/${name}`
 
 export function apiTarget(path) {
   if (path === DATA || path.startsWith(DATA + '/')) return { kind: 'data', target: path.slice(DATA.length) || '/' }
+  if (path === LAYOUT || path.startsWith(LAYOUT + '/')) return { kind: 'layout', target: path.slice(LAYOUT.length) || '/' }
   if (!path.startsWith(ACTION + '/')) return null
   const rest = path.slice(ACTION.length), i = rest.lastIndexOf('/')
   return { kind: 'action', target: rest.slice(0, i) || '/', action: rest.slice(i + 1) }

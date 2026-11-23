@@ -29,7 +29,7 @@ const RULE_DOLLAR: &str = "js/dollar-in-script";
 const RULE_CURRENT_TARGET: &str = "js/current-target";
 
 /// Names the virtual module `pragma` exports.
-pub const PRAGMA_EXPORTS: &[&str] = &["shared", "data", "params", "query", "page", "log", "call", "stream", "navigate", "open", "close", "confirm", "frame"];
+pub const PRAGMA_EXPORTS: &[&str] = &["shared", "data", "layout", "params", "query", "page", "log", "call", "stream", "navigate", "open", "close", "confirm", "frame"];
 const MUTATORS: &[&str] = &["push", "pop", "shift", "unshift", "splice", "sort", "reverse", "fill", "copyWithin", "set", "add", "delete", "clear"];
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -53,6 +53,8 @@ pub struct ScriptInfo {
     pub mutated_consts: Vec<(String, u32, u32)>,
     /// Store: `export const persist = ['field']`.
     pub persist: Vec<String>,
+    /// Names imported from 'pragma' (`data`, `layout`, `shared`…).
+    pub services: Vec<String>,
     /// The script has errors (old API, syntax…): its names are not known, so HTML is not checked
     /// against them.
     pub incomplete: bool,
@@ -219,6 +221,7 @@ impl Transform<'_> {
                                     };
                                     match PRAGMA_EXPORTS.iter().find(|n| **n == imported) {
                                         Some(n) => {
+                                            self.info.services.push(n.to_string());
                                             if let Some(id) = s.local.symbol_id.get() {
                                                 self.syms.insert(id, Sym::Pragma(n));
                                             }

@@ -555,12 +555,27 @@ input:where([type='button'], [type='reset'], [type='submit']),
   dialog::backdrop {
     background-color: rgb(0 0 0 / 0.5);
   }
-  /* Chromium (GPU) can capture an empty old snapshot and paint it white: fade the new page in over the background */
-  ::view-transition-old(root) {
+  [data-page] {
+    view-transition-name: page;
+  }
+  ::view-transition-group(root),
+  ::view-transition-new(root),
+  ::view-transition-group(page) {
+    animation: none;
+  }
+  /* Chromium (GPU) can capture an empty old snapshot and paint it white: the layout swaps at once, the page fades in over the background */
+  ::view-transition-old(root),
+  ::view-transition-old(page) {
     display: none;
   }
-  ::view-transition-new(root) {
+  ::view-transition-new(page) {
     mix-blend-mode: normal;
+    animation: pragma-page-in 150ms ease-out both;
+  }
+  @keyframes pragma-page-in {
+    from {
+      opacity: 0.5;
+    }
   }
   :tool-form-active {
     outline: 2px dashed var(--color-primary-500);

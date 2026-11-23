@@ -330,9 +330,14 @@ export async function load({ params, query, request, env, log }) { return { prod
 export const actions = { async save({ input, params, env, log }) { return { ok: true } } }
 export const ssr = false
 ```
-- Default, no SSR: prebuilt HTML has everything outside blocks; the `<if page.loading>` chain is
+- Default, no SSR: prebuilt HTML has everything outside blocks, plus what the scripts' initial
+  state decides (the build runs page and component scripts once in QuickJS, as SSR does, with
+  `data`, `layout`, `params`, `query` and `page` unknown); the `<if page.loading>` chain is
   a comment anchor the runtime renders on boot, so the skeleton appears once
   `core/boot.js` runs, not in the raw HTML.
+- `routes/_layout.server.js` (only `load`) gives `layout`: `GET /_layout/<path>?<query>` →
+  `{ "layout": ... }`, started by an inline `<head>` script (`self.__pl`), embedded in
+  `pragma-data` with `ssr`, kept across navigations, fetched again after each action.
   The client fetches `GET /_data/<path>?<query>` → `{ "data": ... }` or `{ "error": { "message" } }`.
 - In the `<head>` of pages with a loader, the build injects a minimal inline script that starts
   the fetch before modules: `self.__pd = fetch('/_data' + location.pathname + location.search)`.
@@ -688,7 +693,7 @@ Speculation Rules, i18n.
   (`directives.js`) gives `[name, args]` and `page.js` calls the owner's function.
 - Component script owner: lexical (§3). The runtime stores the owner in each element's scope;
   `data-slot="n"` goes up n components. With no component owner, the owner is the page. The
-  layout has no script in v0: its directives use `shared`, `params`, `query`.
+  layout has no script in v0: its directives use `layout`, `shared`, `params`, `query`.
 - `/_pragma/reload` (WebSocket) and `/_pragma/dev.js` (live reload client) are served by
   `pragma dev`, injected only in dev.
 

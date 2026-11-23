@@ -1,7 +1,7 @@
 import { render, patch, hooks, scopeOf, input, eventCall, useBodies, DEV, PAGE } from './directives.js'
 import { log } from './log.js'
 import { reactive, readers, onChange, persist, persistStores } from './state.js'
-import { fetchData, load, loadResult, call, stream } from './loader.js'
+import { fetchData, fetchLayout, load, loadResult, call, stream } from './loader.js'
 import { navigate, redirect } from './router.js'
 import { DATA_ID, MAIN, PERSIST_SUFFIX, matchPattern, coerce, instantiate, isPlain, readonlyViews } from './contract.js'
 
@@ -16,7 +16,7 @@ export const popOverlay = () => overlayModule?.handlePopState() ?? false
 
 const C = Symbol(), O = Symbol(), mounted = new Set(), comps = {}, types = new Set()
 const shared = {}
-let cur, queued, whole, mounts = []
+let cur, queued, whole, mounts = [], layout = null, layoutSeq = 0
 const dirty = new Set()
 
 function schedule(target, key) {
@@ -40,7 +40,7 @@ function flush() {
     return persistStores()
   }
   whole = false
-  render(document.body, { __proto__: null, shared, params: cur.params, query: cur.query, page: cur.page })
+  render(document.body, { __proto__: null, shared, layout: reactive(layout), params: cur.params, query: cur.query, page: cur.page })
   persistStores()
   for (const o of mounts.splice(0)) {
     if (!mounted.has(o)) continue
@@ -80,11 +80,35 @@ const readonly = readonlyViews(isPlain, name => `pragma: "${name}" is a prop: pr
 const services = {
   shared, log, navigate, open, close, confirm, frame,
   get data() { return reactive(cur?.data) },
+  get layout() { return reactive(layout) },
   get params() { return cur?.params },
   get query() { return cur?.query },
   get page() { return cur?.page },
-  call: (name, data) => call(cur.url, name, data, navigate),
-  stream: (name, data, options) => stream(cur.url, name, data, options, navigate),
+  call: (name, data) => call(cur.url, name, data, navigate).then(r => (refreshLayout(), r)),
+  stream: (name, data, options) => refreshAfter(stream(cur.url, name, data, options, navigate)),
+}
+
+// `layout` comes from routes/_layout.server.js: on the full page load, then again after each action.
+export function loadLayout(pending, doc) {
+  const n = ++layoutSeq
+  if (!pending) {
+    const embedded = doc.getElementById(DATA_ID)
+    layout = embedded ? JSON.parse(embedded.textContent).layout ?? null : layout
+    return
+  }
+  load(pending).then(result => {
+    if (!result || n !== layoutSeq) return
+    if (result.redirect) return redirect(result.redirect, true)
+    if (result.error) return log.error('layout load failed', { 'error.message': result.error.message })
+    layout = result.layout ?? null
+    schedule()
+  })
+}
+
+const refreshLayout = () => cur?.route.layout && loadLayout(fetchLayout(cur.url))
+
+async function* refreshAfter(lines) {
+  try { yield* lines } finally { refreshLayout() }
 }
 
 function instance(el, mod, w) {

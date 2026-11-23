@@ -886,7 +886,13 @@ impl Scoped<'_> {
         let comp = e.value("data-c");
         if let Some(c) = comp {
             self.outer.push((owner.clone(), vars.clone()));
-            if self.ctx.comp_scripts.contains_key(c) {
+            if let Some((tag, script)) = self.ctx.comp_scripts.get(c) {
+                if !in_page && script.info.services.iter().any(|n| n == "data") {
+                    let msg = format!("{tag} is in the layout and its script reads `data`, the data of each page: it is empty during every navigation; give it what it shows from `layout` (routes/_layout.server.js) or a store");
+                    let mut d = diag(&self.p.files, e.pos, "layout/data-in-layout", msg);
+                    d.severity = pragma_diag::Severity::Warning;
+                    self.diags.push(d);
+                }
                 owner = Owner::Comp(c.to_string());
             }
         }
@@ -1055,7 +1061,7 @@ impl Scoped<'_> {
         match root {
             "data" => {
                 if !in_page {
-                    self.err(pos, "html/invalid-root", "data does not exist in the layout (use shared, params or query)");
+                    self.err(pos, "html/invalid-root", "data does not exist in the layout (use layout, shared, params or query)");
                 } else if !self.ctx.loader {
                     let f = rel_str(&self.ctx.page_file.with_extension("server.js"));
                     self.err(pos, "html/invalid-root", format!("data requires a load in {f}"));
@@ -1080,6 +1086,11 @@ impl Scoped<'_> {
                     }
             }
             "query" => {}
+            "layout" => {
+                if self.p.layout_server.is_none() {
+                    self.err(pos, "html/invalid-root", "layout requires a load in routes/_layout.server.js");
+                }
+            }
             "page" => {
                 if !matches!(second, Some("loading" | "error")) {
                     self.err(pos, "html/invalid-path", "page only has page.loading and page.error");
@@ -1095,7 +1106,7 @@ impl Scoped<'_> {
                 let msg = if names.iter().any(|n| n == root) {
                     format!("\"{root}\" is a name of the script: in HTML write ${p} (`{{${p}}}`, `:attr=\"${p}\"`)")
                 } else {
-                    let known = vars.iter().map(String::as_str).chain(["data", "shared", "params", "query", "page"]);
+                    let known = vars.iter().map(String::as_str).chain(["data", "layout", "shared", "params", "query", "page"]);
                     let hint = if let Some(m) = directive::did_you_mean(root, known) {
                         format!("did you mean \"{m}\"? ")
                     } else if let Some(m) = directive::did_you_mean(root, names.iter().map(String::as_str)) {

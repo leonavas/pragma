@@ -40,6 +40,23 @@ The SvelteKit × astra × fable experiment moved out of the repo to `../pragma-t
 - Site: placeholder origin `https://pragma.dev` in the prompt and md links; landing copy lives in
   `site/routes/*.html` and `site/utils/agent-docs/*.md` (drift check compares headings only).
 
+## First paint equals final state (v3chat feedback, 2026-11-23, not released)
+
+v3chat (chat with a fixed sidebar in the layout) showed six cases where the first paint or the navigation frame differed from the final state. Decisions in `DECISIONS.md` (2026-11-23).
+
+1. Done: the build renders every prebuilt page with `server/render.js` in QuickJS (`pragma-compiler/src/prerender.rs`): initial `let`s, props, derived values and their blocks are in the HTML, layout included. `Date`, `Math.random`, `toLocale*`, `localeCompare` throw at build, so those scripts stay to the browser.
+2. Done: `routes/_layout.server.js` (`load` only) → `layout`, `/_layout/<path>`, kept across navigations, fetched again after each action. Warning `layout/data-in-layout`. Rejected: keeping the previous page's `data`.
+3. Done: only `<main data-page>` fades (150 ms from 0.5); the layout swaps at once.
+4. Done: font preload per used style and weight (italic, 700 from tags), at most six.
+5. Done: `aria-current` on the clicked link at the click.
+6. Not a directive: `css.md` "Scroll that starts at the end" (reverse column).
+
+Pending:
+- Release, then in v3chat: `pragma self-update`, `pragma upgrade`, and remove the workarounds (`[data-prop-size]` selectors, `utils/user.js` cache, `.app-sidebar` view-transition-name, `font-display: block`, the pointerdown listener, `scrollTo` in `mount`).
+- The release workflow builds rquickjs (C) for every target: check the Windows and macOS builds.
+- A client navigation to an `ssr` page runs the layout `load` on the server and drops the value (wasted work, same result).
+- Tests not run. The build fixtures' `core/server/render.js` has no `prerender`, so the snapshots do not cover the build render; add a fixture with it, and client tests for `layout` and the click-time `aria-current`.
+
 ## Performance work from escalei-pragma (found 2026-11-22, shipped in v0.2.1)
 
 Lighthouse on a large real app page (escalei-pragma `/app/[id]`, see that repo's README "Status and next session") showed pragma faster on FCP/LCP than the SvelteKit original but worse on TBT, Speed Index and payload. Planned for v0.2.1:

@@ -64,6 +64,8 @@ pub struct Project {
     pub endpoints: Vec<Endpoint>,
     /// `routes/_middleware.server.js`: `handle` runs before every request.
     pub middleware: Option<PathBuf>,
+    /// `routes/_layout.server.js`: `load` gives `layout` on the full page load and after each action.
+    pub layout_server: Option<PathBuf>,
     /// Component folder (`routes/x/_components` or `lib/components`) -> name -> component.
     pub components: HashMap<PathBuf, BTreeMap<String, Component>>,
     pub stores: BTreeMap<String, PathBuf>,
@@ -224,6 +226,7 @@ impl Project {
             pages: Vec::new(),
             endpoints: Vec::new(),
             middleware: None,
+            layout_server: None,
             components: HashMap::new(),
             stores: BTreeMap::new(),
             theme_css: None,
@@ -387,8 +390,12 @@ impl Project {
                     } else {
                         self.err(f, 1, 1, "app/middleware", "middleware lives only in routes/_middleware.server.js; it runs for every request, so check url.pathname there");
                     }
-                } else if file_name == "_layout.js" || file_name == "_layout.server.js" {
-                    self.err(f, 1, 1, "app/structure", "the layout cannot have a module or .server.js");
+                } else if s == "routes/_layout.server.js" {
+                    self.layout_server = Some(f.clone());
+                } else if file_name == "_layout.server.js" {
+                    self.err(f, 1, 1, "app/structure", "only the root layout has a .server.js (routes/_layout.server.js); a nested layout reads `layout` from it");
+                } else if file_name == "_layout.js" {
+                    self.err(f, 1, 1, "app/structure", "the layout cannot have a module; use a component with <script> for behavior");
                 } else if file_name.starts_with('_') && file_name.ends_with(".html") {
                     self.err(f, 1, 1, "app/structure", "only _layout.html and routes/_404.html are special in routes/");
                 }
