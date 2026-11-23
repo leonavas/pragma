@@ -85,6 +85,8 @@ Any subfolder in `routes/` can add `_layout.html` with `<slot></slot>` to wrap r
 
 Put site-wide tags in `routes/_layout.html` `<head>`. Put page `<title>`, `<meta>`, and `<link>` at the top level of each page. A page tag replaces the layout tag with the same `name`, `property`, `http-equiv`, or `rel` (+ `hreflang`); new tags are added.
 
+Every page needs a `<meta name="description">`, its own or the layout's: without one, `pragma check` warns `html/meta-description`. Write what the page shows in 1–2 sentences; a private app can keep one in the layout.
+
 `routes/about.html`:
 ```html
 <title>About · Shop</title>

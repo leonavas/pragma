@@ -445,7 +445,8 @@ Usage:
 ## 7. Router (client)
 
 - Intercepts same-origin `<a>` clicks (without `target`, `download` or `data-reload`).
-- Prefetch on `pointerenter`/`focus` and when the link enters the viewport (idle): fetches the
+- Prefetch on `pointerenter`/`focus` and when the link enters the viewport (idle, after `load` and
+  the first `/_data` and `/_layout`; added links are scanned once per idle period): fetches the
   route's prebuilt HTML and `modulepreload`s its modules (manifest).
 - Navigate: fetch HTML, swap the content of `<main data-page>` and the head tags (§5.1), unmount the
   previous page (cleanups), import modules and start the loader in parallel.
@@ -501,9 +502,11 @@ Usage:
 - Fonts: per route, one `<link rel="preload" as="font" crossorigin>` per face the first paint
   uses: the route CSS rules that match the tags and classes of the prebuilt HTML (layout included;
   not the block bodies it leaves as anchors, not the children of `<dialog>` or `[popover]`), with
-  their `@font-face` family (through `var()` too), style and weight; italic and 700 for every used
-  family when that HTML has `em`, `strong`, `h1`… Latin `.woff2`, upright 400 by default, at most
-  six. Preloads already in `_layout.html` are not repeated.
+  their `@font-face` family (through `var()` too), style and weight; italic and 700 only for the
+  base text family (named by a `:root`/`html`/`body`/`*` rule, else the first used family) when
+  that HTML has `em`, `strong`, `h1`… or a matching rule sets style or weight without a family.
+  Latin `.woff2`, upright 400 by default; the base upright 400 first, at most three. Preloads
+  already in `_layout.html` are not repeated.
 
 ## 9. Build (`pragma build`)
 
@@ -527,8 +530,9 @@ dist/
   modulepreloaded like app modules (`docs/packages.md`).
 - Dev build adds `<script>self.__pragmaDev=true</script>` to `<head>` (path and action errors in dev).
 - `index.html` is not cached; hashed assets are `immutable`.
-- The build prints the JS gzip size of each page and the largest CSS size. Information only: no
-  size limits, no size errors or warnings.
+- The build prints, per page, the JS gzip size and the CSS gzip size (shared + route, the number
+  that decides inline at <= 14 kB), and marks a page whose CSS is over 14 kB as a render-blocking
+  stylesheet. Information only: no size limits, no size errors or warnings.
 - Server WebAssembly: a `.wasm` imported by the server graph (project file, or a package export
   that resolves to `.wasm`, its specifier rewritten to the copy) is copied to `dist/server/`
   (`node_modules/x` → `npm/x`); `wrangler.jsonc` gets `rules: [{ type: "CompiledWasm", globs:
@@ -565,6 +569,9 @@ Errors with file:line:column, rule and message.
   wrongly bound head tags (`html/head`, §5.1); `<script>` with `src` or attributes, two
   `<script>`s, or one that is not at the top level of a page or component (`html/script`).
 - CSS: unknown class; arbitrary value.
+- Head: warning `html/meta-description` (non-blocking; `--strict` makes it an error) on a page
+  (not `_404.html`) whose merged `<head>` (page head tags and layout `<head>`) has no
+  `<meta name="description">`.
 - `core/` version: warning `app/core-outdated` when the app's `core/` is not byte-equal to the
   runtime, docs and `base.css` embedded in the binary (a file changed, missing or extra); fix
   with `pragma upgrade` (§11).
@@ -658,9 +665,10 @@ Speculation Rules, i18n.
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>…</title>
+  <script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}})</script>
+  <script>self.__pl=fetch('/_layout'+…)</script>         only with routes/_layout.server.js
   <script>try{document.documentElement.dataset.theme=…}catch{}</script>   only if the app uses .pragma/theme.js
   <link rel="stylesheet" href="/assets/app-<hash>.css">
-  <script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}})</script>
   <link rel="modulepreload" href="/assets/…">            one per page module
   <script type="application/json" id="pragma-route">{…}</script>
   <script type="module" src="/assets/core/boot-<hash>.js"></script>
@@ -668,8 +676,9 @@ Speculation Rules, i18n.
 <body>…_layout.html content with <main data-page>…page…</main>…</body>
 </html>
 ```
-- `__pd` only on pages with a loader. Extra `<head>` tags come from the layout `<head>` merged
-  with the page's head tags (§5.1), right after `<title>`.
+- `__pd` only on pages with a loader, `__pl` only with a layout loader; neither with `ssr`. Both
+  come before any stylesheet: an inline script waits for the stylesheets above it. Extra `<head>`
+  tags come from the layout `<head>` merged with the page's head tags (§5.1), after them.
 - `#pragma-route`: `{ "pattern", "page": "<page module url or null>",
   "components": { "<data-c id>": "<url>" }, "stores": { "<name>": "<url>" }, "loader": bool, "ssr": bool }`,
   plus `"tpl": "<template module url>"` when the page has block bodies and `"overlays": true` when

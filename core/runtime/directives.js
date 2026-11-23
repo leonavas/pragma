@@ -349,11 +349,13 @@ function branch(t, d, s, last, id) {
 // <for> item) creates at least one more item and leaves the rest for the next task, so the main thread
 // can paint and answer input. In a reverse-column scroller (a chat that opens at its end) the last
 // items come first.
-const SLICE_MS = 30
-let sliceEnd = Infinity, lists = 0, resuming = false, deferred = []
+const SLICE_MS = 12
+let sliceEnd = Infinity, lists = 0, deferred = []
 
 const now = () => performance.now()
 export const sliced = () => deferred.length > 0
+export const startSlice = () => { sliceEnd = now() + SLICE_MS }
+export const spent = () => now() > sliceEnd
 
 function scroller(el) {
   for (; el && el !== document.body; el = el.parentElement) {
@@ -379,7 +381,7 @@ function items(t, d, s, top) {
   const keep = new Set(keys)
   if (DEV && keep.size < keys.length) fail(`duplicate key in <for ${d.v} in ${d.p.join('.')}>`)
   for (const [k, n] of old) if (!keep.has(k)) drop(n)
-  const fresh = new Set()
+  const fresh = new Set(), skipped = []
   let made = 0, rest = false
   const create = i => {
     const n = clone(t, d, id)
@@ -388,7 +390,8 @@ function items(t, d, s, top) {
     return n
   }
   const late = () => top && made > 0 && now() > sliceEnd
-  if (top && old.size < keys.length && (d.end ??= scroller(t.parentNode))) {
+  const end = top && old.size < keys.length && (d.end ??= scroller(t.parentNode))
+  if (end) {
     for (let i = keys.length - 1; i >= 0; i--) {
       if (old.has(keys[i])) continue
       if (late()) { rest = true; break }
@@ -403,28 +406,55 @@ function items(t, d, s, top) {
   for (let i = 0; i < keys.length; i++) {
     let n = old.get(keys[i])
     if (!n) {
-      if (rest || late()) { rest = true; continue }
+      if (rest || late()) { rest = true; skipped.push(i); continue }
       n = create(i)
       ref.after(n)
+      old.set(keys[i], n)
       fresh.add(n)
     } else {
       if (n[L]) stay(n)
       if (next(ref) !== n) ref.after(n)
-      if (fresh.has(n) || resuming) { ref = n; continue }
+      if (fresh.has(n)) { ref = n; continue }
     }
     visit(n, scopes[i])
     ref = n
   }
   d.partial = rest
-  if (rest) deferred.push([t, d, s, outer.slice(), deep])
+  if (rest) deferred.push({ t, d, keys, scopes, nodes: old, todo: end ? skipped.reverse() : skipped, end, outer: outer.slice(), deep })
   return [ref, keys.length > 0, id]
+}
+
+// Creates the items a slice left, from where it stopped (in list order, or from the end in a reverse
+// column), each next to a neighbour that is already on the page.
+function more(job) {
+  const { t, d, keys, scopes, nodes, todo, end } = job
+  outer.length = 0
+  outer.push(...job.outer)
+  deep = job.deep
+  let made = 0
+  lists++
+  try {
+    while (todo.length) {
+      if (made && now() > sliceEnd) return false
+      const i = todo.shift(), n = clone(t, d, d.id)
+      n.setAttribute(KEY, keys[i])
+      const near = nodes.get(keys[end ? i + 1 : i - 1])
+      if (end) near ? near.before(n) : t.after(n)
+      else (near ?? t).after(n)
+      visit(n, scopes[i])
+      nodes.set(keys[i], n)
+      made++
+    }
+  } finally { lists-- }
+  d.partial = false
+  return true
 }
 
 export function render(el, s) {
   outer.length = 0
   deep = 0
   deferred = []
-  sliceEnd = now() + SLICE_MS
+  startSlice()
   forgetReads()
   readBy(0)
   focusing = null
@@ -435,26 +465,21 @@ export function render(el, s) {
   target?.focus()
 }
 
-// Next slice of the lists the last render or resume left unfinished. Items already on the page are not
-// visited again: any state change since then ran a full render, which started the slices over.
+// Next slice of the lists the last render or resume left unfinished. Any state change since then ran a
+// full render, which dropped these jobs and started the slices over.
 export function resume() {
   const jobs = deferred
   deferred = []
-  sliceEnd = now() + SLICE_MS
-  resuming = true
   readBy(0)
   try {
-    for (const [t, d, s, scopes, depth] of jobs) {
-      if (!t.isConnected) continue
-      outer.length = 0
-      outer.push(...scopes)
-      deep = depth
-      list(t, d, s)
+    for (let j = 0; j < jobs.length; j++) {
+      if (!jobs[j].t.isConnected) continue
+      if (!more(jobs[j])) {
+        deferred.push(...jobs.slice(j))
+        break
+      }
     }
-  } finally {
-    resuming = false
-    readBy(null)
-  }
+  } finally { readBy(null) }
   settle()
 }
 

@@ -485,7 +485,16 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   only in a closed dialog or the sidebar drawer. A face for later content swaps when it appears,
   which is the cost of not blocking the first paint. Rejected: an opt-out per `@font-face`
   (a comment is not allowed; a descriptor is one more thing to know).
-- **[firm]** (2026-11-23) Large lists render in slices, with no attribute: once a full render has
+- **[firm]** (2026-11-23) Italic and 700 from `em`/`strong`/`h1`… (and from a matching rule
+  without a family) go only to the base text family, the one a `:root`/`html`/`body`/`*` rule
+  names, else the first used family; at most three preloads, the base upright 400 first.
+  *Why:* after 0.2.7 v3chat still preloaded 4 files (~184 KB): an `em` in the shell gave italic to
+  every used family, mono included. The build reads tags and classes, not the tree, so the
+  inherited family of each `em` is not known; the base family is right for running text. Council
+  (astra, fable, neon): base-family rule 3×0, cap of three 2×1 (astra: the face order does not
+  measure visual importance, so the cap could drop a title face).
+- **[firm]** (2026-11-23) Large lists render in slices, with no attribute (budget and scheduling
+  revised below): once a full render has
   run 30 ms, an outer `<for>` (not inside another `<for>` item) creates at least one more item and
   leaves the rest for the next task (`setTimeout`), which creates only the missing items. In a
   reverse-column scroller (`css.md`, "Scroll that starts at the end") the last items come first.
@@ -495,6 +504,18 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   Rejected: `<for chunk="20" from="end">` (one more choice for the agent to get wrong; the reverse
   column already says where the list starts), a count per slice (cost per item varies by 100×),
   slices for nested lists (a half-rendered answer).
+- **[firm]** (2026-11-23, v3chat second round, council astra/fable/neon by majority) Slices take
+  12 ms and `mount` calls share that budget (the rest run in order in the next task); later slices
+  run at background priority (`scheduler.postTask`, else `setTimeout`) and continue from a cursor
+  instead of rebuilding the list's keys and scopes. `__pd`/`__pl` come before the stylesheets (an
+  inline script waits for the CSS above it: ~110 ms on mobile). Viewport prefetch waits for the
+  first `/_data` and `/_layout`. The router scans added nodes for links once per idle period, not
+  per mutation. *Why:* v3chat still had a 234 ms task (one item plus all its mounts) and the
+  prefetch of `/`, its manifest and chunks competed with `/_data` at ~450 ms. Rejected by the
+  council: one request for `/_data` + `/_layout` (ties the fast load to the slow one), splitting
+  route CSS by first paint (cascade order, flash when a block opens), marking `column-reverse` at
+  build (`@media`, dynamic classes; the runtime reads it once per list), `priority: 'high'` on the
+  data fetches, building slices in a `DocumentFragment`, automatic `content-visibility`.
 - **[firm]** (2026-11-23) A closed `<dialog>` or `[popover]` binds only its own attributes; its
   content renders on the first open (the overlay manager renders the page right before
   `showModal`/`showPopover`) and stays rendered after that. Components inside are created, and
@@ -502,6 +523,15 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   DOM (`overlays.md` forbids open state in a `let`), so v3chat carried a session dialog with
   per-turn tables and a second copy of the history list in a drawer (2866 elements). Rejected: a
   `lazy` opt-in (closed by default is the only useful choice).
+
+- **[firm]** (2026-11-23) `pragma build` prints the CSS gzip size of each page (shared + route,
+  the number that decides inline at <= 14 kB) and marks a page over 14 kB as a render-blocking
+  stylesheet. Information only, like JS (no budget). *Why:* v3chat `c/[id]` shipped 17 kB gzip of
+  external CSS and nobody saw it: the table showed only JS and the largest CSS. Council vote 3×0.
+- **[firm]** (2026-11-23) `html/meta-description` warning: a page (not `_404.html`) with no
+  `<meta name="description">` in its merged `<head>` (page or layout). The starter layout has one.
+  *Why:* agents forget it (v3chat SEO 91); a layout meta covers private apps with one line.
+  Council vote 2×1 (against: a description is editorial).
 
 ## npm dependencies
 

@@ -44,6 +44,8 @@ pub struct BuildOptions {
 pub struct PageReport {
     pub pattern: String,
     pub js_gzip_bytes: u64,
+    /// Shared + route CSS, gzip: the number that decides inline (<= 14 kB) or a render-blocking stylesheet.
+    pub css_gzip_bytes: u64,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -745,6 +747,16 @@ fn analyze<'p>(p: &'p Project, diags: &mut Vec<Diagnostic>) -> Analysis<'p> {
         let mut sc = expand::Scoped { p, ctx: &ctx, diags: Vec::new(), stores: BTreeSet::new(), shared_classes: BTreeSet::new(), page_classes: BTreeSet::new(), outer: Vec::new() };
         sc.run(&exp.body);
         sc.head(&exp.head);
+        let described = exp.head.iter().any(|n| matches!(n, html::Node::Element(e) if e.is("meta") && e.value("name").is_some_and(|v| v.eq_ignore_ascii_case("description"))));
+        if !is_404 && !described {
+            diags.push(Diagnostic::warning(
+                &p.files[page.html as usize],
+                1,
+                1,
+                "html/meta-description",
+                "page without <meta name=\"description\">: search results and link previews show it; write one at the top of this page (what it shows, 1-2 sentences), or one in the <head> of routes/_layout.html for every page",
+            ));
+        }
         let mut queue: Vec<String> = page
             .module
             .iter()
@@ -1068,6 +1080,14 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
             None => doc.push_str(&format!("<title>{}</title>", html::escape_text(&p.config.name))),
         }
         doc.push('\n');
+        if o.loader && !o.ssr {
+            doc.push_str(PD);
+            doc.push('\n');
+        }
+        if p.layout_server.is_some() && !o.ssr {
+            doc.push_str(PL);
+            doc.push('\n');
+        }
         let extras: Vec<html::Node> = o.exp.head.iter().filter(|n| !matches!(n, html::Node::Element(e) if e.is("title"))).cloned().collect();
         let mut ex = String::new();
         compile::write_nodes(&extras, &mut ex, true);
@@ -1101,14 +1121,6 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
         if !prod {
             doc.push_str("<script>self.__pragmaDev=true</script>\n");
         }
-        if o.loader && !o.ssr {
-            doc.push_str(PD);
-            doc.push('\n');
-        }
-        if p.layout_server.is_some() && !o.ssr {
-            doc.push_str(PL);
-            doc.push('\n');
-        }
         for u in &module_urls {
             doc.push_str(&format!("<link rel=\"modulepreload\" href=\"{u}\">\n"));
         }
@@ -1132,7 +1144,7 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
         report.css_gzip_bytes = report.css_gzip_bytes.max(total_css_gz);
         if !o.is_404 {
             manifest.push(json!({ "pattern": o.page.pattern, "html": html_url, "modules": module_urls, "loader": o.loader, "ssr": o.ssr }));
-            report.pages.push(PageReport { pattern: o.page.pattern.clone(), js_gzip_bytes: initial });
+            report.pages.push(PageReport { pattern: o.page.pattern.clone(), js_gzip_bytes: initial, css_gzip_bytes: total_css_gz });
         }
         docs.push(doc);
     }

@@ -469,6 +469,7 @@ fn woff2_url(src: &str) -> Option<String> {
 /// Values of `--name` in every rule, and the font values (`font-family`, `font`) of rules that may
 /// match `markup`.
 struct FontRule {
+    base: bool,
     family: Option<String>,
     italic: Option<bool>,
     weight: Option<u32>,
@@ -482,7 +483,7 @@ struct FontNeed {
 
 const ITALIC_TAGS: &[&str] = &["em", "i", "cite", "dfn", "var", "address"];
 const BOLD_TAGS: &[&str] = &["b", "strong", "h1", "h2", "h3", "h4", "h5", "h6", "th"];
-const MAX_FONT_PRELOADS: usize = 6;
+const MAX_FONT_PRELOADS: usize = 3;
 
 fn weight_value(v: &str) -> Option<u32> {
     match v {
@@ -493,7 +494,7 @@ fn weight_value(v: &str) -> Option<u32> {
 }
 
 fn font_rule(body: &str) -> FontRule {
-    let mut rule = FontRule { family: None, italic: None, weight: None };
+    let mut rule = FontRule { base: false, family: None, italic: None, weight: None };
     for (name, value) in declarations(body) {
         let value = value.trim();
         match name.as_str() {
@@ -525,14 +526,27 @@ fn font_values(css: &str, markup: &Markup) -> (HashMap<String, Vec<String>>, Vec
                 vars.entry(name).or_default().push(value.to_string());
             }
         }
-        if split_top(prelude, ',').iter().any(|s| may_match(s, markup)) {
-            let rule = font_rule(body);
+        let selectors = split_top(prelude, ',');
+        if selectors.iter().any(|s| may_match(s, markup)) {
+            let mut rule = font_rule(body);
+            rule.base = selectors.iter().any(|s| is_root_selector(s));
             if rule.family.is_some() || rule.italic.is_some() || rule.weight.is_some() {
                 rules.push(rule);
             }
         }
     });
     (vars, rules)
+}
+
+/// A selector of one compound on the document root or body (`:root`, `html`, `html[data-theme="dark"]`,
+/// `body`, `*`): the rule sets the base text family.
+fn is_root_selector(sel: &str) -> bool {
+    let s = sel.trim().to_ascii_lowercase();
+    if s.contains([' ', '>', '+', '~']) {
+        return false;
+    }
+    let name: String = s.chars().take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '*').collect();
+    matches!(name.as_str(), "html" | "body" | "*") || (name.is_empty() && (s.starts_with(":root") || s.starts_with(":host")))
 }
 
 fn resolve(value: &str, vars: &HashMap<String, Vec<String>>, seen: &mut BTreeSet<String>, out: &mut String) {
@@ -564,7 +578,8 @@ fn pick_face<'a>(faces: &'a [Face], family: &str, need: FontNeed) -> Option<&'a 
 /// uses (`font-family`/`font`, through `var(--x)` chains), the Latin `.woff2` face of each style and
 /// weight the route uses. Style and weight come from the rule that names the family; a matching rule
 /// without a family (`font-style: italic`) and the tags the browser styles (`em`, `strong`, `h1`)
-/// apply to every used family. Upright 400 when nothing else is set; at most six files.
+/// apply only to the base text family (the one a `:root`/`html`/`body`/`*` rule names, else the
+/// first used family). The base upright 400 comes first; at most three files.
 pub fn font_preloads(css: &str, markup: &Markup) -> Vec<String> {
     let css = strip_comments(css);
     let mut faces = Vec::new();
@@ -595,13 +610,18 @@ pub fn font_preloads(css: &str, markup: &Markup) -> Vec<String> {
     let (vars, rules) = font_values(&css, markup);
     let mut own: Vec<(String, FontNeed)> = Vec::new();
     let mut every: Vec<FontNeed> = Vec::new();
+    let mut base: Option<String> = None;
     for rule in &rules {
         let need = FontNeed { italic: rule.italic.unwrap_or(false), weight: rule.weight.unwrap_or(400) };
         match &rule.family {
             Some(value) => {
                 let mut resolved = String::new();
                 resolve(value, &vars, &mut BTreeSet::new(), &mut resolved);
-                for family in families.iter().filter(|f| names_family(&resolved, f)) {
+                let named: Vec<&String> = families.iter().filter(|f| names_family(&resolved, f)).collect();
+                if rule.base && let Some(first) = named.first() {
+                    base = Some((*first).clone());
+                }
+                for family in named {
                     own.push((family.clone(), need));
                 }
             }
@@ -615,6 +635,7 @@ pub fn font_preloads(css: &str, markup: &Markup) -> Vec<String> {
         every.push(FontNeed { italic: false, weight: 700 });
     }
     let used: Vec<&String> = families.iter().filter(|f| own.iter().any(|(o, _)| o == *f)).collect();
+    let base = base.filter(|b| used.contains(&b)).or_else(|| used.first().map(|f| (*f).clone()));
     let mut out: Vec<String> = Vec::new();
     let mut add = |face: Option<&Face>| {
         if let Some(href) = face.and_then(|f| f.href.clone())
@@ -623,14 +644,17 @@ pub fn font_preloads(css: &str, markup: &Markup) -> Vec<String> {
             out.push(href);
         }
     };
+    if let Some(b) = &base {
+        add(pick_face(&faces, b, FontNeed { italic: false, weight: 400 }));
+    }
     for family in &used {
         for (_, need) in own.iter().filter(|(o, _)| o == *family) {
             add(pick_face(&faces, family, *need));
         }
     }
-    for family in &used {
+    if let Some(b) = &base {
         for need in &every {
-            add(pick_face(&faces, family, *need));
+            add(pick_face(&faces, b, *need));
         }
     }
     out.truncate(MAX_FONT_PRELOADS);

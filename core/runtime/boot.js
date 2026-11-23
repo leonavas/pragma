@@ -7,11 +7,11 @@ const route = JSON.parse(document.getElementById(ROUTE_ID).textContent)
 const url = new URL(location.href)
 const pending = route.loader && !route.ssr ? self.__pd ?? fetchData(url) : undefined
 self.__pd = null
-if (route.layout) loadLayout(route.ssr ? null : self.__pl ?? fetchLayout(url), document)
+const layoutDone = route.layout ? loadLayout(route.ssr ? null : self.__pl ?? fetchLayout(url), document) : null
 self.__pl = null
 
 initClientLog(location.hostname)
 importRoute(route).then(mods => {
-  enter(route, mods, url, document, pending)
-  router().then(r => r.startRouter({ importRoute, enter, leave, closeOverlays, popOverlay }))
+  const loaded = Promise.all([enter(route, mods, url, document, pending), layoutDone]).catch(() => {})
+  router().then(r => r.startRouter({ importRoute, enter, leave, closeOverlays, popOverlay, loaded }))
 })
