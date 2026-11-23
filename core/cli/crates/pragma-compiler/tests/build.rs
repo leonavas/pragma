@@ -787,6 +787,24 @@ fn route_css_keeps_only_matching_theme_rules_and_preloads_used_fonts() {
     assert!(plain.contains(".note{") && !plain.contains(".hero{"), "{plain}");
 }
 
+#[test]
+fn font_preloads_follow_the_prebuilt_html() {
+    let theme = "@font-face { font-family: 'Body'; src: url('/fonts/body.woff2') format('woff2'); }\n@font-face { font-family: 'Body'; font-style: italic; src: url('/fonts/body-italic.woff2') format('woff2'); }\n@font-face { font-family: 'Title'; src: url('/fonts/title.woff2') format('woff2'); }\n@layer tokens {\n  :root { --font-sans: 'Body', sans-serif; }\n}\n@layer components {\n  .hero { font-family: 'Title', serif; }\n}\n";
+    let t = scratch(&[
+        ("lib/theme.css", theme),
+        ("routes/index.html", "<script>\n  let shown = false\n</script>\n<title>Home</title><p>Hi</p>\n<if $shown>\n  <p><em>Later</em></p>\n  <h1 class=\"hero\">Later</h1>\n</if>"),
+        ("routes/now.html", "<title>Now</title><p><em>Now</em></p><h1 class=\"hero\">Now</h1>"),
+    ]);
+    let app = t.0.join("app");
+    let out = t.0.join("dist");
+    build(&BuildOptions { root: app.clone(), out_dir: out.clone(), mode: Mode::Dev }).unwrap();
+    let index = page_html(&out, "index.html");
+    let now = page_html(&out, "now.html");
+    assert!(index.contains("href=\"/fonts/body.woff2\" as=\"font\""), "{index}");
+    assert!(!index.contains("body-italic.woff2\" as") && !index.contains("title.woff2\" as"), "a block body that is not rendered is not preloaded: {index}");
+    assert!(now.contains("body-italic.woff2\" as") && now.contains("title.woff2\" as"), "{now}");
+}
+
 fn css_url_app() -> Tmp {
     let theme = "@font-face { font-family: 'Body'; src: url('/fonts/body.woff2') format('woff2'); }\n@font-face { font-family: 'Cdn'; src: url(https://cdn.example/cdn.woff2) format('woff2'); }\n@layer tokens {\n  :root { --font-sans: 'Body', 'Cdn', sans-serif; }\n}\n@layer components {\n  .hero { background: url(\"/img/bg.svg#top\"), url(/missing.png), url(//cdn.example/a.png), url(img/rel.png); }\n  .mask { mask: url(\"data:image/svg+xml,%3Csvg/%3E\"); fill: url(#grad); }\n}\n";
     let mut seed: u64 = 1;
@@ -1222,9 +1240,9 @@ fn ssr_runs_page_and_component_scripts_on_the_server() {
     assert!(ops.contains("[\"comp\",\"list\",[[\"items\",\"path\",\"data.items\"]],"), "{ops}");
     assert!(ops.contains("[\"text\",\"{state.heading}\"]") && ops.contains("[\"for\","), "{ops}");
     let worker = fs::read_to_string(out.join("server/worker.js")).unwrap();
-    // the list and the page run on the server; clocky imports an npm package, so it stays on the client
+    // the list and the page run on the server; clocky imports an npm package, so it is imported on first use
     assert!(worker.contains("from \"./lib/components/list/list.js\"") && worker.contains("from \"./routes/isle.js\""), "{worker}");
-    assert!(!worker.contains("from \"./lib/components/clocky/clocky.js\"") && !worker.contains("\"clocky\": m"), "{worker}");
+    assert!(worker.contains("= () => import(\"./lib/components/clocky/clocky.js\")") && worker.contains("\"clocky\": m"), "{worker}");
     let isle = worker.lines().find(|l| l.contains("pattern: \"/isle\"")).unwrap();
     assert!(isle.contains(", page: m") && isle.contains("\"list\": m"), "{isle}");
     let server_list = fs::read_to_string(out.join("server/lib/components/list/list.js")).unwrap();

@@ -240,6 +240,18 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   paint must equal the state after boot; a `<c-logo size="sm">` painted at the default size and
   shrank at boot. Rejected: resolving only literal props in Rust (derived values and blocks still
   flash), Node at build (breaks "one binary").
+- **[firm]** (2026-11-23) Page and component scripts that import npm packages run in SSR and
+  in the build prerender. A script is still left to the browser when it reaches a `core/` module,
+  throws, or a package it imports throws on import. On the server the package comes from
+  `node_modules` (Workers: `wrangler` bundles it) and the script is imported on its first request
+  (`() => import()` in `worker.js`), so a package that reads `window` at import time disables
+  only that script, not the server. At build the prerender (QuickJS) resolves the package to its
+  client bundle and imports each script with `await import().catch()`, so one failing script
+  does not drop the whole page render. *Why:* v3chat `c/[id]` renders markdown with `marked`
+  (pure, no DOM); because of that one import the messages never reached the first HTML, and LCP
+  waited for `boot.js` → `/_data` → render. Rejected: an allowlist of "server-safe" packages
+  (one more list to keep), and keeping npm scripts browser-only (most formatters and parsers
+  are pure).
 - **[firm]** (2026-11-23) `routes/_layout.server.js` exports only `load`; its result is
   `layout` (HTML root and `import { layout } from 'pragma'`), fetched from `/_layout/<path>` (an
   inline `<head>` fetch, like `/_data`), embedded with `ssr`, kept across client navigations and
@@ -463,7 +475,33 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   the Latin `.woff2` of each style and weight that the rules naming the family set, plus italic
   and 700 for every family when a rule without a family or a UA-styled tag (`em`, `i`,
   `strong`, `h1`…) needs them; at most six. *Why:* only the upright 400 face was preloaded, so
-  an italic wordmark in the layout swapped fonts after the first paint (v3chat).
+  an italic wordmark in the layout swapped fonts after the first paint (v3chat). The markup it
+  reads changed on 2026-11-23 (below).
+- **[firm]** (2026-11-23) Font preload reads the prebuilt HTML, not the route's source markup:
+  tags and classes of the HTML the build writes after the QuickJS render (layout included),
+  without block bodies left as anchors and without the children of `<dialog>` and `[popover]`.
+  Same face rules and limit of six. *Why:* v3chat `c/[id]` preloaded 5 faces (~374 KB) on the
+  critical path: the italic for `em` in answers that render only after `/_data`, and faces used
+  only in a closed dialog or the sidebar drawer. A face for later content swaps when it appears,
+  which is the cost of not blocking the first paint. Rejected: an opt-out per `@font-face`
+  (a comment is not allowed; a descriptor is one more thing to know).
+- **[firm]** (2026-11-23) Large lists render in slices, with no attribute: once a full render has
+  run 30 ms, an outer `<for>` (not inside another `<for>` item) creates at least one more item and
+  leaves the rest for the next task (`setTimeout`), which creates only the missing items. In a
+  reverse-column scroller (`css.md`, "Scroll that starts at the end") the last items come first.
+  Items created by a later slice do not get `data-entering`. `mount` runs after each slice for
+  the components that slice created. *Why:* v3chat `c/[id]` (40 markdown answers) built the whole
+  conversation in one task (319, 160 and 80 ms tasks, TBT 350 ms against 60 ms in SvelteKit).
+  Rejected: `<for chunk="20" from="end">` (one more choice for the agent to get wrong; the reverse
+  column already says where the list starts), a count per slice (cost per item varies by 100×),
+  slices for nested lists (a half-rendered answer).
+- **[firm]** (2026-11-23) A closed `<dialog>` or `[popover]` binds only its own attributes; its
+  content renders on the first open (the overlay manager renders the page right before
+  `showModal`/`showPopover`) and stays rendered after that. Components inside are created, and
+  their `mount` runs, on that first open. *Why:* the app cannot keep a closed overlay out of the
+  DOM (`overlays.md` forbids open state in a `let`), so v3chat carried a session dialog with
+  per-turn tables and a second copy of the history list in a drawer (2866 elements). Rejected: a
+  `lazy` opt-in (closed by default is the only useful choice).
 
 ## npm dependencies
 

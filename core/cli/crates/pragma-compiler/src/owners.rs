@@ -25,6 +25,19 @@ pub fn markup_of(nodes: &[Node], out: &mut Markup) {
     }
 }
 
+/// Tags and classes the first paint shows: the prebuilt HTML of a page, without the content of a
+/// `<dialog>` or `[popover]` (closed until the user opens it). Block bodies are not in that HTML.
+pub fn painted_markup(nodes: &[Node], out: &mut Markup) {
+    for n in nodes {
+        let Node::Element(e) = n else { continue };
+        out.tags.insert(e.name.to_ascii_lowercase());
+        out.classes.extend(classes(e));
+        if !e.is("dialog") && !e.has("popover") {
+            painted_markup(&e.children, out);
+        }
+    }
+}
+
 /// An element an owner writes: its name and every class it can have, or `None` when unknown.
 pub type Written = Option<(String, Vec<String>)>;
 

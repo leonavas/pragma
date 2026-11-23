@@ -360,10 +360,14 @@ export const ssr = false
   functions) and slot content are in the first HTML. In those scripts `data`, `params`, `query`
   and `page` are read-only, `shared`, `call`, `stream`, `navigate`, `open`, `close` and `confirm` throw.
   A script is left to the browser (its `$x` bindings filled at boot, as without `ssr`) when it
-  imports anything other than app code (`routes/`, `lib/`, `utils/`: no npm package, no
-  `core/` module), when it throws while running on the server (reading `window`, `document`,
-  `localStorage` or a store), or when a prop comes from a store. The rest of the page still
-  renders. Keep browser-only work in `mount(el)` and actions.
+  imports anything other than app code (`routes/`, `lib/`, `utils/`) or npm packages (a `core/`
+  module), when it throws while running on the server (reading `window`, `document`,
+  `localStorage` or a store), when a package it imports throws on import, or when a prop comes
+  from a store. A script that reaches an npm package is imported on its first SSR request
+  (`worker.js`: `const m<i> = () => import(...)`), so such a package cannot break the server.
+  The build prerender runs the same scripts with the package's client bundle (`/assets/npm/`),
+  each script imported on its own. The rest of the page still renders. Keep browser-only work
+  in `mount(el)` and actions.
 - Error in `load` → `page.error` on the client; 500 with ERROR log on the server.
 - Context of `load`, actions (`{ input, ...context }`), endpoints and middleware:
   `{ request, url, params, query, env, db, kv, files, log, cookies, locals, setHeaders, waitUntil }`.
@@ -425,6 +429,9 @@ Always HTML + JS. Primitive in `core/overlay.js`; components in `lib/components/
   mounts (not modulepreloaded: it is not needed for first paint). A click on an `@open` button
   before it arrives runs again once it is loaded.
 - Focus returns to the opener.
+- A closed overlay binds only its own attributes. Its content (blocks, components, bindings)
+  renders on its first open, right before it shows, and stays rendered after that; components
+  inside mount then.
 
 Usage:
 ```html
@@ -491,9 +498,12 @@ Usage:
   names and classes; attribute, id and pseudo-class parts never drop a rule), the route's
   component and page CSS without rules for classes their own elements never have, and the route's
   utilities. Both are inlined when their gzip sum is <= 14 kB.
-- Fonts: per route, one `<link rel="preload" as="font" crossorigin>` per `@font-face` family the
-  route CSS uses (through `var()` too): the upright Latin `.woff2` (weight 400 when there are
-  several). Preloads already in `_layout.html` are not repeated.
+- Fonts: per route, one `<link rel="preload" as="font" crossorigin>` per face the first paint
+  uses: the route CSS rules that match the tags and classes of the prebuilt HTML (layout included;
+  not the block bodies it leaves as anchors, not the children of `<dialog>` or `[popover]`), with
+  their `@font-face` family (through `var()` too), style and weight; italic and 700 for every used
+  family when that HTML has `em`, `strong`, `h1`… Latin `.woff2`, upright 400 by default, at most
+  six. Preloads already in `_layout.html` are not repeated.
 
 ## 9. Build (`pragma build`)
 

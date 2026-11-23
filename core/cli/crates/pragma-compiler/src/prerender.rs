@@ -35,12 +35,13 @@ pub struct Prerender {
     pages: Cell<usize>,
 }
 
-struct Paths;
+/// Relative paths, plus each app import of an npm package mapped to its client bundle file.
+struct Paths(HashMap<(String, String), String>);
 
 impl Resolver for Paths {
     fn resolve<'js>(&mut self, _: &Ctx<'js>, base: &str, name: &str, _: Option<ImportAttributes<'js>>) -> Result<String> {
         if !name.starts_with("./") && !name.starts_with("../") {
-            return Err(Error::new_resolving(base, name));
+            return self.0.get(&(base.to_string(), name.to_string())).cloned().ok_or_else(|| Error::new_resolving(base, name));
         }
         let mut out = PathBuf::new();
         for c in Path::new(base).parent().unwrap_or(Path::new("")).join(name).components() {
@@ -73,8 +74,10 @@ fn module_name(path: &Path) -> String {
 
 impl Prerender {
     /// `None` when the app has no `.pragma/server/render.js` (an app older than the renderer).
-    pub fn new(root: &Path, framework: &Path, modules: impl Iterator<Item = (PathBuf, String)>) -> Option<Self> {
+    /// `packages`: (importing module, package specifier) → the npm bundle file it resolves to.
+    pub fn new(root: &Path, framework: &Path, modules: impl Iterator<Item = (PathBuf, String)>, packages: impl Iterator<Item = ((PathBuf, String), PathBuf)>) -> Option<Self> {
         let mut sources: HashMap<String, String> = modules.map(|(p, src)| (module_name(&p), src)).collect();
+        let packages: HashMap<(String, String), String> = packages.map(|((from, spec), to)| ((module_name(&from), spec), module_name(&to))).collect();
         for file in [RENDER, "contract.js"] {
             let path = framework.join(file);
             let src = std::fs::read_to_string(root.join(&path)).ok()?;
@@ -85,7 +88,7 @@ impl Prerender {
         let deadline = Rc::new(Cell::new(Instant::now() + PAGE_TIME));
         let until = deadline.clone();
         rt.set_interrupt_handler(Some(Box::new(move || Instant::now() > until.get())));
-        rt.set_loader(Paths, Sources(sources));
+        rt.set_loader(Paths(packages), Sources(sources));
         let ctx = Context::full(&rt).ok()?;
         ctx.with(|ctx| ctx.eval::<(), _>(BROWSER_ONLY)).ok()?;
         Some(Prerender { _rt: rt, ctx, deadline, render: module_name(&framework.join(RENDER)), pages: Cell::new(0) })
@@ -98,11 +101,14 @@ impl Prerender {
         self.pages.set(n + 1);
         let entry = format!("__pragma_prerender_{n}.js");
         let mut src = format!("import {{ prerender }} from './{}'\n", self.render);
+        // each script is imported on its own: one that fails to load (a package that throws on
+        // import) is left to the browser, the rest of the page still renders
+        let load = |m: &Path| format!("await import('./{}').catch(() => undefined)", module_name(m));
         if let Some(m) = page {
-            src.push_str(&format!("import * as page from './{}'\n", module_name(m)));
+            src.push_str(&format!("const page = {}\n", load(m)));
         }
         for (i, (_, m)) in components.iter().enumerate() {
-            src.push_str(&format!("import * as c{i} from './{}'\n", module_name(m)));
+            src.push_str(&format!("const c{i} = {}\n", load(m)));
         }
         let comps: Vec<String> = components.iter().enumerate().map(|(i, (id, _))| format!("{}: c{i}", Value::String(id.clone()))).collect();
         src.push_str(&format!(

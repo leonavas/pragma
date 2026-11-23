@@ -1,4 +1,4 @@
-import { render, patch, hooks, scopeOf, input, eventCall, useBodies, DEV, PAGE } from './directives.js'
+import { render, patch, resume, sliced, hooks, scopeOf, input, eventCall, useBodies, DEV, PAGE } from './directives.js'
 import { log } from './log.js'
 import { reactive, readers, onChange, persist, persistStores } from './state.js'
 import { fetchData, fetchLayout, load, loadResult, call, stream } from './loader.js'
@@ -21,7 +21,7 @@ const redirect = (to, replace) => router().then(r => r.redirect(to, replace))
 
 const C = Symbol(), O = Symbol(), mounted = new Set(), comps = {}, types = new Set()
 const shared = {}
-let cur, queued, whole, mounts = [], layout = null, layoutSeq = 0
+let cur, queued, whole, slices = 0, mounts = [], layout = null, layoutSeq = 0
 const dirty = new Set()
 
 function schedule(target, key) {
@@ -47,10 +47,34 @@ function flush() {
   whole = false
   render(document.body, { __proto__: null, shared, layout: reactive(layout), params: cur.params, query: cur.query, page: cur.page })
   persistStores()
+  runMounts()
+  later()
+}
+
+function runMounts() {
   for (const o of mounts.splice(0)) {
     if (!mounted.has(o)) continue
     try { cleanup(o, o.mount?.(o.el)) } catch (e) { reportError(e) }
   }
+}
+
+// A render that left list items for later continues in the next task, after the browser could paint.
+function later() {
+  if (sliced() && !slices) slices = setTimeout(nextSlice)
+}
+
+function nextSlice() {
+  slices = 0
+  if (!cur || !sliced()) return
+  resume()
+  runMounts()
+  later()
+}
+
+// The overlay manager calls this right before the first open: the content renders, then it shows.
+hooks.reveal = () => {
+  whole = true
+  flush()
 }
 
 function cleanup(o, off) {

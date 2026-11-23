@@ -430,6 +430,20 @@ fn is_app_code(path: &Path) -> bool {
     ["routes/", "lib/", "utils/"].iter().any(|d| rel_str(path).starts_with(d))
 }
 
+fn is_npm(path: &Path) -> bool {
+    path.starts_with("node_modules")
+}
+
+/// The server and the build run a script when everything it imports is app code or an npm
+/// package; a package that throws (DOM, `window`) leaves the script to the browser at run time.
+fn server_runnable(mods: &BTreeMap<PathBuf, Module>, m: &Path) -> bool {
+    closure(mods, &[m.to_path_buf()], true).iter().all(|f| is_app_code(f) || is_npm(f))
+}
+
+fn reaches_npm(mods: &BTreeMap<PathBuf, Module>, m: &Path) -> bool {
+    closure(mods, &[m.to_path_buf()], true).iter().any(|f| is_npm(f))
+}
+
 fn is_wasm(path: &Path) -> bool {
     path.extension().is_some_and(|e| e == "wasm")
 }
@@ -497,6 +511,9 @@ fn closure(mods: &BTreeMap<PathBuf, Module>, entries: &[PathBuf], dynamic: bool)
 struct SsrScripts {
     page: Option<PathBuf>,
     components: Vec<(String, PathBuf)>,
+    /// scripts that reach an npm package: imported on first use, so a package that throws on
+    /// import leaves the script to the browser instead of breaking the whole server
+    lazy: BTreeSet<PathBuf>,
 }
 
 struct PageOut<'a> {
@@ -907,8 +924,11 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
         Some(c) => c.boot.clone(),
         None => urls.get(&boot).cloned().unwrap_or_else(|| format!("/assets/{}", deps::asset_path(&rel_str(&boot)))),
     };
-    let prerender = prerender::Prerender::new(&opts.root, &p.framework, mods.iter().map(|(path, m)| (path.clone(), m.src.clone())));
-    let on_server = |m: &PathBuf| closure(&mods, std::slice::from_ref(m), true).iter().all(|f| is_app_code(f));
+    let packages = mods.iter().flat_map(|(path, m)| {
+        m.imports.iter().filter(|(imp, _)| pragma_jslint::is_package(&imp.spec)).filter_map(move |(imp, t)| t.clone().map(|t| ((path.clone(), imp.spec.clone()), t)))
+    });
+    let prerender = prerender::Prerender::new(&opts.root, &p.framework, mods.iter().map(|(path, m)| (path.clone(), m.src.clone())), packages);
+    let on_server = |m: &PathBuf| server_runnable(&mods, m);
     for (i, o) in outs.iter().enumerate() {
         let mut route_css_url: Option<String> = None;
         let mut route_css_src: Option<String> = None;
@@ -939,7 +959,7 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
         if prod {
             rcss = public_assets.rewrite(&rcss, w);
         }
-        let fonts = pragma_css::prune::font_preloads(&format!("{css}\n{rcss}"), &markup);
+        let font_css = format!("{css}\n{rcss}");
         if !rcss.trim().is_empty() {
             if prod {
                 match pragma_css::minify(&rcss) {
@@ -1023,6 +1043,21 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
         if o.overlays {
             route["overlays"] = json!(true);
         }
+        let rendered = prerender.as_ref().and_then(|r| {
+            let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
+            let ops = compile::ops(&o.exp.body, &scripted, &o.bodies);
+            let page = o.page.module.as_deref().filter(|m| on_server(&m.to_path_buf()));
+            let comps: Vec<(String, PathBuf)> = o.exp.components.values().filter_map(|c| c.module.clone().filter(|m| on_server(m)).map(|m| (c.id.clone(), m))).collect();
+            r.body(&ops, page, &comps)
+        });
+        let body = rendered.unwrap_or_else(|| {
+            let mut body = String::new();
+            compile::write_nodes(&o.exp.body, &mut body, prod);
+            body
+        });
+        let mut painted = pragma_css::prune::Markup::default();
+        owners::painted_markup(&html::parse(&body, 0).0, &mut painted);
+        let fonts = pragma_css::prune::font_preloads(&font_css, &painted);
         let mut doc = String::with_capacity(4096);
         doc.push_str(&format!("<!doctype html>\n<html lang=\"{}\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n", html::escape_attr(&p.config.lang)));
         match o.exp.head.iter().find_map(|n| match n {
@@ -1087,18 +1122,6 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
             doc.push_str("<script type=\"module\" src=\"/_pragma/dev.js\"></script>\n");
         }
         doc.push_str("</head>\n<body>\n");
-        let rendered = prerender.as_ref().and_then(|r| {
-            let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
-            let ops = compile::ops(&o.exp.body, &scripted, &o.bodies);
-            let page = o.page.module.as_deref().filter(|m| on_server(&m.to_path_buf()));
-            let comps: Vec<(String, PathBuf)> = o.exp.components.values().filter_map(|c| c.module.clone().filter(|m| on_server(m)).map(|m| (c.id.clone(), m))).collect();
-            r.body(&ops, page, &comps)
-        });
-        let body = rendered.unwrap_or_else(|| {
-            let mut body = String::new();
-            compile::write_nodes(&o.exp.body, &mut body, prod);
-            body
-        });
         doc.push_str(body.trim());
         doc.push_str("\n</body>\n</html>\n");
         let html_url = format!("/{}.html", o.page.out_name);
@@ -1148,13 +1171,12 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
             let (template, shell) = if o.ssr {
                 let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
                 let ops = compile::ops(compile::page_content(&o.exp.body), &scripted, &o.bodies);
-                // the server runs a script only when everything it imports is app code (no npm
-                // package, no browser runtime of the framework); the others stay client-rendered
-                let runs_on_server = |m: &PathBuf| {
-                    closure(mods, std::slice::from_ref(m), true).iter().all(|f| is_app_code(f))
-                };
+                // the server runs a script when everything it imports is app code or an npm package
+                // (no browser runtime of the framework); the others stay client-rendered
+                let runs_on_server = |m: &PathBuf| server_runnable(mods, m);
                 ssr_scripts.page = o.page.module.clone().filter(|m| runs_on_server(m));
                 ssr_scripts.components = o.exp.components.values().filter_map(|c| c.module.clone().filter(|m| runs_on_server(m)).map(|m| (c.id.clone(), m))).collect();
+                ssr_scripts.lazy.extend(ssr_scripts.page.iter().chain(ssr_scripts.components.iter().map(|(_, m)| m)).filter(|m| reaches_npm(mods, m)).cloned());
                 (ops, Value::String(doc.clone()))
             } else {
                 (Value::Null, Value::Null)
@@ -1224,8 +1246,14 @@ fn emit_server(p: &Project, a: &Analysis, client: &Client, opts: &BuildOptions, 
         for (i, r) in server_routes.iter().enumerate() {
             worker.push_str(&format!("import * as s{i} from {}\n", json!(format!("./{}", rel_str(&r.server)))));
         }
+        let lazy: BTreeSet<&PathBuf> = server_routes.iter().flat_map(|r| &r.scripts.lazy).collect();
         for (m, i) in &script_ids {
-            worker.push_str(&format!("import * as m{i} from {}\n", json!(format!("./{}", rel_str(m)))));
+            let spec = json!(format!("./{}", rel_str(m)));
+            if lazy.contains(m) {
+                worker.push_str(&format!("const m{i} = () => import({spec})\n"));
+            } else {
+                worker.push_str(&format!("import * as m{i} from {spec}\n"));
+            }
         }
         for (i, e) in p.endpoints.iter().enumerate() {
             worker.push_str(&format!("import * as e{i} from {}\n", json!(format!("./{}", rel_str(&e.file)))));

@@ -16,7 +16,7 @@ const parsed = new WeakMap()
 const NS = { 'http://www.w3.org/2000/svg': 'svg', 'http://www.w3.org/1998/Math/MathML': 'math' }
 export const DEV = Boolean(self.__pragmaDev)
 
-export const hooks = { on() {}, enter: (el, s) => s, remove() {} }
+export const hooks = { on() {}, enter: (el, s) => s, remove() {}, reveal() {} }
 export const scopeOf = el => el[S]
 
 const fail = msg => { throw new Error('pragma: ' + msg) }
@@ -186,6 +186,17 @@ export function input(e) {
 
 const lexical = (s, d) => (d.u && outer.at(-d.u)) || s
 
+// A closed <dialog> or [popover] binds only its own attributes: its content renders on the first open
+// and stays after that, so a page does not build the DOM of overlays nobody opens.
+const OPENED = Symbol()
+const closed = el => !el[OPENED] && (el.localName === 'dialog' ? !el.open : el.hasAttribute('popover') && !el.matches(':popover-open'))
+
+export function reveal(el) {
+  if (el[OPENED]) return
+  el[OPENED] = true
+  hooks.reveal()
+}
+
 function visit(el, s, d = el[D] ?? parse(el)) {
   s = lexical(s, d)
   let w = null
@@ -204,7 +215,7 @@ function visit(el, s, d = el[D] ?? parse(el)) {
   }
   readBy(0)
   if (d.e) el[S] = s
-  if (el.firstChild) walk(el, s)
+  if (el.firstChild && !closed(el)) walk(el, s)
   if (d.m) model(el, s, d.m)
   if (d.x === COMPONENT) outer.pop()
   if (d.self) deep--
@@ -228,7 +239,7 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)')
 function clone(t, d, id) {
   const n = source(d.s, t.parentNode).cloneNode(true)
   n.setAttribute(OF, id)
-  if (d.rendered && !reduced.matches) {
+  if (d.rendered && !d.partial && !reduced.matches) {
     n.setAttribute('data-entering', '')
     entering.push(n)
   }
@@ -334,7 +345,30 @@ function branch(t, d, s, last, id) {
   return [n, true, id]
 }
 
+// Large lists render in slices: once a render has run SLICE_MS, an outer <for> (not one inside another
+// <for> item) creates at least one more item and leaves the rest for the next task, so the main thread
+// can paint and answer input. In a reverse-column scroller (a chat that opens at its end) the last
+// items come first.
+const SLICE_MS = 30
+let sliceEnd = Infinity, lists = 0, resuming = false, deferred = []
+
+const now = () => performance.now()
+export const sliced = () => deferred.length > 0
+
+function scroller(el) {
+  for (; el && el !== document.body; el = el.parentElement) {
+    const cs = getComputedStyle(el)
+    if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') return cs.flexDirection === 'column-reverse'
+  }
+  return false
+}
+
 function list(t, d, s) {
+  const top = lists++ === 0
+  try { return items(t, d, s, top) } finally { lists-- }
+}
+
+function items(t, d, s, top) {
   const id = d.id, old = new Map(), scopes = [], keys = []
   for (let n = sibling(t); of(n, id); n = sibling(n)) old.set(n.getAttribute(KEY), n)
   for (const it of get(s, d.p) ?? []) {
@@ -345,26 +379,52 @@ function list(t, d, s) {
   const keep = new Set(keys)
   if (DEV && keep.size < keys.length) fail(`duplicate key in <for ${d.v} in ${d.p.join('.')}>`)
   for (const [k, n] of old) if (!keep.has(k)) drop(n)
+  const fresh = new Set()
+  let made = 0, rest = false
+  const create = i => {
+    const n = clone(t, d, id)
+    n.setAttribute(KEY, keys[i])
+    made++
+    return n
+  }
+  const late = () => top && made > 0 && now() > sliceEnd
+  if (top && old.size < keys.length && (d.end ??= scroller(t.parentNode))) {
+    for (let i = keys.length - 1; i >= 0; i--) {
+      if (old.has(keys[i])) continue
+      if (late()) { rest = true; break }
+      const n = create(i)
+      t.after(n)
+      visit(n, scopes[i])
+      old.set(keys[i], n)
+      fresh.add(n)
+    }
+  }
   let ref = t
   for (let i = 0; i < keys.length; i++) {
     let n = old.get(keys[i])
     if (!n) {
-      n = clone(t, d, id)
-      n.setAttribute(KEY, keys[i])
+      if (rest || late()) { rest = true; continue }
+      n = create(i)
       ref.after(n)
+      fresh.add(n)
     } else {
       if (n[L]) stay(n)
       if (next(ref) !== n) ref.after(n)
+      if (fresh.has(n) || resuming) { ref = n; continue }
     }
     visit(n, scopes[i])
     ref = n
   }
+  d.partial = rest
+  if (rest) deferred.push([t, d, s, outer.slice(), deep])
   return [ref, keys.length > 0, id]
 }
 
 export function render(el, s) {
   outer.length = 0
   deep = 0
+  deferred = []
+  sliceEnd = now() + SLICE_MS
   forgetReads()
   readBy(0)
   focusing = null
@@ -373,6 +433,29 @@ export function render(el, s) {
   const target = focusing
   focusing = null
   target?.focus()
+}
+
+// Next slice of the lists the last render or resume left unfinished. Items already on the page are not
+// visited again: any state change since then ran a full render, which started the slices over.
+export function resume() {
+  const jobs = deferred
+  deferred = []
+  sliceEnd = now() + SLICE_MS
+  resuming = true
+  readBy(0)
+  try {
+    for (const [t, d, s, scopes, depth] of jobs) {
+      if (!t.isConnected) continue
+      outer.length = 0
+      outer.push(...scopes)
+      deep = depth
+      list(t, d, s)
+    }
+  } finally {
+    resuming = false
+    readBy(null)
+  }
+  settle()
 }
 
 export function patch(groups) {
