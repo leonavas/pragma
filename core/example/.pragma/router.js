@@ -112,19 +112,37 @@ const watch = el => {
   if (a) io.observe(a)
 }
 
+// Added nodes are collected and scanned once when the browser is idle, not inside each render slice;
+// a root inside another collected root is not scanned twice.
+const idle = self.requestIdleCallback ?? setTimeout
+let added = new Set(), scanning = false
+
+function scan() {
+  scanning = false
+  const roots = added
+  added = new Set()
+  const covered = n => {
+    for (let p = n.parentElement; p; p = p.parentElement) if (roots.has(p)) return true
+    return false
+  }
+  for (const n of roots) {
+    if (!n.isConnected || covered(n)) continue
+    if (n.localName === 'a') watch(n)
+    for (const a of n.querySelectorAll('a[href]')) watch(a)
+  }
+}
+
 function watchAdded(records) {
   for (const r of records) {
-    if (r.type === 'attributes') watch(r.target)
-    else for (const n of r.addedNodes) if (n.nodeType === 1) {
-      if (n.localName === 'a') watch(n)
-      for (const a of n.querySelectorAll('a[href]')) watch(a)
-    }
+    if (r.type === 'attributes') added.add(r.target)
+    else for (const n of r.addedNodes) if (n.nodeType === 1) added.add(n)
   }
+  if (added.size && !scanning) scanning = true, idle(scan)
 }
 
 function observe() {
   if (navigator.connection?.saveData) return
-  ;(self.requestIdleCallback ?? setTimeout)(() => {
+  idle(() => {
     io?.disconnect()
     io = new IntersectionObserver(es => {
       for (const x of es) if (x.isIntersecting) io.unobserve(x.target), prefetch(x.target.href)
@@ -231,5 +249,7 @@ export function startRouter(pageApi) {
   }
   document.addEventListener('pointerenter', hover, true)
   document.addEventListener('focusin', hover)
-  document.readyState === 'complete' ? observe() : addEventListener('load', observe, { once: true })
+  // Viewport prefetch waits for the page load and the first /_data and /_layout: it must not compete with them.
+  const loaded = new Promise(r => (document.readyState === 'complete' ? r() : addEventListener('load', r, { once: true })))
+  Promise.all([loaded, page.loaded]).then(observe)
 }

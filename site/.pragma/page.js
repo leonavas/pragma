@@ -1,4 +1,4 @@
-import { render, patch, resume, sliced, hooks, scopeOf, input, eventCall, useBodies, DEV, PAGE } from './directives.js'
+import { render, patch, resume, sliced, startSlice, spent, hooks, scopeOf, input, eventCall, useBodies, DEV, PAGE } from './directives.js'
 import { log } from './log.js'
 import { reactive, readers, onChange, persist, persistStores } from './state.js'
 import { fetchData, fetchLayout, load, loadResult, call, stream } from './loader.js'
@@ -51,23 +51,36 @@ function flush() {
   later()
 }
 
+// `mount` calls share the slice budget with the render: once it is spent, at least one more runs and
+// the rest wait for the next task, in order.
 function runMounts() {
-  for (const o of mounts.splice(0)) {
+  let ran = false
+  while (mounts.length) {
+    if (ran && spent()) return
+    const o = mounts.shift()
     if (!mounted.has(o)) continue
+    ran = true
     try { cleanup(o, o.mount?.(o.el)) } catch (e) { reportError(e) }
   }
 }
 
-// A render that left list items for later continues in the next task, after the browser could paint.
+// Work left by a slice (list items, mounts) continues in a background-priority task, after the browser
+// could paint and answer input. A state change runs a full render, which starts the slices over.
+const task = self.scheduler?.postTask ? fn => scheduler.postTask(fn, { priority: 'background' }) : fn => setTimeout(fn)
+
 function later() {
-  if (sliced() && !slices) slices = setTimeout(nextSlice)
+  if ((sliced() || mounts.length) && !slices) slices = 1, task(nextSlice)
 }
 
 function nextSlice() {
   slices = 0
-  if (!cur || !sliced()) return
-  resume()
+  if (!cur) return
+  startSlice()
   runMounts()
+  if (sliced() && !spent()) {
+    resume()
+    runMounts()
+  }
   later()
 }
 
@@ -125,7 +138,7 @@ export function loadLayout(pending, doc) {
     layout = embedded ? JSON.parse(embedded.textContent).layout ?? null : layout
     return
   }
-  load(pending).then(result => {
+  return load(pending).then(result => {
     if (!result || n !== layoutSeq) return
     if (result.redirect) return redirect(result.redirect, true)
     if (result.error) return log.error('layout load failed', { 'error.message': result.error.message })

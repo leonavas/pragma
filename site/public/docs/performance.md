@@ -1,6 +1,6 @@
 # Performance
 
-Pragma optimizes builds by default: prebuilt HTML with the scripts' initial state rendered (`data.md`, "Prebuilt HTML"), `load` fetch started in `<head>`, per-route CSS with only the theme rules the page can match (inlined in production when <= 14 kB gzip, so small pages have no render-blocking stylesheet), font preload for the faces the prebuilt HTML shows, per-route JS chunks, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets (JS, CSS, and the `public/` files that CSS names with `url()`, such as fonts), and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
+Pragma optimizes builds by default: prebuilt HTML with the scripts' initial state rendered (`data.md`, "Prebuilt HTML"), `load` fetch started in `<head>`, per-route CSS with only the theme rules the page can match (inlined in production when <= 14 kB gzip, so small pages have no render-blocking stylesheet), font preload for the faces the prebuilt HTML shows, per-route JS chunks, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets (JS, CSS, and the `public/` files that CSS names with `url()`, such as fonts), and unused CSS stripped. `pragma build` prints the JS and CSS gzip size of each page and marks a page whose CSS is over 14 kB (a render-blocking stylesheet); it does not enforce limits. When a page is marked, look for theme or component rules it does not need on first paint.
 
 ## JS chunks
 
@@ -11,7 +11,7 @@ Pragma optimizes builds by default: prebuilt HTML with the scripts' initial stat
 - Code used by 2+ routes goes to `/assets/chunks/shared<nnn>-<hash>.js` (`shared000`, `shared001`, …), one chunk per set of routes. A set under 4 kB joins a chunk that a wider set of routes uses.
 - `await import()` stays a separate chunk. npm packages stay in `/assets/npm/` (`packages.md`).
 - The bodies of `<if>`, `<else-if>`, `<else>`, `<for>` and `<empty>` go to the page's template module (`/assets/tpl/<route>-<hash>.js`), and the page `modulepreload`s it. The prebuilt HTML keeps only a short comment where each block renders (`<!--p:if t3 state.open-->`), so a page with many blocks or long lists stays small. The browser parses a body only when a block first renders it.
-- The page `modulepreload`s every chunk it runs. The router prefetches the HTML and chunks of a link on hover, focus, and when the link enters the viewport, also for links rendered after the page loads (`/app/:id` links included). Viewport prefetch starts after the `load` event, when the browser is idle, and is off when the user turns on Save-Data. The router requests the clean page URL (`/app`, not `/app/index.html`).
+- The page `modulepreload`s every chunk it runs. The router prefetches the HTML and chunks of a link on hover, focus, and when the link enters the viewport, also for links rendered after the page loads (`/app/:id` links included). Viewport prefetch starts after the `load` event and the page's first `/_data` and `/_layout` responses, when the browser is idle, and is off when the user turns on Save-Data. The router requests the clean page URL (`/app`, not `/app/index.html`).
 
 ## Lazy-load heavy code
 
@@ -53,10 +53,10 @@ export function exportXlsx(rows, name) {
 
 ## Long lists
 
-A render that runs past 30 ms leaves the rest of each outer `<for>` (not one inside another `<for>` item) for the next task, so the browser can paint and answer input in between. Each task creates at least one more item, until the list is complete. You add nothing to the markup.
+A render that runs past 12 ms leaves the rest of each outer `<for>` (not one inside another `<for>` item) for a later task, so the browser can paint and answer input in between. Each task creates at least one more item, from where the last one stopped, until the list is complete. `mount` calls share the same 12 ms: the ones left run in the next task, in order. The later tasks run at background priority (`scheduler.postTask`, else `setTimeout`). You add nothing to the markup.
 
 - Items render in list order, except inside a reverse-column scroller ("Scroll that starts at the end" in `css.md`): there the last items render first, so a chat shows its newest messages first.
-- `mount` of a component in an item runs after the task that created it. Do not assume the whole list is on the page in `mount`; read it again on `ResizeObserver` or when you need it.
+- `mount` of a component in an item runs in the task that created it or a later one. Do not assume the whole list is on the page in `mount`; read it again on `ResizeObserver` or when you need it.
 - Items that a later task adds do not get `data-entering`.
 
 ## Page transitions

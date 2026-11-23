@@ -843,6 +843,8 @@ Any subfolder in `routes/` can add `_layout.html` with `<slot></slot>` to wrap r
 
 Put site-wide tags in `routes/_layout.html` `<head>`. Put page `<title>`, `<meta>`, and `<link>` at the top level of each page. A page tag replaces the layout tag with the same `name`, `property`, `http-equiv`, or `rel` (+ `hreflang`); new tags are added.
 
+Every page needs a `<meta name="description">`, its own or the layout's: without one, `pragma check` warns `html/meta-description`. Write what the page shows in 1–2 sentences; a private app can keep one in the layout.
+
 `routes/about.html`:
 ```html
 <title>About · Shop</title>
@@ -1413,7 +1415,7 @@ Each page gets only the CSS its markup can use:
 
 Markup that pragma does not render (HTML from an npm widget) gets no theme rule for its classes. Style it in the component that hosts it with `:global(…)`.
 
-Fonts: the build adds `<link rel="preload" as="font" crossorigin>` for each `@font-face` family that the first paint uses (directly or through `var(--font-…)`): the `.woff2` face that covers Latin letters for each style and weight it uses. The first paint is the page's prebuilt HTML, layout included. Content that renders after boot (an `<if>` or `<for>` body that the prebuilt HTML does not show, data from `load` without `ssr`) and the content of a closed modal, alert or dropdown do not count: their fonts load when they appear. The style and weight come from the rule that names the family (`font: italic 700 1rem var(--font-serif)`). A matching rule without a family (`font-style: italic`) and the tags the browser styles (`em`, `i`, `cite`: italic; `strong`, `b`, `h1`–`h6`, `th`: 700) apply to every family the first paint uses. Without them, the upright 400 face. At most six files per page. Remove manual font preloads from `_layout.html`: they load fonts on pages that do not use them.
+Fonts: the build adds `<link rel="preload" as="font" crossorigin>` for each `@font-face` family that the first paint uses (directly or through `var(--font-…)`): the `.woff2` face that covers Latin letters for each style and weight it uses. The first paint is the page's prebuilt HTML, layout included. Content that renders after boot (an `<if>` or `<for>` body that the prebuilt HTML does not show, data from `load` without `ssr`) and the content of a closed modal, alert or dropdown do not count: their fonts load when they appear. The style and weight come from the rule that names the family (`font: italic 700 1rem var(--font-serif)`). A matching rule without a family (`font-style: italic`) and the tags the browser styles (`em`, `i`, `cite`: italic; `strong`, `b`, `h1`–`h6`, `th`: 700) apply only to the base text family: the one a `:root`, `html`, `body` or `*` rule names (else the first family used). A mono or display family gets its italic or bold only from a rule that names it. Without them, the upright 400 face. At most three files per page, the base upright 400 first. Remove manual font preloads from `_layout.html`: they load fonts on pages that do not use them.
 
 Files in CSS `url()`: put fonts and CSS images in `public/` and write the path from the site root (`url('/fonts/inter.woff2')`). `pragma build` copies each `public/` file that any CSS names to `/assets/<folder>/<name>-<hash>.<ext>` (`/assets/fonts/inter-1a2b3c4d.woff2`) and writes that URL in the CSS and in the font preload. The browser caches it as `immutable`, so a returning visit uses the font with no request and the text does not change font after the first paint. The file also stays at its `public/` URL. `pragma dev` keeps the `public/` URL.
 
@@ -1851,7 +1853,7 @@ Source: https://pragma.leonavas.com/docs/performance.md
 
 # Performance
 
-Pragma optimizes builds by default: prebuilt HTML with the scripts' initial state rendered (`data.md`, "Prebuilt HTML"), `load` fetch started in `<head>`, per-route CSS with only the theme rules the page can match (inlined in production when <= 14 kB gzip, so small pages have no render-blocking stylesheet), font preload for the faces the prebuilt HTML shows, per-route JS chunks, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets (JS, CSS, and the `public/` files that CSS names with `url()`, such as fonts), and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
+Pragma optimizes builds by default: prebuilt HTML with the scripts' initial state rendered (`data.md`, "Prebuilt HTML"), `load` fetch started in `<head>`, per-route CSS with only the theme rules the page can match (inlined in production when <= 14 kB gzip, so small pages have no render-blocking stylesheet), font preload for the faces the prebuilt HTML shows, per-route JS chunks, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets (JS, CSS, and the `public/` files that CSS names with `url()`, such as fonts), and unused CSS stripped. `pragma build` prints the JS and CSS gzip size of each page and marks a page whose CSS is over 14 kB (a render-blocking stylesheet); it does not enforce limits. When a page is marked, look for theme or component rules it does not need on first paint.
 
 ## JS chunks
 
@@ -1862,7 +1864,7 @@ Pragma optimizes builds by default: prebuilt HTML with the scripts' initial stat
 - Code used by 2+ routes goes to `/assets/chunks/shared<nnn>-<hash>.js` (`shared000`, `shared001`, …), one chunk per set of routes. A set under 4 kB joins a chunk that a wider set of routes uses.
 - `await import()` stays a separate chunk. npm packages stay in `/assets/npm/` (`packages.md`).
 - The bodies of `<if>`, `<else-if>`, `<else>`, `<for>` and `<empty>` go to the page's template module (`/assets/tpl/<route>-<hash>.js`), and the page `modulepreload`s it. The prebuilt HTML keeps only a short comment where each block renders (`<!--p:if t3 state.open-->`), so a page with many blocks or long lists stays small. The browser parses a body only when a block first renders it.
-- The page `modulepreload`s every chunk it runs. The router prefetches the HTML and chunks of a link on hover, focus, and when the link enters the viewport, also for links rendered after the page loads (`/app/:id` links included). Viewport prefetch starts after the `load` event, when the browser is idle, and is off when the user turns on Save-Data. The router requests the clean page URL (`/app`, not `/app/index.html`).
+- The page `modulepreload`s every chunk it runs. The router prefetches the HTML and chunks of a link on hover, focus, and when the link enters the viewport, also for links rendered after the page loads (`/app/:id` links included). Viewport prefetch starts after the `load` event and the page's first `/_data` and `/_layout` responses, when the browser is idle, and is off when the user turns on Save-Data. The router requests the clean page URL (`/app`, not `/app/index.html`).
 
 ## Lazy-load heavy code
 
@@ -1904,10 +1906,10 @@ export function exportXlsx(rows, name) {
 
 ## Long lists
 
-A render that runs past 30 ms leaves the rest of each outer `<for>` (not one inside another `<for>` item) for the next task, so the browser can paint and answer input in between. Each task creates at least one more item, until the list is complete. You add nothing to the markup.
+A render that runs past 12 ms leaves the rest of each outer `<for>` (not one inside another `<for>` item) for a later task, so the browser can paint and answer input in between. Each task creates at least one more item, from where the last one stopped, until the list is complete. `mount` calls share the same 12 ms: the ones left run in the next task, in order. The later tasks run at background priority (`scheduler.postTask`, else `setTimeout`). You add nothing to the markup.
 
 - Items render in list order, except inside a reverse-column scroller ("Scroll that starts at the end" in `css.md`): there the last items render first, so a chat shows its newest messages first.
-- `mount` of a component in an item runs after the task that created it. Do not assume the whole list is on the page in `mount`; read it again on `ResizeObserver` or when you need it.
+- `mount` of a component in an item runs in the task that created it or a later one. Do not assume the whole list is on the page in `mount`; read it again on `ResizeObserver` or when you need it.
 - Items that a later task adds do not get `data-entering`.
 
 ## Page transitions
@@ -1986,7 +1988,7 @@ Source: https://pragma.leonavas.com/docs/cli.md
 | `pragma new <dir>` | Creates an app with the fixed structure. Warns and keeps existing files if `<dir>` is not empty. |
 | `pragma dev [--port 5180] [--host 127.0.0.1] [--cf]` | Runs the dev server with WebSocket live reload. Shows an overlay on build errors while valid pages keep working. Starts Node >= 22 when `.server.js` exists. Prints `app/core-outdated` first if `.pragma/` is older than the CLI. `--cf`: Cloudflare bindings in dev (see below). |
 | `pragma check [--strict]` | Checks JS, HTML, CSS, accessibility, and WebMCP tools. `--strict` turns warnings into errors. |
-| `pragma build [--allow-outdated-core]` | Builds `dist/` and prints the JS gzip size of each page (information only, no limits). Stops with `app/core-outdated` if `.pragma/` is older than the CLI (`--allow-outdated-core` overrides this). |
+| `pragma build [--allow-outdated-core]` | Builds `dist/` and prints the JS and CSS gzip size of each page, marking CSS over 14 kB as render-blocking (information only, no limits). Stops with `app/core-outdated` if `.pragma/` is older than the CLI (`--allow-outdated-core` overrides this). |
 | `pragma serve [--port 3000] [--host 127.0.0.1]` | Serves `dist/` as in production. |
 | `pragma upgrade` | Syncs `.pragma/` (runtime, docs, `base.css`, `version`) with the installed CLI version. Prints updated, added, or removed files. Never edits files outside `.pragma/`. |
 | `pragma self-update [version]` | Downloads the latest or specified `pragma` binary from GitHub Releases, verifies it with `SHA256SUMS.txt`, and replaces the executable. If the checksum is missing or wrong, it stops and does not change the binary. |
