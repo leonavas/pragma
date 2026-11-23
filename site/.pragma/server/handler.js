@@ -340,6 +340,15 @@ export function earlyHints(html) {
   return hints.length ? hints.join(', ') : null
 }
 
+// A script that reaches an npm package is imported on first use; one that fails to load is left to the browser.
+const loaded = new Map()
+const loadScript = mod => {
+  if (typeof mod !== 'function') return mod
+  if (!loaded.has(mod)) loaded.set(mod, mod().catch(() => undefined))
+  return loaded.get(mod)
+}
+const loadScripts = async (mods = {}) => Object.fromEntries(await Promise.all(Object.entries(mods).map(async ([id, mod]) => [id, await loadScript(mod)])))
+
 async function page(m, event, layout) {
   const { route, params } = m
   const { request, query, log } = event
@@ -352,7 +361,8 @@ async function page(m, event, layout) {
     payload = layout?.load ? { data: value ?? null, layout: shared ?? null } : { data: value ?? null }
     scope.data = payload.data
     scope.layout = payload.layout ?? null
-    body = renderPage(route.template, scope, { page: route.page, components: route.components, log })
+    const [script, components] = await Promise.all([loadScript(route.page), loadScripts(route.components)])
+    body = renderPage(route.template, scope, { page: script, components, log })
   } catch (err) {
     if (err instanceof Redirect) throw err
     if (err instanceof HttpError) {

@@ -1,4 +1,4 @@
-import { afterMotion } from './directives.js'
+import { afterMotion, reveal } from './directives.js'
 import { log } from './log.js'
 
 let stack = []
@@ -127,7 +127,7 @@ export function initOverlays() {
   document.addEventListener('beforetoggle', e => {
     const el = e.target
     if (!el.popover) return
-    if (e.newState == 'open') add(el, opener || document.activeElement)
+    if (e.newState == 'open') reveal(el), add(el, opener || document.activeElement)
     else refocus(el, done(el)?.o)
     opener = null
   }, true)
@@ -136,6 +136,7 @@ export function initOverlays() {
 export function open(id, o = document.activeElement) {
   const el = get(id)
   if (!el) return log.error('overlay not found', { 'pragma.overlay.id': id })
+  reveal(el)
   if (el.popover) {
     if (el.matches(':popover-open')) return
     opener = o

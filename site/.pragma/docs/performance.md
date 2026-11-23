@@ -1,6 +1,6 @@
 # Performance
 
-Pragma optimizes builds by default: prebuilt HTML with the scripts' initial state rendered (`data.md`, "Prebuilt HTML"), `load` fetch started in `<head>`, per-route CSS with only the theme rules the page can match (inlined in production when <= 14 kB gzip, so small pages have no render-blocking stylesheet), per-page font preload, per-route JS chunks, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets (JS, CSS, and the `public/` files that CSS names with `url()`, such as fonts), and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
+Pragma optimizes builds by default: prebuilt HTML with the scripts' initial state rendered (`data.md`, "Prebuilt HTML"), `load` fetch started in `<head>`, per-route CSS with only the theme rules the page can match (inlined in production when <= 14 kB gzip, so small pages have no render-blocking stylesheet), font preload for the faces the prebuilt HTML shows, per-route JS chunks, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets (JS, CSS, and the `public/` files that CSS names with `url()`, such as fonts), and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
 
 ## JS chunks
 
@@ -51,6 +51,14 @@ export function exportXlsx(rows, name) {
 - The page JS size that `pragma build` prints does not count lazy chunks.
 - Show a pending state if the first load can be slow (`let exporting = true` before the `await`).
 
+## Long lists
+
+A render that runs past 30 ms leaves the rest of each outer `<for>` (not one inside another `<for>` item) for the next task, so the browser can paint and answer input in between. Each task creates at least one more item, until the list is complete. You add nothing to the markup.
+
+- Items render in list order, except inside a reverse-column scroller ("Scroll that starts at the end" in `css.md`): there the last items render first, so a chat shows its newest messages first.
+- `mount` of a component in an item runs after the task that created it. Do not assume the whole list is on the page in `mount`; read it again on `ResizeObserver` or when you need it.
+- Items that a later task adds do not get `data-entering`.
+
 ## Page transitions
 
 The router swaps pages inside a View Transition. Only `<main data-page>` fades in (150 ms, from opacity 0.5); the layout around it (header, sidebar) changes at once and does not blink. To animate another element across pages, give it its own `view-transition-name`. With `prefers-reduced-motion`, there is no transition.
@@ -60,7 +68,7 @@ The router swaps pages inside a View Transition. Only `<main data-page>` fades i
 - Navigate with `<a href>`. A `<button>` that calls `navigate()` gets no prefetch.
 - Match skeleton shapes to the final content.
 - Set `width` and `height` on every `<img>`. Add `loading="lazy"` below the fold. Store AVIF or WebP images in `public/`.
-- Set `font-display: swap` on custom fonts and declare them with `@font-face` in `lib/theme.css`, with the file in `public/` and a root path (`url('/fonts/x.woff2')`). The build serves the font from a hashed, immutable `/assets/` URL and preloads the fonts each page uses (`css.md`). Do not write `<link rel="preload" as="font">` in `_layout.html`.
+- Set `font-display: swap` on custom fonts and declare them with `@font-face` in `lib/theme.css`, with the file in `public/` and a root path (`url('/fonts/x.woff2')`). The build serves the font from a hashed, immutable `/assets/` URL and preloads the fonts the first paint of each page uses (`css.md`). Do not write `<link rel="preload" as="font">` in `_layout.html`.
 - Give `<for>` a stable `key`.
 - Drive per-frame animations (scroll, drag, progress) with `frame` from `'pragma'`: read layout first, then assign state (`state.md`, "Per-frame updates").
 - Use per-frame `:--name` values only in `transform` and `opacity`, never in `top`/`left`/`width`/`height`/`margin`/`padding`/`inset` (`css.md`, "Values that change every frame").

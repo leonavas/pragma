@@ -72,6 +72,10 @@ Opening animates with `.dialog[open]` (or `@starting-style`). Closing is CSS too
 
 Use `forwards` on exit animations, so the dialog does not flash back before it closes.
 
+## Content renders on first open
+
+A closed overlay costs no DOM work: its content (blocks, components, bindings) renders the first time it opens and stays rendered after that, so state inside it survives a close. Components inside it run `mount` on that first open, not with the page. Put a heavy summary or a long list in a modal without an `<if>` around it.
+
 ## Rules
 
 - Back closes the top overlay, not the page. Overlays stack.

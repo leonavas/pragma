@@ -1165,7 +1165,8 @@ Without `ssr`, `pragma build` still runs each page and component script once, wi
 | `shared`, `call`, `stream`, `navigate`, `open`, `close`, `confirm` | Script left to the browser |
 | `Date`, `Math.random()`, `toLocaleString()`, `localeCompare()` | Script left to the browser (the value changes per visit and per locale) |
 | Top-level `window`, `document`, `localStorage` | Script left to the browser |
-| Imports of npm packages or `.pragma/` | Script left to the browser |
+| Imports of npm packages | Run at build (the client bundle of the package); a package that throws (DOM, `window`) leaves the script to the browser |
+| Imports of `.pragma/` | Script left to the browser |
 | `mount(el)`, events | Browser only |
 
 A script left to the browser fills its `$x` bindings at boot; the rest of the page stays prebuilt. To get a value into the first paint, keep it in a top-level `let` or a prop, not in a value the build cannot know.
@@ -1180,7 +1181,8 @@ With `ssr = true`, page and component scripts run once per request on the server
 | `data`, `params`, `query`, `page` | Read-only |
 | `shared`, `call`, `stream`, `navigate`, `open`, `close`, `confirm` | Throws; script deferred to browser |
 | Top-level `window`, `document`, `localStorage` | Throws; script deferred to browser |
-| Imports of npm packages or `.pragma/` | Skipped; script deferred to browser |
+| Imports of npm packages | Run on the server; a package that throws on import or while the script runs defers the script to browser |
+| Imports of `.pragma/` | Skipped; script deferred to browser |
 | Prop passed from a store | Deferred to browser |
 | `mount(el)`, events | Browser only |
 
@@ -1274,6 +1276,10 @@ Opening animates with `.dialog[open]` (or `@starting-style`). Closing is CSS too
 ```
 
 Use `forwards` on exit animations, so the dialog does not flash back before it closes.
+
+## Content renders on first open
+
+A closed overlay costs no DOM work: its content (blocks, components, bindings) renders the first time it opens and stays rendered after that, so state inside it survives a close. Components inside it run `mount` on that first open, not with the page. Put a heavy summary or a long list in a modal without an `<if>` around it.
 
 ## Rules
 
@@ -1407,7 +1413,7 @@ Each page gets only the CSS its markup can use:
 
 Markup that pragma does not render (HTML from an npm widget) gets no theme rule for its classes. Style it in the component that hosts it with `:global(…)`.
 
-Fonts: the build adds `<link rel="preload" as="font" crossorigin>` for each `@font-face` family that the page's CSS uses (directly or through `var(--font-…)`): the `.woff2` face that covers Latin letters for each style and weight the page uses. The style and weight come from the rule that names the family (`font: italic 700 1rem var(--font-serif)`). A matching rule without a family (`font-style: italic`) and the tags the browser styles (`em`, `i`, `cite`: italic; `strong`, `b`, `h1`–`h6`, `th`: 700) apply to every family the page uses. Without them, the upright 400 face. At most six files per page. Remove manual font preloads from `_layout.html`: they load fonts on pages that do not use them.
+Fonts: the build adds `<link rel="preload" as="font" crossorigin>` for each `@font-face` family that the first paint uses (directly or through `var(--font-…)`): the `.woff2` face that covers Latin letters for each style and weight it uses. The first paint is the page's prebuilt HTML, layout included. Content that renders after boot (an `<if>` or `<for>` body that the prebuilt HTML does not show, data from `load` without `ssr`) and the content of a closed modal, alert or dropdown do not count: their fonts load when they appear. The style and weight come from the rule that names the family (`font: italic 700 1rem var(--font-serif)`). A matching rule without a family (`font-style: italic`) and the tags the browser styles (`em`, `i`, `cite`: italic; `strong`, `b`, `h1`–`h6`, `th`: 700) apply to every family the first paint uses. Without them, the upright 400 face. At most six files per page. Remove manual font preloads from `_layout.html`: they load fonts on pages that do not use them.
 
 Files in CSS `url()`: put fonts and CSS images in `public/` and write the path from the site root (`url('/fonts/inter.woff2')`). `pragma build` copies each `public/` file that any CSS names to `/assets/<folder>/<name>-<hash>.<ext>` (`/assets/fonts/inter-1a2b3c4d.woff2`) and writes that URL in the CSS and in the font preload. The browser caches it as `immutable`, so a returning visit uses the font with no request and the text does not change font after the first paint. The file also stays at its `public/` URL. `pragma dev` keeps the `public/` URL.
 
@@ -1522,6 +1528,7 @@ A chat, log, or feed that opens at its last item: make the scroll container a re
 ```
 
 - Keep the items in reading order inside the one child: only the container is reversed.
+- A long list in a reverse column renders its last items first (`performance.md`, "Long lists").
 
 ---
 
@@ -1844,7 +1851,7 @@ Source: https://pragma.leonavas.com/docs/performance.md
 
 # Performance
 
-Pragma optimizes builds by default: prebuilt HTML with the scripts' initial state rendered (`data.md`, "Prebuilt HTML"), `load` fetch started in `<head>`, per-route CSS with only the theme rules the page can match (inlined in production when <= 14 kB gzip, so small pages have no render-blocking stylesheet), per-page font preload, per-route JS chunks, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets (JS, CSS, and the `public/` files that CSS names with `url()`, such as fonts), and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
+Pragma optimizes builds by default: prebuilt HTML with the scripts' initial state rendered (`data.md`, "Prebuilt HTML"), `load` fetch started in `<head>`, per-route CSS with only the theme rules the page can match (inlined in production when <= 14 kB gzip, so small pages have no render-blocking stylesheet), font preload for the faces the prebuilt HTML shows, per-route JS chunks, link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets (JS, CSS, and the `public/` files that CSS names with `url()`, such as fonts), and unused CSS stripped. `pragma build` prints the JS gzip size of each page; it does not enforce limits.
 
 ## JS chunks
 
@@ -1895,6 +1902,14 @@ export function exportXlsx(rows, name) {
 - The page JS size that `pragma build` prints does not count lazy chunks.
 - Show a pending state if the first load can be slow (`let exporting = true` before the `await`).
 
+## Long lists
+
+A render that runs past 30 ms leaves the rest of each outer `<for>` (not one inside another `<for>` item) for the next task, so the browser can paint and answer input in between. Each task creates at least one more item, until the list is complete. You add nothing to the markup.
+
+- Items render in list order, except inside a reverse-column scroller ("Scroll that starts at the end" in `css.md`): there the last items render first, so a chat shows its newest messages first.
+- `mount` of a component in an item runs after the task that created it. Do not assume the whole list is on the page in `mount`; read it again on `ResizeObserver` or when you need it.
+- Items that a later task adds do not get `data-entering`.
+
 ## Page transitions
 
 The router swaps pages inside a View Transition. Only `<main data-page>` fades in (150 ms, from opacity 0.5); the layout around it (header, sidebar) changes at once and does not blink. To animate another element across pages, give it its own `view-transition-name`. With `prefers-reduced-motion`, there is no transition.
@@ -1904,7 +1919,7 @@ The router swaps pages inside a View Transition. Only `<main data-page>` fades i
 - Navigate with `<a href>`. A `<button>` that calls `navigate()` gets no prefetch.
 - Match skeleton shapes to the final content.
 - Set `width` and `height` on every `<img>`. Add `loading="lazy"` below the fold. Store AVIF or WebP images in `public/`.
-- Set `font-display: swap` on custom fonts and declare them with `@font-face` in `lib/theme.css`, with the file in `public/` and a root path (`url('/fonts/x.woff2')`). The build serves the font from a hashed, immutable `/assets/` URL and preloads the fonts each page uses (`css.md`). Do not write `<link rel="preload" as="font">` in `_layout.html`.
+- Set `font-display: swap` on custom fonts and declare them with `@font-face` in `lib/theme.css`, with the file in `public/` and a root path (`url('/fonts/x.woff2')`). The build serves the font from a hashed, immutable `/assets/` URL and preloads the fonts the first paint of each page uses (`css.md`). Do not write `<link rel="preload" as="font">` in `_layout.html`.
 - Give `<for>` a stable `key`.
 - Drive per-frame animations (scroll, drag, progress) with `frame` from `'pragma'`: read layout first, then assign state (`state.md`, "Per-frame updates").
 - Use per-frame `:--name` values only in `transform` and `opacity`, never in `top`/`left`/`width`/`height`/`margin`/`padding`/`inset` (`css.md`, "Values that change every frame").

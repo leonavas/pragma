@@ -244,7 +244,8 @@ Without `ssr`, `pragma build` still runs each page and component script once, wi
 | `shared`, `call`, `stream`, `navigate`, `open`, `close`, `confirm` | Script left to the browser |
 | `Date`, `Math.random()`, `toLocaleString()`, `localeCompare()` | Script left to the browser (the value changes per visit and per locale) |
 | Top-level `window`, `document`, `localStorage` | Script left to the browser |
-| Imports of npm packages or `.pragma/` | Script left to the browser |
+| Imports of npm packages | Run at build (the client bundle of the package); a package that throws (DOM, `window`) leaves the script to the browser |
+| Imports of `.pragma/` | Script left to the browser |
 | `mount(el)`, events | Browser only |
 
 A script left to the browser fills its `$x` bindings at boot; the rest of the page stays prebuilt. To get a value into the first paint, keep it in a top-level `let` or a prop, not in a value the build cannot know.
@@ -259,7 +260,8 @@ With `ssr = true`, page and component scripts run once per request on the server
 | `data`, `params`, `query`, `page` | Read-only |
 | `shared`, `call`, `stream`, `navigate`, `open`, `close`, `confirm` | Throws; script deferred to browser |
 | Top-level `window`, `document`, `localStorage` | Throws; script deferred to browser |
-| Imports of npm packages or `.pragma/` | Skipped; script deferred to browser |
+| Imports of npm packages | Run on the server; a package that throws on import or while the script runs defers the script to browser |
+| Imports of `.pragma/` | Skipped; script deferred to browser |
 | Prop passed from a store | Deferred to browser |
 | `mount(el)`, events | Browser only |
 

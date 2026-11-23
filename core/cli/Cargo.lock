@@ -2071,7 +2071,7 @@ dependencies = [
 
 [[package]]
 name = "pragma-cli"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "brotli",
  "bytes",
@@ -2091,7 +2091,7 @@ dependencies = [
 
 [[package]]
 name = "pragma-compiler"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "anyhow",
  "brotli",
@@ -2111,18 +2111,18 @@ dependencies = [
 
 [[package]]
 name = "pragma-css"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "lightningcss",
 ]
 
 [[package]]
 name = "pragma-diag"
-version = "0.2.6"
+version = "0.2.7"
 
 [[package]]
 name = "pragma-jslint"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "nodejs-built-in-modules",
  "oxc_allocator",
@@ -3610,7 +3610,7 @@ checksum = "3ad82d2a33cdc9674dc7465672f271e096168fcdbe0f799d9e6db8c5892679dc"
 
 [[package]]
 name = "xtask"
-version = "0.2.6"
+version = "0.2.7"
 
 [[package]]
 name = "xxhash-rust"
