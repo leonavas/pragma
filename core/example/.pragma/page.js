@@ -2,10 +2,9 @@ import { render, patch, hooks, scopeOf, input, eventCall, useBodies, DEV, PAGE }
 import { log } from './log.js'
 import { reactive, readers, onChange, persist, persistStores } from './state.js'
 import { fetchData, fetchLayout, load, loadResult, call, stream } from './loader.js'
-import { navigate, redirect } from './router.js'
 import { DATA_ID, MAIN, PERSIST_SUFFIX, matchPattern, coerce, instantiate, isPlain, readonlyViews } from './contract.js'
 
-// The build sets `overlays` in the route and modulepreloads overlay.js only on pages with a dialog or popover.
+// The build sets `overlays` in the route on pages with a dialog or popover; enter() then loads overlay.js (not modulepreloaded).
 let overlayModule = null, overlayLoad = null
 const overlays = () => (overlayLoad ??= import('./overlay.js').then(m => (m.initOverlays(), (overlayModule = m))))
 const open = (...a) => overlays().then(m => m.open(...a))
@@ -13,6 +12,12 @@ const close = (...a) => overlays().then(m => m.close(...a))
 const confirm = (...a) => overlays().then(m => m.confirm(...a))
 export const closeOverlays = () => overlayModule?.closeAll() ?? 0
 export const popOverlay = () => overlayModule?.handlePopState() ?? false
+
+// The router is not needed for first paint: boot.js loads it right after the page mounts.
+let routerLoad = null
+export const router = () => (routerLoad ??= import('./router.js'))
+const navigate = (to, options) => router().then(r => r.navigate(to, options))
+const redirect = (to, replace) => router().then(r => r.redirect(to, replace))
 
 const C = Symbol(), O = Symbol(), mounted = new Set(), comps = {}, types = new Set()
 const shared = {}
@@ -209,7 +214,12 @@ export function enter(route, mods, url, doc, pending) {
   useBodies(mods.bodies, !cur)
   Object.assign(comps, mods.comps)
   for (const [name, mod] of Object.entries(mods.stores)) shared[name] ??= store(name, mod)
-  if (route.overlays) overlays()
+  if (route.overlays && !overlayLoad) {
+    // overlay.js is not modulepreloaded: a click on an @open button before it arrives runs again once it is in.
+    const early = ev => !overlayModule && ev.target.closest?.('[data-open]') && overlays().then(() => ev.target.click())
+    document.addEventListener('click', early)
+    overlays().then(() => document.removeEventListener('click', early))
+  }
   const p = (cur = { route, url, params: matchPattern(route.pattern, url.pathname) ?? {}, query: Object.fromEntries(url.searchParams), page: { loading: false, error: null } })
   const done = loadData(p, doc, pending)
   p.o = instance(document.querySelector(MAIN), mods.page ?? {}, null)
