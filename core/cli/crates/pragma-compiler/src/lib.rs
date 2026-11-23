@@ -965,10 +965,9 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
             Some(ch) => {
                 let entry = ch.routes[i].as_deref();
                 let mut starts = vec![ch.boot.as_str()];
+                // overlay.js and router.js are not needed for first paint: page.js and boot.js
+                // `import()` them right after the page mounts, so they are not modulepreloaded.
                 starts.extend(entry);
-                if o.overlays && let Some(u) = ch.of_module.get(&overlay) {
-                    starts.push(u);
-                }
                 let mut list: Vec<String> = Vec::new();
                 for u in ch.closure(&starts) {
                     match npm_paths.get(u.as_str()) {

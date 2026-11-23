@@ -421,8 +421,9 @@ Always HTML + JS. Primitive in `core/overlay.js`; components in `lib/components/
   had a scrollbar, the value is `gutter` and CSS reserves its space (`scrollbar-gutter: stable`);
   without one, nothing is reserved. No layout shift either way.
   Several open = stack; unlocks when the stack empties.
-- `core/overlay.js` is imported only on pages with `<dialog>` or `[popover]` (the build
-  modulepreloads it only there).
+- `core/overlay.js` is imported only on pages with `<dialog>` or `[popover]`, right after the page
+  mounts (not modulepreloaded: it is not needed for first paint). A click on an `@open` button
+  before it arrives runs again once it is loaded.
 - Focus returns to the opener.
 
 Usage:
@@ -508,7 +509,7 @@ dist/
   per exact set of routes (a set under 4 kB joins the closest wider set); `import()` stays a
   separate chunk and npm packages stay external. Route JSON URLs point to named re-exports
   (`<chunk>.js#p`, `#c<i>`, `#s<i>`). Each page gets `<link rel="modulepreload">` only for the
-  chunks first paint uses (never `import()`), plus `core/overlay.js` if the page has an overlay
+  chunks first paint uses (never `import()`, so not `core/router.js` or `core/overlay.js`)
   and its template module when it has blocks (§3 "Rendered block DOM").
   The manifest uses the same list. `pragma dev` keeps one module per file.
 - Client npm packages: prebundled with `rolldown` (tree-shaking, only names the app imports),
@@ -669,9 +670,12 @@ Speculation Rules, i18n.
 - `core/` modules (boot, router, …) are also hashed; imports between them rewritten.
 
 ### JS interfaces between runtime files
-- `core/boot.js`: entry. Reads `#pragma-route`, starts log and router, mounts the page, and gives
-  the router the page functions (`startRouter({ importRoute, enter, leave, closeOverlays,
-  popOverlay })`).
+- `core/boot.js`: entry. Reads `#pragma-route`, starts log, mounts the page, then loads the router
+  with `import()` (it is not needed for first paint, so it is not modulepreloaded) and gives it the
+  page functions (`startRouter({ importRoute, enter, leave, closeOverlays, popOverlay })`). Until
+  then a link click is a normal full page load.
+- `core/page.js` exports `router()` (the one `import('./router.js')`); `navigate` and `redirect`
+  in `$pragma` wait for it.
 - `core/page.js` imports `core/overlay.js` on demand (`overlays()`) and exports
   `closeOverlays()` and `popOverlay()` for the router.
 - `core/overlay.js` (owner: overlays): `initOverlays()`, `open(id)`, `close(id)`,

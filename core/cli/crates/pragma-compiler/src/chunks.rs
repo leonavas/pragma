@@ -199,6 +199,8 @@ pub fn bundle(
         preserve_entry_signatures: Some(PreserveEntrySignatures::AllowExtension),
         code_splitting: Some(CodeSplittingMode::Advanced(ManualCodeSplittingOptions { groups: Some(vec![groups]), ..ManualCodeSplittingOptions::default() })),
         minify: Some(RawMinifyOptions::Bool(true)),
+        // Only `pragma dev` sets this flag, so a production bundle drops the dev-only checks.
+        define: Some(["self.__pragmaDev", "globalThis.__pragmaDev"].map(|k| (k.to_string(), "false".to_string())).into_iter().collect()),
         legal_comments: Some(LegalComments::None),
         log_level: Some(LogLevel::Silent),
         ..BundlerOptions::default()

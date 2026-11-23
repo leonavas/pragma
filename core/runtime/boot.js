@@ -1,6 +1,5 @@
 import { initClientLog } from './log.js'
-import { startRouter } from './router.js'
-import { importRoute, enter, leave, closeOverlays, popOverlay, loadLayout } from './page.js'
+import { importRoute, enter, leave, closeOverlays, popOverlay, loadLayout, router } from './page.js'
 import { fetchData, fetchLayout } from './loader.js'
 import { ROUTE_ID } from './contract.js'
 
@@ -14,5 +13,5 @@ self.__pl = null
 initClientLog(location.hostname)
 importRoute(route).then(mods => {
   enter(route, mods, url, document, pending)
-  startRouter({ importRoute, enter, leave, closeOverlays, popOverlay })
+  router().then(r => r.startRouter({ importRoute, enter, leave, closeOverlays, popOverlay }))
 })
