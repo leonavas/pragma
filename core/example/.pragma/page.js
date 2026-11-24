@@ -167,7 +167,7 @@ function instance(el, mod, w) {
 
 function store(name, mod) {
   const target = {}, scope = reactive(target)
-  const api = mod.default?.(scope, services) ?? {}
+  const api = create(target, () => mod.default?.(scope, services)) ?? {}
   for (const k in api) target[k] = api[k]
   persist(target, name, mod.persist)
   return scope
