@@ -1,6 +1,6 @@
 import { render, patch, resume, sliced, startSlice, spent, hooks, scopeOf, input, eventCall, useBodies, DEV, PAGE } from './directives.js'
 import { log } from './log.js'
-import { reactive, readers, onChange, persist, persistStores } from './state.js'
+import { reactive, readers, onChange, persist, persistStores, create } from './state.js'
 import { fetchData, fetchLayout, load, loadResult, call, stream } from './loader.js'
 import { DATA_ID, MAIN, PERSIST_SUFFIX, matchPattern, coerce, instantiate, isPlain, readonlyViews } from './contract.js'
 
@@ -156,10 +156,10 @@ async function* refreshAfter(lines) {
 function instance(el, mod, w) {
   const target = {}, o = { el, w, target }
   o.scope = reactive(target)
-  o.mount = instantiate(mod, target, o.scope, services, (k, d, name) => {
+  o.mount = create(target, () => instantiate(mod, target, o.scope, services, (k, d, name) => {
     const v = coerce(o.w && Object.hasOwn(o.w, k) ? o.w[k] : el.getAttribute('data-prop-' + k) ?? undefined, d)
     return DEV ? readonly(v, name) : v
-  })
+  }))
   mounted.add(o)
   mounts.push(o)
   return (el[C] = o)

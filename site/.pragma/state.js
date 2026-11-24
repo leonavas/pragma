@@ -25,6 +25,15 @@ function read(target, key) {
 }
 
 export const onChange = fn => { notify = fn }
+
+// While a script creates its own state (the top-level `let`s of a component or page), writes to that
+// state do not schedule a render: the render that created the instance reads them next.
+let creating = null
+export function create(target, fn) {
+  const outer = creating
+  creating = target
+  try { return fn() } finally { creating = outer }
+}
 const raw = v => raws.get(v) ?? v
 
 function wrappable(v) {
@@ -43,7 +52,7 @@ const handler = {
     const desc = Object.getOwnPropertyDescriptor(target, key)
     if (desc?.get && !desc.set) throw new TypeError(`pragma: "${String(key)}" is a prop and props are read-only`)
     target[key] = value
-    if (!had || old !== value || (Array.isArray(target) && key === 'length')) notify(target, key)
+    if (target !== creating && (!had || old !== value || (Array.isArray(target) && key === 'length'))) notify(target, key)
     return true
   },
   deleteProperty(target, key) {
