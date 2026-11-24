@@ -98,16 +98,76 @@ pub fn classes_doc(theme: &Theme) -> String {
     doc::render(&all_colors(theme))
 }
 
+/// Vendor-prefixed properties without a useful standard version, allowed by `css/vendor-prefix`.
+const PREFIX_ONLY: &[&str] = &[
+    "-webkit-line-clamp",
+    "-webkit-box-orient",
+    "-webkit-text-stroke",
+    "-webkit-text-stroke-width",
+    "-webkit-text-stroke-color",
+    "-webkit-tap-highlight-color",
+    "-webkit-font-smoothing",
+    "-moz-osx-font-smoothing",
+    "-webkit-text-fill-color",
+];
+
+/// Hand-written vendor-prefixed declarations (`-webkit-backdrop-filter: …`) that have a standard
+/// property: (byte offset, prefixed name, standard name). The build adds the prefixes the baseline
+/// needs, and a hand-written prefix next to the standard one can replace it when minified.
+pub fn vendor_prefixes(src: &str) -> Vec<(usize, String, String)> {
+    let bytes = src.as_bytes();
+    let mut out = Vec::new();
+    for (i, _) in src.match_indices('-') {
+        let rest = &src[i..];
+        let Some(prefix) = ["-webkit-", "-moz-", "-ms-", "-o-"].into_iter().find(|p| rest.starts_with(p)) else { continue };
+        let before = src[..i].trim_end();
+        if !(before.is_empty() || before.ends_with('{') || before.ends_with(';')) {
+            continue;
+        }
+        let len = rest.bytes().take_while(|b| b.is_ascii_alphanumeric() || *b == b'-').count();
+        let name = &rest[..len];
+        if !src[i + len..].trim_start().starts_with(':') || i > 0 && bytes[i - 1] == b'-' {
+            continue;
+        }
+        let lower = name.to_ascii_lowercase();
+        if PREFIX_ONLY.contains(&lower.as_str()) {
+            continue;
+        }
+        out.push((i, lower.clone(), lower[prefix.len()..].to_string()));
+    }
+    out
+}
+
+/// Fixed browser baseline: the build adds the vendor prefixes these browsers need (for example
+/// `-webkit-backdrop-filter` for Safari 16.4) and compiles nothing else down.
+fn targets() -> lightningcss::targets::Targets {
+    use lightningcss::targets::{Browsers, Features, Targets};
+    let v = |major: u32, minor: u32| Some((major << 16) | (minor << 8));
+    Targets {
+        browsers: Some(Browsers {
+            chrome: v(111, 0),
+            edge: v(111, 0),
+            firefox: v(128, 0),
+            safari: v(16, 4),
+            ios_saf: v(16, 4),
+            ..Browsers::default()
+        }),
+        include: Features::empty(),
+        exclude: Features::all().difference(Features::VendorPrefixes),
+    }
+}
+
 pub fn minify(css: &str) -> Result<String, String> {
     use lightningcss::stylesheet::{MinifyOptions, ParserOptions, PrinterOptions, StyleSheet};
     let mut sheet = StyleSheet::parse(css, ParserOptions::default())
         .map_err(|e| format!("invalid CSS: {e}"))?;
     sheet
-        .minify(MinifyOptions::default())
+        .minify(MinifyOptions { targets: targets(), ..MinifyOptions::default() })
         .map_err(|e| format!("falha ao minificar CSS: {e}"))?;
     let out = sheet
         .to_css(PrinterOptions {
             minify: true,
+            targets: targets(),
             ..PrinterOptions::default()
         })
         .map_err(|e| format!("falha ao gerar CSS: {e}"))?;

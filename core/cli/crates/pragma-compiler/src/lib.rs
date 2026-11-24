@@ -625,6 +625,16 @@ fn analyze<'p>(p: &'p Project, diags: &mut Vec<Diagnostic>) -> Analysis<'p> {
         for (line, col) in project::comment_positions(src, "/*") {
             diags.push(Diagnostic::error(path, line, col, "css/comment", "comments are not allowed; the code is the documentation"));
         }
+        for (offset, prefixed, standard) in pragma_css::vendor_prefixes(src) {
+            let (line, col) = html::line_col(src, offset);
+            diags.push(Diagnostic::error(
+                path,
+                line,
+                col,
+                "css/vendor-prefix",
+                format!("{prefixed} is written by hand: write `{standard}`; the build adds the prefixes the supported browsers need"),
+            ));
+        }
     };
     css_comment(Path::new("lib/theme.css"), &theme_src, diags);
     let theme = pragma_css::parse_theme(&theme_src);

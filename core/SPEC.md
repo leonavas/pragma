@@ -458,6 +458,8 @@ Usage:
   the build marks prebuilt HTML and the router keeps it on each navigation.
 - `document.startViewTransition` when available, except under `prefers-reduced-motion: reduce`
   (instant swap).
+- During a transition only, `<html>` has `data-view-transition` and `[data-page]` has
+  `view-transition-name: page` (a named element is a stacking context and a backdrop root).
 - Manifest: `/_pragma/manifest.json` → `[{ "pattern": "/shop/:id", "html": "/shop/[id].html", "modules": [...], "loader": true, "ssr": false }]`.
 
 ## 8. CSS
@@ -498,7 +500,9 @@ Usage:
   per route with the `lib/theme.css` rules whose selectors can match the route's markup (element
   names and classes; attribute, id and pseudo-class parts never drop a rule), the route's
   component and page CSS without rules for classes their own elements never have, and the route's
-  utilities. Both are inlined when their gzip sum is <= 14 kB.
+  utilities. Both are inlined when their gzip sum is <= 14 kB. lightningcss runs with a fixed
+  browser baseline (Chrome/Edge 111, Firefox 128, Safari/iOS 16.4) only to add the vendor prefixes
+  those browsers need (`-webkit-backdrop-filter`); nothing else is compiled down.
 - Fonts: per route, one `<link rel="preload" as="font" crossorigin>` per face the first paint
   uses: the route CSS rules that match the tags and classes of the prebuilt HTML (layout included;
   not the block bodies it leaves as anchors, not the children of `<dialog>` or `[popover]`), with
@@ -568,7 +572,9 @@ Errors with file:line:column, rule and message.
   expression argument (`html/invalid-path`); misplaced or
   wrongly bound head tags (`html/head`, §5.1); `<script>` with `src` or attributes, two
   `<script>`s, or one that is not at the top level of a page or component (`html/script`).
-- CSS: unknown class; arbitrary value.
+- CSS: unknown class; arbitrary value; a hand-written vendor-prefixed property that has a standard
+  one (`css/vendor-prefix`; `-webkit-line-clamp`, `-webkit-box-orient`, `-webkit-text-stroke*`,
+  `-webkit-tap-highlight-color`, `-webkit-text-fill-color` and the font-smoothing ones are allowed).
 - Head: warning `html/meta-description` (non-blocking; `--strict` makes it an error) on a page
   (not `_404.html`) whose merged `<head>` (page head tags and layout `<head>`) has no
   `<meta name="description">`.

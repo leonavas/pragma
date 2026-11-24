@@ -100,7 +100,7 @@ const BASE: &str = r#"@layer base {
   dialog::backdrop {
     background-color: rgb(0 0 0 / 0.5);
   }
-  [data-page] {
+  html[data-view-transition] [data-page] {
     view-transition-name: page;
   }
   ::view-transition-group(root),

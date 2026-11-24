@@ -291,6 +291,16 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 
 ## CSS
 
+- **[firm]** (2026-11-23) CSS vendor prefixes come from the build: lightningcss runs with a fixed
+  baseline (Chrome/Edge 111, Firefox 128, Safari/iOS 16.4) that only adds prefixes (every other
+  feature is excluded, so nothing is compiled down), and a hand-written prefixed property with a
+  standard version is `css/vendor-prefix` (prefix-only properties such as `-webkit-line-clamp`
+  are allowed). *Why:* v3chat wrote `backdrop-filter` followed by `-webkit-backdrop-filter`; the
+  minifier merged them and kept only the prefixed one, so the blur vanished in Chrome and Firefox
+  only in production. lightningcss 1.0.0-alpha.72 does this even with targets (its fallback
+  handler replaces the standard declaration with a later prefixed one), so the check rule is what
+  closes it. Council: 3×0 it is a bug; targets and the rule 2×1. Rejected: a general warning with
+  no targets, patching the merge in lightningcss (astra's preference).
 - **[firm]** Reuse CSS as much as possible.
 - **[firm]** Tailwind v4 subset reimplemented in Rust (`pragma-css` crate), generating only used
   classes, no arbitrary values. Goal: fewer classes; custom classes allowed for refined cases
@@ -521,6 +531,12 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   by the render that created it. *Why:* each new component's `let copied = false` scheduled a full render
   (nobody had read the key yet), the full render dropped the pending slices and started over, so
   every slice cost a whole page render: v3chat TBT 350 → 830 ms with list slicing on.
+- **[firm]** (2026-11-23, council 3×0, form by 2×1) `[data-page]` gets `view-transition-name:
+  page` only while a transition runs (`html[data-view-transition]`, set before
+  `startViewTransition` and removed when the newest transition finishes). *Why:* a named element is
+  always a stacking context and a backdrop root; v3chat's frosted topbar and composer stopped
+  blurring the scroller behind them. Rejected: `:active-view-transition` (astra; newer than the
+  browsers pragma targets).
 - **[firm]** (2026-11-23) A closed `<dialog>` or `[popover]` binds only its own attributes; its
   content renders on the first open (the overlay manager renders the page right before
   `showModal`/`showPopover`) and stays rendered after that. Components inside are created, and

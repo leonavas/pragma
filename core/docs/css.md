@@ -30,6 +30,8 @@ Write plain selectors (`button`, `.row:hover`, `li::marker`). Use `:global(…)`
 
 An outside ancestor alone needs no `:global`: `html[data-theme="dark"] .row` compiles identically.
 
+Do not write vendor prefixes (`-webkit-backdrop-filter`): write the standard property and the build adds the prefixes the supported browsers need (`css/vendor-prefix`).
+
 ## Cascade order
 
 `@layer reset, tokens, base, components, utilities`, then component and page styles outside any layer:
