@@ -42,7 +42,7 @@ function text(u) {
   return p
 }
 
-const own = el => (el.localName === 'meta' && el.name !== 'viewport' && !el.hasAttribute('charset')) || (el.localName === 'link' && el.rel !== 'stylesheet' && el.rel !== 'modulepreload')
+const own = el => (el.localName === 'meta' && el.name !== 'viewport' && !el.hasAttribute('charset')) || (el.localName === 'link' && el.rel !== 'stylesheet' && el.rel !== 'modulepreload' && !el.hasAttribute(ROUTE_CSS))
 
 function syncHead(doc) {
   document.title = doc.title
@@ -54,27 +54,37 @@ function syncHead(doc) {
   for (const el of next) h.insertBefore(document.importNode(el, true), at)
 }
 
-function loadRouteCss(href) {
-  const h = document.head, target = new URL(href, location.href).href
-  const existing = [...h.querySelectorAll(`link[${ROUTE_CSS}]`)].find(el => el.href === target)
-  if (existing) return { el: existing, created: false, ready: Promise.resolve() }
-  const el = document.createElement('link')
-  el.rel = 'stylesheet'
-  el.href = href
-  el.setAttribute(ROUTE_CSS, '')
-  const ready = new Promise(resolve => { el.onload = el.onerror = resolve })
-  const sheets = h.querySelectorAll('link[rel=stylesheet]')
-  sheets.length ? sheets[sheets.length - 1].after(el) : h.append(el)
-  return { el, created: true, ready }
-}
-
-function syncRouteCss(keep, nextStyle) {
-  const h = document.head
-  for (const el of h.querySelectorAll(`[${ROUTE_CSS}]`)) if (el !== keep) el.remove()
-  if (nextStyle) {
-    const style = document.importNode(nextStyle, true)
-    const anchor = h.querySelector(`[${SHARED_CSS}], link[rel=stylesheet]`)
-    anchor ? anchor.after(style) : h.append(style)
+// Stage the destination in source order. Its paint styles must be ready at the swap;
+// the preloaded block sheet can finish later, under the destination kernel's clone gate.
+function stageRouteCss(doc) {
+  const head = document.head, staged = [], blocking = []
+  let after = [...head.querySelectorAll(`link[rel=stylesheet], [${SHARED_CSS}], [${ROUTE_CSS}]`)].at(-1)
+  for (const source of doc.head.querySelectorAll(`[${ROUTE_CSS}]`)) {
+    const el = document.importNode(source, true)
+    el.setAttribute('data-pragma-pending', '')
+    el.media = 'not all'
+    if (el.localName === 'link') {
+      el.rel = 'stylesheet'
+      if (el.hasAttribute('data-pragma-blocks')) {
+        el.onload = el.onerror = e => { el.dataset.pragmaCssStatus = e.type }
+      } else {
+        blocking.push(new Promise(resolve => { el.onload = el.onerror = resolve }))
+      }
+    }
+    after ? after.after(el) : head.append(el)
+    after = el
+    staged.push(el)
+  }
+  return {
+    ready: Promise.all(blocking),
+    discard() { for (const el of staged) el.remove() },
+    activate() {
+      for (const el of head.querySelectorAll(`[${ROUTE_CSS}]:not([data-pragma-pending])`)) el.remove()
+      for (const el of staged) {
+        el.removeAttribute('data-pragma-pending')
+        el.media = 'all'
+      }
+    },
   }
 }
 
@@ -183,12 +193,11 @@ async function go(to, pop, replace) {
       const R = import(e.entry)
       R.catch(noop)
       doc = new DOMParser().parseFromString(await (e.ssr ? html(url, true) : text(pageUrl(e.html))), 'text/html')
-      const nextCss = doc.head.querySelector(`link[rel=stylesheet][${ROUTE_CSS}]`)?.getAttribute('href')
-      if (nextCss) css = loadRouteCss(nextCss)
+      css = stageRouteCss(doc)
       // Additive: the entry installs what this route needs into the live runtime (again: a no-op).
       route = (await R).default
       page.install(route.use)
-      if (css) await css.ready
+      await css.ready
     } else e = null
   } catch (err) {
     if (err.moved) moved = err.moved
@@ -196,7 +205,7 @@ async function go(to, pop, replace) {
     e = null
   }
   if (n !== seq || !e) {
-    if (css?.created) css.el.remove()
+    css?.discard()
     if (n !== seq) return
     if (moved) return redirect(moved, pop || replace)
     return pop ? location.reload() : location[replace ? 'replace' : 'assign'](url)
@@ -209,12 +218,16 @@ async function go(to, pop, replace) {
   here = where(url)
 
   const swap = () => {
+    if (n !== seq) {
+      css?.discard()
+      return
+    }
     page.leave()
     const main = document.querySelector(MAIN), next = doc.querySelector(MAIN)
     main.replaceChildren(...next.childNodes)
     main.dataset.page = next.dataset.page
     syncHead(doc)
-    syncRouteCss(css?.el ?? null, doc.head.querySelector(`style[${ROUTE_CSS}]`))
+    css.activate()
     const done = page.enter(route, url, doc, pending)
     const y = pop ? positions.get(key) ?? 0 : 0
     if (!pop && url.hash) document.getElementById(decodeURIComponent(url.hash.slice(1)))?.scrollIntoView()

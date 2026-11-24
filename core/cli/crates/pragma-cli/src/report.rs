@@ -99,7 +99,14 @@ pub fn print_summary(report: &BuildReport) {
     // JS: first load (route entry + its modulepreload list); a static route loads none
     println!("{:width$}  {:>8}  {:>8}  {:>8}  {:>8}", "page", "JS raw", "JS gzip", "JS br", "CSS gzip");
     for page in &report.pages {
-        let blocking = if page.css_gzip_bytes > INLINE_CSS_MAX { "  > 14 KB: render-blocking stylesheet" } else { "" };
+        let blocking = if page.critical_css_gzip_bytes != page.css_gzip_bytes {
+            let delivery = if page.critical_css_gzip_bytes > INLINE_CSS_MAX { "render-blocking stylesheet" } else { "inline" };
+            format!("  first paint: {} gzip, {delivery}", kb(page.critical_css_gzip_bytes))
+        } else if page.critical_css_gzip_bytes > INLINE_CSS_MAX {
+            "  > 14 KB: render-blocking stylesheet".to_string()
+        } else {
+            String::new()
+        };
         println!(
             "{:width$}  {:>8}  {:>8}  {:>8}  {:>8}{blocking}",
             page.pattern,

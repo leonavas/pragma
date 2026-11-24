@@ -448,6 +448,7 @@ pub struct Entry {
     /// (import clause, module), in the order of §3.1.
     pub imports: Vec<(String, PathBuf)>,
     pub body: String,
+    pub paint_css: Option<PathBuf>,
 }
 
 pub struct EntryInput<'a> {
@@ -513,12 +514,12 @@ impl Entry {
             r.push_str(&format!("  d: {},\n", strings(&i.d)));
         }
         r.push_str(&format!("  b: {},\n", object(i.b.iter().map(|(id, d)| (id.clone(), d.to_string())))));
-        r.push_str("}\nexport default R\nstart(R)\n");
-        Entry { imports, body: r }
+        r.push_str("}\nexport default R\n");
+        Entry { imports, body: r, paint_css: None }
     }
 
     pub fn paths(&self) -> Vec<PathBuf> {
-        self.imports.iter().map(|(_, m)| m.clone()).collect()
+        self.imports.iter().map(|(_, m)| m).chain(&self.paint_css).cloned().collect()
     }
 
     pub fn source(&self, spec: impl Fn(&Path) -> String) -> String {
@@ -526,8 +527,12 @@ impl Entry {
         for (clause, m) in &self.imports {
             out.push_str(&format!("import {clause} from {}\n", Value::String(spec(m))));
         }
+        if let Some(file) = &self.paint_css {
+            out.push_str(&format!("import applyBlockCss from {}\n", Value::String(spec(file))));
+        }
         out.push('\n');
         out.push_str(&self.body);
+        out.push_str(if self.paint_css.is_some() { "start(R, applyBlockCss)\n" } else { "start(R)\n" });
         out
     }
 }

@@ -16,6 +16,11 @@ export const ctx = { deep: 0, focus: null, end: Infinity }
 export const K = { overlay: null }
 export const B = {}
 
+export function waitsForCss(id) {
+  if (K.cssBlocks?.has(id)) return (K.cssMiss = true)
+  return false
+}
+
 export const fail = m => { throw new Error('pragma: ' + m) }
 const missing = (what, file) => (DEV ? fail(`${what} needs ${file}.js (build bug)`) : undefined)
 const skip = (what, file) => (t, d, s, last, id) => (missing(what, file), [t, false, id])

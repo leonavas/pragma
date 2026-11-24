@@ -507,7 +507,11 @@ Usage:
   per route with the `lib/theme.css` rules whose selectors can match the route's markup (element
   names and classes; attribute, id and pseudo-class parts never drop a rule), the route's
   component and page CSS without rules for classes their own elements never have, and the route's
-  utilities. Both are inlined when their gzip sum is <= 14 kB. lightningcss runs with a fixed
+  utilities. Both are inlined when their gzip sum is <= 14 kB. Larger reactive prebuilt pages can
+  deliver their first-paint CSS under the same inline budget (external above it) and preload one additional sheet for blocks
+  whose component scopes are absent from the document. The entry waits for that sheet only when
+  creating those bodies. The wait is bounded to 1.5 s per mount. SPA navigation stages the destination
+  block stylesheet and activates it in cascade order. SSR uses the complete route CSS. lightningcss runs with a fixed
   browser baseline (Chrome/Edge 111, Firefox 128, Safari/iOS 16.4) only to add the vendor prefixes
   those browsers need (`-webkit-backdrop-filter`); nothing else is compiled down.
 - Fonts: per route, one `<link rel="preload" as="font" crossorigin>` per face the first paint
@@ -546,7 +550,7 @@ dist/
 - `index.html` is not cached; hashed assets are `immutable`.
 - The build prints, per page, the first-load JS (entry + its modulepreload list) as raw, gzip and
   brotli (`JS raw`, `JS gzip`, `JS br`; `0` for a static route) and the CSS gzip size (`CSS gzip`:
-  shared + route, the number that decides inline at <= 14 kB), and marks a page whose CSS is over 14 kB as a render-blocking
+  shared + complete route). For split CSS, it also gives the first-paint gzip size. It marks a page whose first-paint CSS is over 14 kB as a render-blocking
   stylesheet. Information only: no size limits, no size errors or warnings.
 - Server WebAssembly: a `.wasm` imported by the server graph (project file, or a package export
   that resolves to `.wasm`, its specifier rewritten to the copy) is copied to `dist/server/`

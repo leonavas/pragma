@@ -1,4 +1,4 @@
-import { H, K, L, RD, PART, DEV, ctx, outer, fail, visit, clone, of, sib, scopes } from './dom.js'
+import { H, K, L, RD, PART, DEV, ctx, outer, fail, visit, clone, of, sib, scopes, waitsForCss } from './dom.js'
 
 // Keyed <for>. Large lists render in slices: once a flush has run its budget (ctx.end), an outer
 // <for> (not one inside another <for> item) creates at least one more item and leaves the rest
@@ -43,7 +43,8 @@ function items(t, d, s, top, id) {
     return n
   }
   const late = () => top && made > 0 && now() > ctx.end
-  const end = top && old.size < keys.length && (t[END] ??= scroller(t.parentNode))
+  const waiting = K.cssBlocks && waitsForCss(d.s)
+  const end = top && old.size < keys.length && !waiting && (t[END] ??= scroller(t.parentNode))
   if (end) {
     for (let i = keys.length - 1; i >= 0; i--) {
       if (old.has(keys[i])) continue
@@ -59,6 +60,7 @@ function items(t, d, s, top, id) {
   for (let i = 0; i < keys.length; i++) {
     let n = old.get(keys[i])
     if (!n) {
+      if (waiting) continue
       if (rest || late()) { rest = true; skipped.push(i); continue }
       n = create(i)
       ref.after(n)

@@ -48,8 +48,10 @@ pub struct PageReport {
     pub js_raw_bytes: u64,
     pub js_gzip_bytes: u64,
     pub js_brotli_bytes: u64,
-    /// Shared + route CSS, gzip: the number that decides inline (<= 14 kB) or a render-blocking stylesheet.
+    /// The canonical shared and route stylesheets, gzip.
     pub css_gzip_bytes: u64,
+    /// Styles needed for first paint, gzip.
+    pub critical_css_gzip_bytes: u64,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -833,6 +835,63 @@ struct RouteCss {
     font_css: String,
 }
 
+const INLINE_CSS_BUDGET: u64 = 14 * 1024;
+
+struct PaintCss<'a> {
+    before: &'a str,
+    during: String,
+    after: &'a str,
+    late: &'a str,
+    blocks: Vec<String>,
+    gzip: u64,
+}
+
+/// Preload one range, from the first delayed rule through the last. Rules between them that
+/// are needed at paint get a temporary copy in the critical CSS. Replacing that copy with the
+/// original range preserves the cascade without one network request per alternating owner.
+fn split_paint_css<'a>(rc: &'a RouteCss, o: &PageOut<'_>, nodes: &[html::Node]) -> Option<PaintCss<'a>> {
+    let src = rc.src.as_deref()?;
+    if src.contains("@namespace") || !can_inline_sheet(src) {
+        return None;
+    }
+    let mut absent: HashSet<String> = o.exp.components.values().map(|c| css_owner("component", &c.id)).collect();
+    owners::visit_scopes(nodes, &mut |s| { absent.remove(s); });
+    let ranges = pragma_css::prune::paint_ranges(src, &absent);
+    let first = ranges.iter().position(|r| r.0)?;
+    let last = ranges.iter().rposition(|r| r.0)?;
+    absent.retain(|scope| ranges.iter().any(|(late, css)| *late && css.contains(scope.as_str())));
+    let blocks = owners::blocks_using(&o.bodies, &absent);
+    if blocks.is_empty() {
+        return None;
+    }
+    let from = ranges[..first].iter().map(|r| r.1.len()).sum::<usize>();
+    let end = src.len() - ranges[last + 1..].iter().map(|r| r.1.len()).sum::<usize>();
+    let before = &src[..from];
+    let after = &src[end..];
+    let during: String = ranges[first..=last].iter().filter_map(|(late, s)| (!late).then_some(*s)).collect();
+    let gzip = [before, during.as_str(), after].into_iter().filter(|s| !s.is_empty()).map(|s| gzip_len(s.as_bytes())).sum();
+    (gzip < rc.gz).then_some(PaintCss { before, during, after, late: &src[from..end], blocks, gzip })
+}
+
+// Keep relative asset and import URLs relative to the original external stylesheet.
+fn can_inline_sheet(css: &str) -> bool {
+    if css.contains("@import") {
+        return false;
+    }
+    let mut absolute = true;
+    pragma_css::urls::map(css, |url| {
+        absolute &= ["/", "data:", "https://", "http://"].iter().any(|prefix| url.starts_with(*prefix));
+        None
+    });
+    absolute
+}
+
+fn route_style(doc: &mut String, css: &str, extra: &str) {
+    if !css.is_empty() {
+        doc.push_str(&format!("<style data-pragma-route-css{extra}>{}</style>\n", css.replace("</style", "<\\/style")));
+    }
+}
+
 /// First-load JS of a page: raw, gzip and brotli bytes.
 #[derive(Default, Clone, Copy)]
 struct Size {
@@ -882,6 +941,7 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
     let css_url = if prod { format!("/assets/app-{}.css", hash8(css.as_bytes())) } else { "/assets/app.css".to_string() };
     w.write_client(&format!("client{css_url}"), css.as_bytes(), prod);
     let shared_css_gz = gzip_len(css.as_bytes());
+    let split_shared = prod && can_inline_sheet(&css);
     report.css_gzip_bytes = shared_css_gz;
 
     let mut route_css: Vec<RouteCss> = Vec::with_capacity(outs.len());
@@ -991,6 +1051,48 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
     if let Some(b) = bundle::bundle(&opts.root, &out_abs.join(".cache/npm"), prod, &requests, diags) {
         link_packages(&mut mods, &b, diags);
     }
+    let packages = mods.iter().flat_map(|(path, m)| {
+        m.imports.iter().filter(|(imp, _)| pragma_jslint::is_package(&imp.spec)).filter_map(move |(imp, t)| t.clone().map(|t| ((path.clone(), imp.spec.clone()), t)))
+    });
+    let prerender = prerender::Prerender::new(&opts.root, &p.framework, mods.iter().map(|(path, m)| (path.clone(), m.src.clone())), packages);
+    let on_server = |m: &PathBuf| server_runnable(&mods, m);
+    let mut documents = Vec::with_capacity(outs.len());
+    let paint_module = p.framework.join("block-css.js");
+    for ((o, rc), entry) in outs.iter().zip(&route_css).zip(&mut entries) {
+        let rendered = prerender.as_ref().and_then(|r| {
+            let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
+            let ops = compile::ops(&o.exp.body, &scripted, &o.bodies);
+            let page = o.page.module.as_deref().filter(|m| on_server(&m.to_path_buf()));
+            let comps: Vec<(String, PathBuf)> = o.exp.components.values().filter_map(|c| c.module.clone().filter(|m| on_server(m)).map(|m| (c.id.clone(), m))).collect();
+            r.body(&ops, page, &comps)
+        });
+        let body = rendered.unwrap_or_else(|| {
+            let mut body = String::new();
+            compile::write_nodes(&o.exp.body, &mut body, prod);
+            body
+        });
+        let mut painted = pragma_css::prune::Markup::default();
+        let (body_nodes, parse_errors) = html::parse(&body, 0);
+        owners::painted_markup(&body_nodes, &mut painted);
+        // SSR may replace these block bodies with request-specific markup. Only split a known
+        // production document when the existing inline budget would otherwise be exceeded.
+        let split = if split_shared && entry.is_some() && !o.ssr && parse_errors.is_empty() && shared_css_gz + rc.gz > INLINE_CSS_BUDGET {
+            split_paint_css(rc, o, &body_nodes)
+        } else {
+            None
+        };
+        if let (Some(_), Some(e)) = (&split, entry) {
+            e.paint_css = Some(paint_module.clone());
+        }
+        documents.push((body, painted, split));
+    }
+    if entries.iter().flatten().any(|e| e.paint_css.is_some()) {
+        if !opts.root.join(&paint_module).is_file() {
+            diags.push(Diagnostic::error(&paint_module, 1, 1, "app/structure", "the framework is out of date: run pragma upgrade"));
+        } else {
+            mods.extend(module_graph(p, &[paint_module], true, sources, &deps, &mut requests, diags));
+        }
+    }
     let content_hash: HashMap<&PathBuf, u64> = mods
         .iter()
         .map(|(k, m)| {
@@ -1077,12 +1179,7 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
 
     let theme_js = mods.contains_key(&p.framework.join("theme.js"));
     let mut manifest = Vec::new();
-    let packages = mods.iter().flat_map(|(path, m)| {
-        m.imports.iter().filter(|(imp, _)| pragma_jslint::is_package(&imp.spec)).filter_map(move |(imp, t)| t.clone().map(|t| ((path.clone(), imp.spec.clone()), t)))
-    });
-    let prerender = prerender::Prerender::new(&opts.root, &p.framework, mods.iter().map(|(path, m)| (path.clone(), m.src.clone())), packages);
-    let on_server = |m: &PathBuf| server_runnable(&mods, m);
-    for (i, o) in outs.iter().enumerate() {
+    for (i, (o, (body, painted, split))) in outs.iter().zip(documents).enumerate() {
         let rc = &route_css[i];
         // the entry and its static-import closure, in load order (lazy chunks are never preloaded)
         let (entry_url, module_urls): (Option<String>, Vec<String>) = match (&routes[i].entry, &chunked) {
@@ -1109,20 +1206,6 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
             }
         };
         let reactive = o.described.is_some();
-        let rendered = prerender.as_ref().and_then(|r| {
-            let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
-            let ops = compile::ops(&o.exp.body, &scripted, &o.bodies);
-            let page = o.page.module.as_deref().filter(|m| on_server(&m.to_path_buf()));
-            let comps: Vec<(String, PathBuf)> = o.exp.components.values().filter_map(|c| c.module.clone().filter(|m| on_server(m)).map(|m| (c.id.clone(), m))).collect();
-            r.body(&ops, page, &comps)
-        });
-        let body = rendered.unwrap_or_else(|| {
-            let mut body = String::new();
-            compile::write_nodes(&o.exp.body, &mut body, prod);
-            body
-        });
-        let mut painted = pragma_css::prune::Markup::default();
-        owners::painted_markup(&html::parse(&body, 0).0, &mut painted);
         let fonts = pragma_css::prune::font_preloads(&rc.font_css, &painted);
         let mut doc = String::with_capacity(4096);
         doc.push_str(&format!("<!doctype html>\n<html lang=\"{}\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n", html::escape_attr(&p.config.lang)));
@@ -1157,20 +1240,40 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
             doc.push_str(THEME);
             doc.push('\n');
         }
-        if prod && shared_css_gz + rc.gz <= 14 * 1024 {
+        let blocking_gz = shared_css_gz + split.as_ref().map_or(rc.gz, |s| s.gzip);
+        let inline = prod && blocking_gz <= INLINE_CSS_BUDGET;
+        if inline {
             doc.push_str("<style data-pragma-shared-css>");
             doc.push_str(&css.replace("</style", "<\\/style"));
             doc.push_str("</style>\n");
-            if let Some(rcss) = &rc.src {
-                doc.push_str("<style data-pragma-route-css>");
-                doc.push_str(&rcss.replace("</style", "<\\/style"));
-                doc.push_str("</style>\n");
-            }
         } else {
             doc.push_str(&format!("<link rel=\"stylesheet\" href=\"{css_url}\">\n"));
-            if let Some(rcss_url) = &rc.url {
-                doc.push_str(&format!("<link rel=\"stylesheet\" href=\"{rcss_url}\" data-pragma-route-css>\n"));
+        }
+        if let Some(split) = split {
+            let full = rc.url.as_deref().unwrap();
+            let dir = full.rsplit_once('/').unwrap().0;
+            let url = format!("{dir}/blocks-{}.css", hash8(split.late.as_bytes()));
+            w.write_client(&format!("client{url}"), split.late.as_bytes(), true);
+            let mut paint_style = |doc: &mut String, part: &str, extra: &str| {
+                if inline {
+                    route_style(doc, part, extra);
+                } else if !part.is_empty() {
+                    let url = format!("{dir}/paint-{}.css", hash8(part.as_bytes()));
+                    w.write_client(&format!("client{url}"), part.as_bytes(), true);
+                    doc.push_str(&format!("<link rel=\"stylesheet\" href=\"{url}\" data-pragma-route-css{extra}>\n"));
+                }
+            };
+            paint_style(&mut doc, split.before, "");
+            paint_style(&mut doc, &split.during, " data-pragma-interim-css");
+            let blocks = html::escape_attr(&split.blocks.join(" "));
+            doc.push_str(&format!("<link rel=\"preload\" as=\"style\" href=\"{url}\" data-pragma-full-css=\"{full}\" data-pragma-blocks=\"{blocks}\" data-pragma-route-css>\n"));
+            paint_style(&mut doc, split.after, "");
+        } else if inline {
+            if let Some(rcss) = &rc.src {
+                route_style(&mut doc, rcss, "");
             }
+        } else if let Some(rcss_url) = &rc.url {
+            doc.push_str(&format!("<link rel=\"stylesheet\" href=\"{rcss_url}\" data-pragma-route-css>\n"));
         }
         if !prod && reactive {
             doc.push_str("<script>self.__pragmaDev=true</script>\n");
@@ -1206,7 +1309,7 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
         report.css_gzip_bytes = report.css_gzip_bytes.max(total_css_gz);
         if !o.is_404 {
             manifest.push(json!({ "pattern": o.page.pattern, "html": html_url, "entry": entry_url, "modules": module_urls, "loader": o.loader, "ssr": o.ssr }));
-            report.pages.push(PageReport { pattern: o.page.pattern.clone(), js_raw_bytes: first.raw, js_gzip_bytes: first.gz, js_brotli_bytes: first.br, css_gzip_bytes: total_css_gz });
+            report.pages.push(PageReport { pattern: o.page.pattern.clone(), js_raw_bytes: first.raw, js_gzip_bytes: first.gz, js_brotli_bytes: first.br, css_gzip_bytes: total_css_gz, critical_css_gzip_bytes: blocking_gz });
         }
         docs.push(doc);
     }

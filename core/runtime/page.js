@@ -229,12 +229,15 @@ function fire(el, [p, args], e) {
 }
 
 export function leave() {
+  K.cssBlocks = null
+  K.cssMiss = false
   if (cur) for (const o of mounted) if (cur.o.el.contains(o.el)) unmount(o)
 }
 
 // Runs a route on the live document: boot (from start) or SPA navigation (from the router, after
 // it installed R.use).
 export function enter(R, url, doc, pending) {
+  R.applyBlockCss?.(K, schedule)
   useTables(R, !cur)
   Object.assign(comps, R.comps)
   for (const n in R.stores) shared[n] ??= store(n, R.stores[n])
@@ -250,7 +253,8 @@ export function enter(R, url, doc, pending) {
 let booted = 0
 const idle = self.requestIdleCallback ?? setTimeout
 
-export function start(R) {
+export function start(R, applyBlockCss) {
+  if (applyBlockCss) R.applyBlockCss = applyBlockCss
   install(R.use)
   if (booted) return
   booted = 1

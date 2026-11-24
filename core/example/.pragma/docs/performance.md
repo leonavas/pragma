@@ -2,7 +2,9 @@
 
 Pragma optimizes builds by default: prebuilt HTML with the scripts' initial state rendered (`data.md`, "Prebuilt HTML"), `load` fetch started in `<head>`, per-route CSS with only the theme rules the page can match (inlined in production when <= 14 kB gzip, so small pages have no render-blocking stylesheet), font preload for the faces the prebuilt HTML shows, JS composed per route (below), link prefetch and Speculation Rules, 103 Early Hints, precompressed `.br`/`.gz` assets, hashed immutable assets (JS, CSS, and the `public/` files that CSS names with `url()`, such as fonts), and unused CSS stripped.
 
-`pragma build` prints, per route, the first-load JS (the route entry and every module it preloads) as raw, gzip and brotli bytes, and the CSS gzip size. A static route prints `0` JS. It marks a page whose CSS is over 14 kB (a render-blocking stylesheet); it does not enforce limits. When a page is marked, look for theme or component rules it does not need on first paint.
+`pragma build` prints, per route, the first-load JS (the route entry and every module it preloads) as raw, gzip and brotli bytes, and the CSS gzip size. A static route prints `0` JS. When CSS for first paint exceeds 14 kB gzip, the report marks the stylesheet as render-blocking.
+
+On a reactive, prebuilt route with large CSS, the compiler checks which component scopes occur in the delivered HTML. The HTML preloads one stylesheet for later blocks. It inlines the paint styles up to 14 kB gzip and links them as blocking stylesheets above that limit. The report gives the first-paint size separately. Existing controls mount immediately. A new block that needs the preloaded sheet waits until its styles apply. Intervening rules can appear in both responses to preserve the original cascade. SSR keeps the complete route stylesheet. SPA navigation stages the destination’s block stylesheet and applies it in cascade order at the swap. A stalled sheet releases waiting blocks after 1.5 s.
 
 ## JS per route
 

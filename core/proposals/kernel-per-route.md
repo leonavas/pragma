@@ -27,6 +27,16 @@ mangle-props or terser. When the build is not sure that a route needs a module, 
 
 ---
 
+### Block styles [contract, 2026-11-24]
+
+A prebuilt production route whose large stylesheet has deferrable component rules passes
+`applyBlockCss` to `start(R, applyBlockCss)`. Its markup contains a style preload with
+`data-pragma-full-css` (canonical fallback URL) and `data-pragma-blocks` (space-separated
+template ids, self definitions prefixed with `@`). Only cloning the named bodies waits for CSS.
+The timeout is 1.5 s. Other controls mount immediately. The router stages the destination sheet,
+adopts the critical styles in document order and applies that route's hook at entry. SSR keeps
+its complete sheet because the request can render different component scopes.
+
 ## 1. Runtime modules
 
 All files are in `core/runtime/` (copied to `.pragma/` of an app). "Kernel" = the three eager

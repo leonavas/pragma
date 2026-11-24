@@ -1,4 +1,4 @@
-import { H, L, RD, ctx, visit, clone, of, sib, get } from './dom.js'
+import { H, L, RD, ctx, visit, clone, of, sib, get, waitsForCss } from './dom.js'
 
 // <if> / <else-if> / <else>, and <empty> after a <for>: the body sits right after its anchor.
 function branch(t, d, s, last, id) {
@@ -11,6 +11,7 @@ function branch(t, d, s, last, id) {
     if (n[L]) H.stay(n)
     visit(n, s)
   } else {
+    if (waitsForCss(d.s)) return [t, true, id]
     t.after((n = clone(t, d, id)))
     visit(n, s)
     ctx.focus = (n.matches('[autofocus]') ? n : n.querySelector('[autofocus]')) ?? ctx.focus

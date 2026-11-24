@@ -244,6 +244,48 @@ pub fn prune_scoped(css: &str, markup: &Markup) -> String {
     })
 }
 
+/// Consecutive ranges of a minified stylesheet, in cascade order. A rule can wait only if
+/// every selector requires an absent component's scope. Ignore markers nested inside :not(),
+/// :is(), attribute strings, etc. Global rules and definitions stay available at first paint.
+pub fn paint_ranges<'a>(css: &'a str, absent: &HashSet<String>) -> Vec<(bool, &'a str)> {
+    fn cold(prelude: &str, body: &str, absent: &HashSet<String>) -> bool {
+        if let Some(name) = at_name(prelude) {
+            return matches!(name.as_str(), "media" | "supports" | "container") && items(body).into_iter().all(|item| match item {
+                Item::Text(s) => s.trim().is_empty(),
+                Item::Block { prelude, body } => cold(prelude, body, absent),
+                Item::Statement(_) => false,
+            });
+        }
+        split_top(prelude, ',').into_iter().all(|selector| {
+            top_level(selector).any(|(i, c)| {
+                c == b':' && selector[i..].strip_prefix(":where([data-s~=").and_then(|s| s.split_once("])"))
+                    .is_some_and(|(token, _)| absent.contains(token.trim_matches('"')))
+            })
+        })
+    }
+
+    let mut ranges: Vec<(bool, usize)> = Vec::new();
+    let mut end = 0;
+    for item in items(css) {
+        let (late, len) = match item {
+            Item::Block { prelude, body } => (cold(prelude, body, absent), prelude.len() + body.len() + 2),
+            Item::Statement(s) | Item::Text(s) => (false, s.len()),
+        };
+        end += len;
+        if let Some(last) = ranges.last_mut() && last.0 == late {
+            last.1 = end;
+        } else {
+            ranges.push((late, end));
+        }
+    }
+    let mut start = 0;
+    ranges.into_iter().map(|(late, end)| {
+        let range = &css[start..end];
+        start = end;
+        (late, range)
+    }).collect()
+}
+
 /// What a compound of scoped CSS needs from an element: its name, its classes, and one alternative
 /// of each `:is()`/`:where()` (outside other parentheses and brackets). An empty one matches any
 /// element.

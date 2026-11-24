@@ -2,9 +2,38 @@
 use crate::directive::{self, Dir};
 use crate::html::{Element, Node};
 use pragma_css::prune::{Ancestor, Markup, OwnSelector};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 pub type Owned = HashMap<String, BTreeSet<OwnSelector>>;
+
+pub fn visit_scopes(nodes: &[Node], visit: &mut impl FnMut(&str)) {
+    for node in nodes {
+        if let Node::Element(el) = node {
+            if let Some(scopes) = el.value("data-s") {
+                for scope in scopes.split_ascii_whitespace() {
+                    visit(scope);
+                }
+            }
+            visit_scopes(&el.children, visit);
+        }
+    }
+}
+
+pub fn blocks_using(bodies: &[Element], scopes: &HashSet<String>) -> Vec<String> {
+    let mut ids = Vec::new();
+    for b in bodies {
+        let mut uses_scope = false;
+        visit_scopes(&b.children, &mut |s| uses_scope |= scopes.contains(s));
+        if uses_scope {
+            if let Some(id) = b.value("data-tpl") {
+                ids.push(id.to_owned());
+            } else if let Some(id) = b.value("data-def") {
+                ids.push(format!("@{id}"));
+            }
+        }
+    }
+    ids
+}
 
 /// Every class an element can have: static ones and `.x` toggles.
 pub fn classes(el: &Element) -> Vec<String> {

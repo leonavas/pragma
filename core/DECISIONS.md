@@ -300,6 +300,13 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
 
 ## CSS
 
+- **[firm]** (2026-11-24) Preload CSS for component scopes absent from a prebuilt reactive
+  document when splitting reduces render-blocking CSS. Inline critical styles up to 14 KiB gzip. Retain globals, font faces,
+  page styles and initial component styles at first paint. Preserve source order across the swap
+  from interim styles to the loaded sheet. On network failure try the canonical sheet. Release
+  waiting block clones after 1.5 s. SPA navigation stages the destination styles and SSR serves
+  the canonical sheet. Existing template expansion stays: measured dedup saved under 1% of the
+  compressed route entry.
 - **[firm]** (2026-11-23) CSS vendor prefixes come from the build: lightningcss runs with a fixed
   baseline (Chrome/Edge 111, Firefox 128, Safari/iOS 16.4) that only adds prefixes (every other
   feature is excluded, so nothing is compiled down), and a hand-written prefixed property with a
