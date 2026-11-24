@@ -1,0 +1,30 @@
+# Vendored from lightningcss 1.0.0-alpha.72 (https://github.com/parcel-bundler/lightningcss)
+# and trimmed to what pragma uses. Maintained in this repo; upstream is not tracked.
+[package]
+authors = ["Devon Govett <devongovett@gmail.com>"]
+name = "lightningcss"
+version = "1.0.0-alpha.72"
+description = "A CSS parser, transformer, and minifier (vendored for pragma)"
+license = "MPL-2.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "lightningcss"
+path = "src/lib.rs"
+
+[dependencies]
+cssparser = "0.37.0"
+cssparser-color = "0.5.0"
+parcel_selectors = { path = "../parcel_selectors" }
+lightningcss-derive = { path = "../lightningcss-derive" }
+itertools = "0.10.1"
+smallvec = { version = "1.7.0", features = ["union"] }
+bitflags = "2.2.1"
+data-encoding = "2.3.2"
+lazy_static = "1.4.0"
+const-str = "1.1.0"
+pathdiff = "0.2.1"
+ahash = "0.8.7"
+pastey = "0.1.0"
+indexmap = "2.2.6"

@@ -12,6 +12,8 @@ pragma-diag = { path = "crates/pragma-diag" }
 pragma-css = { path = "crates/pragma-css" }
 pragma-jslint = { path = "crates/pragma-jslint" }
 pragma-compiler = { path = "crates/pragma-compiler" }
+# Vendored lightningcss (trimmed). See vendor/README.md.
+lightningcss = { path = "vendor/lightningcss" }
 
 [profile.release]
 lto = true

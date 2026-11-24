@@ -300,7 +300,12 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   only in production. lightningcss 1.0.0-alpha.72 does this even with targets (its fallback
   handler replaces the standard declaration with a later prefixed one), so the check rule is what
   closes it. Council: 3×0 it is a bug; targets and the rule 2×1. Rejected: a general warning with
-  no targets, patching the merge in lightningcss (astra's preference).
+  no targets, patching the merge in lightningcss (astra's preference). Update (2026-11-23): the
+  merge is now fixed in our fork (next entry); the rule stays, so prefixes have one source.
+- **[firm]** (2026-11-23) lightningcss is a fork in `core/cli/vendor/` (with `lightningcss-derive`
+  and `parcel_selectors`), trimmed to what pragma uses and maintained here; upstream is not
+  tracked. *Why:* pragma must not wait for an upstream that ships alpha releases every few
+  months, and the prefix merge bug is fixed in our copy. Patches and tests: `core/cli/vendor/README.md`.
 - **[firm]** Reuse CSS as much as possible.
 - **[firm]** Tailwind v4 subset reimplemented in Rust (`pragma-css` crate), generating only used
   classes, no arbitrary values. Goal: fewer classes; custom classes allowed for refined cases

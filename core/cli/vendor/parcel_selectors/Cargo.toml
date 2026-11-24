@@ -1,0 +1,26 @@
+# Vendored from parcel_selectors 0.28.3 (https://github.com/parcel-bundler/lightningcss)
+[package]
+name = "parcel_selectors"
+version = "0.28.3"
+authors = ["The Servo Project Developers"]
+description = "CSS Selectors matching for Rust - forked for lightningcss (vendored for pragma)"
+license = "MPL-2.0"
+build = "build.rs"
+edition = "2021"
+publish = false
+
+[lib]
+name = "parcel_selectors"
+path = "lib.rs"
+
+[dependencies]
+bitflags = "2.2.1"
+cssparser = "0.37.0"
+rustc-hash = "2"
+log = "0.4"
+phf = "0.11.2"
+precomputed-hash = "0.1"
+smallvec = "1.0"
+
+[build-dependencies]
+phf_codegen = "0.11"
