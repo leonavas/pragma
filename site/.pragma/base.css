@@ -555,7 +555,7 @@ input:where([type='button'], [type='reset'], [type='submit']),
   dialog::backdrop {
     background-color: rgb(0 0 0 / 0.5);
   }
-  [data-page] {
+  html[data-view-transition] [data-page] {
     view-transition-name: page;
   }
   ::view-transition-group(root),

@@ -61,7 +61,7 @@ A render that runs past 12 ms leaves the rest of each outer `<for>` (not one ins
 
 ## Page transitions
 
-The router swaps pages inside a View Transition. Only `<main data-page>` fades in (150 ms, from opacity 0.5); the layout around it (header, sidebar) changes at once and does not blink. To animate another element across pages, give it its own `view-transition-name`. With `prefers-reduced-motion`, there is no transition.
+The router swaps pages inside a View Transition. Only `<main data-page>` fades in (150 ms, from opacity 0.5); the layout around it (header, sidebar) changes at once and does not blink. To animate another element across pages, give it its own `view-transition-name` only while a transition runs (`:global(html[data-view-transition]) .x { view-transition-name: x; }`): an element with a name is a stacking context and a backdrop root, so a `backdrop-filter` inside it stops blurring. With `prefers-reduced-motion`, there is no transition.
 
 ## Rules
 

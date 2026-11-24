@@ -217,10 +217,27 @@ async function go(to, pop, replace) {
     main.focus({ preventScroll: true })
     mark()
   }
-  if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) await document.startViewTransition(swap).updateCallbackDone
+  if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) await transition(swap)
   else swap()
   log.info('navigation', { 'url.path': url.pathname, 'pragma.route': route.pattern, 'pragma.navigation': pop ? 'pop' : replace ? 'replace' : 'push', 'duration_ms': Math.round(performance.now() - t0) })
   observe()
+}
+
+// `view-transition-name` makes <main> a stacking context and a backdrop root (a `backdrop-filter`
+// inside it stops blurring), so the page has its name only while a transition runs. A newer
+// transition skips the older one; only the newest removes the attribute.
+let active = null
+
+function transition(swap) {
+  const html = document.documentElement
+  html.setAttribute('data-view-transition', '')
+  const vt = (active = document.startViewTransition(swap))
+  vt.finished.finally(() => {
+    if (active !== vt) return
+    active = null
+    html.removeAttribute('data-view-transition')
+  })
+  return vt.updateCallbackDone
 }
 
 export function startRouter(pageApi) {
