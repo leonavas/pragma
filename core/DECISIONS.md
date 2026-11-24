@@ -517,8 +517,8 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   build (`@media`, dynamic classes; the runtime reads it once per list), `priority: 'high'` on the
   data fetches, building slices in a `DocumentFragment`, automatic `content-visibility`.
 - **[firm]** (2026-11-23, bug in 0.2.7/0.2.8) A script creating its own state does not schedule a
-  render: the top-level `let`s of a component or page, set while its factory runs, are read by the
-  render that created it. *Why:* each new component's `let copied = false` scheduled a full render
+  render: the top-level `let`s of a component, page or store, set while its factory runs, are read
+  by the render that created it. *Why:* each new component's `let copied = false` scheduled a full render
   (nobody had read the key yet), the full render dropped the pending slices and started over, so
   every slice cost a whole page render: v3chat TBT 350 → 830 ms with list slicing on.
 - **[firm]** (2026-11-23) A closed `<dialog>` or `[popover]` binds only its own attributes; its
