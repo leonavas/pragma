@@ -53,6 +53,9 @@ pub struct ScriptInfo {
     pub mutated_consts: Vec<(String, u32, u32)>,
     /// Store: `export const persist = ['field']`.
     pub persist: Vec<String>,
+    /// Store: top-level `let` the store assigns but never reads, with the line and column of its
+    /// name. A page reads it through `shared`, or nothing re-renders when it changes.
+    pub unread_lets: Vec<(String, u32, u32)>,
     /// Names imported from 'pragma' (`data`, `layout`, `shared`…).
     pub services: Vec<String>,
     /// The script has errors (old API, syntax…): its names are not known, so HTML is not checked
@@ -151,6 +154,9 @@ pub fn transform(path: &Path, source: &str, kind: ScriptKind) -> Script {
     let mut refs = Refs { t: &mut t, scoping, depth: 0, init: None, handler_params: HashSet::new() };
     refs.visit_program(&ret.program);
     t.stale(scoping);
+    if kind == ScriptKind::Store {
+        t.unread_lets(scoping);
+    }
     if let Some(at) = t.persist_at {
         for key in t.info.persist.clone() {
             if !t.info.lets.contains(&key) {
@@ -356,6 +362,30 @@ impl Transform<'_> {
         for (at, message) in found {
             self.err(at, RULE_STALE, message);
         }
+    }
+
+    fn unread_lets(&mut self, scoping: &Scoping) {
+        let lines = LineIndex::new(self.source);
+        let mut unread: Vec<(String, u32, u32)> = self
+            .syms
+            .iter()
+            .filter(|(_, kind)| **kind == Sym::State)
+            .filter(|(sym, _)| {
+                let mut references = scoping.get_resolved_references(**sym);
+                let mut written = false;
+                let read = references.any(|r| {
+                    written |= r.is_write();
+                    r.is_read() && !r.is_write()
+                });
+                written && !read
+            })
+            .map(|(sym, _)| {
+                let (line, column) = lines.position(self.source, scoping.symbol_span(*sym).start);
+                (scoping.symbol_name(*sym).to_string(), line, column)
+            })
+            .collect();
+        unread.sort_by_key(|u| (u.1, u.2));
+        self.info.unread_lets = unread;
     }
 
     /// The source with only the `pragma` imports removed (a script with errors is not rewritten).

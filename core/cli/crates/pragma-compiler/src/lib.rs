@@ -586,6 +586,32 @@ fn run(opts: &BuildOptions) -> (Vec<Diagnostic>, BuildReport) {
     (sort_diags(diags), report)
 }
 
+fn mentions(code: &str, name: &str) -> bool {
+    let word = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '$';
+    code.match_indices(name).any(|(at, _)| {
+        !code[..at].chars().next_back().is_some_and(word) && !code[at + name.len()..].chars().next().is_some_and(word)
+    })
+}
+
+fn unread_store_state(p: &Project, sources: &HashMap<PathBuf, String>, scripts: &HashMap<PathBuf, ScriptInfo>, diags: &mut Vec<Diagnostic>) {
+    for (store, path) in &p.stores {
+        let Some(info) = scripts.get(path) else { continue };
+        for (name, line, column) in &info.unread_lets {
+            let elsewhere = p.sources.iter().any(|code| mentions(code, name))
+                || sources.iter().any(|(file, code)| file != path && is_app_code(file) && mentions(code, name));
+            if !elsewhere {
+                diags.push(Diagnostic::warning(
+                    path,
+                    *line,
+                    *column,
+                    "js/unread-state",
+                    format!("`{name}` changes, but nothing reads it, so nothing re-renders: a page or component updates only when it reads state that changed. Read the changed value itself (a `let` of the store, through `shared.{store}`), or delete `{name}`"),
+                ));
+            }
+        }
+    }
+}
+
 struct Analysis<'p> {
     sources: HashMap<PathBuf, String>,
     theme_src: String,
@@ -629,6 +655,7 @@ fn analyze<'p>(p: &'p Project, diags: &mut Vec<Diagnostic>) -> Analysis<'p> {
         sources.insert(path.clone(), s.code);
         scripts.insert(path, s.info);
     }
+    unread_store_state(p, &sources, &scripts, diags);
 
     let theme_src = p.theme_css.clone().unwrap_or_default();
     let css_comment = |path: &Path, src: &str, diags: &mut Vec<Diagnostic>| {
