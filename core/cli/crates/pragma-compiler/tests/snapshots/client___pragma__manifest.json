@@ -2,15 +2,16 @@
   {
     "pattern": "/",
     "html": "/index.html",
+    "entry": "/assets/entry/index.js",
     "modules": [
+      "/assets/core/page.js",
+      "/assets/core/branch.js",
+      "/assets/core/list.js",
       "/assets/routes/index.js",
       "/assets/lib/components/card/card.js",
       "/assets/lib/components/counter/counter.js",
       "/assets/lib/state/cart.js",
-      "/assets/core/router.js",
-      "/assets/core/log.js",
-      "/assets/utils/fmt.js",
-      "/assets/tpl/index.js"
+      "/assets/utils/fmt.js"
     ],
     "loader": false,
     "ssr": false
@@ -18,13 +19,14 @@
   {
     "pattern": "/blog/:slug",
     "html": "/blog/[slug].html",
+    "entry": "/assets/entry/blog/_slug_.js",
     "modules": [
+      "/assets/core/page.js",
+      "/assets/core/list.js",
+      "/assets/core/net.js",
       "/assets/routes/blog/_slug_.js",
       "/assets/lib/components/counter/counter.js",
-      "/assets/lib/state/cart.js",
-      "/assets/core/router.js",
-      "/assets/core/log.js",
-      "/assets/tpl/blog/_slug_.js"
+      "/assets/lib/state/cart.js"
     ],
     "loader": true,
     "ssr": true
@@ -32,11 +34,11 @@
   {
     "pattern": "/shop",
     "html": "/shop/index.html",
+    "entry": "/assets/entry/shop/index.js",
     "modules": [
+      "/assets/core/page.js",
       "/assets/lib/components/counter/counter.js",
-      "/assets/lib/state/cart.js",
-      "/assets/core/router.js",
-      "/assets/core/log.js"
+      "/assets/lib/state/cart.js"
     ],
     "loader": false,
     "ssr": false
@@ -44,13 +46,15 @@
   {
     "pattern": "/shop/:id",
     "html": "/shop/[id].html",
+    "entry": "/assets/entry/shop/_id_.js",
     "modules": [
+      "/assets/core/page.js",
+      "/assets/core/branch.js",
+      "/assets/core/model.js",
+      "/assets/core/net.js",
       "/assets/routes/shop/_id_.js",
       "/assets/lib/components/counter/counter.js",
-      "/assets/lib/state/cart.js",
-      "/assets/core/router.js",
-      "/assets/core/log.js",
-      "/assets/tpl/shop/_id_.js"
+      "/assets/lib/state/cart.js"
     ],
     "loader": true,
     "ssr": false

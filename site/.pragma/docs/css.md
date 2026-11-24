@@ -4,7 +4,7 @@ Use utility classes (`classes.md`) first. Write a custom class only when utiliti
 
 | File | Scope |
 |---|---|
-| `.pragma/base.css` | Preflight, layers, `.skeleton`, `[hidden]`, scroll lock. Do not edit. |
+| `.pragma/base.css` | Preflight, layers, `.skeleton`, `[hidden]`, scroll lock, `@view-transition { navigation: auto; }` and the page transition (`performance.md`). Do not edit. |
 | `lib/theme.css` | Tokens and global custom classes (`@layer components`). |
 | Component `<style>` or `<name>.css` | Scoped to the markup that component wrote. `:global(…)` opts out. `[data-c="<name>"]` stays as written (unique per folder for `p-`). |
 | Page `<style>` or `<page>.css` | Scoped to the markup that page wrote. |

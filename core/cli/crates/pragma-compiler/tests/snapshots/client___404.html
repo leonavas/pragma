@@ -9,23 +9,22 @@
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/css/_404.css" data-pragma-route-css>
 <script>self.__pragmaDev=true</script>
+<link rel="modulepreload" href="/assets/core/page.js">
 <link rel="modulepreload" href="/assets/lib/components/counter/counter.js">
 <link rel="modulepreload" href="/assets/lib/state/cart.js">
-<link rel="modulepreload" href="/assets/core/router.js">
-<link rel="modulepreload" href="/assets/core/log.js">
-<script type="application/json" id="pragma-route">{"pattern":"*","page":null,"components":{"counter":"/assets/lib/components/counter/counter.js"},"stores":{"cart":"/assets/lib/state/cart.js"},"loader":false,"ssr":false}</script>
-<script type="module" src="/assets/core/boot.js"></script>
+<script type="module" src="/assets/entry/_404.js"></script>
+<script>addEventListener('pageswap',e=>e.viewTransition&&document.documentElement.setAttribute('data-view-transition',''));addEventListener('pagereveal',e=>{const v=e.viewTransition,h=document.documentElement;if(v)h.setAttribute('data-view-transition',''),v.finished.finally(()=>h.removeAttribute('data-view-transition'))});addEventListener('pageshow',e=>e.persisted&&document.documentElement.removeAttribute('data-view-transition'))</script>
 <script type="module" src="/_pragma/dev.js"></script>
 </head>
 <body>
 <header class="flex items-center gap-4 p-4">
   <a href="/">Home</a>
-  <button data-c="counter" class="btn" data-on-click="add"><span data-text="{state.count}"></span></button>
-  <span data-text="{shared.cart.total}"></span>
+  <button data-c="counter" class="btn" disabled data-b="l0"><span data-b="l1"></span></button>
+  <span data-b="l2"></span>
 </header>
-<main data-page>
+<main data-page data-b="l3">
 <h1 class="text-2xl">Page not found</h1>
 </main>
-<footer class="text-sm text-neutral-500" data-text="{query.ref}"></footer>
+<footer class="text-sm text-neutral-500" data-b="l4"></footer>
 </body>
 </html>

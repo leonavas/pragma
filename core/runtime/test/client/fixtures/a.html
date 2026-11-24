@@ -7,14 +7,13 @@
   <style>#tall{height:3000px}</style>
   <script>self.__pragmaDev=true</script>
   <link rel="modulepreload" href="/assets/a.js">
-  <script type="application/json" id="pragma-route">{"pattern":"/a","page":"/assets/a.js","components":{},"stores":{"cart":"/assets/cart.js"},"loader":false,"ssr":false}</script>
-  <script type="module" src="/core/boot.js"></script>
+  <script type="module" src="/assets/entry/a.js"></script>
 </head>
 <body>
-  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
-  <main data-page>
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-b="l0"></span></header>
+  <main data-page data-b="l1">
     <h1 id="title">Page A</h1>
-    <span id="ticks" data-text="{state.ticks}"></span>
+    <span id="ticks" data-b="p0"></span>
     <div id="tall"></div>
     <a id="p1" href="/product/1">Product 1</a>
     <a id="new" href="/product/new">New</a>

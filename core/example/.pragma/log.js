@@ -1,21 +1,16 @@
 import { OTEL } from './contract.js'
+import { traceId } from './trace.js'
+
+export { traceHeaders, newTrace } from './trace.js'
 
 const SEV = { debug: 5, info: 9, warn: 13, error: 17 }
 const BATCH = 50, FLUSH_MS = 2000
-const hex = (n) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => (b + 256).toString(16).slice(1)).join('')
 const exc = (e) => ({ 'exception.type': e?.name, 'exception.message': e?.message ?? String(e), 'exception.stacktrace': e?.stack })
 
 let queue = []
 let endpoint = OTEL
 let resource = { 'service.name': 'pragma-client' }
-let traceId = hex(16)
 let timer
-
-export const newTrace = () => {
-  traceId = hex(16)
-}
-
-export const traceHeaders = () => ({ traceparent: `00-${traceId}-${hex(8)}-01` })
 
 function emit(level, body, attributes) {
   if (globalThis.__pragmaDev) console[level](body, ...(attributes ? [attributes] : []))
@@ -52,8 +47,11 @@ function flush(beacon) {
     .catch(() => {})
 }
 
-export function initClientLog(service) {
+// Loaded in idle after the first mount (or on the first log call): `queued` holds the
+// [level, msg, attrs] the kernel's stub stored until then.
+export function initClientLog(service, queued = []) {
   resource = { 'service.name': service }
+  for (const [level, msg, attrs] of queued.splice(0)) emit(level, msg, attrs)
   addEventListener('error', (e) => emit('error', e.message, exc(e.error ?? e)))
   addEventListener('unhandledrejection', (e) => emit('error', e.reason?.message ?? String(e.reason), exc(e.reason)))
   addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flush(true))

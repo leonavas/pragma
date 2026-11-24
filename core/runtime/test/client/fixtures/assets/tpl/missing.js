@@ -1,1 +1,0 @@
-export default {"x1": "<p id=\"sk\">loading</p>", "z1": "<p id=\"error\"><span id=\"status\" data-text=\"{page.error.status}\"></span> <span id=\"code\" data-text=\"{page.error.code}\"></span> <span id=\"message\" data-text=\"{page.error.message}\"></span></p>", "z2": "<h1 id=\"found\">found</h1>"}

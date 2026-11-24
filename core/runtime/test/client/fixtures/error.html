@@ -7,14 +7,13 @@
   <style>#tall{height:3000px}</style>
   <script>self.__pragmaDev=true</script>
   <script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}});self.__pd.catch(()=>{})</script>
-  <script type="application/json" id="pragma-route">{"pattern":"/error","page":null,"components":{},"stores":{"cart":"/assets/cart.js"},"loader":true,"ssr":false,"tpl":"/assets/tpl/error.js"}</script>
-  <script type="module" src="/core/boot.js"></script>
+  <script type="module" src="/assets/entry/error.js"></script>
 </head>
 <body>
-  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
-  <main data-page>
-    <!--p:if p1 page.loading-->
-    <!--p:else z2-->
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-b="l0"></span></header>
+  <main data-page data-b="l1">
+    <!--p:p0-->
+    <!--p:p1-->
   </main>
 </body>
 </html>

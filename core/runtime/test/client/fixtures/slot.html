@@ -5,38 +5,37 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Slot</title>
   <script>self.__pragmaDev=true</script>
-  <script type="application/json" id="pragma-route">{"pattern":"/slot","page":"/assets/slot.js","components":{"box":"/assets/box.js","counter":"/assets/counter.js"},"stores":{"account":"/assets/account.js"},"loader":false,"ssr":false,"tpl":"/assets/tpl/slot.js"}</script>
-  <script type="module" src="/core/boot.js"></script>
+  <script type="module" src="/assets/entry/slot.js"></script>
 </head>
 <body>
-  <header><nav><a id="nav-a" href="/a">A</a> <a id="nav-slot" href="/slot">Slot</a></nav> <span id="qty" data-text="{shared.account.total}"></span></header>
-  <main data-page>
-    <section data-c="box" data-prop-initial="5" data-on-click="box">
-      <h2 id="box-title" data-text="{state.title}"></h2>
-      <button id="box-inc" data-on-click="inc">+</button>
-      <output id="box-n" data-text="{state.n}"></output>
+  <header><nav><a id="nav-a" href="/a">A</a> <a id="nav-slot" href="/slot">Slot</a></nav> <span id="qty" data-b="l0"></span></header>
+  <main data-page data-b="l1">
+    <section data-c="box" data-b="pa">
+      <h2 id="box-title" data-b="p0"></h2>
+      <button id="box-inc" data-b="p1">+</button>
+      <output id="box-n" data-b="p2"></output>
       <div class="body">
-        <button id="page-btn" data-slot="1" data-on-click="page">page</button>
-        <p id="page-title" data-slot="1" data-text="{state.title}"></p>
-        <input id="page-field" data-slot="1" data-model="state.field">
-        <!--p:if1 s1 state.visible-->
-        <div data-c="counter">
-          <button class="inc" data-on-click="inc">+</button><span class="count" data-text="{state.n}"></span>
-          <button id="deep-btn" data-slot="2" data-on-click="page">deep</button>
-          <button id="middle-btn" data-slot="1" data-on-click="inc">middle</button>
+        <button id="page-btn" data-b="p3">page</button>
+        <p id="page-title" data-b="p4"></p>
+        <input id="page-field" data-b="p5">
+        <!--p:p6-->
+        <div data-c="counter" data-b="p9">
+          <button class="inc" data-b="p1">+</button><span class="count" data-b="p2"></span>
+          <button id="deep-btn" data-b="p7">deep</button>
+          <button id="middle-btn" data-b="p8">middle</button>
         </div>
       </div>
     </section>
     <ul>
-      <!--p:for s2 item state.items item.id-->
+      <!--p:pb-->
     </ul>
-    <span id="field" data-text="{state.field}"></span>
-    <span id="picked" data-text="{state.picked}"></span>
-    <span id="double" data-text="{state.double}"></span>
+    <span id="field" data-b="pc"></span>
+    <span id="picked" data-b="pd"></span>
+    <span id="double" data-b="pe"></span>
     <a id="link-slot" href="/slot">here</a>
     <a id="link-filter" href="/slot?f=1">filter</a>
-    <input id="chk" type="checkbox" data-attr-checked="state.marked">
-    <!--p:if s3 state.editing-->
+    <input id="chk" type="checkbox" data-b="pf">
+    <!--p:pg-->
   </main>
 </body>
 </html>

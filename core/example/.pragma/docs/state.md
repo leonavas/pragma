@@ -134,7 +134,7 @@ Keep the original `item` reference (`row.item`) when mutating it. Spreading `{ .
 
 ## Per-frame updates
 
-Assign state from `frame` (scroll, drag, a progress animation) and bind it with `:--name`, `{}`, `:attr`, `:class`, or `:show`. When a change is read only by such bindings (directly or through derived functions), the runtime updates only those bindings, not the page. A value read by `<if>`, `<for>`, `:model`, or a component prop renders the whole page.
+Assign state from `frame` (scroll, drag, a progress animation) and bind it with `:--name`, `{}`, `:attr`, `:class`, or `:show`. When a change is read only by such bindings (directly or through derived functions), the runtime updates only those bindings, not the page. A value read by `<if>`, `<for>`, `:model`, or a component prop re-renders only the element that holds that block or component (`performance.md`, "Updates").
 
 `frame(fn)` is `requestAnimationFrame` for all components together: every `frame` callback of the page runs in one animation frame, then the runtime writes all their state changes to the DOM in one pass. It returns a function that cancels the callback.
 
@@ -218,7 +218,7 @@ function add(title) {
 - Write `count` in JS, never `$count` (`js/dollar-in-script`).
 - Keep page-only state in the page script. Use a store for shared or persisted state, and put actions shared by 2+ pages in the store.
 - Store filters, tabs, and pagination in `query`, read by a derived function.
-- `persist` saves listed `let` names to `localStorage` (key `pragma:<store>`; a store named `theme` uses `pragma:store:theme`, because `pragma:theme` belongs to `.pragma/theme.js`); use it only for preferences, drafts, and local-only data.
+- `persist` saves listed `let` names to `localStorage` (key `pragma:<store>`; a store named `theme` uses `pragma:store:theme`, because `pragma:theme` belongs to `.pragma/theme.js`); use it only for preferences, drafts, and local-only data. Saved fields are restored before the first render and before `mount`.
 - Declare mutated top-level state with `let`, not `const` (`js/const-state`).
 - Do not use `var`, destructuring `let`, or top-level `await`. Use `export` only for props (or `persist` in stores).
 - Access stores only through `shared`; direct store imports trigger `js/store-import`.

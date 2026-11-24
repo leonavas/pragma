@@ -1,7 +1,8 @@
 # pragma
 
-Agentic, opinionated framework for web apps in native HTML, CSS and JS: prebuilt `.html` pages,
-closed directives, minimal bundle, no UI framework, and a Rust CLI
+A small, opinionated framework for web apps in native HTML, CSS and JS, built for agents: prebuilt
+`.html` pages, closed directives, JS per route in proportion to its interaction (none on a static
+route), no UI framework, and a Rust CLI
 (`pragma new|dev|build|check|serve`) with rules, docs and checks built for agents.
 
 Agent-first both ways: agents build with it, and the apps work for agents. Every `<form>` is a
@@ -17,8 +18,9 @@ WebMCP tool by default (checked by `pragma check`), and pages can serve markdown
 pragma/
   core/
     SPEC.md  DECISIONS.md  TEAM.md  TESTING.md  README.md
+    proposals/   design contracts between runtime and compiler
     docs/        LLM docs; copied to <app>/core/docs/
-    runtime/     framework JS; copied to <app>/core/
+    runtime/     framework JS (kernel + per-use and lazy modules); copied to <app>/core/
       server/    fetch handler, SSR, Node adapter, server logs
     starter/     app skeleton used by `pragma new` (AGENTS.md, routes/, lib/…)
     cli/         Rust workspace
@@ -39,6 +41,27 @@ The SvelteKit × astra × fable experiment moved out of the repo to `../pragma-t
   `sign_guestbook`) not tried in a browser with WebMCP (Chrome origin trial).
 - Site: placeholder origin `https://pragma.dev` in the prompt and md links; landing copy lives in
   `site/routes/*.html` and `site/utils/agent-docs/*.md` (drift check compares headings only).
+
+## Kernel per route (2026-11-24, in progress)
+
+Contract: [proposals/kernel-per-route.md](proposals/kernel-per-route.md). Decisions: `DECISIONS.md`
+("Positioning", "Kernel per route").
+
+Pending:
+- Measured first-load JS (brotli q11 of entry + modulepreloads, v0.2.11 → kernel per route):
+  example `/` 10.0 → 7.7 kB, `/shop` 10.4 → 10.3, `/shop/:id` 10.1 → 8.5, `/tasks` 10.3 → 9.1,
+  `/_404` 9.4 → 6.6; v3chat `/` 23.0 → 23.6, `/c/:id` 48.0 → 49.4 (uses every module; the entry
+  carries ~40 kB raw of block bodies in `R.t`; `marked` is 13.8 kB of `/c/:id`). The report's `JS
+  br` reads the build's `.br` files, a bit larger than q11. Still to do: TBT (Lighthouse, mobile),
+  then update the numbers in the root `README.md` ("Small") and the site.
+- Lint idea: CSS selectors on attributes that leave the HTML (`[data-prop-*]`, `[data-text]`,
+  `[data-on-*]`…) match nothing now; `site` frame and v3chat logo used `[data-prop-*]`.
+- Site copy still describes the old model: `site/routes/guide.html` (Performance list, `pragma
+  build` table, head order with route JSON and boot module, "8.7 kB of runtime"),
+  `site/routes/index.html` and `site/utils/agent-docs/index.md` ("12.5 kB"). Update with the
+  measured numbers, then `npm run agent-docs`.
+- CLI help says "HTML, CSS and JS without a framework" (`pragma-cli/src/lib.rs`, and the copy in
+  `site/routes/guide.html`): align with "a small, opinionated framework".
 
 ## First paint equals final state (v3chat feedback, 2026-11-23, not released)
 

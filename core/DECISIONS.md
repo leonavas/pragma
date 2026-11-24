@@ -13,7 +13,8 @@ Status: **[firm]** · **[firm v0]** v0 contract, revisable later · **[likely]**
 2. Fixed folder structure. Every page is a `.html` in `routes/`; its path is the route.
 3. Never HTML in JS, not even on the server. Markup lives in `.html`.
 4. Closed, boring, deterministic directives: one way to do each thing.
-5. Reused components; each page serves the minimum (per-page modules + modulepreload).
+5. Reused components; each page serves the minimum: a static route ships no JS, a reactive
+   route loads only the runtime modules it uses (`proposals/kernel-per-route.md`).
 6. Pages open fast: prebuilt HTML with skeleton, data via async loader. SSR is opt-in.
 7. Overlays always HTML + JS; back closes the overlay; modal and alert lock scroll.
 8. CSS: Tailwind v4 subset in Rust; custom classes only for refined cases.
@@ -25,6 +26,14 @@ Status: **[firm]** · **[firm v0]** v0 contract, revisable later · **[likely]**
 Empirical basis: `../../pragma-tests_1/COMPARACAO.md` (outside the repo; SvelteKit SPA × astra ×
 fable). The native apps shipped about 4× less on first visit (10.8 to 12.3 kB gzip vs 41.5 kB)
 and painted in half the time without throttling (108 vs 212 ms). n = 1, one model per app.
+
+## Positioning
+
+- **[firm]** (2026-11-24) pragma is "a small, opinionated framework", not an "anti-framework".
+  *Why:* zero JS on a static page is parity with Astro and Qwik, not a difference. The honest
+  difference is JS in proportion to interaction: the compiler infers, per route, what the page
+  uses and ships only that, and `pragma build` measures it per route. No "smaller than Preact or
+  Svelte" and no unqualified "zero JS" in docs or the site.
 
 ## Language
 
@@ -453,6 +462,8 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   14 / 16.7 → 6 / 14.7, `/app/[id]` 99 / 186.0 → 10 / 153.2. *Why:* ~0.6 kB modules cost one
   request each (115 requests on `/app/[id]`). The router also watches links added after load
   (MutationObserver) for viewport prefetch, so client-rendered `/app/<id>` lists get prefetched.
+  (Changed 2026-11-24: one entry per route instead of one runtime chunk and the route JSON,
+  "Kernel per route" below.)
 - **[superseded]** Budgets in `pragma.json` (`initialJsKb`, `routeJsKb`, `cssKb`, per-route
   `budgets.routes`), checked by build and check.
 - **[firm]** (2026-11-21) Binding-only updates: the full render records which bindings read each
@@ -465,6 +476,7 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   (hero scroll, timeline drag, 520 ms send) walked the whole page every frame. Trade-off (same as
   Svelte): a derived function that reads non-state values (`Date.now()`) refreshes only on a full
   render or when state it reads changes.
+  (Changed 2026-11-24: structural reads re-visit only their owner, "Kernel per route" below.)
 - **[firm]** (2026-11-21) Updates stay microtask-batched; no automatic rAF deferral. *Why:* code
   that waits with `queueMicrotask` and then measures expects the new DOM (escalei
   `depoisDoRender`, the client tests), and a change made inside a `requestAnimationFrame`
@@ -571,6 +583,62 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   Direction if that is not enough: a `<rich>` element in the core that builds DOM from a JSON tree
   with a closed tag list (no string, no sanitizer), after measuring the cost of one component
   instance.
+
+### Kernel per route (2026-11-24)
+
+Author decision, council astra/sol/fable. The contract (modules, entry, detection table,
+descriptors, `disabled` rule, invalidation, report) is `proposals/kernel-per-route.md`; these
+entries hold only the what and the why.
+
+- **[firm]** A static route (no directive, script, store, `load`, `<dialog>` or `[popover]` in
+  its closure) ships zero JS: no entry, no modulepreload, no route JSON. Navigation to it is MPA
+  with a cross-document view transition (`@view-transition { navigation: auto; }`) and
+  Speculation Rules. *Why:* the boot ran on pages with nothing to do; the platform already
+  navigates and animates between documents.
+- **[firm]** No feature flags: the build computes per route (layout, nested layouts, page,
+  components, slots, stores, block bodies, server loaders, CSS) which runtime modules the route
+  uses and generates one entry module that imports only those. Rolldown shares chunks between
+  routes. When the build is not sure, it includes the module. *Why:* a flag is one more thing for
+  the agent to set wrong, and the compiler already knows the closure. Main risk: the closure
+  misses a dependency (a body of an inactive branch, a slot, a store) and the first interaction
+  breaks; scanning every block body is mandatory.
+- **[firm]** Router (prefetch, view transitions), `log`/OTel, `call`/`stream` and overlays load
+  lazily: router and log in idle after the first mount (log keeps a queue until then),
+  `call`/`stream` on first use, overlays on first `open()` or when the route has a dialog or
+  popover. Lazy chunks are never modulepreloaded. A link clicked before the router is in is a
+  normal MPA navigation. *Why:* none of them is needed for the first paint or the first input of
+  most pages, and each one has a native fallback or a first-use trigger.
+- **[firm]** SPA navigation is additive: a target route that needs modules not loaded yet imports
+  and installs them in the running runtime before `enter`. *Why:* one kernel instance and state
+  that survives navigation.
+- **[firm]** The compiler writes pre-parsed descriptors (events, bindings, anchors) in a table of
+  the route entry; the HTML carries only ids. The SSR reads the same format. *Why:* the runtime
+  parsed `data-*` attributes and comments with regexes on every visit; the build already has the
+  parsed form, and the parser left the runtime.
+- **[firm]** JS-only controls (`<button>`, button-like and choice `<input>`, `<select>` with an
+  event or overlay trigger and no useful native fallback, and the submit of a `<form @submit>`
+  without `action`) ship `disabled`; the kernel enables each one when its handler is live. A
+  `disabled` the app writes is never touched. Links and native forms stay operable. No replay of
+  early clicks. *Why:* between paint and kernel a click did nothing or was replayed out of
+  context; a disabled control is honest and needs no queue. Rejected: replay (order and state
+  races).
+- **[firm]** Updates invalidate the owner: a structural read (`<if>`, `<for>`, `:model`, props,
+  components) re-visits only the element that made it; binding reads patch only their binding.
+  A change without a reader does nothing, and an event handler no longer renders the page. Whole
+  renders stay for boot, navigation, `load` and layout results, overlay arrival and cross-tab
+  restore. *Why:* `render(document.body)` after each structural change and after each handler was
+  the CPU cost on large pages (v3chat, escalei).
+- **[firm]** `persist` is eager and synchronous: stored fields are restored before the first
+  render and the first `mount`. *Why:* an asynchronous restore painted the default value, then
+  the stored one (flash), and a `mount` could read the default.
+- **[firm]** Slicing of long lists always comes with `<for>` (one module). *Why:* a route with a
+  `<for>` can get a long list from data at any time; slicing as a separate choice would be a
+  flag by another name.
+- **[firm]** `pragma build` prints first-load JS per route (entry + its modulepreload list) as
+  raw, gzip and brotli; a static route prints `0`. Information only, no budget. *Why:* the claim
+  is "JS in proportion to interaction"; it must be measured per route, not asserted.
+- **[firm]** No mangle-props or terser. *Why:* size comes from shipping fewer modules, not from
+  unreadable output.
 
 ## npm dependencies
 

@@ -6,30 +6,29 @@
   <title>Template</title>
   <script>self.__pragmaDev=true</script>
   <link rel="modulepreload" href="/assets/template.js">
-  <script type="application/json" id="pragma-route">{"pattern":"/template","page":"/assets/template.js","components":{"inner":"/assets/inner.js"},"stores":{"basket":"/assets/basket.js"},"loader":false,"ssr":false,"tpl":"/assets/tpl/template.js"}</script>
-  <script type="module" src="/core/boot.js"></script>
+  <script type="module" src="/assets/entry/template.js"></script>
 </head>
 <body>
-  <main data-page>
-    <span id="qty" data-text="{state.count}"></span>
-    <p id="hello" data-text="Hello {state.name}, you have {state.count} items \{literal} &amp; more"></p>
-    <a id="link" data-attr-href="/u/{state.id}?tab=1" data-attr-title="Open {state.name}">user</a>
-    <p id="mixed"><b>Total:</b> <!--{state.total}--><!--}--> tasks, <!--{state.name}--><!--}-->!</p>
-    <p id="adopt">Hi <!--{state.name}-->SSR<!--}-->!</p>
-    <p id="pending" data-text="{state.pending.length} pending"></p>
-    <ul id="tasks"><!--p:for t1 task state.tasks task.id--></ul>
-    <button id="record" data-on-click="record(event, 'a, b', -2.5, true, null, state.name)">record</button>
-    <p id="log" data-text="{state.log}"></p>
-    <input id="search" aria-label="Search" data-on-input="search">
-    <p id="query" data-text="{state.query}"></p>
-    <button id="locate" data-on-click="locate(el, event)"><b>locate</b></button>
-    <p id="spot" data-text="{state.spot}"></p>
-    <button id="save-twice" data-on-click="saveTwice">save</button>
-    <p id="saves" data-text="{state.saves}"></p>
-    <button id="not-a-function" data-on-click="name">name</button>
-    <ul id="basket"><!--p:for t8 item shared.basket.items item.id--></ul>
-    <pre id="code"><code>{literal}: <!--p:for t9 line state.tasks line.id--></code></pre>
-    <div data-c="inner"><span class="own" data-text="{state.name}"></span> <!--1{state.name}--><!--}--></div>
+  <main data-page data-b="l0">
+    <span id="qty" data-b="p0"></span>
+    <p id="hello" data-b="p1"></p>
+    <a id="link" data-b="p2">user</a>
+    <p id="mixed" data-b="p3"><b>Total:</b> <!--{--><!--}--> tasks, <!--{--><!--}-->!</p>
+    <p id="adopt" data-b="p4">Hi <!--{-->SSR<!--}-->!</p>
+    <p id="pending" data-b="p5"></p>
+    <ul id="tasks"><!--p:p6--></ul>
+    <button id="record" data-b="p7">record</button>
+    <p id="log" data-b="p8"></p>
+    <input id="search" aria-label="Search" data-b="p9">
+    <p id="query" data-b="pa"></p>
+    <button id="locate" data-b="pb"><b>locate</b></button>
+    <p id="spot" data-b="pc"></p>
+    <button id="save-twice" data-b="pd">save</button>
+    <p id="saves" data-b="pe"></p>
+    <button id="not-a-function" data-b="pf">name</button>
+    <ul id="basket"><!--p:pg--></ul>
+    <pre id="code"><code>{literal}: <!--p:ph--></code></pre>
+    <div data-c="inner" data-b="pj"><span class="own" data-b="pi"></span> <!--{--><!--}--></div>
   </main>
 </body>
 </html>

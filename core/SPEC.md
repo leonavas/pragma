@@ -159,6 +159,8 @@ any ancestor up to `routes/`. 1 root element. Expanded at build (macro).
 
 ### Rendered block DOM (client and SSR identical)
 
+> Superseded in part by `proposals/kernel-per-route.md` (2026-11-24): descriptors in the route entry replace the regex-parsed attributes and comments, and the template module moves into the entry. Where they differ, the proposal wins.
+
 Each block is a comment anchor in the DOM: `<!--p:<kind>[n] <tid>[ <value>…]-->`, kind `if`/`elif`
 (value `[!]path`), `else`, `for` (values `var path key`) or `empty`; `n` is the `data-slot` count
 of slot content. Values percent-encode every byte outside `[A-Za-z0-9_$.!]`, so none can end the
@@ -300,7 +302,7 @@ The top-level script is the component (no `export default`, `this` or `ctx`):
 - Imports are hoisted out of the per-instance factory. No top-level `await` (do it in `mount()` or
   an action), no `var`, no destructuring `let`, no other `export` (`js/component-script`); `$` and
   `$pragma` are reserved names.
-- Services: `import { shared, data, params, query, page, log, call, stream, navigate, open, close, confirm, frame } from 'pragma'`.
+- Services: `import { shared, data, params, query, page, log, call, stream, navigate, open, close, confirm, frame, layout } from 'pragma'`.
   `frame(fn)` is `requestAnimationFrame` shared by the page: all callbacks run in one frame and their
   state changes reach the DOM in one pass; it returns a cancel function.
   They are live: `data` is undefined until the loader is done (read it in functions, or rely on
@@ -444,6 +446,8 @@ Usage:
 
 ## 7. Router (client)
 
+> Superseded in part by `proposals/kernel-per-route.md` (2026-11-24): the router loads lazily, and a static route or an early click is an MPA navigation. Where they differ, the proposal wins.
+
 - Intercepts same-origin `<a>` clicks (without `target`, `download` or `data-reload`).
 - Prefetch on `pointerenter`/`focus` and when the link enters the viewport (idle, after `load` and
   the first `/_data` and `/_layout`; added links are scanned once per idle period): fetches the
@@ -460,7 +464,10 @@ Usage:
   (instant swap).
 - During a transition only, `<html>` has `data-view-transition` and `[data-page]` has
   `view-transition-name: page` (a named element is a stacking context and a backdrop root).
-- Manifest: `/_pragma/manifest.json` → `[{ "pattern": "/shop/:id", "html": "/shop/[id].html", "modules": [...], "loader": true, "ssr": false }]`.
+- Manifest: `/_pragma/manifest.json` → `[{ "pattern": "/shop/:id", "html": "/shop/[id].html", "entry": "/assets/routes/shop/_id_-<hash>.js", "modules": [...], "loader": true, "ssr": false }]`.
+  `entry` is the route's entry module (`null` for a static route: the router does a full page
+  load); `modules` is its static-import closure without the entry (what the page
+  `modulepreload`s; lazy chunks never).
 
 ## 8. CSS
 
@@ -514,28 +521,32 @@ Usage:
 
 ## 9. Build (`pragma build`)
 
+> Superseded in part by `proposals/kernel-per-route.md` (2026-11-24): one entry per reactive route replaces the runtime chunk and `#p`/`#c`/`#s` re-exports; a static route ships no JS; the report prints first-load JS per route. Where they differ, the proposal wins.
+
 ```
 dist/
-  client/                 HTML per route, hashed assets (assets/tpl/: block bodies per page), /_pragma/manifest.json
+  client/                 HTML per route, hashed assets (assets/routes/: one entry per reactive route, with its block bodies and descriptors), /_pragma/manifest.json
   server/worker.js        Cloudflare Workers entry (if any *.server.js)
   server/node.mjs         Node adapter (node:http) with static files
   server/wrangler.jsonc   assets dist/client, html_handling drop-trailing-slash, run_worker_first (no not_found_handling)
 ```
-- JS: `pragma build` bundles client modules with `rolldown`: the core runtime is one chunk, each
-  route one chunk (page, components, stores, code only it uses), code used by 2+ routes one chunk
-  per exact set of routes (a set under 4 kB joins the closest wider set); `import()` stays a
-  separate chunk and npm packages stay external. Route JSON URLs point to named re-exports
-  (`<chunk>.js#p`, `#c<i>`, `#s<i>`). Each page gets `<link rel="modulepreload">` only for the
-  chunks first paint uses (never `import()`, so not `core/router.js` or `core/overlay.js`)
-  and its template module when it has blocks (§3 "Rendered block DOM").
-  The manifest uses the same list. `pragma dev` keeps one module per file.
+- JS: `pragma build` bundles client modules with `rolldown`. Each reactive route has one entry
+  (`/assets/routes/<route>-<hash>.js`): it imports the kernel (`chunks/page`), only the per-use
+  runtime modules the route uses, the page, component and store scripts, holds the block bodies
+  and descriptors (`R.t`, `R.d`, `R.b`) and calls `start(R)`. Code used by 2+ routes is shared in
+  `chunks/shared*`. Lazy runtime chunks (`chunks/router`, `chunks/log`, `chunks/overlay`,
+  `chunks/action`) and app `import()` stay separate and are never preloaded. A static route ships
+  no JS (no entry, no modulepreload). Each page gets `<link rel="modulepreload">` for the
+  static-import closure of its entry, then `<script type="module" src="<entry>">`. The manifest
+  uses the same list. `pragma dev` keeps one module per file (entry at `/assets/entry/<route>.js`).
 - Client npm packages: prebundled with `rolldown` (tree-shaking, only names the app imports),
   one `/assets/npm/<package>-<hash>.js` per package and shared chunks in `/assets/npm/_*`;
   modulepreloaded like app modules (`docs/packages.md`).
 - Dev build adds `<script>self.__pragmaDev=true</script>` to `<head>` (path and action errors in dev).
 - `index.html` is not cached; hashed assets are `immutable`.
-- The build prints, per page, the JS gzip size and the CSS gzip size (shared + route, the number
-  that decides inline at <= 14 kB), and marks a page whose CSS is over 14 kB as a render-blocking
+- The build prints, per page, the first-load JS (entry + its modulepreload list) as raw, gzip and
+  brotli (`JS raw`, `JS gzip`, `JS br`; `0` for a static route) and the CSS gzip size (`CSS gzip`:
+  shared + route, the number that decides inline at <= 14 kB), and marks a page whose CSS is over 14 kB as a render-blocking
   stylesheet. Information only: no size limits, no size errors or warnings.
 - Server WebAssembly: a `.wasm` imported by the server graph (project file, or a package export
   that resolves to `.wasm`, its specifier rewritten to the copy) is copied to `dist/server/`
@@ -663,6 +674,8 @@ Speculation Rules, i18n.
 
 ## 14. Build ↔ runtime contract
 
+> Superseded in part by `proposals/kernel-per-route.md` (2026-11-24): no `#pragma-route`, no `boot.js`; the generated head, entry module and runtime files are in the proposal. Where they differ, the proposal wins.
+
 ### Generated HTML per page
 ```html
 <!doctype html>
@@ -728,7 +741,10 @@ Speculation Rules, i18n.
 
 ### CSS the runtime expects from `base.css`
 `html[data-scroll-lock]{overflow:hidden}`, `html[data-scroll-lock=gutter]{scrollbar-gutter:stable}`, `[hidden]{display:none!important}`,
-default `dialog::backdrop` and `.skeleton` (pulsing block honoring `prefers-reduced-motion`).
+default `dialog::backdrop`, `.skeleton` (pulsing block honoring `prefers-reduced-motion`),
+`@view-transition { navigation: auto; }` (cross-document transition for full page loads: static
+routes and clicks before the router is in) and the `html[data-view-transition] [data-page]`
+transition rules shared by both kinds of navigation.
 
 ## 15. Server ↔ build contract
 

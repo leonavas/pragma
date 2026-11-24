@@ -7,15 +7,15 @@
   <style>#tall{height:3000px}</style>
   <script>self.__pragmaDev=true</script>
   <link rel="modulepreload" href="/assets/overlay.js">
-  <script type="application/json" id="pragma-route">{"pattern":"/overlay","page":"/assets/overlay.js","components":{},"stores":{"cart":"/assets/cart.js"},"loader":false,"ssr":false,"overlays":true}</script>
-  <script type="module" src="/core/boot.js"></script>
+  <script type="module" src="/assets/entry/overlay.js"></script>
 </head>
 <body>
-  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
-  <main data-page>
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-b="l0"></span></header>
+  <main data-page data-b="l1">
     <h1 id="title">Overlay</h1>
-    <button id="open" data-on-click="open">open</button>
-    <dialog id="m"><p>modal</p><button data-close value="ok">close</button></dialog>
+    <button id="open" disabled data-b="p2">open</button>
+    <button id="kept" disabled data-b="p3">kept</button>
+    <dialog id="m"><p>modal</p><button id="close-m" data-close value="ok" disabled data-b="p4">close</button></dialog>
   </main>
 </body>
 </html>

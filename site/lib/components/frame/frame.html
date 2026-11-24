@@ -119,7 +119,7 @@
   }
 </script>
 
-<div class="flex w-full min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-ground">
+<div :data-height="$height" class="flex w-full min-w-0 flex-col overflow-hidden rounded-xl border border-line bg-ground">
   <div class="flex h-11 items-center gap-1 border-b border-line bg-sunken pr-1 font-mono text-xs">
     <button type="button" class="frame-control inline-flex h-11 min-w-11 flex-none cursor-pointer items-center justify-center text-muted transition-colors hover:text-ink" @click="reload(el)" :aria-label="$reloadLabel" .is-busy="$loading">
       <svg class="frame-reload size-3.5" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1" fill="none" stroke="currentColor" stroke-width="1.25"></path><path d="M12.4 1.6v2.9H9.5" fill="none" stroke="currentColor" stroke-width="1.25"></path></svg>
@@ -152,11 +152,11 @@
   .frame-path[data-beat="b"] { animation: frame-beat-b 1.2s var(--ease-out); }
   [data-kind="router"] .frame-kind { color: var(--color-accent-text); }
   .frame-view { height: 26rem; }
-  [data-c="frame"][data-prop-height="sm"] .frame-view { height: 18rem; }
-  [data-c="frame"][data-prop-height="lg"] .frame-view { height: 34rem; }
+  [data-height="sm"] .frame-view { height: 18rem; }
+  [data-height="lg"] .frame-view { height: 34rem; }
   @media (max-width: 29.99rem) {
     .frame-view { height: 24rem; }
-    [data-c="frame"][data-prop-height="lg"] .frame-view { height: 30rem; }
+    [data-height="lg"] .frame-view { height: 30rem; }
   }
   @keyframes frame-spin {
     to { rotate: 360deg; }

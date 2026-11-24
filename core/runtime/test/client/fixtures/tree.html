@@ -6,16 +6,15 @@
   <title>Tree</title>
   <script>self.__pragmaDev=true</script>
   <link rel="modulepreload" href="/assets/tree.js">
-  <script type="application/json" id="pragma-route">{"pattern":"/tree","page":"/assets/tree.js","components":{"node":"/assets/node.js"},"stores":{},"loader":false,"ssr":false,"tpl":"/assets/tpl/tree.js"}</script>
-  <script type="module" src="/core/boot.js"></script>
+  <script type="module" src="/assets/entry/tree.js"></script>
 </head>
 <body>
-  <main data-page>
-    <span id="qty" data-text="{state.count}"></span>
-    <div id="bar" class="bar" style="--fixed:1" data-var-left="state.left" data-var-tone="state.tone"></div>
-    <ul id="rows"><!--p:for t1 row state.rows row.id--></ul>
-    <svg id="dots" viewBox="0 0 10 10" aria-hidden="true"><!--p:for t2 row state.rows row.id--></svg>
-    <ul id="tree"><li data-c="node" class="node" data-with-node="state.root"><span data-text="{state.node.name}"></span><ul><!--p:for t9 child state.node.children child.id--><li data-c="node" data-self="c-node" class="node" data-with-node="child" data-var-depth="child.depth" data-of="t9" data-key="a" style="--depth:1"><span id="adopted" data-text="{state.node.name}">A</span><ul><!--p:for t9 child state.node.children child.id--></ul></li></ul></li></ul>
+  <main data-page data-b="l0">
+    <span id="qty" data-b="p0"></span>
+    <div id="bar" class="bar" style="--fixed:1" data-b="p1"></div>
+    <ul id="rows"><!--p:p2--></ul>
+    <svg id="dots" viewBox="0 0 10 10" aria-hidden="true"><!--p:p3--></svg>
+    <ul id="tree"><li data-c="node" class="node" data-b="p7"><span data-b="p4"></span><ul><!--p:p5--><li data-c="node" class="node" data-of="t9" data-key="a" style="--depth:1" data-b="p6"><span id="adopted" data-b="p4">A</span><ul><!--p:p5--></ul></li></ul></li></ul>
     <a id="go-b" href="/b">B</a>
     
     

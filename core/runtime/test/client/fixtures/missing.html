@@ -5,16 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Missing</title>
   <script>self.__pragmaDev=true</script>
-
-  <script type="application/json" id="pragma-route">{"pattern":"/missing","page":null,"components":{},"stores":{"cart":"/assets/cart.js"},"loader":true,"ssr":false,"tpl":"/assets/tpl/missing.js"}</script>
-  <script type="module" src="/core/boot.js"></script>
+  <script type="module" src="/assets/entry/missing.js"></script>
 </head>
 <body>
-  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
-  <main data-page>
-    <!--p:if x1 page.loading-->
-    <!--p:elif z1 page.error-->
-    <!--p:else z2-->
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-b="l0"></span></header>
+  <main data-page data-b="l1">
+    <!--p:p0-->
+    <!--p:p1-->
+    <!--p:p2-->
   </main>
 </body>
 </html>

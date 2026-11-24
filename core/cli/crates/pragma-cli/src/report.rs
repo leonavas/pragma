@@ -96,10 +96,18 @@ fn kb(bytes: u64) -> String {
 
 pub fn print_summary(report: &BuildReport) {
     let width = report.pages.iter().map(|p| p.pattern.chars().count()).max().unwrap_or(0).max(6);
-    println!("{:width$}  {:>8}  {:>8}", "page", "JS gzip", "CSS gzip");
+    // JS: first load (route entry + its modulepreload list); a static route loads none
+    println!("{:width$}  {:>8}  {:>8}  {:>8}  {:>8}", "page", "JS raw", "JS gzip", "JS br", "CSS gzip");
     for page in &report.pages {
         let blocking = if page.css_gzip_bytes > INLINE_CSS_MAX { "  > 14 KB: render-blocking stylesheet" } else { "" };
-        println!("{:width$}  {:>8}  {:>8}{blocking}", page.pattern, kb(page.js_gzip_bytes), kb(page.css_gzip_bytes));
+        println!(
+            "{:width$}  {:>8}  {:>8}  {:>8}  {:>8}{blocking}",
+            page.pattern,
+            kb(page.js_raw_bytes),
+            kb(page.js_gzip_bytes),
+            kb(page.js_brotli_bytes),
+            kb(page.css_gzip_bytes)
+        );
     }
     let server = if report.has_server { ", with server" } else { "" };
     println!("{} page(s){server}", report.pages.len());

@@ -1,4 +1,4 @@
-export function start(route, log) {
-  log.info('route', { pattern: route.pattern })
+export function start(R, log) {
+  log.info('route', { pattern: R.pattern })
   return import('./lazy.js')
 }

@@ -12,14 +12,23 @@ after(() => app?.stop())
 appSuite('serve', () => app)
 
 describe('pragma serve build output', () => {
-  const preloads = async url => (await (await fetch(app.url + url)).text()).match(/rel="modulepreload" href="[^"]+"/g).map(tag => tag.split('/assets/')[1].replace(/-[0-9a-f]{8}\.js"$/, ''))
+  const name = href => href.split('/assets/')[1].replace(/-[0-9a-f]{8}\.js$/, '')
+  const firstLoad = async url => {
+    const html = await (await fetch(app.url + url)).text()
+    const preloads = [...html.matchAll(/rel="modulepreload" href="([^"]+)"/g)].map(m => name(m[1]))
+    const entry = html.match(/<script type="module" src="([^"]+)"/)?.[1]
+    return { entry: entry && name(entry), preloads }
+  }
+  const LAZY = ['chunks/overlay', 'chunks/router', 'chunks/log', 'chunks/action']
 
-  it('each page preloads only what the first paint uses', async () => {
-    const dashboard = await preloads('/')
-    assert.ok(dashboard.includes('chunks/overlay') && dashboard.includes('routes/index'))
-    assert.ok(!dashboard.some(chunk => chunk.startsWith('routes/shop')))
-    const shop = await preloads('/shop')
-    assert.ok(shop.includes('routes/shop/index') && !shop.includes('routes/index'))
+  it('each page loads only its own entry and kernel; lazy chunks are never preloaded', async () => {
+    const dashboard = await firstLoad('/')
+    assert.equal(dashboard.entry, 'routes/index')
+    assert.ok(dashboard.preloads.includes('chunks/page'))
+    assert.ok(!dashboard.preloads.some(chunk => chunk.startsWith('routes/') || LAZY.includes(chunk)))
+    const shop = await firstLoad('/shop')
+    assert.equal(shop.entry, 'routes/shop/index')
+    assert.ok(!shop.preloads.some(chunk => chunk.startsWith('routes/') || LAZY.includes(chunk)))
     const notFound = await (await fetch(app.url + '/_404.html')).text()
     assert.ok(!notFound.includes('overlay-'))
   })

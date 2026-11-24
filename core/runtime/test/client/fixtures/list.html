@@ -7,13 +7,12 @@
   <style>#tall{height:3000px}</style>
   <script>self.__pragmaDev=true</script>
   <link rel="modulepreload" href="/assets/list.js">
-  <script type="application/json" id="pragma-route">{"pattern":"/list","page":"/assets/list.js","components":{},"stores":{"cart":"/assets/cart.js"},"loader":false,"ssr":false,"tpl":"/assets/tpl/list.js"}</script>
-  <script type="module" src="/core/boot.js"></script>
+  <script type="module" src="/assets/entry/list.js"></script>
 </head>
 <body>
-  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
-  <main data-page>
-    <ul id="l"><!--p:for i1 item state.items item.id--></ul>
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-b="l0"></span></header>
+  <main data-page data-b="l1">
+    <ul id="l"><!--p:p0--></ul>
   </main>
 </body>
 </html>

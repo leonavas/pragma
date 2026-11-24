@@ -5,18 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Prefs</title>
   <script>self.__pragmaDev=true</script>
-  <script type="application/json" id="pragma-route">{"pattern":"/prefs","page":"/assets/prefs.js","components":{},"stores":{"cart":"/assets/cart.js","theme":"/assets/theme.js"},"loader":false,"ssr":false,"tpl":"/assets/tpl/prefs.js"}</script>
-  <script type="module" src="/core/boot.js"></script>
+  <script type="module" src="/assets/entry/prefs.js"></script>
 </head>
 <body>
-  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
-  <main data-page>
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-b="l0"></span></header>
+  <main data-page data-b="l1">
     <h1 id="title">Prefs</h1>
-    <p id="mode" data-text="{shared.theme.mode}"></p>
-    <button id="wide" data-on-click="shared.theme.set('wide')">wide</button>
-    <button id="nums" data-on-click="nums(.5, 1e3, -2.5e-3, +1, 1., 7)">numbers</button>
-    <p id="got" data-text="{state.got}"></p>
-    <ul id="picks"><!--p:for p1 constructor state.parts constructor.id--></ul>
+    <p id="mode" data-b="p0"></p>
+    <button id="wide" data-b="p1">wide</button>
+    <button id="nums" data-b="p2">numbers</button>
+    <p id="got" data-b="p3"></p>
+    <ul id="picks"><!--p:p4--></ul>
   </main>
 </body>
 </html>

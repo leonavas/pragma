@@ -7,19 +7,18 @@
   <style>#tall{height:3000px}</style>
   <script>self.__pragmaDev=true</script>
   <link rel="modulepreload" href="/assets/ssr.js">
-  <script type="application/json" id="pragma-route">{"pattern":"/ssr","page":"/assets/ssr.js","components":{},"stores":{"cart":"/assets/cart.js"},"loader":true,"ssr":true,"tpl":"/assets/tpl/ssr.js"}</script>
-  <script type="module" src="/core/boot.js"></script>
+  <script type="module" src="/assets/entry/ssr.js"></script>
 </head>
 <body>
-  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
-  <main data-page>
-    <h1 id="t" data-text="{data.title}">Hello SSR</h1>
-    <ul id="l"><!--p:for s1 x data.items x.id--><li data-of="s1" data-key="1" data-text="{x.name}">one</li><li data-of="s1" data-key="2" data-text="{x.name}">two</li><!--p:empty z1--></ul>
-    <!--p:if s2 data.featured--><p data-of="s2" id="d">featured</p><!--p:else z2-->
-    <!--p:if s4 !data.featured--><!--p:else z3--><p data-of="s4" id="cd">with</p>
-    <span id="c" data-text="{state.n}"></span>
-    <button id="inc" data-on-click="inc">+</button>
-    <!--p:if s3 state.open-->
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-b="l0"></span></header>
+  <main data-page data-b="l1">
+    <h1 id="t" data-b="p0">Hello SSR</h1>
+    <ul id="l"><!--p:p1--><li data-of="s1" data-key="1" data-b="p2">one</li><li data-of="s1" data-key="2" data-b="p2">two</li><!--p:p3--></ul>
+    <!--p:p4--><p data-of="s2" id="d">featured</p><!--p:p5-->
+    <!--p:p6--><!--p:p7--><p data-of="s4" id="cd">with</p>
+    <span id="c" data-b="p8"></span>
+    <button id="inc" data-b="p9">+</button>
+    <!--p:pa-->
   </main>
   <script type="application/json" id="pragma-data">{"data":{"title":"Hello SSR","items":[{"id":1,"name":"one"},{"id":2,"name":"two"}],"featured":true}}</script>
   <script>

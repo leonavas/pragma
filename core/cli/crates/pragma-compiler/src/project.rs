@@ -233,7 +233,7 @@ impl Project {
             js_files: Vec::new(),
             embedded: HashMap::new(),
             public_files: Vec::new(),
-            framework: PathBuf::from(if !root.join(".pragma/boot.js").is_file() && root.join(legacy::DIR).join("boot.js").is_file() { legacy::DIR } else { ".pragma" }),
+            framework: PathBuf::from(if !root.join(".pragma/page.js").is_file() && root.join(legacy::DIR).join("page.js").is_file() { legacy::DIR } else { ".pragma" }),
             diags: Vec::new(),
         };
         p.load_config();

@@ -9,44 +9,44 @@
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/css/index.css" data-pragma-route-css>
 <script>self.__pragmaDev=true</script>
+<link rel="modulepreload" href="/assets/core/page.js">
+<link rel="modulepreload" href="/assets/core/branch.js">
+<link rel="modulepreload" href="/assets/core/list.js">
 <link rel="modulepreload" href="/assets/routes/index.js">
 <link rel="modulepreload" href="/assets/lib/components/card/card.js">
 <link rel="modulepreload" href="/assets/lib/components/counter/counter.js">
 <link rel="modulepreload" href="/assets/lib/state/cart.js">
-<link rel="modulepreload" href="/assets/core/router.js">
-<link rel="modulepreload" href="/assets/core/log.js">
 <link rel="modulepreload" href="/assets/utils/fmt.js">
-<link rel="modulepreload" href="/assets/tpl/index.js">
-<script type="application/json" id="pragma-route">{"pattern":"/","page":"/assets/routes/index.js","components":{"card":"/assets/lib/components/card/card.js","counter":"/assets/lib/components/counter/counter.js"},"stores":{"cart":"/assets/lib/state/cart.js"},"loader":false,"ssr":false,"tpl":"/assets/tpl/index.js"}</script>
-<script type="module" src="/assets/core/boot.js"></script>
+<script type="module" src="/assets/entry/index.js"></script>
+<script>addEventListener('pageswap',e=>e.viewTransition&&document.documentElement.setAttribute('data-view-transition',''));addEventListener('pagereveal',e=>{const v=e.viewTransition,h=document.documentElement;if(v)h.setAttribute('data-view-transition',''),v.finished.finally(()=>h.removeAttribute('data-view-transition'))});addEventListener('pageshow',e=>e.persisted&&document.documentElement.removeAttribute('data-view-transition'))</script>
 <script type="module" src="/_pragma/dev.js"></script>
 </head>
 <body>
 <header class="flex items-center gap-4 p-4">
   <a href="/" aria-current="page">Home</a>
-  <button data-c="counter" class="btn" data-on-click="add"><span data-text="{state.count}"></span></button>
-  <span data-text="{shared.cart.total}"></span>
+  <button data-c="counter" class="btn" disabled data-b="l0"><span data-b="l1"></span></button>
+  <span data-b="l2"></span>
 </header>
-<main data-page>
+<main data-page data-b="l3">
 <section class="p-4">
   <h1 class="text-2xl font-bold">Products</h1>
-  <button class="btn" data-on-click="toggle" data-open="about">Toggle</button>
-  <div data-c="card" class="card p-4 mt-4" data-class-featured="state.featured" data-prop-heading="Featured" data-prop-featured="true">
-  <h2 class="text-lg" data-text="{state.heading}"></h2>
-  <!--p:if t0 state.featured-->
-  <!--p:else t1-->
+  <button class="btn" data-open="about" disabled data-b="p0">Toggle</button>
+  <div data-c="card" class="card p-4 mt-4" data-b="p1">
+  <h2 class="text-lg" data-b="p2"></h2>
+  <!--p:p3-->
+  <!--p:p4-->
   
     <p>Card body</p>
     
   
-  <footer><button class="btn" data-on-click="buy">Buy</button><button class="btn" data-on-click="toggle" data-text="{state.open}" data-slot="1"></button></footer>
+  <footer><button class="btn" disabled data-b="p5">Buy</button><button class="btn" disabled data-b="p6"></button></footer>
 </div>
-  <ul data-show="state.open">
-    <!--p:for t4 item state.items item.id-->
-    <!--p:empty t5-->
+  <ul data-b="p7">
+    <!--p:p8-->
+    <!--p:p9-->
   </ul>
 </section>
 </main>
-<footer class="text-sm text-neutral-500" data-text="{query.ref}"></footer>
+<footer class="text-sm text-neutral-500" data-b="l4"></footer>
 </body>
 </html>

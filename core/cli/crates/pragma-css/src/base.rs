@@ -80,6 +80,9 @@ const TOKENS_DARK: &str = r#"  [data-theme="dark"] {
 }
 "#;
 
+/// Cross-document view transitions: a static route navigates as a normal page load (MPA).
+const VIEW_TRANSITION: &str = "@view-transition {\n  navigation: auto;\n}\n";
+
 const BASE: &str = r#"@layer base {
   html {
     background-color: var(--page-bg);
@@ -253,6 +256,7 @@ fn render(filter: Option<(&HashSet<String>, &str)>) -> String {
         }
     }
     s.push('\n');
+    s.push_str(VIEW_TRANSITION);
     s.push_str(BASE);
     s.push('\n');
     match filter {

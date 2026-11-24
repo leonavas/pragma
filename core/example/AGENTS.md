@@ -1,6 +1,6 @@
 # AGENTS.md
 
-A pragma app uses native HTML, CSS, and JS without a framework. Read the relevant file in `.pragma/docs/` before you change code.
+A pragma app uses native HTML, CSS, and JS with pragma, a small, opinionated framework, and no UI framework. Read the relevant file in `.pragma/docs/` before you change code.
 
 ## Version check
 

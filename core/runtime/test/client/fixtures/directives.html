@@ -7,44 +7,43 @@
   <style>#tall{height:3000px}</style>
   <script>self.__pragmaDev=true</script>
   <link rel="modulepreload" href="/assets/directives.js">
-  <script type="application/json" id="pragma-route">{"pattern":"/directives","page":"/assets/directives.js","components":{"counter":"/assets/counter.js"},"stores":{"cart":"/assets/cart.js"},"loader":false,"ssr":false,"tpl":"/assets/tpl/directives.js"}</script>
-  <script type="module" src="/core/boot.js"></script>
+  <script type="module" src="/assets/entry/directives.js"></script>
 </head>
 <body>
-  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-text="{shared.cart.items.length}"></span></header>
-  <main data-page>
-    <h1 id="name" data-text="{state.name}"></h1>
-    <a id="link" data-attr-href="state.link" data-attr-aria-disabled="state.disabled" data-attr-title="state.title" data-attr-data-x="state.active">link</a>
-    <p id="cls" class="base" data-class-active="state.active" data-class-inactive="!state.active">class</p>
-    <p id="show" data-show="state.active">show</p>
-    <p id="hide" data-show="!state.active">hide</p>
-    <!--p:if t1 state.visible-->
-    <!--p:else z1-->
+  <header><nav><a href="/a">A</a> <a href="/b">B</a></nav> <span id="qty" data-b="l0"></span></header>
+  <main data-page data-b="l1">
+    <h1 id="name" data-b="p0"></h1>
+    <a id="link" data-b="p1">link</a>
+    <p id="cls" class="base" data-b="p2">class</p>
+    <p id="show" data-b="p3">show</p>
+    <p id="hide" data-b="p4">hide</p>
+    <!--p:p5-->
+    <!--p:p6-->
     <ul id="list">
-      <!--p:for t2 item state.items item.id-->
-      <!--p:empty z3-->
+      <!--p:p7-->
+      <!--p:p8-->
     </ul>
-    <div data-with-p="state.person"><span id="w" data-text="{p.name}"></span></div>
-    <input id="m-text" data-model="state.name">
-    <input id="m-check" type="checkbox" data-model="state.accepted">
-    <input id="m-num" type="number" data-model="state.qty">
-    <select id="m-sel" data-model="state.color"><!--p:for t5 c state.colors c--></select>
-    <input id="r-p" type="radio" name="size" value="p" data-model="state.size">
-    <input id="r-g" type="radio" name="size" value="g" data-model="state.size">
-    <span id="echo-qty" data-text="{state.qty}"></span>
-    <span id="echo-accepted" data-text="{state.accepted}"></span>
-    <span id="echo-size" data-text="{state.size}"></span>
-    <span id="echo-color" data-text="{state.color}"></span>
-    <button id="toggle" data-on-click="toggle">toggle</button>
-    <button id="save" data-on-click="save">save</button>
-    <button id="fail" data-on-click="fail">fail</button>
-    <span id="saving" data-show="state.saving">saving</span>
-    <!--p:if t6 state.response-->
-    <p id="error" data-text="{state.error}"></p>
-    <button id="buy" data-on-click="buy">buy</button>
-    <span id="tick" data-text="{state.tick}"></span>
-    <form data-on-submit="submit(event)"><button id="submit">submit</button></form>
-    <span id="sent" data-text="{state.sent}"></span>
+    <div data-b="pa"><span id="w" data-b="p9"></span></div>
+    <input id="m-text" data-b="pb">
+    <input id="m-check" type="checkbox" data-b="pc">
+    <input id="m-num" type="number" data-b="pd">
+    <select id="m-sel" data-b="pf"><!--p:pe--></select>
+    <input id="r-p" type="radio" name="size" value="p" data-b="pg">
+    <input id="r-g" type="radio" name="size" value="g" data-b="pg">
+    <span id="echo-qty" data-b="ph"></span>
+    <span id="echo-accepted" data-b="pi"></span>
+    <span id="echo-size" data-b="pj"></span>
+    <span id="echo-color" data-b="pk"></span>
+    <button id="toggle" data-b="pl">toggle</button>
+    <button id="save" data-b="pm">save</button>
+    <button id="fail" data-b="pn">fail</button>
+    <span id="saving" data-b="po">saving</span>
+    <!--p:pp-->
+    <p id="error" data-b="pq"></p>
+    <button id="buy" data-b="pr">buy</button>
+    <span id="tick" data-b="ps"></span>
+    <form data-b="pt"><button id="submit">submit</button></form>
+    <span id="sent" data-b="pu"></span>
   </main>
 </body>
 </html>

@@ -84,9 +84,8 @@ fn every_rule_the_tools_report_is_in_the_docs() {
 
 #[test]
 fn the_theme_key_is_the_same_everywhere() {
-    let contract = read("core/runtime/contract.js");
-    let key = between(&contract, "export const THEME_KEY = '", "'");
-    assert!(read("core/runtime/theme.js").contains(&format!("localStorage.setItem('{key}', ")), "core/runtime/theme.js (kept out of contract.js: importing it would split contract.js into its own chunk)");
+    // THEME_KEY left contract.js (kernel-per-route §1): theme.js holds the key
+    let key = between(&read("core/runtime/theme.js"), "localStorage.setItem('", "'").to_string();
     assert!(read("core/cli/crates/pragma-compiler/src/lib.rs").contains(&format!("localStorage.getItem('{key}')")), "the theme script of pragma-compiler");
 }
 

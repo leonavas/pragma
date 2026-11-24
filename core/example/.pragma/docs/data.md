@@ -273,7 +273,7 @@ When a script is deferred to the browser, its `$x` bindings fill at boot while t
 - Put every write and every secret-using operation in a server action. Update `data` or a `let` after the call.
 - Read `data` inside functions only (`js/top-level-data`). Without `ssr`, `data` is undefined until `load` finishes.
 - Load data from `fetch` with secrets from `env`, a database via `env`, or `import products from './_products.json' with { type: 'json' }`.
-- Default mode is no SSR: prebuilt HTML holds static content and what the scripts' initial state decides ("Prebuilt HTML"), and `.pragma/boot.js` renders the skeleton and what depends on `data`.
+- Default mode is no SSR: prebuilt HTML holds static content and what the scripts' initial state decides ("Prebuilt HTML"), and the runtime renders the skeleton and what depends on `data`.
 - Enable `ssr = true` when crawlers, link previews, or data-bound `<head>`/JSON-LD tags need server data (`routes.md`).
 - Do not fetch data in `mount` or client actions. Do not create `/api/...` routes or endpoints for page data. Do not return secrets from `load`. `env` exists only on the server.
 - Put auth checks in `routes/_middleware.server.js` and keep the user in `locals`. Store sessions in `__Host-` cookies.

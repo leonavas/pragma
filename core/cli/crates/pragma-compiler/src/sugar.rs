@@ -361,8 +361,8 @@ mod tests {
     fn text_beside_elements_gets_markers() {
         let (out, errors) = sugar("<label><input type=\"checkbox\"> {task.title} ({$n})</label>");
         assert!(errors.is_empty(), "{errors:?}");
-        assert_eq!(out, "<label><input type=\"checkbox\"> <!--{task.title}--><!--}--> (<!--{$.n}--><!--}-->)</label>");
-        assert_eq!(sugar("<c-button>Save {$n}</c-button>").0, "<c-button>Save <!--{$.n}--><!--}--></c-button>");
+        assert_eq!(out, "<label><input type=\"checkbox\"> <!--{--><!--}--> (<!--{--><!--}-->)</label>");
+        assert_eq!(sugar("<c-button>Save {$n}</c-button>").0, "<c-button>Save <!--{--><!--}--></c-button>");
     }
 
     #[test]
@@ -378,7 +378,7 @@ mod tests {
         assert!(errors.is_empty(), "{errors:?}");
         assert_eq!(out, "<pre data-attr-aria-label=\"$.path\"><code><!--p:for * line $.lines line.n--></code></pre>|<span data-attr-data-n=\"line.n\" data-text=\"{line.text}\"></span>");
         assert_eq!(sugar("<pre>$ curl {url} <span>{$path}</span></pre>").0, "<pre>$ curl {url} <span data-text=\"{$.path}\"></span></pre>");
-        assert_eq!(sugar("<code>a <b>{$x} and <i>y</i> {$z}</b> {raw}</code>").0, "<code>a <b><!--{$.x}--><!--}--> and <i>y</i> <!--{$.z}--><!--}--></b> {raw}</code>");
+        assert_eq!(sugar("<code>a <b>{$x} and <i>y</i> {$z}</b> {raw}</code>").0, "<code>a <b><!--{--><!--}--> and <i>y</i> <!--{--><!--}--></b> {raw}</code>");
         assert_eq!(sugar("<pre><button @click=\"copy(line)\" .on=\"$on\">c</button></pre>").0, "<pre><button data-on-click=\"copy(line)\" data-class-on=\"$.on\">c</button></pre>");
         assert_eq!(sugar("<pre><span :text=\"$x\"></span></pre>").1[0].0, "html/text-removed");
     }

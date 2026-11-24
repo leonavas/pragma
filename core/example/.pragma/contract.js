@@ -7,7 +7,6 @@ export const MANIFEST = PRAGMA + 'manifest.json'
 export const ASSETS = '/assets/'
 export const IMMUTABLE = 'public, max-age=31536000, immutable'
 
-export const ROUTE_ID = 'pragma-route'
 export const DATA_ID = 'pragma-data'
 export const MAIN = 'main[data-page]'
 export const OF = 'data-of'
@@ -15,8 +14,6 @@ export const KEY = 'data-key'
 export const ROUTE_CSS = 'data-pragma-route-css'
 export const SHARED_CSS = 'data-pragma-shared-css'
 export const LAYOUT_PREFIX = 'l'
-export const PERSIST_SUFFIX = '$persist'
-export const THEME_KEY = 'pragma:theme'
 export const STORE_KEY = name => (name === 'theme' ? 'pragma:store:theme' : 'pragma:' + name)
 
 const segments = path => path.split('/').filter(Boolean)
@@ -58,7 +55,10 @@ export function matchRoute(table, path) {
   return null
 }
 
-export const matchPattern = (pattern, path) => matchRoute(sortRoutes([{ pattern }]), path)?.params ?? null
+export function matchPattern(pattern, path) {
+  const parts = decodedSegments(path)
+  return parts && paramsOf(segments(pattern), parts)
+}
 
 export const pageUrl = file => encodeURI(file.replace(/(\/index)?\.html$/, '')) || '/'
 

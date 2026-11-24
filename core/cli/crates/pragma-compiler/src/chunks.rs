@@ -1,5 +1,4 @@
 use crate::Module;
-use crate::project::rel_str;
 use pragma_diag::Diagnostic;
 use rolldown::{
     Bundler, BundlerOptions, ChunkFilenamesOutputOption, CodeSplittingMode, HashCharacters, InputItem, IsExternal, LegalComments, LogLevel,
@@ -12,44 +11,17 @@ use std::sync::Arc;
 
 const TINY_GROUP_BYTES: usize = 4096;
 
+/// A route of the bundle: its entry module (`None`: a static route, no JS).
 pub struct Route {
     pub name: String,
-    pub page: Option<PathBuf>,
-    pub components: Vec<(String, PathBuf)>,
-    pub stores: Vec<(String, PathBuf)>,
-}
-
-impl Route {
-    pub fn is_empty(&self) -> bool {
-        self.page.is_none() && self.components.is_empty() && self.stores.is_empty()
-    }
-
-    fn exports(&self) -> Vec<(String, &PathBuf)> {
-        let mut out: Vec<(String, &PathBuf)> = self.page.iter().map(|m| (page_export(), m)).collect();
-        out.extend(self.components.iter().enumerate().map(|(i, (_, m))| (component_export(i), m)));
-        out.extend(self.stores.iter().enumerate().map(|(i, (_, m))| (store_export(i), m)));
-        out
-    }
-}
-
-pub fn page_export() -> String {
-    "p".into()
-}
-
-pub fn component_export(i: usize) -> String {
-    format!("c{i}")
-}
-
-pub fn store_export(i: usize) -> String {
-    format!("s{i}")
+    pub entry: Option<crate::kernel::Entry>,
 }
 
 pub struct Chunks {
     pub files: Vec<(String, String)>,
     pub imports: HashMap<String, Vec<String>>,
-    pub of_module: HashMap<PathBuf, String>,
+    /// URL of each route's entry chunk.
     pub routes: Vec<Option<String>>,
-    pub boot: String,
 }
 
 impl Chunks {
@@ -84,8 +56,8 @@ fn spec(path: &Path) -> String {
 fn shared_groups(mods: &BTreeMap<PathBuf, Module>, routes: &[Route], core: &[PathBuf]) -> Vec<(PathBuf, String)> {
     let mut used_by: BTreeMap<PathBuf, BTreeSet<usize>> = BTreeMap::new();
     for (i, r) in routes.iter().enumerate() {
-        let entries: Vec<PathBuf> = r.exports().into_iter().map(|(_, m)| m.clone()).collect();
-        for m in crate::closure(mods, &entries, false) {
+        let Some(entry) = &r.entry else { continue };
+        for m in crate::closure(mods, &entry.paths(), false) {
             if !m.starts_with("node_modules") && !core.contains(&m) {
                 used_by.entry(m).or_default().insert(i);
             }
@@ -116,17 +88,20 @@ fn shared_groups(mods: &BTreeMap<PathBuf, Module>, routes: &[Route], core: &[Pat
     ordered.into_iter().enumerate().flat_map(|(i, (_, ms))| ms.into_iter().map(move |m| (m, format!("shared{i:03}")))).collect()
 }
 
-/// Bundles app and core modules into one chunk per route, shared chunks and the core runtime.
-/// npm modules stay as they are (`external`, imported by their hashed URL).
+/// Bundles app and core modules into one entry chunk per reactive route, shared chunks and the
+/// kernel. npm modules stay as they are (`external`, imported by their hashed URL).
 pub fn bundle(
     dir: &Path,
     mods: &BTreeMap<PathBuf, Module>,
     urls: &HashMap<PathBuf, String>,
-    boot: &Path,
+    kernel: &Path,
     routes: &[Route],
     diags: &mut Vec<Diagnostic>,
 ) -> Option<Chunks> {
     let _ = fs::remove_dir_all(dir);
+    if routes.iter().all(|r| r.entry.is_none()) {
+        return Some(Chunks { files: Vec::new(), imports: HashMap::new(), routes: routes.iter().map(|_| None).collect() });
+    }
     let src_dir = dir.join("src");
     let mut externals: BTreeSet<String> = BTreeSet::new();
     for (path, m) in mods.iter().filter(|(p, _)| !p.starts_with("node_modules")) {
@@ -152,34 +127,20 @@ pub fn bundle(
     }
     let entry_dir = dir.join("entries");
     let _ = fs::create_dir_all(&entry_dir);
-    let boot_name = crate::deps::asset_path(&rel_str(boot)).trim_end_matches(".js").to_string();
-    let mut input = vec![InputItem { name: Some(boot_name.clone()), import: src_dir.join(boot).to_string_lossy().into_owned() }];
+    let mut input = Vec::new();
     let mut route_entries: Vec<Option<String>> = Vec::new();
     for (i, r) in routes.iter().enumerate() {
-        if r.is_empty() {
+        let Some(entry) = &r.entry else {
             route_entries.push(None);
             continue;
-        }
-        let src: String = r
-            .exports()
-            .iter()
-            .map(|(name, m)| {
-                let has = pragma_jslint::exported_names(&mods[*m].src);
-                let names: Vec<String> = has.iter().filter_map(|n| match n.as_str() {
-                    "default" => Some(format!("default as {name}")),
-                    "persist" => Some(format!("persist as {name}$persist")),
-                    _ => None,
-                }).collect();
-                format!("export {{ {} }} from \"{}\";\n", names.join(", "), spec(&src_dir.join(m)))
-            })
-            .collect();
+        };
         let file = entry_dir.join(format!("{i}.js"));
-        let _ = fs::write(&file, src);
+        let _ = fs::write(&file, entry.source(|m| src_dir.join(m).to_string_lossy().into_owned()));
         let import = file.to_string_lossy().into_owned();
         input.push(InputItem { name: Some(r.name.clone()), import: import.clone() });
         route_entries.push(Some(import));
     }
-    let core = crate::closure(mods, &[boot.to_path_buf()], false);
+    let core = crate::closure(mods, &[kernel.to_path_buf()], false);
     let group_of: HashMap<String, String> = shared_groups(mods, routes, &core).into_iter().map(|(m, g)| (src_dir.join(m).to_string_lossy().into_owned(), g)).collect();
     let name_of: Arc<_> = Arc::new(move |ids: Vec<String>, _: &rolldown::ChunkingContext| {
         let names: Vec<Option<String>> = ids.iter().map(|id| group_of.get(id).cloned()).collect();
@@ -223,17 +184,17 @@ pub fn bundle(
         Ok(Err(errs)) => {
             for e in errs.into_vec() {
                 let id = e.id().unwrap_or_default().to_string();
-                let file = id.strip_prefix(&format!("{}/", src_dir.display())).map(PathBuf::from).unwrap_or_else(|| PathBuf::from(boot));
+                let file = id.strip_prefix(&format!("{}/", src_dir.display())).map(PathBuf::from).unwrap_or_else(|| kernel.to_path_buf());
                 diags.push(Diagnostic::error(file, 1, 1, "js/syntax", format!("cannot bundle: {}", e.to_string().trim())));
             }
             return None;
         }
         Err(e) => {
-            diags.push(Diagnostic::error(boot, 1, 1, "js/syntax", e));
+            diags.push(Diagnostic::error(kernel, 1, 1, "js/syntax", e));
             return None;
         }
     };
-    let mut chunks = Chunks { files: Vec::new(), imports: HashMap::new(), of_module: HashMap::new(), routes: Vec::new(), boot: String::new() };
+    let mut chunks = Chunks { files: Vec::new(), imports: HashMap::new(), routes: Vec::new() };
     let mut entry_urls: HashMap<String, String> = HashMap::new();
     for o in &out.assets {
         let rolldown_common::Output::Chunk(c) = o else { continue };
@@ -242,14 +203,6 @@ pub fn bundle(
             && let Some(facade) = &c.facade_module_id
         {
             entry_urls.insert(facade.to_string(), url.clone());
-            if c.name.as_str() == boot_name {
-                chunks.boot = url.clone();
-            }
-        }
-        for id in &c.module_ids {
-            if let Ok(rel) = Path::new(id.as_str()).strip_prefix(&src_dir) {
-                chunks.of_module.insert(PathBuf::from(rel_str(rel)), url.clone());
-            }
         }
         let imports = c.imports.iter().map(|i| if i.starts_with('/') || i.contains("://") { i.to_string() } else { url_of(i) }).collect();
         chunks.imports.insert(url, imports);

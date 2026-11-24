@@ -26,6 +26,9 @@ async function open(path) {
   page.on('request', r => page.requests.push(new URL(r.url()).pathname))
   await page.goto(server.url + path)
   await page.waitForFunction(() => document.querySelector('#qty')?.textContent !== '')
+  // router.js arrives in idle after the first mount (a click before it is a document navigation);
+  // startRouter writes the history key
+  await page.waitForFunction(() => history.state?.k)
   return page
 }
 
@@ -458,6 +461,19 @@ test('router: popstate with an open overlay is consumed by the overlay', async (
   assert.equal(await text(p, '#title'), 'Overlay')
 })
 
+test('build-disabled controls: enabled when the handler is live, data-close when overlay.js is in; a :disabled of the app wins', async () => {
+  const p = await open('/overlay')
+  await p.waitForFunction(() => !document.querySelector('#open').disabled)
+  assert.equal(await p.isDisabled('#kept'), true)
+  await p.evaluate(() => __overlay.update(s => { s.locked = false }))
+  await p.waitForFunction(() => !document.querySelector('#kept').disabled)
+  await p.click('#open')
+  await p.waitForFunction(() => document.querySelector('#m').open && !document.querySelector('#close-m').disabled)
+  await p.click('#close-m')
+  await p.waitForFunction(() => !document.querySelector('#m').open)
+  assert.deepEqual(p.errors, [])
+})
+
 test('performance: 1000 items with keyed diff', async () => {
   const p = await open('/list')
   const r = await p.evaluate(async () => {
@@ -679,7 +695,7 @@ test('a const holding a function made by a call is a handler; a non-function thr
   assert.equal(await text(p, '#saves'), '2')
   assert.deepEqual(p.errors, [])
   await p.click('#not-a-function')
-  assert.match(p.errors.join(), /@click="name" needs a function, but "name" holds string/)
+  assert.match(p.errors.join(), /@click="name" needs a function, but it holds string/)
 })
 
 test('loader: a redirect replaces the history entry and an error keeps its status and body', async () => {
@@ -851,7 +867,7 @@ test('a component renders itself: tree from data, adopts prerendered levels, dep
   const p = await open('/tree')
   const names = () => p.$$eval('#tree span', s => s.map(x => x.textContent))
   assert.deepEqual(await names(), ['root', 'A', 'A1', 'B'])
-  assert.deepEqual(await p.$$eval('#tree li[data-self]', ls => ls.map(l => l.style.getPropertyValue('--depth'))), ['1', '2', '1'])
+  assert.deepEqual(await p.$$eval('#tree li.node li.node', ls => ls.map(l => l.style.getPropertyValue('--depth'))), ['1', '2', '1'])
   assert.equal(await p.locator('#adopted').textContent(), 'A')
   assert.equal(await p.locator('#tree li[data-key="a"] > span').count(), 1)
   assert.deepEqual(await p.$$eval('#dots circle', cs => cs.map(c => [c.namespaceURI, c.getAttribute('cx')])), [['http://www.w3.org/2000/svg', '1'], ['http://www.w3.org/2000/svg', '2']], 'a body inside <svg> is parsed as SVG')
@@ -869,8 +885,8 @@ test('a component renders itself: tree from data, adopts prerendered levels, dep
   assert.deepEqual(await p.$eval('#tree', el => {
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_COMMENT), anchors = []
     while (walker.nextNode()) anchors.push(walker.currentNode.data)
-    return [anchors, el.querySelectorAll('template').length]
-  }), [Array(4).fill('p:for t9 child state.node.children child.id'), 0], 'items clone comment anchors; bodies come from the template module')
+    return [anchors.length, new Set(anchors).size, /^p:p\w+$/.test(anchors[0]), el.querySelectorAll('template').length]
+  }), [4, 1, true, 0], 'items clone comment anchors; bodies come from the route entry')
   assert.deepEqual(p.errors, [])
 
   await p.evaluate(() => document.querySelector('#go-b').click())
@@ -909,7 +925,7 @@ test('an overlay that exists only inside a block opens', async () => {
   assert.deepEqual(p.errors, [])
 })
 
-test('a store named theme keeps its own key: the theme value is not read as store data, old store data moves', async () => {
+test('a store named theme keeps its own key: the theme value is not read as store data', async () => {
   const visit = async init => {
     const ctx = await browser.newContext()
     await ctx.addInitScript(init)
@@ -925,11 +941,7 @@ test('a store named theme keeps its own key: the theme value is not read as stor
   await themed.click('#wide')
   await themed.waitForFunction(() => localStorage.getItem('pragma:store:theme') === '{"mode":"wide"}')
   assert.equal(await themed.evaluate(() => localStorage.getItem('pragma:theme')), 'dark')
-
-  const old = await visit(() => localStorage.getItem('pragma:store:theme') ?? localStorage.setItem('pragma:theme', '{"mode":"wide"}'))
-  assert.equal(await text(old, '#mode'), 'wide')
-  assert.deepEqual(await old.evaluate(() => [localStorage.getItem('pragma:theme'), localStorage.getItem('pragma:store:theme')]), [null, '{"mode":"wide"}'])
-  assert.deepEqual([...themed.errors, ...old.errors], [])
+  assert.deepEqual(themed.errors, [])
 })
 
 test('a loop variable named like an Object.prototype member is passed to the handler', async () => {

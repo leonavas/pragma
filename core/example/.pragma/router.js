@@ -1,11 +1,15 @@
-import { log, traceHeaders, newTrace } from './log.js'
-import { fetchData } from './loader.js'
-import { MAIN, MANIFEST, ROUTE_CSS, ROUTE_ID, SHARED_CSS, matchRoute, pageUrl, sortRoutes } from './contract.js'
+import { traceHeaders, newTrace } from './trace.js'
+import { fetchData } from './net.js'
+import { MAIN, MANIFEST, ROUTE_CSS, SHARED_CSS, matchRoute, pageUrl, sortRoutes } from './contract.js'
+
+// Loaded by page.js in idle after the first mount (or on the first navigate/redirect). A click on a
+// link before that is a normal document navigation. A route without JS (manifest `entry: null`)
+// is always a document navigation.
 
 const MAX_HOPS = 20
 const pages = new Map(), seen = new Set(), positions = new Map()
 const noop = () => {}
-let page, manifest, here, key, seq = 0, io, mo, hops = 0
+let page, log, manifest, here, key, seq = 0, io, mo, hops = 0
 
 const where = u => u.pathname + u.search
 const newKey = () => Math.random().toString(36).slice(2)
@@ -94,7 +98,7 @@ async function prefetch(href) {
   if (seen.has(where(url)) || where(url) === here) return
   seen.add(where(url))
   const e = await entry(url).catch(noop)
-  if (!e) return
+  if (!e?.entry) return
   if (!e.ssr) text(pageUrl(e.html)).catch(noop)
   for (const m of e.modules ?? []) preload(m)
 }
@@ -169,20 +173,23 @@ export function redirect(to, replace = false) {
 async function go(to, pop, replace) {
   const url = new URL(to, location.href), n = ++seq, t0 = performance.now()
   newTrace()
-  let e, doc, route, mods, pending, css, moved
+  let e, doc, route, pending, css, moved
   try {
     e = await entry(url)
-    if (e) {
+    if (e?.entry) {
       pending = e.loader && !e.ssr ? fetchData(url) : undefined
       pending?.catch(noop)
-      for (const m of e.modules ?? []) import(m).catch(noop)
+      for (const m of e.modules ?? []) preload(m)
+      const R = import(e.entry)
+      R.catch(noop)
       doc = new DOMParser().parseFromString(await (e.ssr ? html(url, true) : text(pageUrl(e.html))), 'text/html')
-      route = JSON.parse(doc.getElementById(ROUTE_ID).textContent)
       const nextCss = doc.head.querySelector(`link[rel=stylesheet][${ROUTE_CSS}]`)?.getAttribute('href')
       if (nextCss) css = loadRouteCss(nextCss)
-      mods = await page.importRoute(route)
+      // Additive: the entry installs what this route needs into the live runtime (again: a no-op).
+      route = (await R).default
+      page.install(route.use)
       if (css) await css.ready
-    }
+    } else e = null
   } catch (err) {
     if (err.moved) moved = err.moved
     else log.error('navigation failed', { 'url.path': url.pathname, 'error.message': err.message })
@@ -208,7 +215,7 @@ async function go(to, pop, replace) {
     main.dataset.page = next.dataset.page
     syncHead(doc)
     syncRouteCss(css?.el ?? null, doc.head.querySelector(`style[${ROUTE_CSS}]`))
-    const done = page.enter(route, mods, url, doc, pending)
+    const done = page.enter(route, url, doc, pending)
     const y = pop ? positions.get(key) ?? 0 : 0
     if (!pop && url.hash) document.getElementById(decodeURIComponent(url.hash.slice(1)))?.scrollIntoView()
     else scrollTo(0, y)
@@ -242,6 +249,7 @@ function transition(swap) {
 
 export function startRouter(pageApi) {
   page = pageApi
+  log = page.log
   history.scrollRestoration = 'manual'
   key = history.state?.k ?? newKey()
   history.replaceState({ ...history.state, k: key }, '')

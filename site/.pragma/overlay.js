@@ -1,5 +1,9 @@
-import { afterMotion, reveal } from './directives.js'
-import { log } from './log.js'
+import { K, reveal } from './dom.js'
+import { afterMotion } from './motion.js'
+
+// Loaded by page.js on the first open()/close()/confirm(), or when a route with a <dialog> or
+// [popover] enters. Its arrival runs one whole render, which enables the build-disabled
+// data-open/data-close controls.
 
 let stack = []
 let opener
@@ -135,7 +139,7 @@ export function initOverlays() {
 
 export function open(id, o = document.activeElement) {
   const el = get(id)
-  if (!el) return log.error('overlay not found', { 'pragma.overlay.id': id })
+  if (!el) return K.log.error('overlay not found', { 'pragma.overlay.id': id })
   reveal(el)
   if (el.popover) {
     if (el.matches(':popover-open')) return

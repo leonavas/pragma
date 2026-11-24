@@ -1,266 +1,267 @@
-import { render, patch, resume, sliced, startSlice, spent, hooks, scopeOf, input, eventCall, useBodies, DEV, PAGE } from './directives.js'
-import { log } from './log.js'
-import { reactive, readers, onChange, persist, persistStores, create } from './state.js'
-import { fetchData, fetchLayout, load, loadResult, call, stream } from './loader.js'
-import { DATA_ID, MAIN, PERSIST_SUFFIX, matchPattern, coerce, instantiate, isPlain, readonlyViews } from './contract.js'
+import { H, K, D, S as SCOPE, DEV, render, update, useTables, get, ctx } from './dom.js'
+import { reactive, readers, create, S } from './state.js'
+import { MAIN, coerce, isPlain, matchPattern, readonlyViews } from './contract.js'
 
-// The build sets `overlays` in the route on pages with a dialog or popover; enter() then loads overlay.js (not modulepreloaded).
-let overlayModule = null, overlayLoad = null
-const overlays = () => (overlayLoad ??= import('./overlay.js').then(m => (m.initOverlays(), (overlayModule = m))))
-const open = (...a) => overlays().then(m => m.open(...a))
-const close = (...a) => overlays().then(m => m.close(...a))
-const confirm = (...a) => overlays().then(m => m.confirm(...a))
-export const closeOverlays = () => overlayModule?.closeAll() ?? 0
-export const popOverlay = () => overlayModule?.handlePopState() ?? false
+export { K }
 
-// The router is not needed for first paint: boot.js loads it right after the page mounts.
-let routerLoad = null
-export const router = () => (routerLoad ??= import('./router.js'))
-const navigate = (to, options) => router().then(r => r.navigate(to, options))
-const redirect = (to, replace) => router().then(r => r.redirect(to, replace))
-
-const C = Symbol(), O = Symbol(), mounted = new Set(), comps = {}, types = new Set()
-const shared = {}
-let cur, queued, whole, slices = 0, mounts = [], layout = null, layoutSeq = 0
-const dirty = new Set()
-
-function schedule(target, key) {
-  if (!whole) {
-    const r = target && readers(target, key)
-    if (r) dirty.add(r)
-    else whole = true
-  }
-  if (queued) return
-  queued = true
-  queueMicrotask(flush)
+// Per-use modules (R.use) install their hooks once; nothing is ever uninstalled.
+const installed = new WeakSet()
+export function install(use = []) {
+  for (const f of use) if (!installed.has(f)) installed.add(f), f(K)
 }
+
+// Lazy modules: loaded on first use (or in idle after the first mount), never modulepreloaded.
+// A failed load (offline, or the document unloading while it is in flight) is forgotten, so the
+// next call tries again.
+const once = f => {
+  let p
+  return () => (p ??= f().catch(e => { p = null; throw e }))
+}
+// Loads started by the runtime itself (idle, enter, the log queue) have no caller to reject to.
+const quiet = load => () => load().catch(() => {})
+// A service whose module is not loaded yet: the call loads it, then forwards.
+const later = (load, names, pick = m => m) => Object.fromEntries(names.map(k => [k, (...a) => load().then(m => pick(m)[k](...a))]))
+
+let loaded
+const router = once(() => import('./router.js').then(m => (m.startRouter(api), m)))
+const overlays = once(() => import('./overlay.js').then(m => (m.initOverlays(), (K.overlay = m), schedule(), m)))
+const actions = once(() => import('./action.js'))
+const { navigate, redirect } = later(router, ['navigate', 'redirect'])
+const { open, close, confirm } = later(overlays, ['open', 'close', 'confirm'])
+
+// `log` is a queue until log.js arrives; initClientLog replays it.
+const queue = []
+let real = null
+const logs = once(() => import('./log.js').then(m => (m.initClientLog(location.hostname, queue), (real = m.log))))
+const log = { flush: () => real?.flush() }
+for (const l of ['debug', 'info', 'warn', 'error']) log[l] = (msg, attrs) => (real ? real[l](msg, attrs) : (queue.push([l, msg, attrs]), quiet(logs)(), undefined))
+
+const api = { install, enter, leave, log, closeOverlays: () => K.overlay?.closeAll() ?? 0, popOverlay: () => K.overlay?.handlePopState() ?? false, get loaded() { return loaded } }
+
+const C = Symbol(), O = Symbol(), mounted = new Set(), comps = {}, types = new Set(), shared = {}, dirty = new Set()
+let cur, queued, whole, mounts = [], layout = null, slicing = 0
+
+Object.defineProperties(K, Object.getOwnPropertyDescriptors({
+  log, redirect, schedule,
+  get cur() { return cur },
+  set layout(v) { layout = v },
+}))
+
+// schedule(target, key): the readers of that key are dirty (the disconnected ones are pruned).
+// schedule(): one whole render (enter, loader data, layout, overlay.js, reveal, storage).
+export function schedule(t, k) {
+  if (t === undefined) whole = 1
+  else {
+    const set = readers(t, k)
+    if (!set) return
+    for (const r of set) (r.el ?? r[0]).isConnected ? dirty.add(r) : set.delete(r)
+    if (!dirty.size) return
+  }
+  if (!queued) queued = 1, queueMicrotask(flush)
+}
+S.n = schedule
+
+const now = () => performance.now()
+const SLICE_MS = 12
 
 function flush() {
-  queued = false
+  queued = 0
   if (!cur) return
-  const groups = [...dirty]
-  dirty.clear()
-  if (!whole) {
-    patch(groups)
-    return persistStores()
+  ctx.end = now() + SLICE_MS
+  if (whole) {
+    whole = 0
+    dirty.clear()
+    render(document.body, { __proto__: null, shared, layout: reactive(layout), params: cur.params, query: cur.query, page: cur.page })
+  } else {
+    const rs = [...dirty]
+    dirty.clear()
+    update(rs)
   }
-  whole = false
-  render(document.body, { __proto__: null, shared, layout: reactive(layout), params: cur.params, query: cur.query, page: cur.page })
-  persistStores()
   runMounts()
-  later()
+  H.flushed()
+  next()
 }
-
-// `mount` calls share the slice budget with the render: once it is spent, at least one more runs and
-// the rest wait for the next task, in order.
-function runMounts() {
-  let ran = false
-  while (mounts.length) {
-    if (ran && spent()) return
-    const o = mounts.shift()
-    if (!mounted.has(o)) continue
-    ran = true
-    try { cleanup(o, o.mount?.(o.el)) } catch (e) { reportError(e) }
-  }
-}
-
-// Work left by a slice (list items, mounts) continues in a background-priority task, after the browser
-// could paint and answer input. A state change runs a full render, which starts the slices over.
-const task = self.scheduler?.postTask ? fn => scheduler.postTask(fn, { priority: 'background' }) : fn => setTimeout(fn)
-
-function later() {
-  if ((sliced() || mounts.length) && !slices) slices = 1, task(nextSlice)
-}
-
-function nextSlice() {
-  slices = 0
-  if (!cur) return
-  startSlice()
-  runMounts()
-  if (sliced() && !spent()) {
-    resume()
-    runMounts()
-  }
-  later()
-}
-
-// The overlay manager calls this right before the first open: the content renders, then it shows.
-hooks.reveal = () => {
-  whole = true
+H.reveal = () => {
+  whole = 1
   flush()
 }
 
-function cleanup(o, off) {
-  if (typeof off?.then !== 'function') return void (o.off = off)
-  off.then(fn => {
-    if (typeof fn !== 'function') return
-    if (mounted.has(o)) o.off = fn
-    else try { fn() } catch (e) { reportError(e) }
-  }, reportError)
-}
-
-let frameCallbacks = [], frameRequest = 0
-
-function runFrame(now) {
-  frameRequest = 0
-  const callbacks = frameCallbacks
-  frameCallbacks = []
-  for (const fn of callbacks) try { fn(now) } catch (e) { reportError(e) }
-}
-
-function frame(fn) {
-  frameCallbacks.push(fn)
-  frameRequest ||= requestAnimationFrame(runFrame)
-  return () => {
-    const i = frameCallbacks.indexOf(fn)
-    if (i >= 0) frameCallbacks.splice(i, 1)
+// `mount` calls share the slice budget with the render: once it is spent, at least one more runs
+// and the rest wait for the next task, in order.
+function runMounts() {
+  let ran = false
+  while (mounts.length) {
+    if (ran && now() > ctx.end) return
+    const o = mounts.shift()
+    if (!mounted.has(o)) continue
+    ran = true
+    try { off(o, o.mount?.(o.el)) } catch (e) { reportError(e) }
   }
 }
 
-const readonly = readonlyViews(isPlain, name => `pragma: "${name}" is a prop: props are read-only, also inside; copy what you change into a let (\`let rows = ${name}.map(row => ({ ...row }))\`)`)
+// Work left by a slice (list items, mounts) continues in a background task, after the browser
+// could paint and answer input.
+const task = self.scheduler?.postTask ? fn => scheduler.postTask(fn, { priority: 'background' }) : fn => setTimeout(fn)
+function next() {
+  if ((K.slices?.pending() || mounts.length) && !slicing) slicing = 1, task(slice)
+}
+function slice() {
+  slicing = 0
+  if (!cur) return
+  ctx.end = now() + SLICE_MS
+  runMounts()
+  if (K.slices?.pending() && now() <= ctx.end) {
+    K.slices.resume()
+    runMounts()
+  }
+  next()
+}
+
+function off(o, f) {
+  if (typeof f?.then !== 'function') return void (o.off = f)
+  f.then(f => {
+    if (typeof f !== 'function') return
+    if (mounted.has(o)) o.off = f
+    else try { f() } catch (e) { reportError(e) }
+  }, reportError)
+}
+
+let frames = [], frameReq = 0
+function frame(fn) {
+  frames.push(fn)
+  frameReq ||= requestAnimationFrame(t => {
+    frameReq = 0
+    const f = frames
+    frames = []
+    for (const fn of f) try { fn(t) } catch (e) { reportError(e) }
+  })
+  return () => {
+    const i = frames.indexOf(fn)
+    if (i >= 0) frames.splice(i, 1)
+  }
+}
+
+const refresh = () => K.net?.refreshLayout()
+async function* stream(name, input, options) {
+  const m = await actions()
+  try { yield* m.stream(cur.url, name, input, options, navigate) } finally { refresh() }
+}
 
 const services = {
-  shared, log, navigate, open, close, confirm, frame,
+  shared, log, navigate, open, close, confirm, frame, stream,
   get data() { return reactive(cur?.data) },
   get layout() { return reactive(layout) },
   get params() { return cur?.params },
   get query() { return cur?.query },
   get page() { return cur?.page },
-  call: (name, data) => call(cur.url, name, data, navigate).then(r => (refreshLayout(), r)),
-  stream: (name, data, options) => refreshAfter(stream(cur.url, name, data, options, navigate)),
+  call: (name, input) => actions().then(m => m.call(cur.url, name, input, navigate)).then(r => (refresh(), r)),
 }
 
-// `layout` comes from routes/_layout.server.js: on the full page load, then again after each action.
-export function loadLayout(pending, doc) {
-  const n = ++layoutSeq
-  if (!pending) {
-    const embedded = doc.getElementById(DATA_ID)
-    layout = embedded ? JSON.parse(embedded.textContent).layout ?? null : layout
-    return
+const readonly = readonlyViews(isPlain, name => `pragma: "${name}" is a prop: props are read-only, also inside; copy what you change into a let (\`let rows = ${name}.map(row => ({ ...row }))\`)`)
+
+// A component (or the page) instance: its script runs once with `state` (reactive) and services.
+function instance(el, factory, w) {
+  const target = {}, o = { el, w, target, scope: reactive(target) }
+  const prop = (name, d) => {
+    const k = name.toLowerCase()
+    Object.defineProperty(target, name, {
+      enumerable: true,
+      get: () => {
+        const v = coerce(o.w && Object.hasOwn(o.w, k) ? o.w[k] : el[D]?.p?.[k], d)
+        return DEV ? readonly(v, name) : v
+      },
+    })
   }
-  return load(pending).then(result => {
-    if (!result || n !== layoutSeq) return
-    if (result.redirect) return redirect(result.redirect, true)
-    if (result.error) return log.error('layout load failed', { 'error.message': result.error.message })
-    layout = result.layout ?? null
-    schedule()
-  })
-}
-
-const refreshLayout = () => cur?.route.layout && loadLayout(fetchLayout(cur.url))
-
-async function* refreshAfter(lines) {
-  try { yield* lines } finally { refreshLayout() }
-}
-
-function instance(el, mod, w) {
-  const target = {}, o = { el, w, target }
-  o.scope = reactive(target)
-  o.mount = create(target, () => instantiate(mod, target, o.scope, services, (k, d, name) => {
-    const v = coerce(o.w && Object.hasOwn(o.w, k) ? o.w[k] : el.getAttribute('data-prop-' + k) ?? undefined, d)
-    return DEV ? readonly(v, name) : v
-  }))
+  const a = create(target, () => factory?.(o.scope, { __proto__: services, prop })) ?? {}
+  for (const k in a) if (k !== 'mount') target[k] = a[k]
+  o.mount = a.mount
   mounted.add(o)
   mounts.push(o)
   return (el[C] = o)
 }
 
-function store(name, mod) {
+function store(name, [factory, keys]) {
   const target = {}, scope = reactive(target)
-  const api = create(target, () => mod.default?.(scope, services)) ?? {}
-  for (const k in api) target[k] = api[k]
-  persist(target, name, mod.persist)
+  const a = create(target, () => factory?.(scope, services)) ?? {}
+  for (const k in a) target[k] = a[k]
+  if (keys?.length) K.persist ? K.persist(target, name, keys) : DEV && fail('persist')
   return scope
 }
+const fail = what => { throw new Error(`pragma: ${what} needs ${what}.js (build bug)`) }
 
 function unmount(o) {
   mounted.delete(o)
   try { o.off?.() } catch (e) { reportError(e) }
 }
 
-hooks.on = t => types.has(t) || (types.add(t), document.addEventListener(t, onEvent, true))
-hooks.remove = n => { for (const o of mounted) if (n.contains(o.el)) unmount(o) }
-hooks.enter = (el, s, x, w = null) => {
-  if (x === PAGE) return { __proto__: s, data: reactive(cur.data), state: cur.o.scope, [O]: cur.o }
-  const mod = comps[el.dataset.c]
-  if (!mod) return s
-  const o = el[C] ?? instance(el, mod, w)
+H.on = t => types.has(t) || (types.add(t), document.addEventListener(t, onEvent, true))
+H.remove = n => { for (const o of mounted) if (n.contains(o.el)) unmount(o) }
+H.enter = (el, s, d, w = null) => {
+  if (d.x === 2) return { __proto__: s, data: reactive(cur.data), state: cur.o.scope, [O]: cur.o }
+  const f = comps[d.c]
+  if (!f) return s
+  const o = el[C] ?? instance(el, f, w)
   o.w = w
   return { __proto__: s, state: o.scope, [O]: o }
 }
 
+// Delegation: the first element from the target up whose descriptor handles this event type.
+// Writes in the handler go through the Proxy and schedule their own readers.
 function onEvent(e) {
-  if (e.type === 'input' && input(e)) schedule()
-  const el = e.target.closest?.(`[data-on-${e.type}]`)
-  if (!el) return
-  const o = scopeOf(el)?.[O] ?? cur.o, [name, args, store] = eventCall(el, e.type, e), fn = store ?? o.target[name]
+  if (e.type === 'input') H.input(e)
+  for (let el = e.target; el?.nodeType === 1; el = el.parentElement) {
+    const h = el[D]?.e?.[e.type]
+    if (h) return fire(el, h, e)
+  }
+}
+
+function fire(el, [p, args], e) {
+  const s = el[SCOPE], o = s?.[O] ?? cur.o
+  let fn, self
+  if (p.length === 1) fn = o.target[p[0]]
+  else self = s && get(s, p.slice(0, -1)), (fn = self?.[p.at(-1)])
   if (typeof fn !== 'function') {
-    if (DEV) throw new Error(`pragma: @${e.type}="${name}" needs a function, but "${name}" holds ${fn === null ? 'null' : typeof fn} (in the ${name.includes('.') ? 'store' : 'script'}): use a function or a const holding one (\`const saveLater = debounce(save, 300)\`)`)
+    if (DEV) throw new Error(`pragma: @${e.type}="${p.join('.')}" needs a function, but it holds ${fn === null ? 'null' : typeof fn}: use a function or a const holding one (\`const saveLater = debounce(save, 300)\`)`)
     return
   }
   if (e.type === 'submit') e.preventDefault()
-  let r
-  try { r = fn(...args) } finally { schedule() }
-  if (typeof r?.then === 'function') r.finally(schedule)
-}
-
-onChange(schedule)
-
-const importPart = async u => {
-  const [file, name] = u.split('#')
-  const m = await import(file)
-  return name ? { default: m[name], persist: m[name + PERSIST_SUFFIX] } : m
-}
-
-export async function importRoute(r) {
-  const all = o => Promise.all(Object.entries(o ?? {}).map(async ([k, u]) => [k, await importPart(u)]))
-  const [page, c, s, bodies] = await Promise.all([r.page && importPart(r.page), all(r.components), all(r.stores), r.tpl && import(r.tpl)])
-  return { page, comps: Object.fromEntries(c), stores: Object.fromEntries(s), bodies }
+  fn.apply(self, args.map(a => (a === 0 ? e : a === 1 ? el : Array.isArray(a) ? s && get(s, a) : a.v)))
 }
 
 export function leave() {
-  if (!cur) return
-  for (const o of mounted) if (cur.o.el.contains(o.el)) unmount(o)
+  if (cur) for (const o of mounted) if (cur.o.el.contains(o.el)) unmount(o)
 }
 
-function settle(p, result) {
-  p.data = result.data
-  p.page.error = result.error
-  p.page.loading = false
-  if (result.error) log.error('loader failed', { 'url.path': p.url.pathname, 'error.message': result.error.message })
-}
-
-function loadData(p, doc, pending) {
-  if (!p.route.loader) return Promise.resolve()
-  const embedded = p.route.ssr && doc.getElementById(DATA_ID)
-  // SSR data is set before the page script runs, so the script sees what the server rendered with.
-  if (embedded) {
-    const result = loadResult(JSON.parse(embedded.textContent))
-    if (!result.redirect) settle(p, result)
-    return Promise.resolve().then(() => cur === p && result.redirect && redirect(result.redirect, true))
-  }
-  p.page.loading = true
-  return load(pending ?? fetchData(p.url)).then(result => {
-    if (!result) return cur === p && schedule()
-    if (!result.redirect) settle(p, result)
-    if (cur === p) return result.redirect ? redirect(result.redirect, true) : schedule()
-  })
-}
-
-export function enter(route, mods, url, doc, pending) {
-  useBodies(mods.bodies, !cur)
-  Object.assign(comps, mods.comps)
-  for (const [name, mod] of Object.entries(mods.stores)) shared[name] ??= store(name, mod)
-  if (route.overlays && !overlayLoad) {
-    // overlay.js is not modulepreloaded: a click on an @open button before it arrives runs again once it is in.
-    const early = ev => !overlayModule && ev.target.closest?.('[data-open]') && overlays().then(() => ev.target.click())
-    document.addEventListener('click', early)
-    overlays().then(() => document.removeEventListener('click', early))
-  }
-  const p = (cur = { route, url, params: matchPattern(route.pattern, url.pathname) ?? {}, query: Object.fromEntries(url.searchParams), page: { loading: false, error: null } })
-  const done = loadData(p, doc, pending)
-  p.o = instance(document.querySelector(MAIN), mods.page ?? {}, null)
-  whole = true
+// Runs a route on the live document: boot (from start) or SPA navigation (from the router, after
+// it installed R.use).
+export function enter(R, url, doc, pending) {
+  useTables(R, !cur)
+  Object.assign(comps, R.comps)
+  for (const n in R.stores) shared[n] ??= store(n, R.stores[n])
+  if (R.overlays) quiet(overlays)()
+  const p = (cur = { route: R, url, params: matchPattern(R.pattern, url.pathname) ?? {}, query: Object.fromEntries(url.searchParams), page: reactive({ loading: false, error: null }) })
+  const done = R.loader ? K.net.loadData(p, doc, pending) : Promise.resolve()
+  p.o = instance(document.querySelector(MAIN), R.page, null)
+  whole = 1
   flush()
   return done
+}
+
+let booted = 0
+const idle = self.requestIdleCallback ?? setTimeout
+
+export function start(R) {
+  install(R.use)
+  if (booted) return
+  booted = 1
+  const url = new URL(location.href), net = K.net
+  const pending = R.loader && !R.ssr ? self.__pd ?? net.fetchData(url) : undefined
+  const layoutDone = R.layout ? net.loadLayout(R.ssr ? null : self.__pl ?? net.fetchLayout(url), document) : null
+  self.__pd = self.__pl = null
+  loaded = Promise.all([enter(R, url, document, pending), layoutDone]).catch(() => {})
+  // After the first mount: logging, then the router (links, prefetch, back/forward).
+  idle(() => {
+    quiet(logs)()
+    quiet(router)()
+  })
 }

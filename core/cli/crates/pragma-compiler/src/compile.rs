@@ -1,6 +1,6 @@
 //! Output: final HTML and compiled ops for SSR (SPEC §3 "Compiled format").
 use crate::directive::{self, Dir};
-use crate::html::{Attr, Element, Node, VOID, open_tag, push_attr};
+use crate::html::{Attr, Element, Node, VOID, push_attr};
 use serde_json::{Value, json};
 use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -26,12 +26,45 @@ pub fn write_nodes(nodes: &[Node], out: &mut String, compact: bool) {
     }
 }
 
-/// `#interp` → `<!--{path}-->` (`<!--n{path}-->` for slot content n components up); `<!--}-->` closes it.
-fn interp_open(e: &Element) -> String {
-    format!("<!--{}{}-->", e.value("data-slot").unwrap_or(""), e.value("data-text").unwrap_or(""))
+/// `#interp` → `<!--{-->text<!--}-->`: its path and slot level are a MARK binding of the parent's
+/// descriptor (kernel-per-route §5).
+const INTERP_OPEN: &str = "<!--{-->";
+const INTERP_CLOSE: &str = "<!--}-->";
+
+/// Internal attribute of a JS-only control (kernel-per-route §6), written as `disabled`.
+pub const BUILD_DISABLED: &str = "#disabled";
+/// Descriptor id of an element or block anchor (kernel-per-route §5.2).
+pub const DESC: &str = "data-b";
+
+/// Attributes that leave the body HTML for the element's descriptor (kernel-per-route §5.2).
+pub fn moves_to_descriptor(name: &str) -> bool {
+    let n = name.to_ascii_lowercase();
+    matches!(n.as_str(), "data-text" | "data-show" | "data-model" | "data-slot" | "data-self")
+        || ["data-attr-", "data-var-", "data-class-", "data-on-", "data-with-", "data-prop-"].iter().any(|p| n.starts_with(p))
 }
 
-const INTERP_CLOSE: &str = "<!--}-->";
+/// Whether the body HTML writes `a`: an element with a descriptor drops the attributes it took.
+fn written(e: &Element, a: &Attr) -> bool {
+    !(e.has(DESC) && moves_to_descriptor(&a.name))
+}
+
+fn push_body_attr(out: &mut String, a: &Attr) {
+    if a.name == BUILD_DISABLED {
+        out.push_str("disabled");
+    } else {
+        push_attr(out, a);
+    }
+}
+
+fn open_tag(out: &mut String, e: &Element) {
+    out.push('<');
+    out.push_str(&e.name);
+    for a in e.attrs.iter().filter(|a| written(e, a)) {
+        out.push(' ');
+        push_body_attr(out, a);
+    }
+    out.push('>');
+}
 
 /// A value inside an anchor comment: bytes outside `[A-Za-z0-9_$.!]` are percent-encoded, so no
 /// value can end the comment (`-->`, `--!>`) or split its fields.
@@ -47,9 +80,15 @@ fn anchor_value(v: &str) -> String {
     out
 }
 
-/// Block anchor (SPEC §3 "Rendered block DOM"): `<!--p:<kind>[slot] <tid>[ <value>…]-->` with kind
-/// `if`/`elif` (`[!]path`), `else`, `for` (`var path key`) or `empty`.
+/// Block anchor: `<!--p:<id>-->` with its descriptor id (kernel-per-route §5.2). Without one (the
+/// tree before `kernel::describe`): `<!--p:<kind>[slot] <tid>[ <value>…]-->` with kind `if`/`elif`
+/// (`[!]path`), `else`, `for` (`var path key`) or `empty`.
 pub fn anchor(e: &Element) -> Option<String> {
+    if directive::is_block(e)
+        && let Some(id) = e.value(DESC)
+    {
+        return Some(format!("<!--p:{id}-->"));
+    }
     let (kind, values): (&str, Vec<&str>) = if let Some(v) = e.value("data-if") {
         ("if", vec![v])
     } else if let Some(v) = e.value("data-else-if") {
@@ -76,7 +115,7 @@ pub fn anchor(e: &Element) -> Option<String> {
 
 pub fn write_element(e: &Element, out: &mut String, compact: bool) {
     if e.name == directive::INTERP {
-        out.push_str(&interp_open(e));
+        out.push_str(INTERP_OPEN);
         out.push_str(INTERP_CLOSE);
         return;
     }
@@ -107,7 +146,7 @@ pub fn write_element(e: &Element, out: &mut String, compact: bool) {
 /// Moves every block body out of the page: the block stays as an empty anchor whose `data-tid` is a
 /// short id (`<prefix><base36>`, equal bodies share one): `l` in the layout, `t` inside `<main
 /// data-page>`. Returns one `<template data-tpl="<tid>">` per body and the `<template data-def>` of
-/// self calls, which leave the page for its template module.
+/// self calls, which leave the page for the route entry (`R.t`, `R.d`).
 pub fn hoist(body: &mut Vec<Node>) -> Vec<Element> {
     hoist_with(body, 'l')
 }
@@ -120,7 +159,9 @@ fn hoist_with(nodes: &mut Vec<Node>, prefix: char) -> Vec<Element> {
     while i < nodes.len() {
         match &nodes[i] {
             Node::Element(e) if e.is("template") && e.has("data-def") => {
-                let Node::Element(def) = nodes.remove(i) else { unreachable!() };
+                let Node::Element(mut def) = nodes.remove(i) else { unreachable!() };
+                // the region it comes from: the prefix of its descriptor ids
+                def.attrs.push(Attr { name: "data-r".into(), value: Some(prefix.to_string()), pos: def.pos });
                 out.push(def);
             }
             _ => i += 1,
@@ -135,7 +176,7 @@ struct Hoisted {
     out: Vec<Element>,
 }
 
-fn base36(mut n: usize) -> String {
+pub fn base36(mut n: usize) -> String {
     let mut digits = Vec::new();
     loop {
         digits.push(b"0123456789abcdefghijklmnopqrstuvwxyz"[n % 36]);
@@ -187,6 +228,7 @@ fn hoist_nodes(nodes: &mut [Node], h: &mut Hoisted, foreign: bool) {
     }
 }
 
+#[cfg(test)]
 fn js_string(v: &str) -> String {
     let mut out = String::with_capacity(v.len() + 2);
     out.push('\'');
@@ -203,6 +245,7 @@ fn js_string(v: &str) -> String {
     out
 }
 
+#[cfg(test)]
 fn js_object(entries: &[(String, String)]) -> String {
     let fields: Vec<String> = entries
         .iter()
@@ -214,10 +257,10 @@ fn js_object(entries: &[(String, String)]) -> String {
     format!("{{{}}}", fields.join(","))
 }
 
-/// The page's template module: `export default { <tid>: '<body>' }` and, for self calls,
-/// `export const d = { '<data-c id>': '<root>' }`.
-pub fn template_module(bodies: &[Element], compact: bool) -> String {
-    let (mut tpls, mut defs) = (Vec::new(), Vec::new());
+/// The route's bodies: `R.t` (`<tid>` → block body) and `R.d` (`<data-c id>` → self-call root;
+/// the first one wins when the layout and the page both define it).
+pub fn body_tables(bodies: &[Element], compact: bool) -> (Vec<(String, String)>, Vec<(String, String)>) {
+    let (mut tpls, mut defs): (Vec<(String, String)>, Vec<(String, String)>) = (Vec::new(), Vec::new());
     for t in bodies {
         let mut html = String::new();
         for c in t.element_children() {
@@ -225,10 +268,19 @@ pub fn template_module(bodies: &[Element], compact: bool) -> String {
         }
         if let Some(id) = t.value("data-tpl") {
             tpls.push((id.to_string(), html));
-        } else if let Some(id) = t.value("data-def") {
+        } else if let Some(id) = t.value("data-def")
+            && !defs.iter().any(|(d, _)| d == id)
+        {
             defs.push((id.to_string(), html));
         }
     }
+    (tpls, defs)
+}
+
+/// `body_tables` as a module (`export default` the block bodies, `export const d` the self calls).
+#[cfg(test)]
+pub fn template_module(bodies: &[Element], compact: bool) -> String {
+    let (tpls, defs) = body_tables(bodies, compact);
     let mut out = format!("export default {}\n", js_object(&tpls));
     if !defs.is_empty() {
         out.push_str(&format!("export const d = {}\n", js_object(&defs)));
@@ -440,7 +492,7 @@ fn component_ops(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
 
 fn element_body(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
     if e.name == directive::INTERP {
-        o.html(&interp_open(e));
+        o.html(INTERP_OPEN);
         let v = e.value("data-text").unwrap_or("");
         if directive::template_paths(v).iter().all(|p| server_path(p, vars)) {
             o.op(json!(["text", v]));
@@ -467,6 +519,8 @@ fn element_body(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
         }
         match d {
             Dir::Text => text = Some(p.to_string()),
+            // a build-disabled control: the kernel enables it, then applies the binding (§6)
+            Dir::Attr(n) if n == "disabled" && e.has(BUILD_DISABLED) => {}
             Dir::Attr(n) => attrs.push((n.to_string(), p.to_string())),
             Dir::Class(n) => classes.push(json!([n, p, neg])),
             Dir::Show => show = Some((p.to_string(), neg)),
@@ -478,13 +532,13 @@ fn element_body(e: &Element, o: &mut Ops, vars: &mut Vec<String>, seal: bool) {
         let fixed = e.value("style").map(|v| v.replace('{', "\\{")).into_iter();
         attrs.push(("style".into(), fixed.chain(css_vars).collect::<Vec<_>>().join(";")));
     }
-    for a in &e.attrs {
+    for a in e.attrs.iter().filter(|a| written(e, a)) {
         let lname = a.name.to_ascii_lowercase();
         if (lname == "class" && !classes.is_empty()) || attrs.iter().any(|(n, _)| n.eq_ignore_ascii_case(&lname)) || (lname == "hidden" && show.is_some()) {
             continue;
         }
         let mut s = String::from(" ");
-        push_attr(&mut s, a);
+        push_body_attr(&mut s, a);
         o.html(&s);
     }
     for (n, p) in attrs {
@@ -608,16 +662,16 @@ mod tests {
         p.attrs.push(Attr { name: "data-attr-title".into(), value: Some("{state.t}".into()), pos: Default::default() });
         let mut html = String::new();
         write_element(&p, &mut html, false);
-        assert_eq!(html, "<p data-attr-href=\"/p/{data.id}\" data-attr-title=\"{state.t}\">Hi <!--{data.name}--><!--}-->, <!--{state.n}--><!--}--></p>");
+        assert_eq!(html, "<p data-attr-href=\"/p/{data.id}\" data-attr-title=\"{state.t}\">Hi <!--{--><!--}-->, <!--{--><!--}--></p>");
         assert_eq!(
             normalized(ops(&[Node::Element(p)], &BTreeSet::new(), &[])),
             json!([
                 ["html", "<p data-attr-href=\"/p/{data.id}\" data-attr-title=\"{state.t}\""],
                 ["attr", "href", "/p/{data.id}"],
                 ["attr", "title", "{state.t}"],
-                ["html", ">Hi <!--{data.name}-->"],
+                ["html", ">Hi <!--{-->"],
                 ["text", "{data.name}"],
-                ["html", "<!--}-->, <!--{state.n}-->"],
+                ["html", "<!--}-->, <!--{-->"],
                 ["text", "{state.n}"],
                 ["html", "<!--}--></p>"]
             ])

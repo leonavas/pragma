@@ -9,6 +9,7 @@ mod expand;
 mod hash;
 mod html;
 mod js;
+mod kernel;
 pub mod layout;
 mod owners;
 mod prerender;
@@ -43,7 +44,10 @@ pub struct BuildOptions {
 #[derive(Debug, Clone, Default)]
 pub struct PageReport {
     pub pattern: String,
+    /// First-load JS (route entry + its modulepreload list); 0 for a static route.
+    pub js_raw_bytes: u64,
     pub js_gzip_bytes: u64,
+    pub js_brotli_bytes: u64,
     /// Shared + route CSS, gzip: the number that decides inline (<= 14 kB) or a render-blocking stylesheet.
     pub css_gzip_bytes: u64,
 }
@@ -527,8 +531,12 @@ struct PageOut<'a> {
     page_classes: BTreeSet<String>,
     is_404: bool,
     overlays: bool,
-    /// Block and self-call bodies `compile::hoist` moved out of the page (its template module).
+    /// Block and self-call bodies `compile::hoist` moved out of the page (`R.t`, `R.d`).
     bodies: Vec<html::Element>,
+    /// What the closure of the route uses (kernel-per-route §4).
+    scan: kernel::Scan,
+    /// Descriptors of a reactive route; `None`: a static route (no JS).
+    described: Option<kernel::Described>,
 }
 
 const PD: &str = "<script>self.__pd=fetch('/_data'+location.pathname+location.search,{headers:{accept:'application/json'}});self.__pd.catch(()=>{})</script>";
@@ -730,6 +738,7 @@ fn analyze<'p>(p: &'p Project, diags: &mut Vec<Diagnostic>) -> Analysis<'p> {
         }
         webmcp::strip_notool(&mut exp.body);
         let overlays = any_element(&exp.body, &|e| e.is("dialog") || e.has("popover"));
+        kernel::mark_disabled(&mut exp.body);
         let (loader, ssr) = match page.server.as_ref().and_then(|s| sources.get(s)) {
             Some(src) => {
                 let names = pragma_jslint::exported_names(src);
@@ -794,8 +803,18 @@ fn analyze<'p>(p: &'p Project, diags: &mut Vec<Diagnostic>) -> Analysis<'p> {
         } else {
             sc.page_classes
         };
-        let bodies = compile::hoist(&mut exp.body);
-        outs.push(PageOut { page, exp, loader, ssr, stores: sc.stores, page_classes, is_404, overlays, bodies });
+        let mut bodies = compile::hoist(&mut exp.body);
+        let scan = kernel::scan(&exp.body, &bodies);
+        let reactive = scan.directive || page.module.is_some() || exp.components.values().any(|c| c.module.is_some()) || !sc.stores.is_empty() || loader || overlays;
+        // a control with @open/@close is enabled once overlay.js is in: the route loads it at start
+        let overlays = overlays || scan.opens;
+        let described = if reactive {
+            Some(kernel::describe(&mut exp.body, &mut bodies))
+        } else {
+            kernel::strip(&mut exp.body, &mut bodies);
+            None
+        };
+        outs.push(PageOut { page, exp, loader, ssr, stores: sc.stores, page_classes, is_404, overlays, bodies, scan, described });
     }
     Analysis { sources, theme_src, comp_css, page_css, classes, outs, shared_classes }
 }
@@ -806,26 +825,163 @@ struct Client {
     docs: Vec<String>,
 }
 
+/// Route CSS of one page: the per-route stylesheet (its URL and text) and the CSS its fonts come from.
+struct RouteCss {
+    url: Option<String>,
+    src: Option<String>,
+    gz: u64,
+    font_css: String,
+}
+
+/// First-load JS of a page: raw, gzip and brotli bytes.
+#[derive(Default, Clone, Copy)]
+struct Size {
+    raw: u64,
+    gz: u64,
+    br: u64,
+}
+
 fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, report: &mut BuildReport, diags: &mut Vec<Diagnostic>) -> Client {
     let prod = opts.mode == Mode::Prod;
     let Analysis { sources, theme_src, comp_css, page_css, classes, outs, shared_classes } = a;
     let mut docs = Vec::with_capacity(outs.len());
-    let boot = p.framework.join("boot.js");
-    let overlay = p.framework.join("overlay.js");
-    if !opts.root.join(&boot).is_file() {
-        diags.push(Diagnostic::error(".pragma/boot.js", 1, 1, "app/structure", ".pragma/boot.js not found; the framework lives in .pragma/ (created by pragma new)"));
+    let kernel_js = p.framework.join(kernel::KERNEL);
+    if !opts.root.join(&kernel_js).is_file() {
+        diags.push(Diagnostic::error(".pragma/page.js", 1, 1, "app/structure", ".pragma/page.js not found; the framework lives in .pragma/ (created by pragma new, updated by pragma upgrade)"));
     }
-    let page_entries = |o: &PageOut| -> Vec<PathBuf> {
-        let mut e = vec![boot.clone()];
-        e.extend(o.page.module.clone());
-        e.extend(o.exp.components.values().filter_map(|c| c.module.clone()));
-        e.extend(o.stores.iter().filter_map(|s| p.stores.get(s).cloned()));
-        if o.overlays && opts.root.join(&overlay).is_file() {
-            e.push(overlay.clone());
+
+    let shared_names: Vec<String> = shared_classes.iter().cloned().collect();
+    let generated = pragma_css::generate(&shared_names, &classes.theme);
+    let mut css = if prod {
+        let mut all_used = String::with_capacity(theme_src.len() + generated.css.len() + 4096);
+        all_used.push_str(theme_src);
+        all_used.push_str(&generated.css);
+        for s in comp_css.values().chain(page_css.values()) {
+            all_used.push_str(s);
+            all_used.push('\n');
         }
-        e
+        let all_route_vec: Vec<String> = outs.iter().flat_map(|o| o.page_classes.iter()).filter(|c| !shared_classes.contains(*c)).cloned().collect::<BTreeSet<_>>().into_iter().collect();
+        all_used.push_str(&pragma_css::generate(&all_route_vec, &classes.theme).css);
+        if let Err(e) = pragma_css::minify(theme_src) {
+            diags.push(Diagnostic::error("lib/theme.css", 1, 1, "css/syntax", e));
+        }
+        pragma_css::base_css_for(&all_used)
+    } else {
+        String::from(pragma_css::base_css())
     };
-    let all_entries: Vec<PathBuf> = outs.iter().flat_map(page_entries).collect();
+    css.push('\n');
+    css.push_str(&generated.css);
+    let mut public_assets = PublicAssets::new(&opts.root, &p.public_files);
+    if prod {
+        match pragma_css::minify(&css) {
+            Ok(m) => css = m,
+            Err(e) => diags.push(Diagnostic::error("lib/theme.css", 1, 1, "css/syntax", e)),
+        }
+        css = public_assets.rewrite(&css, w);
+    }
+    let css_url = if prod { format!("/assets/app-{}.css", hash8(css.as_bytes())) } else { "/assets/app.css".to_string() };
+    w.write_client(&format!("client{css_url}"), css.as_bytes(), prod);
+    let shared_css_gz = gzip_len(css.as_bytes());
+    report.css_gzip_bytes = shared_css_gz;
+
+    let mut route_css: Vec<RouteCss> = Vec::with_capacity(outs.len());
+    for o in outs {
+        let mut markup = pragma_css::prune::Markup::default();
+        owners::markup_of(&o.exp.body, &mut markup);
+        for b in &o.bodies {
+            owners::markup_of(&b.children, &mut markup);
+        }
+        let mut scoped = String::new();
+        let mut seen_dirs = HashSet::new();
+        for c in o.exp.components.values() {
+            if seen_dirs.insert(&c.dir)
+                && let Some(s) = comp_css.get(&c.dir)
+            {
+                scoped.push_str(&format!("/* {} */\n{}\n", rel_str(p.origin(c.css.as_ref().unwrap())), pragma_css::prune::prune_scoped(s, &markup).trim()));
+            }
+        }
+        if let Some(f) = &o.page.css
+            && let Some(s) = page_css.get(f)
+        {
+            scoped.push_str(&format!("/* {} */\n{}\n", rel_str(p.origin(f)), pragma_css::prune::prune_scoped(s, &markup).trim()));
+        }
+        let route_names: Vec<String> = o.page_classes.iter().filter(|c| !shared_classes.contains(*c)).cloned().collect();
+        scoped.push_str(&pragma_css::generate(&route_names, &classes.theme).css);
+        let route_theme = pragma_css::prune::prune_theme(theme_src, &markup, &scoped);
+        let mut rcss = if route_theme.trim().is_empty() { scoped } else { format!("/* lib/theme.css */\n{}\n{scoped}", route_theme.trim()) };
+        if prod {
+            rcss = public_assets.rewrite(&rcss, w);
+        }
+        let font_css = format!("{css}\n{rcss}");
+        let mut out = RouteCss { url: None, src: None, gz: 0, font_css };
+        if !rcss.trim().is_empty() {
+            if prod {
+                match pragma_css::minify(&rcss) {
+                    Ok(m) => rcss = m,
+                    Err(e) => {
+                        let file = o.page.css.as_deref().unwrap_or(&p.files[o.page.html as usize]);
+                        diags.push(Diagnostic::error(file, 1, 1, "css/syntax", e));
+                    }
+                }
+            }
+            let css_name = url_safe(&o.page.out_name);
+            let url = if prod { format!("/assets/css/{css_name}-{}.css", hash8(rcss.as_bytes())) } else { format!("/assets/css/{css_name}.css") };
+            w.write_client(&format!("client{url}"), rcss.as_bytes(), prod);
+            out.gz = gzip_len(rcss.as_bytes());
+            out.url = Some(url);
+            out.src = Some(rcss);
+        }
+        route_css.push(out);
+    }
+
+    // the entry of each reactive route (kernel-per-route §3.1, §4)
+    let mut missing: BTreeSet<&str> = BTreeSet::new();
+    let mut entries: Vec<Option<kernel::Entry>> = Vec::with_capacity(outs.len());
+    for (o, rc) in outs.iter().zip(&route_css) {
+        let Some(described) = &o.described else {
+            entries.push(None);
+            continue;
+        };
+        let persists = |f: &PathBuf| sources.get(f).is_some_and(|src| pragma_jslint::exported_names(src).iter().any(|n| n == "persist"));
+        let stores: Vec<(String, PathBuf, bool)> = p.stores.iter().filter(|(name, _)| o.stores.contains(*name)).map(|(name, f)| (name.clone(), f.clone(), persists(f))).collect();
+        let motion = [css.as_str(), rc.src.as_deref().unwrap_or("")].iter().any(|c| c.contains("data-entering") || c.contains("data-leaving"));
+        let uses = kernel::Uses {
+            branch: o.scan.branch,
+            list: o.scan.list,
+            model: o.scan.model,
+            motion: o.scan.blocks() && motion,
+            selfs: o.scan.selfs,
+            vars: o.scan.vars,
+            persist: stores.iter().any(|s| s.2),
+            net: o.loader || p.layout_server.is_some(),
+        };
+        for (_, file) in uses.modules() {
+            if !opts.root.join(p.framework.join(file)).is_file() {
+                missing.insert(file);
+            }
+        }
+        let (t, d) = compile::body_tables(&o.bodies, prod);
+        entries.push(Some(kernel::Entry::new(kernel::EntryInput {
+            framework: &p.framework,
+            pattern: &o.page.pattern,
+            loader: o.loader,
+            ssr: o.ssr,
+            layout: p.layout_server.is_some(),
+            overlays: o.overlays,
+            uses,
+            page: o.page.module.as_ref(),
+            comps: o.exp.components.values().filter_map(|c| c.module.clone().map(|m| (c.id.clone(), m))).collect(),
+            stores,
+            t,
+            d,
+            b: &described.b,
+        })));
+    }
+    for file in missing {
+        diags.push(Diagnostic::error(format!(".pragma/{file}"), 1, 1, "app/structure", format!(".pragma/{file} not found; the framework is out of date: run pragma upgrade")));
+    }
+
+    let all_entries: Vec<PathBuf> = entries.iter().flatten().flat_map(kernel::Entry::paths).collect();
     let deps = deps::Deps::new(&opts.root, diags);
     let mut requests = BTreeMap::new();
     let mut mods = module_graph(p, &all_entries, true, sources, &deps, &mut requests, diags);
@@ -864,22 +1020,15 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
         urls.insert(path.clone(), url);
     }
 
-    let routes: Vec<chunks::Route> = outs
-        .iter()
-        .map(|o| chunks::Route {
-            name: format!("routes/{}", o.page.out_name),
-            page: o.page.module.clone(),
-            components: o.exp.components.values().filter_map(|c| c.module.clone().map(|m| (c.id.clone(), m))).collect(),
-            stores: o.stores.iter().filter_map(|s| p.stores.get(s).map(|f| (s.clone(), f.clone()))).collect(),
-        })
-        .collect();
+    let routes: Vec<chunks::Route> = outs.iter().zip(entries).map(|(o, entry)| chunks::Route { name: format!("routes/{}", o.page.out_name), entry }).collect();
     let chunked = if prod && !diags.iter().any(|d| d.severity == Severity::Error) {
-        chunks::bundle(&out_abs.join(".cache/app"), &mods, &urls, &boot, &routes, diags)
+        chunks::bundle(&out_abs.join(".cache/app"), &mods, &urls, &kernel_js, &routes, diags)
     } else {
         None
     };
 
-    let mut gz: HashMap<String, u64> = HashMap::new();
+    // every JS file a page can load, by URL: the first-load report reads its sizes
+    let mut js: HashMap<String, String> = HashMap::new();
     for (path, m) in &mods {
         if chunked.is_some() && !path.starts_with("node_modules") {
             continue;
@@ -896,175 +1045,70 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
         } else {
             js::rewrite(&m.src, &m.imports.iter().map(|(i, _)| i.clone()).collect::<Vec<_>>(), |i| map.get(i.spec.as_str()).map(|u| u.to_string()))
         };
-        gz.insert(urls[path].clone(), gzip_len(code.as_bytes()));
         let code = if !prod && *path == p.framework.join("log.js") { with_ignore_map(code) } else { code };
         w.write_client(&format!("client{}", urls[path]), code.as_bytes(), prod);
+        js.insert(urls[path].clone(), code);
     }
     for (file, code) in chunked.iter().flat_map(|c| &c.files) {
-        gz.insert(format!("/assets/{file}"), gzip_len(code.as_bytes()));
         w.write_client(&format!("client/assets/{file}"), code.as_bytes(), prod);
+        js.insert(format!("/assets/{file}"), code.clone());
+    }
+    // dev (or a prod build with errors): the entry imports each module by the URL it is served at,
+    // so the kernel the entry imports is the one `page.js` imports its lazy modules next to
+    let dev_entry = |o: &PageOut| format!("/assets/entry/{}.js", url_safe(&o.page.out_name));
+    if chunked.is_none() {
+        for (o, r) in outs.iter().zip(&routes) {
+            let Some(entry) = &r.entry else { continue };
+            let code = entry.source(|m| urls.get(m).cloned().unwrap_or_else(|| format!("/assets/{}", url_safe(&deps::asset_path(&rel_str(m))))));
+            let url = dev_entry(o);
+            w.write_client(&format!("client{url}"), code.as_bytes(), prod);
+            js.insert(url, code);
+        }
     }
     let npm_paths: HashMap<&str, &PathBuf> = urls.iter().filter(|(k, _)| k.starts_with("node_modules")).map(|(k, u)| (u.as_str(), k)).collect();
-
-    let shared_names: Vec<String> = shared_classes.iter().cloned().collect();
-    let generated = pragma_css::generate(&shared_names, &classes.theme);
-    let mut css = if prod {
-        let mut all_used = String::with_capacity(theme_src.len() + generated.css.len() + 4096);
-        all_used.push_str(theme_src);
-        all_used.push_str(&generated.css);
-        for s in comp_css.values().chain(page_css.values()) {
-            all_used.push_str(s);
-            all_used.push('\n');
-        }
-        let all_route_vec: Vec<String> = outs.iter().flat_map(|o| o.page_classes.iter()).filter(|c| !shared_classes.contains(*c)).cloned().collect::<BTreeSet<_>>().into_iter().collect();
-        all_used.push_str(&pragma_css::generate(&all_route_vec, &classes.theme).css);
-        if let Err(e) = pragma_css::minify(theme_src) {
-            diags.push(Diagnostic::error("lib/theme.css", 1, 1, "css/syntax", e));
-        }
-        pragma_css::base_css_for(&all_used)
-    } else {
-        String::from(pragma_css::base_css())
+    let mut sizes: HashMap<String, Size> = HashMap::new();
+    let mut size_of = |u: &str| -> Size {
+        *sizes.entry(u.to_string()).or_insert_with(|| {
+            let Some(code) = js.get(u) else { return Size::default() };
+            let b = code.as_bytes();
+            Size { raw: b.len() as u64, gz: gzip_len(b), br: brotli_compress(b).map_or(0, |c| c.len() as u64) }
+        })
     };
-    css.push('\n');
-    css.push_str(&generated.css);
-    let mut public_assets = PublicAssets::new(&opts.root, &p.public_files);
-    if prod {
-        match pragma_css::minify(&css) {
-            Ok(m) => css = m,
-            Err(e) => diags.push(Diagnostic::error("lib/theme.css", 1, 1, "css/syntax", e)),
-        }
-        css = public_assets.rewrite(&css, w);
-    }
-    let css_url = if prod { format!("/assets/app-{}.css", hash8(css.as_bytes())) } else { "/assets/app.css".to_string() };
-    w.write_client(&format!("client{css_url}"), css.as_bytes(), prod);
-    let shared_css_gz = gzip_len(css.as_bytes());
-    report.css_gzip_bytes = shared_css_gz;
 
     let theme_js = mods.contains_key(&p.framework.join("theme.js"));
     let mut manifest = Vec::new();
-    let boot_url = match &chunked {
-        Some(c) => c.boot.clone(),
-        None => urls.get(&boot).cloned().unwrap_or_else(|| format!("/assets/{}", deps::asset_path(&rel_str(&boot)))),
-    };
     let packages = mods.iter().flat_map(|(path, m)| {
         m.imports.iter().filter(|(imp, _)| pragma_jslint::is_package(&imp.spec)).filter_map(move |(imp, t)| t.clone().map(|t| ((path.clone(), imp.spec.clone()), t)))
     });
     let prerender = prerender::Prerender::new(&opts.root, &p.framework, mods.iter().map(|(path, m)| (path.clone(), m.src.clone())), packages);
     let on_server = |m: &PathBuf| server_runnable(&mods, m);
     for (i, o) in outs.iter().enumerate() {
-        let mut route_css_url: Option<String> = None;
-        let mut route_css_src: Option<String> = None;
-        let mut route_css_gz: u64 = 0;
-        let mut markup = pragma_css::prune::Markup::default();
-        owners::markup_of(&o.exp.body, &mut markup);
-        for b in &o.bodies {
-            owners::markup_of(&b.children, &mut markup);
-        }
-        let mut scoped = String::new();
-        let mut seen_dirs = HashSet::new();
-        for c in o.exp.components.values() {
-            if seen_dirs.insert(&c.dir)
-                && let Some(s) = comp_css.get(&c.dir)
-            {
-                scoped.push_str(&format!("/* {} */\n{}\n", rel_str(p.origin(c.css.as_ref().unwrap())), pragma_css::prune::prune_scoped(s, &markup).trim()));
-            }
-        }
-        if let Some(f) = &o.page.css
-            && let Some(s) = page_css.get(f)
-        {
-            scoped.push_str(&format!("/* {} */\n{}\n", rel_str(p.origin(f)), pragma_css::prune::prune_scoped(s, &markup).trim()));
-        }
-        let route_names: Vec<String> = o.page_classes.iter().filter(|c| !shared_classes.contains(*c)).cloned().collect();
-        scoped.push_str(&pragma_css::generate(&route_names, &classes.theme).css);
-        let route_theme = pragma_css::prune::prune_theme(theme_src, &markup, &scoped);
-        let mut rcss = if route_theme.trim().is_empty() { scoped } else { format!("/* lib/theme.css */\n{}\n{scoped}", route_theme.trim()) };
-        if prod {
-            rcss = public_assets.rewrite(&rcss, w);
-        }
-        let font_css = format!("{css}\n{rcss}");
-        if !rcss.trim().is_empty() {
-            if prod {
-                match pragma_css::minify(&rcss) {
-                    Ok(m) => rcss = m,
-                    Err(e) => {
-                        let file = o.page.css.as_deref().unwrap_or(&p.files[o.page.html as usize]);
-                        diags.push(Diagnostic::error(file, 1, 1, "css/syntax", e));
+        let rc = &route_css[i];
+        // the entry and its static-import closure, in load order (lazy chunks are never preloaded)
+        let (entry_url, module_urls): (Option<String>, Vec<String>) = match (&routes[i].entry, &chunked) {
+            (None, _) => (None, Vec::new()),
+            (Some(_), Some(ch)) => match ch.routes[i].clone() {
+                Some(entry) => {
+                    let mut list: Vec<String> = Vec::new();
+                    for u in ch.closure(&[entry.as_str()]) {
+                        match npm_paths.get(u.as_str()) {
+                            Some(npm) => list.extend(closure(&mods, &[(*npm).clone()], false).iter().map(|m| urls[m].clone())),
+                            None => list.push(u),
+                        }
                     }
+                    let mut seen = HashSet::new();
+                    list.retain(|u| *u != entry && seen.insert(u.clone()));
+                    (Some(entry), list)
                 }
-            }
-            let css_name = url_safe(&o.page.out_name);
-            let url = if prod {
-                format!("/assets/css/{css_name}-{}.css", hash8(rcss.as_bytes()))
-            } else {
-                format!("/assets/css/{css_name}.css")
-            };
-            w.write_client(&format!("client{url}"), rcss.as_bytes(), prod);
-            route_css_gz = gzip_len(rcss.as_bytes());
-            route_css_url = Some(url);
-            route_css_src = Some(rcss);
-        }
-        let (module_urls, page_js, comps, stores): (Vec<String>, Value, serde_json::Map<String, Value>, serde_json::Map<String, Value>) = match &chunked {
-            Some(ch) => {
-                let entry = ch.routes[i].as_deref();
-                let mut starts = vec![ch.boot.as_str()];
-                // overlay.js and router.js are not needed for first paint: page.js and boot.js
-                // `import()` them right after the page mounts, so they are not modulepreloaded.
-                starts.extend(entry);
-                let mut list: Vec<String> = Vec::new();
-                for u in ch.closure(&starts) {
-                    match npm_paths.get(u.as_str()) {
-                        Some(npm) => list.extend(closure(&mods, &[(*npm).clone()], false).iter().map(|m| urls[m].clone())),
-                        None => list.push(u),
-                    }
-                }
+                None => (None, Vec::new()),
+            },
+            (Some(entry), None) => {
                 let mut seen = HashSet::new();
-                list.retain(|u| *u != ch.boot && seen.insert(u.clone()));
-                let export = |name: String| entry.map_or(Value::Null, |e| Value::String(format!("{e}#{name}")));
-                let r = &routes[i];
-                (
-                    list,
-                    if r.page.is_some() { export(chunks::page_export()) } else { Value::Null },
-                    r.components.iter().enumerate().map(|(k, (id, _))| (id.clone(), export(chunks::component_export(k)))).collect(),
-                    r.stores.iter().enumerate().map(|(k, (name, _))| (name.clone(), export(chunks::store_export(k)))).collect(),
-                )
-            }
-            None => {
-                let modules = closure(&mods, &page_entries(o), false);
-                let url_of = |f: &Option<PathBuf>| f.as_ref().and_then(|f| urls.get(f)).map(|u| Value::String(u.clone())).unwrap_or(Value::Null);
-                (
-                    modules.iter().filter(|m| **m != boot).map(|m| urls[m].clone()).collect(),
-                    url_of(&o.page.module),
-                    o.exp.components.values().filter(|c| c.module.is_some()).map(|c| (c.id.clone(), url_of(&c.module))).collect(),
-                    p.stores.iter().filter(|(name, _)| o.stores.contains(*name)).map(|(name, f)| (name.clone(), url_of(&Some(f.clone())))).collect(),
-                )
+                let list = closure(&mods, &entry.paths(), false).iter().map(|m| urls[m].clone()).filter(|u| seen.insert(u.clone())).collect();
+                (Some(dev_entry(o)), list)
             }
         };
-        let mut module_urls = module_urls;
-        let tpl_url = (!o.bodies.is_empty()).then(|| {
-            let module = compile::template_module(&o.bodies, prod);
-            let name = url_safe(&o.page.out_name);
-            let url = if prod { format!("/assets/tpl/{name}-{}.js", hash8(module.as_bytes())) } else { format!("/assets/tpl/{name}.js") };
-            w.write_client(&format!("client{url}"), module.as_bytes(), prod);
-            module_urls.push(url.clone());
-            url
-        });
-        let mut route = json!({
-            "pattern": o.page.pattern,
-            "page": page_js,
-            "components": comps,
-            "stores": stores,
-            "loader": o.loader,
-            "ssr": o.ssr,
-        });
-        if p.layout_server.is_some() {
-            route["layout"] = json!(true);
-        }
-        if let Some(u) = &tpl_url {
-            route["tpl"] = json!(u);
-        }
-        if o.overlays {
-            route["overlays"] = json!(true);
-        }
+        let reactive = o.described.is_some();
         let rendered = prerender.as_ref().and_then(|r| {
             let scripted: BTreeSet<String> = o.exp.components.values().filter(|c| c.module.is_some()).map(|c| c.id.clone()).collect();
             let ops = compile::ops(&o.exp.body, &scripted, &o.bodies);
@@ -1079,7 +1123,7 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
         });
         let mut painted = pragma_css::prune::Markup::default();
         owners::painted_markup(&html::parse(&body, 0).0, &mut painted);
-        let fonts = pragma_css::prune::font_preloads(&font_css, &painted);
+        let fonts = pragma_css::prune::font_preloads(&rc.font_css, &painted);
         let mut doc = String::with_capacity(4096);
         doc.push_str(&format!("<!doctype html>\n<html lang=\"{}\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n", html::escape_attr(&p.config.lang)));
         match o.exp.head.iter().find_map(|n| match n {
@@ -1094,7 +1138,7 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
             doc.push_str(PD);
             doc.push('\n');
         }
-        if p.layout_server.is_some() && !o.ssr {
+        if reactive && p.layout_server.is_some() && !o.ssr {
             doc.push_str(PL);
             doc.push('\n');
         }
@@ -1113,48 +1157,56 @@ fn emit_client(p: &Project, a: &Analysis, opts: &BuildOptions, w: &mut Writer, r
             doc.push_str(THEME);
             doc.push('\n');
         }
-        if prod && shared_css_gz + route_css_gz <= 14 * 1024 {
+        if prod && shared_css_gz + rc.gz <= 14 * 1024 {
             doc.push_str("<style data-pragma-shared-css>");
             doc.push_str(&css.replace("</style", "<\\/style"));
             doc.push_str("</style>\n");
-            if let Some(rcss) = &route_css_src {
+            if let Some(rcss) = &rc.src {
                 doc.push_str("<style data-pragma-route-css>");
                 doc.push_str(&rcss.replace("</style", "<\\/style"));
                 doc.push_str("</style>\n");
             }
         } else {
             doc.push_str(&format!("<link rel=\"stylesheet\" href=\"{css_url}\">\n"));
-            if let Some(rcss_url) = &route_css_url {
+            if let Some(rcss_url) = &rc.url {
                 doc.push_str(&format!("<link rel=\"stylesheet\" href=\"{rcss_url}\" data-pragma-route-css>\n"));
             }
         }
-        if !prod {
+        if !prod && reactive {
             doc.push_str("<script>self.__pragmaDev=true</script>\n");
         }
         for u in &module_urls {
             doc.push_str(&format!("<link rel=\"modulepreload\" href=\"{u}\">\n"));
         }
-        let route_json = serde_json::to_string(&route).unwrap().replace('<', "\\u003c");
-        doc.push_str(&format!("<script type=\"application/json\" id=\"pragma-route\">{route_json}</script>\n"));
-        doc.push_str(&format!("<script type=\"module\" src=\"{boot_url}\"></script>\n"));
+        if let Some(u) = &entry_url {
+            doc.push_str(&format!("<script type=\"module\" src=\"{u}\"></script>\n"));
+        }
+        doc.push_str(kernel::VT);
+        doc.push('\n');
         if prod {
             doc.push_str(SPECULATION_RULES);
             doc.push('\n');
         } else {
             doc.push_str("<script type=\"module\" src=\"/_pragma/dev.js\"></script>\n");
         }
-        doc.push_str("</head>\n<body>\n");
+        match o.described.as_ref().and_then(|d| d.body.as_ref()) {
+            Some(id) => doc.push_str(&format!("</head>\n<body data-b=\"{id}\">\n")),
+            None => doc.push_str("</head>\n<body>\n"),
+        }
         doc.push_str(body.trim());
         doc.push_str("\n</body>\n</html>\n");
         let html_url = format!("/{}.html", o.page.out_name);
         w.write_client(&format!("client{html_url}"), doc.as_bytes(), prod);
 
-        let initial: u64 = module_urls.iter().chain(std::iter::once(&boot_url)).map(|u| gz.get(u).copied().unwrap_or(0)).sum();
-        let total_css_gz = shared_css_gz + route_css_gz;
+        let first = module_urls.iter().chain(entry_url.iter()).fold(Size::default(), |t, u| {
+            let s = size_of(u);
+            Size { raw: t.raw + s.raw, gz: t.gz + s.gz, br: t.br + s.br }
+        });
+        let total_css_gz = shared_css_gz + rc.gz;
         report.css_gzip_bytes = report.css_gzip_bytes.max(total_css_gz);
         if !o.is_404 {
-            manifest.push(json!({ "pattern": o.page.pattern, "html": html_url, "modules": module_urls, "loader": o.loader, "ssr": o.ssr }));
-            report.pages.push(PageReport { pattern: o.page.pattern.clone(), js_gzip_bytes: initial, css_gzip_bytes: total_css_gz });
+            manifest.push(json!({ "pattern": o.page.pattern, "html": html_url, "entry": entry_url, "modules": module_urls, "loader": o.loader, "ssr": o.ssr }));
+            report.pages.push(PageReport { pattern: o.page.pattern.clone(), js_raw_bytes: first.raw, js_gzip_bytes: first.gz, js_brotli_bytes: first.br, css_gzip_bytes: total_css_gz });
         }
         docs.push(doc);
     }

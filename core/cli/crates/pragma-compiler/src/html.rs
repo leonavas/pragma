@@ -339,16 +339,6 @@ pub fn escape_text(v: &str) -> String {
     v.replace('<', "&lt;").replace('>', "&gt;")
 }
 
-pub fn open_tag(out: &mut String, e: &Element) {
-    out.push('<');
-    out.push_str(&e.name);
-    for a in &e.attrs {
-        out.push(' ');
-        push_attr(out, a);
-    }
-    out.push('>');
-}
-
 pub fn push_attr(out: &mut String, a: &Attr) {
     out.push_str(&a.name);
     if let Some(v) = &a.value {

@@ -535,6 +535,9 @@ input:where([type='button'], [type='reset'], [type='submit']),
   }
 }
 
+@view-transition {
+  navigation: auto;
+}
 @layer base {
   html {
     background-color: var(--page-bg);
