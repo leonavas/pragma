@@ -554,6 +554,19 @@ and painted in half the time without throttling (108 vs 212 ms). n = 1, one mode
   *Why:* agents forget it (v3chat SEO 91); a layout meta covers private apps with one line.
   Council vote 2×1 (against: a description is editorial).
 
+- **[discarded]** (2026-11-23, council 2×1: astra and fable C, neon D) `:html` / trusted HTML for
+  markdown and rich text. The v3chat proposal: a `:html` binding fed by `html()` (sanitized, marked
+  value, also from `/_data`). *Why not:* the 92 vs 96 Lighthouse gap does not pay for breaking
+  "never HTML in JS" (`marked(md)` straight into the page would be the agent's first move); a
+  marked value does not survive JSON, so the client must sanitize again; no native sanitizer in
+  Safari (`setHTML`), and DOMPurify is ~8–12 kB gzip, near the whole starter page. Neon's variant
+  (sanitize always at the sink, own allowlist without SVG/MathML) was the minority. Instead: the app
+  renders inline markdown as flat segments (`{ id, text, strong, em, code, del, href }` in one
+  `<for>`, `href` checked with `URL` for `http:`/`https:`), with no instance per inline node.
+  Direction if that is not enough: a `<rich>` element in the core that builds DOM from a JSON tree
+  with a closed tag list (no string, no sanitizer), after measuring the cost of one component
+  instance.
+
 ## npm dependencies
 
 - **[firm]** npm packages are allowed. *Why:* it's a web dev project; banning the ecosystem
