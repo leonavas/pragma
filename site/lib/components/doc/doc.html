@@ -38,10 +38,8 @@
 
   const bottomGap = 16
 
-  function roomFor(aside, root) {
-    const limit = Math.min(innerHeight - bottomGap, root.getBoundingClientRect().bottom)
-    const stickyTop = parseFloat(getComputedStyle(aside).top)
-    return Math.round(limit - Math.max(aside.getBoundingClientRect().top, stickyTop))
+  function roomFor(aside) {
+    return Math.round(innerHeight - bottomGap - parseFloat(getComputedStyle(aside).top))
   }
 
   function mount(el) {
@@ -53,7 +51,7 @@
       pending ??= frame(() => {
         pending = null
         currentId = findCurrent(headings)
-        asideRoom = roomFor(aside, el)
+        asideRoom = roomFor(aside)
         const toc = aside.querySelector('.doc-toc-nav')
         tocRoom = toc ? asideRoom - toc.offsetTop : 9999
         revealLink(el, currentId)
@@ -79,8 +77,7 @@
     </details>
     <span class="doc-current min-w-0 truncate text-muted">{$currentTitle}</span>
   </div>
-  <aside class="hidden self-start lg:sticky lg:flex lg:flex-col"
-    :--room="$asideRoom">
+  <aside class="hidden self-start lg:sticky lg:flex lg:flex-col">
     <a href="/examples" class="label nav-link">All examples</a>
     <c-section-nav class="compact mt-4" label="Example sections"></c-section-nav>
     <if $sections.length>
@@ -111,7 +108,7 @@
   [data-c="doc"] .doc-sections summary::-webkit-details-marker { display: none; }
   [data-c="doc"] .doc-sections[open] .doc-sections-chevron { rotate: 180deg; }
   [data-c="doc"] .doc-sections-panel { left: var(--gutter); width: min(18rem, calc(100vw - 2 * var(--gutter))); max-height: min(70vh, 26rem); padding: 0.5rem 0.875rem; overflow-y: auto; }
-  [data-c="doc"] aside { max-height: min(calc(100vh - var(--header-height) - 5rem), calc(var(--room) * 1px)); overflow: clip; overflow-clip-margin: 4px; }
+  [data-c="doc"] aside { max-height: calc(100vh - var(--header-height) - 5rem - 1px); margin-bottom: 1rem; overflow: clip; overflow-clip-margin: 4px; }
   [data-c="doc"] .doc-toc { scrollbar-width: thin; }
   [data-c="doc"] .doc-toc-nav.collapsed { visibility: hidden; }
   [data-c="doc"] .doc-toc-link { display: block; padding: 0.3rem 0 0.3rem 0.75rem; border-left: 1px solid var(--color-line); font-size: 0.75rem; line-height: 1.35; }
