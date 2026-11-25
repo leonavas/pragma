@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 /// Inline in every page's head: `html[data-view-transition]` while a cross-document transition runs (§3.4).
-pub const VT: &str = "<script>addEventListener('pageswap',e=>{const v=e.viewTransition;if(!v)return;e.activation&&e.activation.navigationType==='traverse'?v.skipTransition():document.documentElement.setAttribute('data-view-transition','')});addEventListener('pagereveal',e=>{const v=e.viewTransition,h=document.documentElement;if(v&&navigation.activation&&navigation.activation.navigationType==='traverse')return v.skipTransition();if(v)h.setAttribute('data-view-transition',''),v.finished.finally(()=>h.removeAttribute('data-view-transition'))});addEventListener('pageshow',e=>e.persisted&&document.documentElement.removeAttribute('data-view-transition'))</script>";
+pub const VT: &str = "<script>addEventListener('pageswap',e=>{const v=e.viewTransition;if(!v)return;e.activation&&e.activation.navigationType==='traverse'?(v.ready.catch(()=>{}),v.skipTransition()):document.documentElement.setAttribute('data-view-transition','')});addEventListener('pagereveal',e=>{const v=e.viewTransition,h=document.documentElement;if(v&&navigation.activation&&navigation.activation.navigationType==='traverse')return v.ready.catch(()=>{}),v.skipTransition();if(v)h.setAttribute('data-view-transition',''),v.finished.finally(()=>h.removeAttribute('data-view-transition'))});addEventListener('pageshow',e=>e.persisted&&document.documentElement.removeAttribute('data-view-transition'))</script>";
 
 /// The kernel file the route entry imports `start` from.
 pub const KERNEL: &str = "page.js";

@@ -18,7 +18,7 @@
 <link rel="modulepreload" href="/assets/lib/state/cart.js">
 <link rel="modulepreload" href="/assets/utils/fmt.js">
 <script type="module" src="/assets/entry/index.js"></script>
-<script>addEventListener('pageswap',e=>{const v=e.viewTransition;if(!v)return;e.activation&&e.activation.navigationType==='traverse'?v.skipTransition():document.documentElement.setAttribute('data-view-transition','')});addEventListener('pagereveal',e=>{const v=e.viewTransition,h=document.documentElement;if(v&&navigation.activation&&navigation.activation.navigationType==='traverse')return v.skipTransition();if(v)h.setAttribute('data-view-transition',''),v.finished.finally(()=>h.removeAttribute('data-view-transition'))});addEventListener('pageshow',e=>e.persisted&&document.documentElement.removeAttribute('data-view-transition'))</script>
+<script>addEventListener('pageswap',e=>{const v=e.viewTransition;if(!v)return;e.activation&&e.activation.navigationType==='traverse'?(v.ready.catch(()=>{}),v.skipTransition()):document.documentElement.setAttribute('data-view-transition','')});addEventListener('pagereveal',e=>{const v=e.viewTransition,h=document.documentElement;if(v&&navigation.activation&&navigation.activation.navigationType==='traverse')return v.ready.catch(()=>{}),v.skipTransition();if(v)h.setAttribute('data-view-transition',''),v.finished.finally(()=>h.removeAttribute('data-view-transition'))});addEventListener('pageshow',e=>e.persisted&&document.documentElement.removeAttribute('data-view-transition'))</script>
 <script type="module" src="/_pragma/dev.js"></script>
 </head>
 <body>
