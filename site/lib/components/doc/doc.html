@@ -79,7 +79,7 @@
     </details>
     <span class="doc-current min-w-0 truncate text-muted">{$currentTitle}</span>
   </div>
-  <aside class="hidden self-start lg:sticky lg:top-24 lg:flex lg:flex-col"
+  <aside class="hidden self-start lg:sticky lg:flex lg:flex-col"
     :--room="$asideRoom">
     <a href="/examples" class="label nav-link">All examples</a>
     <c-section-nav class="compact mt-4" label="Example sections"></c-section-nav>
@@ -111,7 +111,7 @@
   [data-c="doc"] .doc-sections summary::-webkit-details-marker { display: none; }
   [data-c="doc"] .doc-sections[open] .doc-sections-chevron { rotate: 180deg; }
   [data-c="doc"] .doc-sections-panel { left: var(--gutter); width: min(18rem, calc(100vw - 2 * var(--gutter))); max-height: min(70vh, 26rem); padding: 0.5rem 0.875rem; overflow-y: auto; }
-  [data-c="doc"] aside { max-height: min(calc(100vh - 7rem), calc(var(--room) * 1px)); overflow: clip; overflow-clip-margin: 4px; }
+  [data-c="doc"] aside { max-height: min(calc(100vh - var(--header-height) - 5rem), calc(var(--room) * 1px)); overflow: clip; overflow-clip-margin: 4px; }
   [data-c="doc"] .doc-toc { scrollbar-width: thin; }
   [data-c="doc"] .doc-toc-nav.collapsed { visibility: hidden; }
   [data-c="doc"] .doc-toc-link { display: block; padding: 0.3rem 0 0.3rem 0.75rem; border-left: 1px solid var(--color-line); font-size: 0.75rem; line-height: 1.35; }
@@ -120,6 +120,7 @@
   [data-c="doc"] .doc-title { font-size: clamp(1.875rem, 5vw, 3.25rem); }
   @media (min-width: 64rem) {
     [data-c="doc"] { display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: 4rem; padding-top: 4rem; margin-bottom: -6rem; }
+    [data-c="doc"] aside { top: calc(var(--header-height) + 4rem + 1px); }
     [data-c="doc"] > article { padding-bottom: 6rem; }
   }
 </style>
