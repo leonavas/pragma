@@ -237,7 +237,7 @@ async function go(to, pop, replace) {
     main.focus({ preventScroll: true })
     mark()
   }
-  if (document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) await transition(swap)
+  if (!pop && document.startViewTransition && !matchMedia('(prefers-reduced-motion: reduce)').matches) await transition(swap)
   else swap()
   log.info('navigation', { 'url.path': url.pathname, 'pragma.route': route.pattern, 'pragma.navigation': pop ? 'pop' : replace ? 'replace' : 'push', 'duration_ms': Math.round(performance.now() - t0) })
   observe()
