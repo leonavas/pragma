@@ -1,16 +1,16 @@
 <script>
-  let likes = 0
+  let votes = 0
 
-  function like() {
-    likes += 1
+  function agree() {
+    votes += 1
   }
 </script>
 
-<div>
-  <p-panel heading="Release 1.2">
-    <p>{$likes} likes</p>
-    <button slot="actions" class="btn" @click="like">
-      Like
+<div class="w-full max-w-xs">
+  <p-panel heading="Hot take">
+    <p class="text-sm">Tabs beat spaces. ({$votes} agrees)</p>
+    <button slot="actions" class="btn" @click="agree">
+      Agree
     </button>
   </p-panel>
 </div>

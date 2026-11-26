@@ -9,9 +9,9 @@
   <section class="doc-section" aria-labelledby="modal">
     <h2 id="modal">Modal: <code>@open</code> and <code>@close</code></h2>
     <div class="prose">
-      <p><code>&lt;c-modal&gt;</code>, <code>&lt;c-alert&gt;</code> and <code>&lt;c-dropdown&gt;</code> come with a new app, in <code>lib/components/</code>. <code>@open="about"</code> opens the overlay with the id <code>about</code>. <code>@close</code> closes the overlay it is in. Esc and the Back button close it too.</p>
+      <p><code>&lt;c-modal&gt;</code>, <code>&lt;c-alert&gt;</code> and <code>&lt;c-dropdown&gt;</code> come with a new app, in <code>lib/components/</code>. <code>@open="briefing"</code> opens the overlay with the id <code>briefing</code>. <code>@close</code> closes the overlay it is in. Esc and the Back button close it too.</p>
     </div>
-    <c-showcase :source="data.examples.modal" caption="Click About.">
+    <c-showcase :source="data.examples.modal" caption="Open the secret file, then close it with the button, Esc or Back.">
       <p-about-modal></p-about-modal>
     </c-showcase>
   </section>
@@ -19,9 +19,9 @@
   <section class="doc-section" aria-labelledby="alert">
     <h2 id="alert">Alert: <code>await confirm(id)</code></h2>
     <div class="prose">
-      <p><code>import { confirm } from 'pragma'</code>. <code>await confirm('delete-file')</code> opens the alert and waits. It returns the <code>value</code> of the clicked button, or <code>'cancel'</code> on Esc.</p>
+      <p><code>import { confirm } from 'pragma'</code>. <code>await confirm('delete-prod')</code> opens the alert and waits. It returns the <code>value</code> of the clicked button, or <code>'cancel'</code> on Esc.</p>
     </div>
-    <c-showcase :source="data.examples.alert" caption="Click Delete file, then pick an answer.">
+    <c-showcase :source="data.examples.alert" caption="Dare to click Delete prod database, then pick an answer.">
       <p-delete-file></p-delete-file>
     </c-showcase>
   </section>
@@ -31,7 +31,7 @@
     <div class="prose">
       <p><code>&lt;c-dropdown&gt;</code> is a menu under its button. It closes on an outside click, Esc and <code>@close</code>.</p>
     </div>
-    <c-showcase :source="data.examples.dropdown" caption="Pick an order.">
+    <c-showcase :source="data.examples.dropdown" caption="Pick how to sort the playlist.">
       <p-file-sort></p-file-sort>
     </c-showcase>
   </section>
@@ -41,7 +41,7 @@
     <div class="prose">
       <p>An overlay can open another one. <code>close('editor')</code> from <code>'pragma'</code> closes an overlay from a script.</p>
     </div>
-    <c-showcase :source="data.examples.stacking" caption="Click Edit note, then Discard.">
+    <c-showcase :source="data.examples.stacking" caption="Open the risky email, then click Trash draft to stack an alert on top.">
       <p-note-editor></p-note-editor>
     </c-showcase>
   </section>
@@ -51,7 +51,7 @@
     <div class="prose">
       <p>A class on <code>&lt;c-modal&gt;</code> restyles it. To animate the close, style <code>[data-leaving]</code>: the runtime waits for the animation.</p>
     </div>
-    <c-showcase :source="data.examples.sheet" caption="Open the sheet, then close it.">
+    <c-showcase :source="data.examples.sheet" caption="Inspect Captain Nova: the sheet slides in and out from the right.">
       <p-side-sheet></p-side-sheet>
     </c-showcase>
     <div class="prose">

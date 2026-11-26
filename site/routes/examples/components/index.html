@@ -10,9 +10,9 @@
     <h2 id="counter">A component is a file</h2>
     <div class="prose">
       <p><code>routes/_components/counter/counter.html</code> is the component <code>&lt;p-counter&gt;</code>. The pages in <code>routes/</code> and its folders can use it. It has the same syntax as a page, but exactly one root element.</p>
-      <p>Each instance has its own state: two counters, two counts. A component in <code>lib/components/counter/</code> is <code>&lt;c-counter&gt;</code> and works on every page.</p>
+      <p>Each instance has its own state: two buttons, two counts. A component in <code>lib/components/counter/</code> is <code>&lt;c-counter&gt;</code> and works on every page.</p>
     </div>
-    <c-showcase :source="data.examples.counter" caption="Click each counter: each keeps its own count.">
+    <c-showcase :source="data.examples.counter" caption="Clap on either button: each instance keeps its own count.">
       <div class="flex gap-3">
         <p-counter></p-counter>
         <p-counter></p-counter>
@@ -23,13 +23,13 @@
   <section class="doc-section" aria-labelledby="typed-props">
     <h2 id="typed-props">Props: <code>export let</code></h2>
     <div class="prose">
-      <p><code>export let sale = false</code> declares a prop: a value that the page gives with an attribute, <code>sale</code>. The default decides the type, so <code>sale="false"</code> arrives as the boolean <code>false</code>. A missing attribute gives the default.</p>
+      <p><code>export let rare = false</code> declares a prop: a value that the page gives with an attribute, <code>rare</code>. The default decides the type, so <code>rare="false"</code> arrives as the boolean <code>false</code>. A missing attribute gives the default.</p>
     </div>
-    <c-showcase :source="data.examples.product" caption="Lamp has sale=&quot;false&quot;, so no sale tag. Desk gets the default.">
-      <div>
-        <p-product name="Mug" sale></p-product>
-        <p-product name="Lamp" sale="false"></p-product>
-        <p-product name="Desk"></p-product>
+    <c-showcase :source="data.examples.loot" caption="Dragon Egg passes rare='false', so no badge. Pocket Lint gets the default.">
+      <div class="grid w-full max-w-xs gap-2">
+        <p-loot name="Rusty Spoon" rare></p-loot>
+        <p-loot name="Dragon Egg" rare="false"></p-loot>
+        <p-loot name="Pocket Lint"></p-loot>
       </div>
     </c-showcase>
   </section>
@@ -37,9 +37,9 @@
   <section class="doc-section" aria-labelledby="object-props">
     <h2 id="object-props">Object props: <code>:prop="path"</code></h2>
     <div class="prose">
-      <p>An attribute is text. To give an object, bind it with a colon: <code>:person="person"</code>. The component reads the object and does not change it.</p>
+      <p>An attribute is text. To give an object, bind it with a colon: <code>:member="member"</code>. The component reads the object and does not change it.</p>
     </div>
-    <c-showcase :source="data.examples.teamList" caption="The page gives each person object to one row.">
+    <c-showcase :source="data.examples.teamList" caption="The page passes each crew object to one row.">
       <p-team-list></p-team-list>
     </c-showcase>
   </section>
@@ -49,7 +49,7 @@
     <div class="prose">
       <p><code>&lt;slot&gt;</code> shows the children that the page puts in the tag. <code>&lt;slot name="actions"&gt;</code> shows only the children with <code>slot="actions"</code>. The content of a <code>&lt;slot&gt;</code> shows when the page gives nothing.</p>
     </div>
-    <c-showcase :source="data.examples.slots" caption="The second panel gets no children, so it shows its fallback.">
+    <c-showcase :source="data.examples.slots" caption="Mission #43 gets no children, so it shows the panel's fallback.">
       <p-release-notes></p-release-notes>
     </c-showcase>
   </section>
@@ -57,9 +57,9 @@
   <section class="doc-section" aria-labelledby="slot-owner">
     <h2 id="slot-owner">Slot content belongs to the page</h2>
     <div class="prose">
-      <p>The page writes the slot content, so <code>{$likes}</code> and <code>@click="like"</code> read the page's script, not the panel's. The panel only decides where the content goes.</p>
+      <p>The page writes the slot content, so <code>{$votes}</code> and <code>@click="agree"</code> read the page's script, not the panel's. The panel only decides where the content goes.</p>
     </div>
-    <c-showcase :source="data.examples.slotOwner" caption="Click Like: the page's state changes inside the panel.">
+    <c-showcase :source="data.examples.slotOwner" caption="Click Agree: the page's state updates inside the panel.">
       <p-post></p-post>
     </c-showcase>
   </section>
@@ -69,10 +69,11 @@
     <div class="prose">
       <p>Without a script, a component still reads its attributes as <code>$label</code> and <code>$star</code>. The compiler resolves it when it builds the page, so it sends plain HTML and no JavaScript.</p>
     </div>
-    <c-showcase :source="data.examples.badge" caption="Two badges, no JavaScript.">
-      <div class="flex gap-3">
-        <p-badge label="New" star></p-badge>
-        <p-badge label="Beta"></p-badge>
+    <c-showcase :source="data.examples.badge" caption="Three achievement badges, zero JavaScript.">
+      <div class="flex flex-wrap justify-center gap-2">
+        <p-badge label="Speedrunner" star></p-badge>
+        <p-badge label="Night Owl"></p-badge>
+        <p-badge label="Zero Bugs" star></p-badge>
       </div>
     </c-showcase>
   </section>
@@ -82,8 +83,8 @@
     <div class="prose">
       <p>A component can use its own tag. Put it inside <code>&lt;for&gt;</code> or <code>&lt;if&gt;</code>, so it stops when the data ends. Here the data is in <code>routes/index.js</code>: a page script can be a <code>.js</code> file next to the page, instead of a <code>&lt;script&gt;</code>.</p>
     </div>
-    <c-showcase :source="data.examples.fileTree" caption="One component, three levels of files.">
-      <ul>
+    <c-showcase :source="data.examples.fileTree" caption="One component rendering a whole secret lair.">
+      <ul class="rounded-xl border border-line bg-surface px-5 py-4">
         <p-file-tree :node="$files"></p-file-tree>
       </ul>
     </c-showcase>

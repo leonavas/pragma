@@ -1,10 +1,17 @@
 const files = {
-  name: 'my-app/',
+  name: 'secret-lair/',
   children: [
     {
-      name: 'routes/',
-      children: [{ name: 'index.html', children: [] }],
+      name: 'traps/',
+      children: [
+        { name: 'laser-grid.js', children: [] },
+        { name: 'trapdoor.html', children: [] },
+      ],
     },
-    { name: 'pragma.json', children: [] },
+    {
+      name: 'vault/',
+      children: [{ name: 'snacks.json', children: [] }],
+    },
+    { name: 'exit.html', children: [] },
   ],
 }

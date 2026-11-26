@@ -1,26 +1,26 @@
 <script>
-  let added = ''
+  let picked = ''
 
-  const columns = () => [
-    { value: 'todo', label: 'To do' },
-    { value: 'doing', label: 'Doing' },
-    { value: 'done', label: 'Done' },
+  const modes = () => [
+    { value: 'chill', label: 'Chill' },
+    { value: 'spicy', label: 'Spicy' },
+    { value: 'chaos', label: 'Chaos' },
   ]
 
-  function add(event) {
-    added = new FormData(event.target).get('column')
+  function choose(event) {
+    picked = new FormData(event.target).get('mode')
   }
 </script>
 
-<div class="grid gap-2">
+<div class="grid gap-3">
   <form class="flex items-center gap-2"
-    toolname="add_card"
-    tooldescription="Add a card to a column"
-    @submit="add">
-    <c-select name="column" label="Column" value="todo"
-      toolparamdescription="todo, doing or done"
-      :options="$columns"></c-select>
-    <button class="btn btn-primary">Add</button>
+    toolname="set_difficulty"
+    tooldescription="Set the quest difficulty mode"
+    @submit="choose">
+    <c-select name="mode" label="Difficulty" value="chill"
+      toolparamdescription="chill, spicy or chaos"
+      :options="$modes"></c-select>
+    <button class="btn btn-primary">Lock in</button>
   </form>
-  <p>Form value: {$added}</p>
+  <p class="font-mono text-xs text-muted">Selected: {$picked}</p>
 </div>

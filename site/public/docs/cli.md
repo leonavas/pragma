@@ -6,7 +6,7 @@
 | `pragma new <dir>` | Creates an app with the fixed structure. Warns and keeps existing files if `<dir>` is not empty. |
 | `pragma dev [--port 5180] [--host 127.0.0.1] [--cf]` | Runs the dev server with WebSocket live reload. Shows an overlay on build errors while valid pages keep working. Starts Node >= 22 when `.server.js` exists. Prints `app/core-outdated` first if `.pragma/` is older than the CLI. `--cf`: Cloudflare bindings in dev (see below). |
 | `pragma check [--strict]` | Checks JS, HTML, CSS, accessibility, and WebMCP tools. `--strict` turns warnings into errors. |
-| `pragma build [--allow-outdated-core]` | Builds `dist/` and prints the JS and CSS gzip size of each page, marking CSS over 14 kB as render-blocking (information only, no limits). Stops with `app/core-outdated` if `.pragma/` is older than the CLI (`--allow-outdated-core` overrides this). |
+| `pragma build [--allow-outdated-core]` | Builds `dist/` and prints, per page, the first-load JS (`JS raw`, `JS gzip`, `JS br`: the route entry and the modules it preloads; `0` for a static route) and the `CSS gzip` size, marking CSS over 14 kB as render-blocking (information only, no limits; `performance.md`). Stops with `app/core-outdated` if `.pragma/` is older than the CLI (`--allow-outdated-core` overrides this). |
 | `pragma serve [--port 3000] [--host 127.0.0.1]` | Serves `dist/` as in production. |
 | `pragma upgrade` | Syncs `.pragma/` (runtime, docs, `base.css`, `version`) with the installed CLI version. Prints updated, added, or removed files. Never edits files outside `.pragma/`. |
 | `pragma self-update [version]` | Downloads the latest or specified `pragma` binary from GitHub Releases, verifies it with `SHA256SUMS.txt`, and replaces the executable. If the checksum is missing or wrong, it stops and does not change the binary. |
@@ -43,6 +43,7 @@ Fix the root cause; do not work around a rule.
 | `js/stale-derived` | Convert static derived values to functions (`const doubled = () => count * 2`), or update them in actions. |
 | `js/derived-call` | Call derived functions in JS (`empty()`), not as bare values (`if (empty)`). |
 | `js/current-target` | Pass the element with `el` (`@click="move(event, el)"`): in a handler, `event.currentTarget` is the page root. |
+| `js/unread-state` | A store `let` changes but nothing reads it, so nothing re-renders (a counter that "forces" a render). Read the changed value itself through `shared`, or delete the `let`. |
 | `js/dollar-in-script` | Write `x` in JS; `$x` is HTML only. |
 | `html/legacy-syntax`, `html/unknown-directive` | Use pragma syntax (`syntax.md`). Replace foreign attributes (`v-if`, `x-show`, `v-bind:href`, `on:click`, `*ngIf`, `[disabled]`, `className`) with pragma forms (`<if path>`, `:show`, `:href`, `@click`). |
 | `html/data-attribute` | Do not write `data-*` by hand. Use short forms (`{path}` instead of `data-text`), `:data-x="path"`, `.name="path"`, `aria-*`, or role/label/id. |
@@ -54,6 +55,7 @@ Fix the root cause; do not work around a rule.
 | `html/duplicate-module` | Use inline `<script>`/`<style>` or external `x.js`/`x.css`, not both. |
 | `html/component`, `html/unknown-component` | Follow component rules (`components.md`). |
 | `html/layout`, `html/title`, `html/head` | Follow layout and SEO rules (`routes.md`). |
+| `html/meta-description` (warning) | Write `<meta name="description">` at the top of the page (1-2 sentences on what it shows), or one in the `<head>` of `routes/_layout.html` for every page (`routes.md`). |
 | `html/css-var` | Write `:--name` in lowercase kebab-case. A static value cannot contain `;`, `{`, `}`, or `<` (`css.md`). |
 | `html/class` | Toggle classes with `.name="path"`. Do not use `:class` or `{}` in `class` (`syntax.md`). |
 | `html/interpolation` | Replace `{{ }}` and `${ }` with `{path}` (`syntax.md`). |
@@ -63,6 +65,7 @@ Fix the root cause; do not work around a rule.
 | `css/utility-name` | In `lib/theme.css`, do not write a rule whose selector is only a utility name (`.flex`, `.hidden:hover`). Rename the class (`css.md`). |
 | `css/unmatched-selector` (warning) | A page or component selector matches no element its owner writes (slot content, child component markup). Wrap the outside part in `:global(…)` or move the style to the writer (`css.md`). |
 | `app/structure`, `app/route-conflict` | Follow structure and route rules (`structure.md`, `routes.md`). |
+| `app/layout-load` | `routes/_layout.server.js` exports only `load`, which returns what the layout shows (read it as `layout`) (`data.md`). |
 | `app/endpoint`, `app/middleware` | An endpoint exports only `GET`/`POST`/`PUT`/`PATCH`/`DELETE`; the middleware exports `handle` (`data.md`). |
 | `app/endpoint-json` (warning) | An endpoint answers JSON. Use `load` and actions for page data (`data.md`). |
 | `app/package` | Follow package rules (`packages.md`). |

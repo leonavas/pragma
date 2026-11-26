@@ -11,7 +11,7 @@
     <div class="prose">
       <p>The utility classes have the same names as in Tailwind v4. A variant such as <code>hover:</code> applies a class in one state. A class outside the list is a check error.</p>
     </div>
-    <c-showcase :source="data.examples.utilities" caption="Hover the button.">
+    <c-showcase :source="data.examples.utilities" caption="Hover over the button to trigger the hover: utilities.">
       <p-hover-button></p-hover-button>
     </c-showcase>
   </section>
@@ -21,7 +21,7 @@
     <div class="prose">
       <p>Each <code>--color-&lt;name&gt;</code> in <code>lib/theme.css</code> becomes a set of utilities: <code>--color-accent</code> gives <code>bg-accent</code>, <code>text-accent</code> and <code>border-accent</code>.</p>
     </div>
-    <c-showcase :source="data.examples.tokens" caption="The token gives the utility.">
+    <c-showcase :source="data.examples.tokens" caption="Declare the token once, get every color utility for free.">
       <p-swatch></p-swatch>
     </c-showcase>
   </section>
@@ -49,9 +49,9 @@
   <section class="doc-section" aria-labelledby="variables">
     <h2 id="variables">Values from state: <code>:--name</code></h2>
     <div class="prose">
-      <p>There is no <code>style</code> attribute. <code>:--progress="$progress"</code> puts a value in a CSS variable, and the CSS reads <code>var(--progress)</code>.</p>
+      <p>There is no <code>style</code> attribute. <code>:--thrust="$thrust"</code> puts a value in a CSS variable, and the CSS reads <code>var(--thrust)</code>.</p>
     </div>
-    <c-showcase :source="data.examples.variables" caption="Drag the slider.">
+    <c-showcase :source="data.examples.variables" caption="Drag the throttle slider to scale the thrust bar.">
       <p-upload-bar></p-upload-bar>
     </c-showcase>
   </section>
@@ -61,7 +61,7 @@
     <div class="prose">
       <p>For a value that changes each frame (pointer, scroll, drag), set it in <code>frame</code> and use it only in <code>translate</code>, <code>scale</code>, <code>rotate</code> or <code>opacity</code>. These properties do not compute the layout again.</p>
     </div>
-    <c-showcase :source="data.examples.perFrame" caption="Move the pointer over the box: the dot follows.">
+    <c-showcase :source="data.examples.perFrame" caption="Glide your pointer across the track: the orb tracks on the GPU.">
       <p-pointer-dot></p-pointer-dot>
     </c-showcase>
   </section>
@@ -71,7 +71,7 @@
     <div class="prose">
       <p>The root of an <code>&lt;if&gt;</code> or <code>&lt;for&gt;</code> item gets <code>data-entering</code> when it comes in and <code>data-leaving</code> when it goes. The element stays until its CSS animation ends. Without an animation, it goes at once.</p>
     </div>
-    <c-showcase :source="data.examples.motion" caption="Click Show tip two times: it fades in, then out.">
+    <c-showcase :source="data.examples.motion" caption="Click Crack fortune cookie twice to watch it pop in and fade out.">
       <p-tip></p-tip>
     </c-showcase>
   </section>
@@ -81,7 +81,7 @@
     <div class="prose">
       <p><code>dark:</code> utilities apply inside <code>data-theme="dark"</code>. The next example sets it for the whole page.</p>
     </div>
-    <c-showcase :source="data.examples.theme" caption="One component, light and dark.">
+    <c-showcase :source="data.examples.theme" caption="One boarding pass component, light and dark.">
       <div class="grid w-full max-w-xs gap-3">
         <p-invoice-card></p-invoice-card>
         <div :data-theme="'dark'">
@@ -96,7 +96,7 @@
     <div class="prose">
       <p><code>theme()</code> and <code>setTheme()</code> from <code>.pragma/theme.js</code> read and set the theme of the page. The choice stays for the next visit, and a first visit follows the system setting.</p>
     </div>
-    <c-showcase :source="data.examples.themeToggle" caption="Click the button: the card follows, also after a reload.">
+    <c-showcase :source="data.examples.themeToggle" caption="Click to flip themes: the whole page switches and remembers after a reload.">
       <p-theme-toggle></p-theme-toggle>
     </c-showcase>
   </section>

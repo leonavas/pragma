@@ -1,18 +1,18 @@
-<title>Ask · data demo</title>
+<title>Oracle · data demo</title>
 <meta name="robots" content="noindex">
 
 <script>
   import { stream } from 'pragma'
 
-  let answer = ''
+  let fortune = ''
 
   async function ask() {
-    answer = ''
+    fortune = ''
     for await (const chunk of stream('ask')) {
-      answer += chunk.word + ' '
+      fortune += chunk.word + ' '
     }
   }
 </script>
 
-<button class="btn" @click="ask">Ask</button>
-<p>{$answer}</p>
+<button class="btn btn-primary" @click="ask">Consult the oracle</button>
+<p class="font-mono text-sm">{$fortune}</p>

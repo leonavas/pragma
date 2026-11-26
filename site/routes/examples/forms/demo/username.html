@@ -1,4 +1,4 @@
-<title>Pick a username</title>
+<title>Claim a callsign</title>
 <meta name="robots" content="noindex">
 
 <script>
@@ -12,19 +12,20 @@
     const claiming = call('claim', input)
     if (event.agentInvoked) event.respondWith(claiming)
     try {
-      message = `${(await claiming).name} is yours.`
+      message = `${(await claiming).name} is now on the arcade board.`
     } catch (failure) {
       message = failure.message
     }
   }
 </script>
 
-<form class="flex gap-2" toolname="claim_username"
-  tooldescription="Claim a free username"
+<form class="flex gap-2" toolname="claim_callsign"
+  tooldescription="Claim a free arcade leaderboard callsign"
   @submit="claim">
-  <input name="name" required aria-label="Username"
-    toolparamdescription="The username to claim"
-    class="border border-line px-2">
+  <input name="name" required aria-label="Arcade callsign"
+    placeholder="Try nova or your tag…"
+    toolparamdescription="The arcade callsign to claim"
+    class="flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm">
   <button class="btn btn-primary">Claim</button>
 </form>
-<p role="status">{$message}</p>
+<p class="font-mono text-sm text-muted" role="status">{$message}</p>

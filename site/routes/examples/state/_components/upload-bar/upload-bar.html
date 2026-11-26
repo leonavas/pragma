@@ -1,21 +1,27 @@
 <script>
   import { frame } from 'pragma'
 
-  let progress = 0
+  let charge = 0
+
+  const percent = () => Math.round(charge * 100)
 
   function step() {
-    progress = Math.min(progress + 0.01, 1)
-    if (progress < 1) frame(step)
+    charge = Math.min(charge + 0.015, 1)
+    if (charge < 1) frame(step)
   }
 
-  function start() {
-    progress = 0
+  function ignite() {
+    charge = 0
     frame(step)
   }
 </script>
 
-<div>
-  <progress aria-label="Upload"
-    :value="$progress"></progress>
-  <button class="btn" @click="start">Upload</button>
+<div class="grid w-full max-w-xs gap-3">
+  <div class="flex items-center justify-between font-mono text-xs text-muted">
+    <span>HYPERDRIVE</span>
+    <span class="tabular-nums">{$percent}%</span>
+  </div>
+  <progress class="w-full" aria-label="Hyperdrive charge"
+    :value="$charge"></progress>
+  <button class="btn btn-primary" @click="ignite">Charge</button>
 </div>

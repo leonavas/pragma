@@ -1,11 +1,11 @@
 <script>
-  let count = 0
+  let claps = 0
 
-  function increase() {
-    count += 1
+  function clap() {
+    claps += 1
   }
 </script>
 
-<button class="btn" @click="increase">
-  Clicks: {$count}
+<button class="btn" @click="clap">
+  Clap <span class="font-mono text-primary-500">{$claps}</span>
 </button>

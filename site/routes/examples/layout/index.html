@@ -11,7 +11,7 @@
     <div class="prose">
       <p><code>flex</code> puts the children in a row. <code>items-center</code> aligns them vertically, <code>justify-between</code> pushes them to the two ends and <code>gap-4</code> keeps space between them.</p>
     </div>
-    <c-showcase :source="data.examples.row" caption="The title stays left, the buttons go right.">
+    <c-showcase :source="data.examples.row" caption="The deck title stays left, the launch buttons go right.">
       <p-toolbar></p-toolbar>
     </c-showcase>
   </section>
@@ -21,7 +21,7 @@
     <div class="prose">
       <p><code>flex-col</code> puts the children in a column. <code>gap-3</code> sets the space between them and <code>p-4</code> the space inside the border. <code>max-w-xs</code> limits the card width, and <code>w-full</code> makes the button as wide as the card.</p>
     </div>
-    <c-showcase :source="data.examples.stack" caption="The same gap between each line, no margins.">
+    <c-showcase :source="data.examples.stack" caption="Even spacing between every element, with zero margins.">
       <p-profile></p-profile>
     </c-showcase>
   </section>
@@ -31,7 +31,7 @@
     <div class="prose">
       <p><code>grid-cols-3</code> makes three equal columns. A child takes one column, and <code>col-span-2</code> makes it take two: here, a nav and a wider content area.</p>
     </div>
-    <c-showcase :source="data.examples.grid" caption="The nav takes one column, the content two.">
+    <c-showcase :source="data.examples.grid" caption="The quest menu takes one column, the board takes two.">
       <p-mailbox></p-mailbox>
     </c-showcase>
   </section>
@@ -41,7 +41,7 @@
     <div class="prose">
       <p>Breakpoints are mobile first: a class with no prefix applies on every screen, and <code>sm:grid-cols-2</code> applies from 40rem up. <code>lg:</code> starts at 64rem. <code>mx-auto w-full max-w-3xl</code> centers the content and limits its width.</p>
     </div>
-    <c-showcase :source="data.examples.responsive" caption="Open the frame in a new tab and change the window width: one, two, then three columns.">
+    <c-showcase :source="data.examples.responsive" caption="Open the frame in a new tab and resize it: one, two, then three starship classes.">
       <c-frame src="/examples/layout/demo" title="Layout demo: responsive grid" height="sm"></c-frame>
     </c-showcase>
   </section>
@@ -49,9 +49,9 @@
   <section class="doc-section" aria-labelledby="sticky">
     <h2 id="sticky">A sticky header in a scrolling list</h2>
     <div class="prose">
-      <p><code>h-48 overflow-auto</code> gives the list a fixed height and its own scroll bar. <code>sticky top-0</code> keeps each letter at the top while its names scroll under it. <code>bg-surface</code> hides the names below.</p>
+      <p><code>h-48 overflow-auto</code> gives the list a fixed height and its own scroll bar. <code>sticky top-0</code> keeps each letter at the top while its planets scroll under it. <code>bg-surface</code> hides the names below.</p>
     </div>
-    <c-showcase :source="data.examples.sticky" caption="Scroll the list: A stays on top until B pushes it out.">
+    <c-showcase :source="data.examples.sticky" caption="Scroll the star chart: A stays pinned until B pushes it out.">
       <p-contacts></p-contacts>
     </c-showcase>
   </section>
@@ -61,7 +61,7 @@
     <div class="prose">
       <p><code>absolute top-0 right-0</code> places the dot at the top right of the nearest <code>relative</code> parent, out of the flow. <code>z-10</code> keeps it above its siblings.</p>
     </div>
-    <c-showcase :source="data.examples.absolute" caption="The status dot sits on the corner of the avatar.">
+    <c-showcase :source="data.examples.absolute" caption="The online status dot sits right on the corner of the avatar.">
       <p-avatar></p-avatar>
     </c-showcase>
   </section>

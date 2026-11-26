@@ -7,7 +7,7 @@ const page = name => ({ file: `_components/${name}/${name}.html`, as: 'routes/in
 export async function load() {
   const examples = await readExamples('routes/examples/components', {
     counter: ['_components/counter/counter.html', '_snippets/counter/usage.html'],
-    product: ['_components/product/product.html', '_snippets/product/usage.html'],
+    loot: ['_components/loot/loot.html', '_snippets/loot/usage.html'],
     teamList: ['_components/person-row/person-row.html', page('team-list')],
     slots: ['_components/panel/panel.html', page('release-notes')],
     slotOwner: ['_components/panel/panel.html', page('post')],

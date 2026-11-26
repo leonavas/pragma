@@ -1,7 +1,9 @@
 <script>
-  function save() {
-    throw new Error('save failed')
+  function triggerBug() {
+    throw new Error('gremlins in the mainframe')
   }
 </script>
 
-<button class="btn" @click="save">Save</button>
+<button class="btn btn-danger" @click="triggerBug">
+  Release the gremlins
+</button>

@@ -1,4 +1,4 @@
-<title>Booking · data demo</title>
+<title>Time machine · data demo</title>
 <meta name="robots" content="noindex">
 
 <script>
@@ -6,9 +6,9 @@
 
   let message = ''
 
-  async function book(day) {
+  async function book(year) {
     try {
-      message = (await call('book', { day })).message
+      message = (await call('book', { year })).message
     } catch (failure) {
       const taken = failure.status === 409
       message = taken ? failure.message : 'Try again.'
@@ -17,7 +17,7 @@
 </script>
 
 <div class="flex gap-2">
-  <button class="btn" @click="book('Mon')">Mon</button>
-  <button class="btn" @click="book('Tue')">Tue</button>
+  <button class="btn" @click="book('1969')">Visit 1969</button>
+  <button class="btn" @click="book('1999')">Visit 1999</button>
 </div>
-<p role="status">{$message}</p>
+<p class="font-mono text-sm text-muted" role="status">{$message}</p>

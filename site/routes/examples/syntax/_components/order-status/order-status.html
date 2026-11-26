@@ -1,23 +1,30 @@
 <script>
-  let status = 'loading'
+  let mood = 'purring'
 
-  const loading = () => status === 'loading'
-  const failed = () => status === 'error'
+  const purring = () => mood === 'purring'
+  const hungry = () => mood === 'hungry'
 </script>
 
-<div>
-  <select aria-label="Status" :model="$status">
-    <option>loading</option>
-    <option>error</option>
-    <option>ready</option>
+<div class="grid w-full max-w-xs gap-3">
+  <select class="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+    aria-label="Cat mood" :model="$mood">
+    <option value="purring">Purring</option>
+    <option value="hungry">Hungry</option>
+    <option value="zoomies">Zoomies</option>
   </select>
-  <if $loading>
-    <p>Loading…</p>
+  <if $purring>
+    <p class="rounded-lg border border-line bg-surface p-3 text-sm">
+      Content. You may live.
+    </p>
   </if>
-  <else-if $failed>
-    <p>Could not load.</p>
+  <else-if $hungry>
+    <p class="rounded-lg border border-line bg-surface p-3 text-sm">
+      Bowl is 98% full. Literally starving.
+    </p>
   </else-if>
   <else>
-    <p>You have 3 orders.</p>
+    <p class="rounded-lg border border-line bg-surface p-3 text-sm">
+      3 AM sprint across the couch.
+    </p>
   </else>
 </div>

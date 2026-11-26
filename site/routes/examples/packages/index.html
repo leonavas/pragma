@@ -31,7 +31,7 @@
     <div class="prose">
       <p>Import only the names you need. These four names ship <strong>0.94 kB gzip</strong> of valibot, not the whole package.</p>
     </div>
-    <c-showcase :source="data.examples.signupEmail" caption="Finish the address: Valid turns true.">
+    <c-showcase :source="data.examples.signupEmail" caption="Finish the email domain to unlock the VIP pass.">
       <p-signup-email></p-signup-email>
     </c-showcase>
   </section>
@@ -41,7 +41,7 @@
     <div class="prose">
       <p>When a package is needed only after a click, import it in a <code>utils/</code> module, then <code>await import()</code> that module in the action. The package does not load with the page, and the module keeps its import open to tree shaking.</p>
     </div>
-    <c-showcase :source="data.examples.releaseAge" caption="Open the network panel, then click: dayjs-*.js loads only now.">
+    <c-showcase :source="data.examples.releaseAge" caption="Open the network panel, then click Check stardate: dayjs-*.js loads only now.">
       <p-release-age></p-release-age>
     </c-showcase>
   </section>

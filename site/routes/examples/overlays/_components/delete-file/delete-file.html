@@ -1,20 +1,26 @@
 <script>
   import { confirm } from 'pragma'
 
-  let answer = ''
+  let outcome = 'Production is still alive.'
 
-  async function remove() {
-    answer = await confirm('delete-file')
+  async function wipe() {
+    const answer = await confirm('delete-prod')
+    outcome = answer === 'ok'
+      ? 'Deleted. Updating resume…'
+      : 'Crisis averted.'
   }
 </script>
 
-<div>
-  <button class="btn" @click="remove">Delete</button>
-  <p>Answer: {$answer}</p>
-  <c-alert id="delete-file" title="Delete the file?">
-    <button slot="actions" class="btn" @close
-      value="cancel">Keep</button>
-    <button slot="actions" class="btn btn-danger" @close
-      value="ok">Delete</button>
+<div class="grid justify-items-center gap-3">
+  <button class="btn btn-danger" @click="wipe">Delete prod database</button>
+  <p class="font-mono text-xs text-muted">{$outcome}</p>
+  <c-alert id="delete-prod" title="Delete production?">
+    <p class="text-sm text-muted">It is Friday at 4:58 PM.</p>
+    <button slot="actions" class="btn" @close value="cancel">
+      Nope, abort
+    </button>
+    <button slot="actions" class="btn btn-danger" @close value="ok">
+      YOLO, delete
+    </button>
   </c-alert>
 </div>

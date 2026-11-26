@@ -12,7 +12,7 @@
       <p><code>:model</code> keeps the type of the value. A <code>number</code> or <code>range</code> input gives a number, a checkbox gives <code>true</code> or <code>false</code>, and a group of radios gives the <code>value</code> of the checked one.</p>
       <p>Each field has a label: a <code>&lt;label&gt;</code> around it, or a <code>&lt;legend&gt;</code> for a group.</p>
     </div>
-    <c-showcase :source="data.examples.ticket" caption="Change the fields: the line below follows.">
+    <c-showcase :source="data.examples.ticket" caption="Customize the pizza order: the summary updates with typed values.">
       <p-ticket></p-ticket>
     </c-showcase>
   </section>
@@ -22,7 +22,7 @@
     <div class="prose">
       <p>A native <code>&lt;select&gt;</code> works with the keyboard, with screen readers and on phones. <code>:model</code> holds the <code>value</code> of the option, not its label. Style the box with utilities; do not change its <code>appearance</code>.</p>
     </div>
-    <c-showcase :source="data.examples.sizePicker" caption="Pick a size: the value is the short code.">
+    <c-showcase :source="data.examples.sizePicker" caption="Pick a spice level: the state holds the short option value.">
       <p-size-picker></p-size-picker>
     </c-showcase>
   </section>
@@ -33,7 +33,7 @@
       <p>When the list needs its own look, use <code>&lt;c-select&gt;</code>. It is in <code>lib/components/select/</code> of every new app. It opens a dropdown and keeps a hidden native <code>&lt;select name&gt;</code> in sync, so <code>new FormData(event.target)</code> reads it like any field.</p>
       <p>Every form is also a tool for agents, so it has a <code>toolname</code> and a <code>tooldescription</code>. WebMCP explains them.</p>
     </div>
-    <c-showcase :source="data.examples.columnPicker" caption="Pick a column with the arrow keys, then click Add.">
+    <c-showcase :source="data.examples.columnPicker" caption="Pick a difficulty with the arrow keys, then click Lock in.">
       <p-column-picker></p-column-picker>
     </c-showcase>
   </section>
@@ -44,7 +44,7 @@
       <p>Native attributes come first: <code>required</code>, <code>type="email"</code>, <code>min</code>, <code>minlength</code>. The browser stops the submit and shows its message, so <code>@submit</code> runs only with valid fields.</p>
       <p>A rule between two fields goes in the submit function. It puts its message in state, in a <code>role="alert"</code> element.</p>
     </div>
-    <c-showcase :source="data.examples.stayDates" caption="Click Book with empty dates, then with check-out before check-in.">
+    <c-showcase :source="data.examples.stayDates" caption="Click Schedule jump with empty dates, then try returning before you leave.">
       <p-stay-dates></p-stay-dates>
     </c-showcase>
   </section>
@@ -52,10 +52,10 @@
   <section class="doc-section" aria-labelledby="submit">
     <h2 id="submit">Submit to a server action</h2>
     <div class="prose">
-      <p>Some rules need the server, for example a name that must be free. The action stops with <code>error(409, message)</code>, and <code>call</code> throws: <code>failure.message</code> is the text for the form. The <a href="/examples/data#actions">guestbook</a> shows the success path.</p>
+      <p>Some rules need the server, for example a callsign that must be free. The action stops with <code>error(409, message)</code>, and <code>call</code> throws: <code>failure.message</code> is the text for the form. The <a href="/examples/data#actions">guestbook</a> shows the success path.</p>
     </div>
-    <c-showcase :source="data.examples.username" caption="Claim ada (taken), then a new name.">
-      <c-frame src="/examples/forms/demo/username" title="Forms demo: claim a username" height="sm"></c-frame>
+    <c-showcase :source="data.examples.username" caption="Try claiming nova (taken), then pick your own arcade callsign.">
+      <c-frame src="/examples/forms/demo/username" title="Forms demo: claim a callsign" height="sm"></c-frame>
     </c-showcase>
   </section>
 </c-doc>

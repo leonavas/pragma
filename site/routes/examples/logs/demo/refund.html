@@ -17,17 +17,19 @@
 </script>
 
 <if page.loading>
-  <p class="skeleton h-16"></p>
+  <p class="skeleton h-16 rounded-lg"></p>
 </if>
 <else>
-  <div>
-    <h1>Refund {data.refund.id}</h1>
-    <button class="btn" @click="send('approve')">
-      Approve
-    </button>
-    <button class="btn" @click="send('escalate')">
-      Escalate
-    </button>
-    <p role="status">{$result}</p>
+  <div class="grid gap-3">
+    <h1 class="font-mono text-xl">Refund {data.refund.id}</h1>
+    <div class="flex gap-2">
+      <button class="btn btn-primary" @click="send('approve')">
+        Approve
+      </button>
+      <button class="btn btn-danger" @click="send('escalate')">
+        Escalate
+      </button>
+    </div>
+    <p class="font-mono text-sm text-muted" role="status">{$result}</p>
   </div>
 </else>

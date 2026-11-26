@@ -1,4 +1,4 @@
-const words = ['Each', 'line', 'comes', 'alone.']
+const words = ['Your', 'next', 'deploy', 'will', 'succeed', 'on', 'a', 'Friday.']
 const wait = ms =>
   new Promise(done => setTimeout(done, ms))
 
@@ -10,7 +10,7 @@ export const actions = {
         for (const word of words) {
           const line = JSON.stringify({ word }) + '\n'
           controller.enqueue(encoder.encode(line))
-          await wait(300)
+          await wait(240)
         }
         controller.close()
       },

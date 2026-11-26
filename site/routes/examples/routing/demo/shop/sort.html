@@ -4,17 +4,15 @@
 <script>
   import { query } from 'pragma'
 
-  const newest = () => query.sort !== 'price' && 'true'
-  const price = () => query.sort === 'price' && 'true'
+  const hottest = () => query.sort !== 'price' && 'true'
+  const cheapest = () => query.sort === 'price' && 'true'
 </script>
 
-<nav class="flex gap-4" aria-label="Sort">
-  <a href="?sort=new" :aria-current="$newest">Newest</a>
-  <a href="?sort=price" :aria-current="$price">
-    Cheapest
-  </a>
+<nav class="flex gap-4 text-sm" aria-label="Sort">
+  <a href="?sort=hot" :aria-current="$hottest">Hottest</a>
+  <a href="?sort=price" :aria-current="$cheapest">Cheapest</a>
 </nav>
 
 <style>
-  [aria-current] { font-weight: 600; }
+  [aria-current] { font-weight: 700; color: var(--color-primary-500); }
 </style>

@@ -9,10 +9,10 @@
   <section class="doc-section" aria-labelledby="load">
     <h2 id="load"><code>load()</code> with a skeleton</h2>
     <div class="prose">
-      <p><code>routes/catalog.server.js</code> runs on the server, next to the page <code>routes/catalog.html</code>. Its <code>load</code> function returns the data, and the page reads it as <code>data.products</code>. While <code>load</code> runs, <code>page.loading</code> is true, so the page shows a <code>skeleton</code> block.</p>
+      <p><code>routes/catalog.server.js</code> runs on the server, next to the page <code>routes/catalog.html</code>. Its <code>load</code> function returns the data, and the page reads it as <code>data.potions</code>. While <code>load</code> runs, <code>page.loading</code> is true, so the page shows a <code>skeleton</code> block.</p>
     </div>
-    <c-showcase :source="data.examples.catalog" caption="load waits 800 ms. Press Reload in the frame bar to see the skeleton again.">
-      <c-frame src="/examples/data/demo/catalog" title="Catalog demo route" height="sm"></c-frame>
+    <c-showcase :source="data.examples.catalog" caption="load waits 800 ms to brew. Press Reload in the frame bar to see the skeleton again.">
+      <c-frame src="/examples/data/demo/catalog" title="Potion menu demo route" height="sm"></c-frame>
     </c-showcase>
     <div class="prose">
       <ul>
@@ -27,8 +27,8 @@
     <div class="prose">
       <p><code>error(503, 'message')</code> from <code>'pragma/server'</code> stops <code>load</code> with that status. The page gets it as <code>page.error</code>, so the <code>&lt;else-if page.error&gt;</code> branch shows.</p>
     </div>
-    <c-showcase :source="data.examples.failure" caption="The same route with ?fail=1 in the URL.">
-      <c-frame src="/examples/data/demo/catalog?fail=1" title="Catalog demo route with a failing load" height="sm"></c-frame>
+    <c-showcase :source="data.examples.failure" caption="The same potion route with ?fail=1 in the URL.">
+      <c-frame src="/examples/data/demo/catalog?fail=1" title="Potion menu route with a failing load" height="sm"></c-frame>
     </c-showcase>
   </section>
 
@@ -37,7 +37,7 @@
     <div class="prose">
       <p>With <code>export const ssr = true</code>, the server runs <code>load</code> and sends the page with its data in the HTML. There is no skeleton, and search engines see the data.</p>
     </div>
-    <c-showcase :source="data.examples.clock" caption="Reload the frame: the time is in the HTML at once.">
+    <c-showcase :source="data.examples.clock" caption="Reload the frame: the server time arrives in the first HTML.">
       <c-frame src="/examples/data/demo/clock" title="SSR demo route" height="sm"></c-frame>
     </c-showcase>
   </section>
@@ -48,7 +48,7 @@
       <p><code>load</code> and every action get one context object. <code>cookies.get</code> reads a cookie of the request and <code>cookies.set</code> adds it to the response. A cookie is <code>httpOnly</code>, <code>sameSite: 'lax'</code> and <code>secure</code> by default.</p>
       <p>The context also has <code>request</code>, <code>url</code>, <code>params</code>, <code>query</code>, <code>env</code> (secrets and bindings), <code>log</code>, <code>locals</code>, <code>setHeaders</code> and <code>waitUntil</code>.</p>
     </div>
-    <c-showcase :source="data.examples.visits" caption="Reload the frame: the count goes up.">
+    <c-showcase :source="data.examples.visits" caption="Reload the frame to stamp your secret club card again.">
       <c-frame src="/examples/data/demo/visits" title="Cookie demo route" height="sm"></c-frame>
     </c-showcase>
   </section>
@@ -59,7 +59,7 @@
       <p>A server action writes data. <code>call('sign', input)</code> runs <code>actions.sign</code> in the <code>.server.js</code> file and returns its result; the page assigns it to <code>data</code>. <code>new FormData(event.target)</code> reads the form fields.</p>
       <p>Every form is also a tool for AI agents in the browser (WebMCP). <code>toolname</code>, <code>tooldescription</code> and <code>toolparamdescription</code> describe it, and <code>event.respondWith</code> gives the agent the result.</p>
     </div>
-    <c-showcase :source="data.examples.guestbook" caption="Sign with your name.">
+    <c-showcase :source="data.examples.guestbook" caption="Sign the time travelers' guestbook with your name and year.">
       <c-frame src="/examples/data/demo/guestbook" title="Guestbook demo route"></c-frame>
     </c-showcase>
   </section>
@@ -69,7 +69,7 @@
     <div class="prose">
       <p><code>error(409, 'message')</code> in an action makes <code>call</code> throw. The error has <code>status</code>, <code>body</code> (what the server sent) and <code>message</code>, so the page can react to each status.</p>
     </div>
-    <c-showcase :source="data.examples.booking" caption="Click Mon, then Tue: Tue is taken.">
+    <c-showcase :source="data.examples.booking" caption="Try 1969, then 1999: 1999 returns a 409 conflict.">
       <c-frame src="/examples/data/demo/booking" title="Booking demo route" height="sm"></c-frame>
     </c-showcase>
   </section>
@@ -79,7 +79,7 @@
     <div class="prose">
       <p><code>redirect(303, url)</code> from <code>'pragma/server'</code> sends the browser to another page. After an action, the page navigates before <code>call</code> returns. In <code>load</code>, it replaces the current page, so Back skips it.</p>
     </div>
-    <c-showcase :source="data.examples.redirects" caption="Click Place order, then open /done without an id.">
+    <c-showcase :source="data.examples.redirects" caption="Book the flight, then click Open /done without an id to bounce back.">
       <c-frame src="/examples/data/demo/order" title="Redirect demo route" height="sm"></c-frame>
     </c-showcase>
   </section>
@@ -109,7 +109,7 @@ x-frame-options: DENY</code></pre>
       <p>A <code>.server.js</code> with no <code>.html</code> next to it is an endpoint. It exports <code>GET</code>, <code>POST</code> and the other methods, and each returns a <code>Response</code>: a file, a stream, a webhook reply. A link with <code>download</code> opens it without the router.</p>
       <p>Page data comes from <code>load</code>, and writes go through actions. Do not make <code>/api</code> endpoints for them.</p>
     </div>
-    <c-showcase :source="data.examples.endpoint" caption="Click Download: the browser saves products.csv.">
+    <c-showcase :source="data.examples.endpoint" caption="Click Download: the endpoint streams back highscores.csv.">
       <c-frame src="/examples/data/demo/downloads" title="Endpoint demo route" height="sm"></c-frame>
     </c-showcase>
   </section>
@@ -119,7 +119,7 @@ x-frame-options: DENY</code></pre>
     <div class="prose">
       <p>An action can return a <code>Response</code> with a <code>ReadableStream</code>. With <code>content-type: application/x-ndjson</code>, each line is one JSON value. <code>stream('ask')</code> gives each line as soon as the server writes it, in a <code>for await</code> loop.</p>
     </div>
-    <c-showcase :source="data.examples.stream" caption="Click Ask: the words arrive one at a time.">
+    <c-showcase :source="data.examples.stream" caption="Consult the oracle: the prophecy streams word by word.">
       <c-frame src="/examples/data/demo/ask" title="Streaming demo route" height="sm"></c-frame>
     </c-showcase>
   </section>

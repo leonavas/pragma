@@ -1,9 +1,11 @@
 <div>
-  <button class="btn" @open="about">About</button>
-  <c-modal id="about" title="About pragma">
-    <p>Native HTML, CSS and JS.</p>
-    <button slot="actions" class="btn" @close>
-      Close
+  <button class="btn" @open="briefing">Open secret file</button>
+  <c-modal id="briefing" title="Top Secret">
+    <p class="text-sm text-muted">
+      The cake is not a lie. It is in the break room fridge.
+    </p>
+    <button slot="actions" class="btn btn-primary" @close>
+      Understood
     </button>
   </c-modal>
 </div>

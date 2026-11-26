@@ -1,12 +1,18 @@
 <script>
   let locked = true
+  let status = 'Safety cover down.'
+
+  function launch() {
+    status = 'Liftoff! We have left orbit.'
+  }
 </script>
 
-<div>
-  <label>
-    <input type="checkbox" :model="$locked"> Locked
+<div class="grid justify-items-center gap-3">
+  <label class="flex cursor-pointer items-center gap-2 text-sm">
+    <input type="checkbox" :model="$locked"> Safety lock
   </label>
-  <button class="btn" :disabled="$locked">
-    Deploy
+  <button class="btn btn-danger" :disabled="$locked" @click="launch">
+    Launch rocket
   </button>
+  <p class="font-mono text-xs text-muted">{$status}</p>
 </div>

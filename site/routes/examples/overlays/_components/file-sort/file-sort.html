@@ -1,15 +1,16 @@
 <script>
-  let order = 'name'
+  let order = 'vibes'
 
   function sortBy(next) {
     order = next
   }
 </script>
 
-<div>
-  <c-dropdown id="sort" label="Sort">
-    <button @close @click="sortBy('name')">Name</button>
-    <button @close @click="sortBy('size')">Size</button>
+<div class="flex flex-wrap items-center gap-3">
+  <c-dropdown id="playlist" label="Sort playlist">
+    <button @close @click="sortBy('bpm')">BPM</button>
+    <button @close @click="sortBy('vibes')">Vibes</button>
+    <button @close @click="sortBy('chaos')">Chaos</button>
   </c-dropdown>
-  <p>Sorted by {$order}</p>
+  <p class="font-mono text-sm text-muted">Playing by: {$order}</p>
 </div>

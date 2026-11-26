@@ -1,24 +1,25 @@
 <script>
-  let tasks = [
-    { id: 1, title: 'Write the docs' },
-    { id: 2, title: 'Ship the release' },
+  let slices = [
+    { id: 1, flavor: 'Pepperoni' },
+    { id: 2, flavor: 'Margherita' },
+    { id: 3, flavor: 'Pineapple (brave)' },
   ]
 
-  function remove(task) {
-    tasks = tasks.filter(other => other.id !== task.id)
+  function eat(slice) {
+    slices = slices.filter(other => other.id !== slice.id)
   }
 </script>
 
-<ul>
-  <for task in $tasks key=task.id>
-    <li>
-      {task.title}
-      <button class="btn" @click="remove(task)">
-        Done
-      </button>
+<ul class="grid w-full max-w-xs gap-2">
+  <for slice in $slices key=slice.id>
+    <li class="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2 text-sm">
+      <span>{slice.flavor}</span>
+      <button class="btn" @click="eat(slice)">Eat</button>
     </li>
   </for>
   <empty>
-    <li>All done.</li>
+    <li class="rounded-lg border border-dashed border-line px-4 py-3 text-center text-sm text-muted">
+      Box is empty. Order another?
+    </li>
   </empty>
 </ul>

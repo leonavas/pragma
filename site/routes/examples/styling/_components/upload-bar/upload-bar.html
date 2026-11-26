@@ -1,17 +1,23 @@
 <script>
-  let progress = 40
+  let thrust = 65
 </script>
 
-<div>
-  <input type="range" aria-label="Progress"
-    :model="$progress">
-  <div class="bar h-2 bg-primary-500"
-    :--progress="$progress"></div>
+<div class="grid w-full max-w-xs gap-3">
+  <div class="flex items-center justify-between font-mono text-xs text-muted">
+    <span>THRUST</span>
+    <span class="tabular-nums">{$thrust}%</span>
+  </div>
+  <input type="range" aria-label="Rocket thrust"
+    :model="$thrust">
+  <div class="overflow-hidden rounded-full bg-line">
+    <div class="bar h-3 rounded-full bg-primary-500"
+      :--thrust="$thrust"></div>
+  </div>
 </div>
 
 <style>
   .bar {
-    scale: calc(var(--progress) / 100) 1;
+    scale: calc(var(--thrust) / 100) 1;
     transform-origin: left;
   }
 </style>

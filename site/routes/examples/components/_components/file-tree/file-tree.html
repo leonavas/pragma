@@ -2,9 +2,9 @@
   export let node = null
 </script>
 
-<li>
+<li class="font-mono text-sm leading-relaxed">
   {$node.name}
-  <ul class="pl-4">
+  <ul class="border-l border-line pl-4">
     <for child in $node.children key=child.name>
       <p-file-tree :node="child"></p-file-tree>
     </for>

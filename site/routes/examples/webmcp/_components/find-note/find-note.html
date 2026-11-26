@@ -1,19 +1,20 @@
-<form class="flex gap-2" toolname="find_note"
-  tooldescription="Find a note by words in its title"
+<form class="flex w-full max-w-xs gap-2" toolname="find_recipe"
+  tooldescription="Search the secret taco recipe book"
   toolautosubmit>
-  <input class="border border-line px-2" name="words"
-    aria-label="Words" type="search"
-    toolparamdescription="Words from the note title">
+  <input class="flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm"
+    name="words" aria-label="Recipe keywords" type="search"
+    placeholder="Search secret tacos…"
+    toolparamdescription="Ingredients or words from the recipe">
   <button class="btn">Find</button>
 </form>
 
 <style>
   form:tool-form-active {
-    outline: 2px dashed var(--color-primary-600);
+    outline: 2px dashed var(--color-primary-500);
     outline-offset: 4px;
   }
   button:tool-submit-active {
-    background: var(--color-primary-600);
-    color: white;
+    background: var(--color-primary-500);
+    color: var(--color-black);
   }
 </style>

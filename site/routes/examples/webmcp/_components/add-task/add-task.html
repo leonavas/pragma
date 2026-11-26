@@ -1,25 +1,32 @@
 <script>
-  let tasks = ['Buy milk']
+  let gear = [
+    { id: 1, name: 'Spacesuit' },
+    { id: 2, name: 'Duct tape' },
+  ]
 
-  function add(event) {
+  function pack(event) {
     const form = new FormData(event.target)
-    tasks.push(String(form.get('title')))
+    const id = gear.length + 1
+    gear.push({ id, name: String(form.get('item')) })
     event.target.reset()
   }
 </script>
 
-<div class="grid gap-2">
-  <form class="flex gap-2" toolname="add_task"
-    tooldescription="Add a task to the to-do list"
-    toolautosubmit @submit="add">
-    <input class="border border-line px-2" name="title"
-      aria-label="Task" required
-      toolparamdescription="What to do, in a few words">
-    <button class="btn">Add</button>
+<div class="grid w-full max-w-xs gap-3">
+  <form class="flex gap-2" toolname="pack_item"
+    tooldescription="Add an item to the Mars packing list"
+    toolautosubmit @submit="pack">
+    <input class="flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm"
+      name="item" aria-label="Gear item" required
+      placeholder="Extra snacks…"
+      toolparamdescription="Item to pack for Mars">
+    <button class="btn btn-primary">Pack</button>
   </form>
-  <ul class="list-disc pl-5">
-    <for task in $tasks key=task>
-      <li>{task}</li>
+  <ul class="grid gap-1.5">
+    <for entry in $gear key=entry.id>
+      <li class="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm">
+        {entry.name}
+      </li>
     </for>
   </ul>
 </div>

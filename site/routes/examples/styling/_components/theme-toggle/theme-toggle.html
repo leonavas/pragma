@@ -3,7 +3,7 @@
 
   let dark = theme() === 'dark'
 
-  const label = () => (dark ? 'Light theme' : 'Dark theme')
+  const label = () => (dark ? 'Switch to daylight' : 'Switch to night shift')
 
   function toggle() {
     dark = !dark
@@ -11,9 +11,7 @@
   }
 </script>
 
-<div class="grid gap-3 rounded-lg bg-white p-4
-  text-neutral-900 dark:bg-neutral-900
-  dark:text-neutral-100">
-  <p>The theme is saved for the next visit.</p>
+<div class="grid gap-3 rounded-xl border border-neutral-200 bg-white p-4 text-neutral-900 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100">
+  <p class="text-sm">Your eyes will thank you at 2 AM.</p>
   <button class="btn" @click="toggle">{$label}</button>
 </div>

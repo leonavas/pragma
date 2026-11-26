@@ -75,8 +75,8 @@ This is the whole component, read from disk when the page renders: the source yo
 <script>
   let draft = ''
   let tasks = [
-    { id: 1, title: 'Write the page' },
-    { id: 2, title: 'Run pragma check' },
+    { id: 1, title: 'Feed the office cat' },
+    { id: 2, title: 'Deploy on Friday' },
   ]
 
   function add(event) {
@@ -88,26 +88,27 @@ This is the whole component, read from disk when the page renders: the source yo
 </script>
 
 <div class="grid w-full max-w-xs gap-3">
-  <p>{$tasks.length} tasks</p>
-  <ul class="tasks">
+  <p class="font-mono text-xs uppercase tracking-wider text-muted">
+    Mission checklist · {$tasks.length}
+  </p>
+  <ul class="grid gap-1.5">
     <for task in $tasks key=task.id>
-      <li>{task.title}</li>
+      <li class="rounded-lg border border-line bg-surface px-3 py-2 text-sm">
+        {task.title}
+      </li>
     </for>
   </ul>
   <form class="flex gap-2" @submit="add"
     toolname="add_task"
     tooldescription="Add a task to the demo list">
-    <input class="flex-1 border border-line px-2"
+    <input class="flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm"
       name="title" required aria-label="New task"
+      placeholder="Blame DNS…"
       toolparamdescription="Title of the task"
       :model="$draft">
-    <button class="btn">Add</button>
+    <button class="btn btn-primary">Add</button>
   </form>
 </div>
-
-<style>
-  .tasks { list-style: disc inside; }
-</style>
 ```
 
 - `add_task`: Add a task to the demo list

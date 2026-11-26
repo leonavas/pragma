@@ -1,14 +1,16 @@
 <script>
-  let tickets = 1
+  let shots = 1
 
-  const total = () => tickets * 12
+  const caffeine = () => shots * 75
 
-  function add() {
-    if (total() < 48) tickets += 1
+  function pour() {
+    if (caffeine() < 450) shots += 1
   }
 </script>
 
-<div class="flex items-center gap-3">
-  <button class="btn" @click="add">Add ticket</button>
-  <p>{$tickets} tickets, total {$total}</p>
+<div class="flex flex-wrap items-center gap-3">
+  <button class="btn" @click="pour">Add espresso shot</button>
+  <p class="rounded-lg border border-line bg-surface px-3 py-2 font-mono text-sm tabular-nums">
+    {$shots}x · {$caffeine} mg
+  </p>
 </div>

@@ -1,32 +1,35 @@
 <script>
-  let message = ''
+  let message = '6 seats left in the escape pod.'
   let freeSeats = 6
 
-  function book(guests) {
-    if (guests < 1) return { error: 'At least 1 guest.' }
-    if (guests > freeSeats) return { error: 'Full.' }
-    freeSeats -= guests
-    return { booked: guests, freeSeats }
+  function reserve(seats) {
+    if (seats < 1) return { error: 'At least 1 passenger.' }
+    if (seats > freeSeats) {
+      return { error: 'Not enough seats. Someone rides on the roof.' }
+    }
+    freeSeats -= seats
+    return { reserved: seats, freeSeats }
   }
 
   function submit(event) {
     const form = new FormData(event.target)
-    const result = book(Number(form.get('guests')))
+    const result = reserve(Number(form.get('seats')))
     const reply = Promise.resolve(result)
     if (event.agentInvoked) event.respondWith(reply)
-    const done = 'Booked. Free seats: ' + freeSeats
+    const done = 'Reserved! Seats left: ' + freeSeats
     message = result.error ?? done
   }
 </script>
 
-<div class="grid gap-2">
-  <form class="flex gap-2" toolname="book_table"
-    tooldescription="Book a table for a number of guests"
+<div class="grid w-full max-w-xs gap-3">
+  <form class="flex gap-2" toolname="reserve_pod"
+    tooldescription="Reserve seats in the escape pod"
     toolautosubmit @submit="submit">
-    <input class="border border-line px-2" name="guests"
-      type="number" aria-label="Guests" required
-      toolparamdescription="Number of guests, 1 or more">
-    <button class="btn">Book</button>
+    <input class="w-24 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm"
+      name="seats" type="number" aria-label="Seats" required
+      placeholder="Seats"
+      toolparamdescription="Number of passengers, 1 or more">
+    <button class="btn btn-primary">Reserve</button>
   </form>
-  <p>{$message}</p>
+  <p class="font-mono text-xs text-muted">{$message}</p>
 </div>

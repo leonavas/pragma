@@ -1,7 +1,7 @@
 <script>
   import { frame } from 'pragma'
 
-  let pointerX = 0
+  let pointerX = 96
   let cancel = null
 
   function move(event, track) {
@@ -13,12 +13,15 @@
   }
 </script>
 
-<div class="h-12 w-full rounded-lg border border-line"
+<div class="relative h-14 w-full overflow-hidden rounded-xl border border-line bg-surface"
   @pointermove="move(event, el)">
-  <div class="dot size-12 rounded-full bg-primary-500"
+  <div class="orb size-10 rounded-full bg-primary-500 shadow-lg"
     :--x="$pointerX"></div>
 </div>
 
 <style>
-  .dot { translate: calc(var(--x) * 1px - 50%) 0; }
+  .orb {
+    margin-top: 0.5rem;
+    translate: calc(var(--x) * 1px - 50%) 0;
+  }
 </style>

@@ -1,9 +1,13 @@
 <script>
   import { shared } from 'pragma'
 
-  const message = () => shared.cart.count >= 3
-    ? 'Free shipping!'
-    : 'Free shipping from 3 items.'
+  const unlocked = () => shared.cart.count >= 3
+  const perk = () => (unlocked()
+    ? 'Free espresso unlocked!'
+    : 'Add 3 donuts for a free espresso.')
 </script>
 
-<p>{$message}</p>
+<p class="rounded-lg border border-line bg-surface px-4 py-2.5 text-sm"
+  .text-primary-500="$unlocked">
+  {$perk}
+</p>

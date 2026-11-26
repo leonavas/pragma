@@ -12,7 +12,7 @@
       <p><code>routes/index.html</code> is the page at <code>/</code>. <code>routes/about.html</code> is the page at <code>/about</code>. A folder adds a segment: <code>routes/blog/index.html</code> is <code>/blog</code>.</p>
       <p>A page is a piece of HTML, with no <code>&lt;html&gt;</code> or <code>&lt;body&gt;</code>: the app adds them. <code>&lt;title&gt;</code> names the browser tab. A plain <code>&lt;a href&gt;</code> moves between pages, without a full reload. A URL with no file gets <code>routes/_404.html</code>, with status 404.</p>
     </div>
-    <c-showcase :source="data.examples.files" caption="Click the links. The address bar shows the URL of each file.">
+    <c-showcase :source="data.examples.files" caption="Click the links: the address bar follows the file path without a reload.">
       <c-frame src="/examples/routing/demo" title="Two pages" height="sm"></c-frame>
     </c-showcase>
   </section>
@@ -23,7 +23,7 @@
       <p><code>routes/_layout.html</code> wraps every page: the header and the footer stay, and the page goes in <code>&lt;main data-page&gt;</code>, at <code>&lt;slot&gt;</code>. It has one <code>&lt;main data-page&gt;</code> with only the slot inside.</p>
       <p>A layout has no <code>&lt;script&gt;</code>. It reads only <code>shared</code>, <code>params</code> and <code>query</code>, for example <code>{shared.cart.count}</code>. For behavior, put a component in it.</p>
     </div>
-    <c-showcase :source="data.examples.root" caption="Click Home and Shop: the header and the footer stay.">
+    <c-showcase :source="data.examples.root" caption="Click Home and Gadgets: the header and footer never remount.">
       <c-frame src="/examples/routing/demo" title="Routing demo: root layout" height="sm"></c-frame>
     </c-showcase>
   </section>
@@ -33,8 +33,8 @@
     <div class="prose">
       <p><code>routes/shop/[slug].html</code> answers every URL of the form <code>/shop/&lt;anything&gt;</code>. The page reads that part of the URL as <code>params.slug</code>.</p>
     </div>
-    <c-showcase :source="data.examples.param" caption="Click a product: one file shows both.">
-      <c-frame src="/examples/routing/demo/shop" title="Routing demo: products"></c-frame>
+    <c-showcase :source="data.examples.param" caption="Pick either gadget: one route file serves both.">
+      <c-frame src="/examples/routing/demo/shop" title="Routing demo: gadgets"></c-frame>
     </c-showcase>
   </section>
 
@@ -44,7 +44,7 @@
       <p><code>routes/shop/_layout.html</code> wraps every page in <code>routes/shop/</code> and its subfolders. The root layout wraps it in turn: root, then shop, then the page at the inner <code>&lt;slot&gt;</code>.</p>
       <p>A folder layout has no <code>&lt;head&gt;</code> and no <code>&lt;main&gt;</code>: only its markup and one <code>&lt;slot&gt;</code>. A link to the current page gets <code>aria-current="page"</code>, ready for CSS.</p>
     </div>
-    <c-showcase :source="data.examples.layout" caption="Click the shop links: both navs stay, the page changes.">
+    <c-showcase :source="data.examples.layout" caption="Click across the gadget links: both navs stay mounted while the page swaps.">
       <c-frame src="/examples/routing/demo/shop/tabs" title="Routing demo: shop layout" height="sm"></c-frame>
     </c-showcase>
   </section>
@@ -54,7 +54,7 @@
     <div class="prose">
       <p><code>import { query } from 'pragma'</code> gives the query string: <code>?tab=reviews</code> is <code>query.tab</code>. A tab in the URL survives a reload and a shared link.</p>
     </div>
-    <c-showcase :source="data.examples.tabs" caption="Switch tabs, then reload the frame.">
+    <c-showcase :source="data.examples.tabs" caption="Switch between Specs and Reviews, then reload the frame.">
       <c-frame src="/examples/routing/demo/shop/tabs?tab=reviews" title="Routing demo: query tabs" height="sm"></c-frame>
     </c-showcase>
   </section>
@@ -64,7 +64,7 @@
     <div class="prose">
       <p><code>aria-current</code> is automatic only for a link without a query. For <code>?sort=price</code>, bind <code>:aria-current</code> to a function that gives <code>'true'</code> for the current link and <code>false</code> for the others. <code>false</code> removes the attribute.</p>
     </div>
-    <c-showcase :source="data.examples.active" caption="Click Cheapest: it gets aria-current and turns bold.">
+    <c-showcase :source="data.examples.active" caption="Click Cheapest: it gets aria-current and lights up.">
       <c-frame src="/examples/routing/demo/shop/sort" title="Routing demo: current query link" height="sm"></c-frame>
     </c-showcase>
   </section>
@@ -74,7 +74,7 @@
     <div class="prose">
       <p><code>navigate(url)</code> opens a page from a script, like a click on a link. Use it after an action, for example after a save.</p>
     </div>
-    <c-showcase :source="data.examples.navigate" caption="Click Open keyboard.">
+    <c-showcase :source="data.examples.navigate" caption="Click Warp to hoverboard to navigate from JS.">
       <c-frame src="/examples/routing/demo/shop/go" title="Routing demo: navigate" height="sm"></c-frame>
     </c-showcase>
   </section>

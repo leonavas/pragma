@@ -1,24 +1,28 @@
 <script>
-  let error = ''
+  let status = ''
 
   function book(event) {
     const form = new FormData(event.target)
-    const valid = form.get('out') > form.get('in')
-    error = valid ? '' : 'Check-out is too early.'
+    const valid = form.get('returnDate') > form.get('departure')
+    status = valid
+      ? 'Time jump scheduled.'
+      : 'Return date must be after departure (no paradoxes).'
   }
 </script>
 
-<form class="grid gap-2" toolname="book_stay"
-  tooldescription="Book a stay between two dates"
+<form class="grid w-full max-w-xs gap-3" toolname="book_trip"
+  tooldescription="Book a time-travel trip between two dates"
   @submit="book">
-  <label>Check-in
-    <input name="in" type="date" required
-      class="border border-line px-2">
+  <label class="grid gap-1 text-sm">Departure
+    <input name="departure" type="date" required
+      toolparamdescription="Departure date (YYYY-MM-DD)"
+      class="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm">
   </label>
-  <label>Check-out
-    <input name="out" type="date" required
-      class="border border-line px-2">
+  <label class="grid gap-1 text-sm">Return
+    <input name="returnDate" type="date" required
+      toolparamdescription="Return date after departure (YYYY-MM-DD)"
+      class="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm">
   </label>
-  <button class="btn btn-primary">Book</button>
-  <p role="alert">{$error}</p>
+  <button class="btn btn-primary">Schedule jump</button>
+  <p class="font-mono text-xs text-muted" role="alert">{$status}</p>
 </form>

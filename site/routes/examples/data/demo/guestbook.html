@@ -1,4 +1,4 @@
-<title>Guestbook · data demo</title>
+<title>Time travelers · data demo</title>
 <meta name="robots" content="noindex">
 
 <script>
@@ -10,19 +10,23 @@
     const signing = call('sign', input)
     if (event.agentInvoked) event.respondWith(signing)
     data.entries = (await signing).entries
+    event.target.reset()
   }
 </script>
 
 <form class="flex gap-2" toolname="sign_guestbook"
-  tooldescription="Sign the guestbook with your name"
+  tooldescription="Sign the time travelers guestbook with your name"
   @submit="sign">
-  <input class="border border-line px-2" name="name"
-    aria-label="Name" required
-    toolparamdescription="Your name">
-  <button class="btn">Sign</button>
+  <input class="flex-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm"
+    name="name" aria-label="Traveler name" required
+    placeholder="Your name and year…"
+    toolparamdescription="Your name and home year">
+  <button class="btn btn-primary">Sign</button>
 </form>
-<ul>
+<ul class="grid gap-2">
   <for entry in data.entries key=entry.id>
-    <li>{entry.name}</li>
+    <li class="rounded-lg border border-line bg-surface px-3.5 py-2 text-sm">
+      {entry.name}
+    </li>
   </for>
 </ul>

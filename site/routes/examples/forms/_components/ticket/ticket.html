@@ -1,24 +1,29 @@
 <script>
-  let seats = 2
-  let pass = 'day'
-  let lunch = false
+  let slices = 3
+  let crust = 'thin'
+  let extraCheese = true
 </script>
 
-<div class="grid gap-2">
-  <label>Seats
-    <input type="number" min="1" max="9"
-      class="w-16 border border-line px-2"
-      :model="$seats">
+<div class="grid w-full max-w-xs gap-3">
+  <label class="flex items-center justify-between gap-3 text-sm">
+    <span>Slices</span>
+    <input type="number" min="1" max="8"
+      class="w-20 rounded-lg border border-line bg-surface px-2.5 py-1 text-sm"
+      :model="$slices">
   </label>
-  <fieldset class="flex gap-4">
-    <legend>Pass</legend>
-    <label><input type="radio" name="pass" value="day"
-      :model="$pass"> Day</label>
-    <label><input type="radio" name="pass" value="week"
-      :model="$pass"> Week</label>
+  <fieldset class="flex gap-4 text-sm">
+    <legend class="mb-1 text-xs uppercase tracking-wider text-muted">Crust</legend>
+    <label class="flex cursor-pointer items-center gap-1.5">
+      <input type="radio" name="crust" value="thin" :model="$crust"> Thin
+    </label>
+    <label class="flex cursor-pointer items-center gap-1.5">
+      <input type="radio" name="crust" value="stuffed" :model="$crust"> Stuffed
+    </label>
   </fieldset>
-  <label>
-    <input type="checkbox" :model="$lunch"> Lunch
+  <label class="flex cursor-pointer items-center gap-2 text-sm">
+    <input type="checkbox" :model="$extraCheese"> Extra cheese
   </label>
-  <p>{$seats} seats, {$pass} pass, lunch: {$lunch}</p>
+  <p class="rounded-lg border border-line bg-surface px-3 py-2 font-mono text-xs text-muted">
+    {$slices} slices · {$crust} · cheese: {$extraCheese}
+  </p>
 </div>

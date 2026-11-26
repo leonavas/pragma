@@ -12,7 +12,7 @@
       <p>Import <code>log</code> from <code>'pragma'</code> and call <code>debug</code>, <code>info</code>, <code>warn</code> or <code>error</code>. Keep the message fixed and put the values in attributes.</p>
       <p>The browser sends the records in batches to <code>/_otel</code> on the server.</p>
     </div>
-    <c-showcase :source="data.examples.orderButton" caption="Click, then open the network panel: a POST /_otel follows about 2 s later.">
+    <c-showcase :source="data.examples.orderButton" caption="Pour a cup, then watch the network panel: POST /_otel fires about 2 s later.">
       <p-order-button></p-order-button>
     </c-showcase>
   </section>
@@ -22,7 +22,7 @@
     <div class="prose">
       <p>The runtime logs every uncaught error as <code>ERROR</code>, with its message and stack. No log call needed.</p>
     </div>
-    <c-showcase :source="data.examples.saveButton" caption="Click, then open the console.">
+    <c-showcase :source="data.examples.saveButton" caption="Press the big red button, then check the console and /_otel.">
       <p-save-button></p-save-button>
     </c-showcase>
   </section>

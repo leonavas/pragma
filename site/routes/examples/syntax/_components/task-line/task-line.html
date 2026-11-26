@@ -2,6 +2,8 @@
   let done = false
 </script>
 
-<label .line-through="$done">
-  <input type="checkbox" :model="$done"> Write the notes
+<label class="flex cursor-pointer items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3"
+  .line-through="$done" .opacity-50="$done">
+  <input type="checkbox" :model="$done">
+  <span>Pet a capybara</span>
 </label>

@@ -1,9 +1,14 @@
 <script>
-  let name = 'Ada'
+  let alias = 'Captain Nap'
 </script>
 
-<div>
-  <input class="border border-line px-2 py-1"
-    aria-label="Name" :model="$name">
-  <p>Hello, {$name}!</p>
+<div class="grid w-full max-w-xs gap-3">
+  <input class="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+    aria-label="Villain alias" :model="$alias">
+  <div class="rounded-xl border border-line bg-surface p-3 text-center">
+    <p class="font-mono text-xs uppercase tracking-wider text-muted">
+      Hello, my alias is
+    </p>
+    <p class="mt-1 text-lg font-bold">{$alias}</p>
+  </div>
 </div>

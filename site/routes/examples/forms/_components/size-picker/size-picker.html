@@ -1,14 +1,14 @@
 <script>
-  let size = 'm'
+  let spice = 'med'
 </script>
 
-<div class="flex items-center gap-3">
-  <label for="size">Size</label>
-  <select id="size" :model="$size"
-    class="rounded border border-line px-2 py-1">
-    <option value="s">Small</option>
-    <option value="m">Medium</option>
-    <option value="l">Large</option>
+<div class="flex flex-wrap items-center gap-3">
+  <label class="text-sm" for="spice">Spice level</label>
+  <select id="spice" :model="$spice"
+    class="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm">
+    <option value="mild">Mild</option>
+    <option value="med">Medium</option>
+    <option value="hot">Volcano</option>
   </select>
-  <p>Value: {$size}</p>
+  <p class="font-mono text-xs text-muted">Code: {$spice}</p>
 </div>

@@ -9,9 +9,9 @@
   <section class="doc-section" aria-labelledby="actions">
     <h2 id="actions">Change state in place</h2>
     <div class="prose">
-      <p>State is tracked deeply: <code>items.push(…)</code> updates the list on the page. There is no need to copy the array.</p>
+      <p>State is tracked deeply: <code>toppings.push(…)</code> updates the list on the page. There is no need to copy the array.</p>
     </div>
-    <c-showcase :source="data.examples.shoppingList" caption="Click Add eggs.">
+    <c-showcase :source="data.examples.shoppingList" caption="Click Add topping to pile on more pizza toppings.">
       <p-shopping-list></p-shopping-list>
     </c-showcase>
   </section>
@@ -19,9 +19,9 @@
   <section class="doc-section" aria-labelledby="derived">
     <h2 id="derived">Derived values</h2>
     <div class="prose">
-      <p>A value computed from state is a function: <code>const total = () =&gt; tickets * 12</code>. The markup reads it as <code>{$total}</code>, with no call, and it follows each change. In the script, call it: <code>total()</code>.</p>
+      <p>A value computed from state is a function: <code>const caffeine = () =&gt; shots * 75</code>. The markup reads it as <code>{$caffeine}</code>, with no call, and it follows each change. In the script, call it: <code>caffeine()</code>.</p>
     </div>
-    <c-showcase :source="data.examples.ticketTotal" caption="Click Add ticket: the total follows. It stops at 48.">
+    <c-showcase :source="data.examples.ticketTotal" caption="Pour shots: the caffeine total follows and cuts you off at 450 mg.">
       <p-ticket-total></p-ticket-total>
     </c-showcase>
   </section>
@@ -31,7 +31,7 @@
     <div class="prose">
       <p>An <code>async</code> function updates the page before each <code>await</code> and again after it.</p>
     </div>
-    <c-showcase :source="data.examples.saveButton" caption="Click Save.">
+    <c-showcase :source="data.examples.saveButton" caption="Click Brew: the status updates before and after the pause.">
       <p-save-button></p-save-button>
     </c-showcase>
   </section>
@@ -51,7 +51,7 @@
     <div class="prose">
       <p><code>import { frame } from 'pragma'</code> gets a service of the runtime. <code>frame(step)</code> runs <code>step</code> in the next animation frame. To animate, <code>step</code> asks for the next frame until it is done.</p>
     </div>
-    <c-showcase :source="data.examples.uploadBar" caption="Click Upload.">
+    <c-showcase :source="data.examples.uploadBar" caption="Click Charge to power up the hyperdrive.">
       <p-upload-bar></p-upload-bar>
     </c-showcase>
   </section>
@@ -59,9 +59,9 @@
   <section class="doc-section" aria-labelledby="wrapped">
     <h2 id="wrapped">Wrapped handlers</h2>
     <div class="prose">
-      <p>A <code>const</code> that holds a function is a handler too. So a function made by <code>debounce</code>, from the npm package <code>es-toolkit</code>, works in <code>@input="saveLater"</code>.</p>
+      <p>A <code>const</code> that holds a function is a handler too. So a function made by <code>debounce</code>, from the npm package <code>es-toolkit</code>, works in <code>@input="lockLater"</code>.</p>
     </div>
-    <c-showcase :source="data.examples.draftAutosave" caption="Type, then stop: Saved follows 500 ms after the last key.">
+    <c-showcase :source="data.examples.draftAutosave" caption="Type a secret, then pause: Vaulted updates 500 ms after the last key.">
       <p-draft-autosave></p-draft-autosave>
     </c-showcase>
   </section>

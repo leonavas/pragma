@@ -1,17 +1,19 @@
 <script>
   import { debounce } from 'es-toolkit/function'
 
-  let draft = ''
-  let saved = ''
+  let secret = ''
+  let vaulted = ''
 
-  const saveLater = debounce(() => {
-    saved = draft
+  const lockLater = debounce(() => {
+    vaulted = secret
   }, 500)
 </script>
 
-<div>
-  <input class="border border-line px-2 py-1"
-    aria-label="Draft" :model="$draft"
-    @input="saveLater">
-  <p>Saved: {$saved}</p>
+<div class="grid w-full max-w-xs gap-3">
+  <input class="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+    aria-label="Top secret note" placeholder="Type a secret…"
+    :model="$secret" @input="lockLater">
+  <p class="rounded-lg border border-line bg-surface px-3 py-2 font-mono text-xs text-muted">
+    Vaulted: {$vaulted}
+  </p>
 </div>

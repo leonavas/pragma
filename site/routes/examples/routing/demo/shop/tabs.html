@@ -1,4 +1,4 @@
-<title>Tabs</title>
+<title>Specs</title>
 <meta name="robots" content="noindex">
 
 <script>
@@ -7,11 +7,17 @@
   const reviews = () => query.tab === 'reviews'
 </script>
 
-<a class="underline" href="?tab=specs">Specs</a>
-<a class="underline" href="?tab=reviews">Reviews</a>
+<div class="flex gap-4 text-sm">
+  <a class="underline" href="?tab=specs">Specs</a>
+  <a class="underline" href="?tab=reviews">Reviews</a>
+</div>
 <if $reviews>
-  <p>4.8 out of 5.</p>
+  <p class="rounded-lg border border-line bg-surface p-3 text-sm">
+    4.9 out of 5 — my dog refuses to get off it.
+  </p>
 </if>
 <else>
-  <p>87 keys, USB-C.</p>
+  <p class="rounded-lg border border-line bg-surface p-3 text-sm">
+    Zero gravity, USB-C, 3-hour hover battery.
+  </p>
 </else>

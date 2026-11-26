@@ -1,0 +1,13 @@
+<script>
+  export let name = ''
+  export let rare = false
+</script>
+
+<p class="flex items-center justify-between gap-6 rounded-lg border border-line bg-surface px-3.5 py-2 text-sm">
+  <span>{$name}</span>
+  <if $rare>
+    <span class="rounded-full bg-primary-500/20 px-2 py-0.5 font-mono text-xs font-semibold text-primary-500">
+      RARE
+    </span>
+  </if>
+</p>

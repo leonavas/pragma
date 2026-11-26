@@ -1,6 +1,6 @@
 export const ssr = true
 
-const entries = [{ id: 1, name: 'Ada' }]
+const entries = [{ id: 1, name: 'Marty (1985)' }]
 
 export async function load() {
   return { entries }

@@ -1,16 +1,22 @@
-<title>Catalog · data demo</title>
+<title>Potion menu · data demo</title>
 <meta name="robots" content="noindex">
 
 <if page.loading>
-  <p class="skeleton h-12"></p>
+  <div class="grid gap-2">
+    <p class="skeleton h-10 rounded-lg"></p>
+    <p class="skeleton h-10 rounded-lg"></p>
+  </div>
 </if>
 <else-if page.error>
-  <p role="alert">{page.error.message}</p>
+  <p class="rounded-lg border border-danger-500/40 bg-danger-500/10 px-4 py-3 text-sm text-danger-500"
+    role="alert">{page.error.message}</p>
 </else-if>
 <else>
-  <ul>
-    <for product in data.products key=product.id>
-      <li>{product.name}</li>
+  <ul class="grid gap-2">
+    <for potion in data.potions key=potion.id>
+      <li class="rounded-lg border border-line bg-surface px-4 py-2.5 text-sm">
+        {potion.name}
+      </li>
     </for>
   </ul>
 </else>

@@ -12,7 +12,7 @@
       <p><code>toolname</code> and <code>tooldescription</code> on a <code>&lt;form&gt;</code> make it a tool. Each field with a <code>name</code> is a parameter, and <code>toolparamdescription</code> tells the agent what to type.</p>
       <p><code>toolautosubmit</code> lets the agent submit without a click. Use it only on safe forms, such as add or search. The handler reads the fields with <code>FormData</code>.</p>
     </div>
-    <c-showcase :source="data.examples.tool" caption="Add a task. A browser with WebMCP also shows add_task to its agent.">
+    <c-showcase :source="data.examples.tool" caption="Pack something for Mars. A browser with WebMCP also exposes pack_item to its agent.">
       <p-add-task></p-add-task>
     </c-showcase>
   </section>
@@ -23,7 +23,7 @@
       <p><code>event.agentInvoked</code> is true when an agent submits. <code>event.respondWith(promise)</code> gives the agent the result as JSON. Call it before any <code>await</code>.</p>
       <p>Reply with errors too, so the agent can try again. A reply can also come from a server action: see the <a href="/examples/data#actions">guestbook</a>.</p>
     </div>
-    <c-showcase :source="data.examples.reply" caption="Book 4 guests, then 4 again: the second reply is an error.">
+    <c-showcase :source="data.examples.reply" caption="Reserve 4 seats, then 4 again: the second attempt replies with an error.">
       <p-book-table></p-book-table>
     </c-showcase>
   </section>
@@ -33,7 +33,7 @@
     <div class="prose">
       <p><code>:tool-form-active</code> matches the form while an agent fills it, and <code>:tool-submit-active</code> matches its submit button. The starter styles both; this component sets its own style.</p>
     </div>
-    <c-showcase :source="data.examples.css" caption="Without an agent the form looks normal. When an agent calls find_note, the outline shows.">
+    <c-showcase :source="data.examples.css" caption="Normal for humans. When an agent calls find_recipe, the dashed outline lights up.">
       <p-find-note></p-find-note>
     </c-showcase>
   </section>
@@ -43,7 +43,7 @@
     <div class="prose">
       <p>A form without <code>toolname</code> gets a warning. Add <code>notool</code> to keep a form away from agents: sign in, password, payment. The build removes the attribute.</p>
     </div>
-    <c-showcase :source="data.examples.notool" caption="A normal form. Agents do not see it as a tool.">
+    <c-showcase :source="data.examples.notool" caption="A normal login form. Agents cannot see it as a tool.">
       <p-sign-in></p-sign-in>
     </c-showcase>
   </section>

@@ -11,8 +11,8 @@
     <div class="prose">
       <p><code>lib/state/cart.js</code> is the store <code>cart</code>: its <code>let</code> is state and its function is an action. Any component reads it as <code>{shared.cart.count}</code> and calls it with <code>@click="shared.cart.add()"</code>. The two components here have no script.</p>
     </div>
-    <c-showcase :source="data.examples.cart" caption="Click Add to cart: the other component follows.">
-      <div class="grid w-full max-w-xs gap-4">
+    <c-showcase :source="data.examples.cart" caption="Click Add donut: the box counter updates without a shared parent.">
+      <div class="grid w-full max-w-xs gap-3">
         <p-add-button></p-add-button>
         <p-cart-badge></p-cart-badge>
       </div>
@@ -27,7 +27,7 @@
     <div class="prose">
       <p>In a script, <code>import { shared } from 'pragma'</code> gives the stores. Read the store like any value.</p>
     </div>
-    <c-showcase :source="data.examples.shipping" caption="Add items in the cart above: the message follows.">
+    <c-showcase :source="data.examples.shipping" caption="Add 3 donuts above to unlock the free espresso.">
       <p-shipping></p-shipping>
     </c-showcase>
   </section>
@@ -37,7 +37,7 @@
     <div class="prose">
       <p><code>export const persist = ['draft']</code> keeps <code>draft</code> in the browser storage, so it survives a reload. A second page, <code>routes/notes.html</code>, shows the same draft.</p>
     </div>
-    <c-showcase :source="data.examples.notes" caption="Type, then reload the page.">
+    <c-showcase :source="data.examples.notes" caption="Write a note, reload the page, and watch it stick in both views.">
       <div class="grid w-full gap-4">
         <p-note-pad></p-note-pad>
         <c-frame src="/examples/stores/demo/notes" title="Second page reading the same store" height="sm"></c-frame>

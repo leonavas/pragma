@@ -1,5 +1,7 @@
-<section class="border border-line p-4">
-  <h3>{$heading}</h3>
-  <slot><p>Nothing here yet.</p></slot>
+<section class="grid gap-2 rounded-xl border border-line bg-surface p-4">
+  <h3 class="font-mono text-xs uppercase tracking-wider text-muted">
+    {$heading}
+  </h3>
+  <slot><p class="text-sm text-muted">Classified. Nothing to report yet.</p></slot>
   <slot name="actions"></slot>
 </section>

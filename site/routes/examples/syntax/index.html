@@ -7,40 +7,40 @@
 
 <c-doc heading="Syntax" lede="A page can have a script. Its values go into the HTML with braces, its functions run on events, and a few tags add conditions and lists.">
   <section class="doc-section" aria-labelledby="text">
-    <h2 id="text">Script and text: <code>{$name}</code></h2>
+    <h2 id="text">Script and text: <code>{$ship}</code></h2>
     <div class="prose">
       <p>Each example on this page is <code>routes/index.html</code>, the home page of a new app. A <code>&lt;script&gt;</code> at the top of the page holds its values. A top-level <code>let</code> is state: a value that can change.</p>
-      <p><code>{$name}</code> puts the value of <code>name</code> in the text. The <code>$</code> says that the name comes from the script. Braces work in attribute strings too: <code>title="Hi {$name}"</code>.</p>
+      <p><code>{$ship}</code> puts the value of <code>ship</code> in the text. The <code>$</code> says that the name comes from the script. Braces work in attribute strings too: <code>title="Boarding {$ship}"</code>.</p>
     </div>
-    <c-showcase :source="data.examples.greeting" caption="The paragraph shows the value of name.">
+    <c-showcase :source="data.examples.greeting" caption="The boarding pass reads the value of ship straight from the script.">
       <p-greeting></p-greeting>
     </c-showcase>
   </section>
   <section class="doc-section" aria-labelledby="events">
     <h2 id="events">Events: <code>@click</code></h2>
     <div class="prose">
-      <p><code>@click="add(1)"</code> calls the function <code>add</code> of the script with the argument <code>1</code>. The function assigns <code>score</code>, and the page shows the new value. No other step is necessary.</p>
-      <p>Without parentheses, <code>@click="add"</code> gives the function the DOM event. Any DOM event works: <code>@input</code>, <code>@keydown</code>, <code>@submit</code>.</p>
+      <p><code>@click="hit(100)"</code> calls the function <code>hit</code> of the script with the argument <code>100</code>. The function assigns <code>score</code>, and the page shows the new value. No other step is necessary.</p>
+      <p>Without parentheses, <code>@click="hit"</code> gives the function the DOM event. Any DOM event works: <code>@input</code>, <code>@keydown</code>, <code>@submit</code>.</p>
     </div>
-    <c-showcase :source="data.examples.score" caption="Click the buttons.">
+    <c-showcase :source="data.examples.score" caption="Hit the bumper or the ramp to rack up points.">
       <p-score></p-score>
     </c-showcase>
   </section>
   <section class="doc-section" aria-labelledby="model">
     <h2 id="model">Two-way binding: <code>:model</code></h2>
     <div class="prose">
-      <p><code>:model="$name"</code> keeps the field and <code>name</code> equal: typing changes <code>name</code>, and a new <code>name</code> changes the field. A checkbox gives a boolean, a number field a number.</p>
+      <p><code>:model="$alias"</code> keeps the field and <code>alias</code> equal: typing changes <code>alias</code>, and a new <code>alias</code> changes the field. A checkbox gives a boolean, a number field a number.</p>
     </div>
-    <c-showcase :source="data.examples.nameField" caption="Type in the field.">
+    <c-showcase :source="data.examples.nameField" caption="Pick a villain alias: the sticker updates on every keystroke.">
       <p-name-field></p-name-field>
     </c-showcase>
   </section>
   <section class="doc-section" aria-labelledby="values">
     <h2 id="values">Logic goes in a function</h2>
     <div class="prose">
-      <p>The HTML takes names, not code: <code>{$name.toUpperCase()}</code> is an error. Write a function in the script and use its name: <code>{$loudName}</code> calls <code>loudName()</code> on each render, so it always follows <code>name</code>.</p>
+      <p>The HTML takes names, not code: <code>{$phrase.toUpperCase()}</code> is an error. Write a function in the script and use its name: <code>{$battleCry}</code> calls <code>battleCry()</code> on each render, so it always follows <code>phrase</code>.</p>
     </div>
-    <c-showcase :source="data.examples.loudName" caption="Type in the field: the function runs again.">
+    <c-showcase :source="data.examples.loudName" caption="Type a whisper: the battle cry updates live.">
       <p-loud-name></p-loud-name>
     </c-showcase>
   </section>
@@ -49,43 +49,43 @@
     <div class="prose">
       <p><code>:disabled="$locked"</code> sets the attribute from a value. <code>true</code> adds it and <code>false</code> removes it. This works for any attribute: <code>:href</code>, <code>:title</code>, <code>:aria-expanded</code>.</p>
     </div>
-    <c-showcase :source="data.examples.deployButton" caption="Clear Locked: the button is no longer disabled.">
+    <c-showcase :source="data.examples.deployButton" caption="Flip off the safety lock, then launch the rocket.">
       <p-deploy-button></p-deploy-button>
     </c-showcase>
   </section>
   <section class="doc-section" aria-labelledby="classes">
     <h2 id="classes">Class toggles: <code>.class</code></h2>
     <div class="prose">
-      <p><code>.line-through="$done"</code> adds the class <code>line-through</code> while <code>done</code> is true, and removes it when it is false.</p>
+      <p><code>.line-through="$done"</code> adds the class <code>line-through</code> while <code>done</code> is true, and removes it when it is false. Stack as many toggles as you need.</p>
     </div>
-    <c-showcase :source="data.examples.taskLine" caption="Check the task.">
+    <c-showcase :source="data.examples.taskLine" caption="Cross an item off the bucket list.">
       <p-task-line></p-task-line>
     </c-showcase>
   </section>
   <section class="doc-section" aria-labelledby="show-if">
     <h2 id="show-if"><code>:show</code> hides, <code>&lt;if&gt;</code> creates</h2>
     <div class="prose">
-      <p><code>:show</code> hides the element and keeps it in the page. <code>&lt;if $open&gt;</code> adds its content when <code>open</code> is true and removes it when it is false.</p>
+      <p><code>:show</code> hides the element and keeps it in the page. <code>&lt;if $lit&gt;</code> adds its content when <code>lit</code> is true and removes it when it is false.</p>
     </div>
-    <c-showcase :source="data.examples.noteToggle" caption="Check Open, then inspect the DOM.">
+    <c-showcase :source="data.examples.noteToggle" caption="Flip the flashlight on and off, then inspect the DOM.">
       <p-note-toggle></p-note-toggle>
     </c-showcase>
   </section>
   <section class="doc-section" aria-labelledby="conditions">
     <h2 id="conditions">Conditions: <code>&lt;else-if&gt;</code> and <code>&lt;else&gt;</code></h2>
     <div class="prose">
-      <p>After <code>&lt;if&gt;</code>, add <code>&lt;else-if&gt;</code> and <code>&lt;else&gt;</code>. One branch shows at a time. Each condition is a name: <code>loading</code> and <code>failed</code> are functions.</p>
+      <p>After <code>&lt;if&gt;</code>, add <code>&lt;else-if&gt;</code> and <code>&lt;else&gt;</code>. One branch shows at a time. Each condition is a name: <code>purring</code> and <code>hungry</code> are functions.</p>
     </div>
-    <c-showcase :source="data.examples.orderStatus" caption="Pick a status.">
+    <c-showcase :source="data.examples.orderStatus" caption="Switch the cat's mood to translate it.">
       <p-order-status></p-order-status>
     </c-showcase>
   </section>
   <section class="doc-section" aria-labelledby="lists">
     <h2 id="lists">Lists: <code>&lt;for&gt;</code> and <code>&lt;empty&gt;</code></h2>
     <div class="prose">
-      <p><code>&lt;for task in $tasks key=task.id&gt;</code> repeats its element for each task. The <code>key</code> must be unique for each item. <code>@click="remove(task)"</code> gives the function the task of that row. <code>&lt;empty&gt;</code> shows when the list is empty.</p>
+      <p><code>&lt;for slice in $slices key=slice.id&gt;</code> repeats its element for each slice. The <code>key</code> must be unique for each item. <code>@click="eat(slice)"</code> gives the function the slice of that row. <code>&lt;empty&gt;</code> shows when the list is empty.</p>
     </div>
-    <c-showcase :source="data.examples.taskList" caption="Click Done on both tasks: the empty branch shows.">
+    <c-showcase :source="data.examples.taskList" caption="Eat every slice to reveal the empty branch.">
       <p-task-list></p-task-list>
     </c-showcase>
   </section>

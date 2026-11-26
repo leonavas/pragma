@@ -1,14 +1,19 @@
 <script>
-  let status = 'Not saved'
+  let status = 'Ready to brew.'
+  let brewing = false
 
-  async function save() {
-    status = 'Saving…'
+  async function brew() {
+    brewing = true
+    status = 'Grinding beans…'
     await new Promise(done => setTimeout(done, 800))
-    status = 'Saved'
+    status = 'Hot espresso ready.'
+    brewing = false
   }
 </script>
 
-<div>
-  <button class="btn" @click="save">Save</button>
-  <p>{$status}</p>
+<div class="flex flex-wrap items-center gap-3">
+  <button class="btn btn-primary" :disabled="$brewing" @click="brew">
+    Brew
+  </button>
+  <p class="font-mono text-sm text-muted">{$status}</p>
 </div>

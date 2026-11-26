@@ -1,17 +1,17 @@
 <script>
   import { log } from 'pragma'
 
-  let orders = 0
+  let cups = 0
 
-  function placeOrder() {
-    orders += 1
-    log.info('order placed', {
-      'order.count': orders,
+  function pourCoffee() {
+    cups += 1
+    log.info('coffee poured', {
+      'coffee.cups': cups,
     })
   }
 </script>
 
-<div>
-  <button class="btn" @click="placeOrder">Order</button>
-  <p>Orders placed: {$orders}</p>
+<div class="flex flex-wrap items-center gap-3">
+  <button class="btn btn-primary" @click="pourCoffee">Pour coffee</button>
+  <p class="font-mono text-sm text-muted">Cups logged: {$cups}</p>
 </div>

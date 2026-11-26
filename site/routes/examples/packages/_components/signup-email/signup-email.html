@@ -3,13 +3,18 @@
 
   const emailSchema = pipe(string(), email())
 
-  let address = 'ada@example'
+  let address = 'hero@mars'
 
   const valid = () => is(emailSchema, address)
+  const verdict = () => (valid()
+    ? 'VIP pass granted.'
+    : 'Finish the domain (e.g. .com).')
 </script>
 
-<div>
-  <input class="border border-line px-2 py-1"
-    aria-label="Email" :model="$address">
-  <p>Valid: {$valid}</p>
+<div class="grid w-full max-w-xs gap-3">
+  <input class="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+    aria-label="VIP email" :model="$address">
+  <p class="font-mono text-xs text-muted" .text-primary-500="$valid">
+    {$verdict}
+  </p>
 </div>

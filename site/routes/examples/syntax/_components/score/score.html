@@ -1,13 +1,15 @@
 <script>
   let score = 0
 
-  function add(points) {
+  function hit(points) {
     score += points
   }
 </script>
 
-<div>
-  <button class="btn" @click="add(1)">+1</button>
-  <button class="btn" @click="add(10)">+10</button>
-  <p>Score: {$score}</p>
+<div class="grid justify-items-center gap-3">
+  <p class="font-mono text-3xl font-bold tabular-nums">{$score} pts</p>
+  <div class="flex gap-2">
+    <button class="btn" @click="hit(100)">Bumper +100</button>
+    <button class="btn btn-primary" @click="hit(500)">Ramp +500</button>
+  </div>
 </div>

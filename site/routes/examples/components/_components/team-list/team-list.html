@@ -1,12 +1,13 @@
 <script>
-  const people = [
-    { id: 1, name: 'Ada', role: 'Engineer' },
-    { id: 2, name: 'Linus', role: 'Designer' },
+  const crew = [
+    { id: 1, name: 'Nova', role: 'Pilot' },
+    { id: 2, name: 'Pixel', role: 'Hacker' },
+    { id: 3, name: 'Biscuit', role: 'Morale (dog)' },
   ]
 </script>
 
-<ul>
-  <for person in $people key=person.id>
-    <p-person-row :person="person"></p-person-row>
+<ul class="grid w-full max-w-xs gap-2">
+  <for member in $crew key=member.id>
+    <p-person-row :member="member"></p-person-row>
   </for>
 </ul>

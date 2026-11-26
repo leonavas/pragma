@@ -1,7 +1,9 @@
-<form class="grid max-w-xs gap-2" notool>
-  <input class="border border-line px-2" name="email"
-    aria-label="Email" type="email" required>
-  <input class="border border-line px-2" name="password"
-    aria-label="Password" type="password" required>
-  <button class="btn btn-primary">Sign in</button>
+<form class="grid w-full max-w-xs gap-2.5 rounded-xl border border-line bg-surface p-4" notool>
+  <input class="rounded-lg border border-line px-3 py-2 text-sm"
+    name="email" aria-label="Agent email" type="email"
+    placeholder="agent@lair.io" required>
+  <input class="rounded-lg border border-line px-3 py-2 text-sm"
+    name="password" aria-label="Vault passphrase" type="password"
+    placeholder="Passphrase" required>
+  <button class="btn btn-primary w-full">Unlock vault</button>
 </form>

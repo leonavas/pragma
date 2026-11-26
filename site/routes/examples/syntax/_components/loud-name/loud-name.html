@@ -1,11 +1,13 @@
 <script>
-  let name = 'Ada'
+  let phrase = 'ship it'
 
-  const loudName = () => name.toUpperCase()
+  const battleCry = () => phrase.toUpperCase() + '!!!'
 </script>
 
-<div>
-  <input class="border border-line px-2 py-1"
-    aria-label="Name" :model="$name">
-  <p>{$loudName}</p>
+<div class="grid w-full max-w-xs gap-3">
+  <input class="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+    aria-label="Whisper" :model="$phrase">
+  <p class="rounded-lg border border-line bg-surface px-4 py-3 text-center font-mono text-lg font-bold tracking-wide">
+    {$battleCry}
+  </p>
 </div>

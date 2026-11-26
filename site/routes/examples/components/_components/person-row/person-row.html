@@ -1,5 +1,8 @@
 <script>
-  export let person = null
+  export let member = null
 </script>
 
-<li>{$person.name}, {$person.role}</li>
+<li class="flex items-center justify-between gap-6 rounded-lg border border-line bg-surface px-3.5 py-2 text-sm">
+  <strong>{$member.name}</strong>
+  <span class="text-muted">{$member.role}</span>
+</li>

@@ -1,13 +1,18 @@
 <script>
-  let open = false
+  let lit = false
 </script>
 
-<div>
-  <label>
-    <input type="checkbox" :model="$open"> Open
+<div class="grid w-full max-w-xs gap-2">
+  <label class="flex cursor-pointer items-center gap-2 text-sm">
+    <input type="checkbox" :model="$lit"> Turn on flashlight
   </label>
-  <p :show="$open">I am hidden, but in the DOM.</p>
-  <if $open>
-    <p>I am added and removed.</p>
+  <p class="rounded-lg border border-line bg-surface px-3 py-2 text-sm"
+    :show="$lit">
+    Ninja (hidden, still in the DOM)
+  </p>
+  <if $lit>
+    <p class="rounded-lg border border-line bg-surface px-3 py-2 text-sm">
+      Ghost (summoned and removed)
+    </p>
   </if>
 </div>

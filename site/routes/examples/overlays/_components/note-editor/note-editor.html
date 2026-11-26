@@ -8,16 +8,21 @@
 </script>
 
 <div>
-  <button class="btn" @open="editor">Edit note</button>
-  <c-modal id="editor" title="Edit note">
+  <button class="btn" @open="editor">Write risky email</button>
+  <c-modal id="editor" title="Reply All to CEO">
+    <p class="text-sm text-muted">
+      Dear everyone, I am renaming the main branch to vibes…
+    </p>
     <button slot="actions" class="btn" @click="discard">
-      Discard
+      Trash draft
     </button>
   </c-modal>
-  <c-alert id="discard" title="Discard the note?">
-    <button slot="actions" class="btn" @close
-      value="cancel">Keep</button>
-    <button slot="actions" class="btn btn-danger" @close
-      value="ok">Discard</button>
+  <c-alert id="discard" title="Burn this draft forever?">
+    <button slot="actions" class="btn" @close value="cancel">
+      Keep it
+    </button>
+    <button slot="actions" class="btn btn-danger" @close value="ok">
+      Burn it
+    </button>
   </c-alert>
 </div>
